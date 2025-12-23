@@ -1,0 +1,436 @@
+"use client";
+
+import { ColumnDef } from "@tanstack/react-table";
+import { MoreHorizontal, ArrowUpDown, Edit, Trash2, Eye, XCircle } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import type { IJournal } from "@/models/Journal";
+import { useState } from "react";
+import { formatCurrency } from "@/utils/formatters/currency";
+import { formatDisplayDate, formatTime } from "@/utils/formatters/date";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+
+// ✅ Export the interface
+export type { IJournal } from "@/models/Journal";
+
+// Copy to clipboard function
+const copyToClipboard = (text: string) => {
+  navigator.clipboard.writeText(text).then(() => {
+    toast.success(`Copied: ${text}`);
+  }).catch(() => {
+    toast.error("Failed to copy");
+  });
+};
+
+const getStatusVariant = (status: string) => {
+  switch (status) {
+    case 'posted': return 'success';
+    case 'draft': return 'warning';
+    case 'void': return 'destructive';
+    default: return 'secondary';
+  }
+};
+
+const getReferenceTypeVariant = (type: string) => {
+  switch (type) {
+    case 'Invoice': return 'primary';
+    case 'Receipt': return 'success';
+    case 'Payment': return 'destructive';
+    case 'Purchase': return 'warning';
+    case 'Expense': return 'info';
+    case 'Refund': return 'pink';
+    case 'Manual': return 'secondary';
+    default: return 'secondary';
+  }
+};
+
+// Delete Journal Dialog
+const DeleteJournalDialog = ({
+  journal,
+  onDelete,
+  trigger
+}: {
+  journal: IJournal;
+  onDelete: (journal: IJournal) => void;
+  trigger: React.ReactNode;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <div onClick={() => setIsOpen(true)}>{trigger}</div>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Journal Entry</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete journal entry <strong>{journal.journalNumber}</strong>?
+            <br /><br />
+            {journal.status === 'posted' && (
+              <span className="text-destructive font-medium">
+                ⚠️ Posted entries cannot be deleted. Please void them instead.
+              </span>
+            )}
+            {journal.status !== 'posted' && (
+              <>This will move the entry to trash. You can restore it later if needed.</>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          {journal.status !== 'posted' && (
+            <AlertDialogAction
+              onClick={() => {
+                onDelete(journal);
+                setIsOpen(false);
+              }}
+              className={cn(buttonVariants({ variant: "destructive" }))}
+            >
+              Delete
+            </AlertDialogAction>
+          )}
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
+// Void Journal Dialog
+const VoidJournalDialog = ({
+  journal,
+  onVoid,
+  trigger
+}: {
+  journal: IJournal;
+  onVoid: (journal: IJournal) => void;
+  trigger: React.ReactNode;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <div onClick={() => setIsOpen(true)}>{trigger}</div>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Void Journal Entry</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to void journal entry <strong>{journal.journalNumber}</strong>?
+            <br /><br />
+            <span className="text-orange-600 font-medium">
+              ⚠️ Voiding will mark this entry as cancelled but keep it in the records for audit purposes.
+            </span>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              onVoid(journal);
+              setIsOpen(false);
+            }}
+            className={cn(buttonVariants({ variant: "destructive" }))}
+          >
+            Void Entry
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
+interface JournalPermissions {
+  canUpdate: boolean;
+  canDelete: boolean;
+  canVoid: boolean;
+}
+
+export const getJournalColumns = (
+  onView: (journal: IJournal) => void,
+  onEdit: (journal: IJournal) => void,
+  onDelete: (journal: IJournal) => void,
+  onVoid: (journal: IJournal) => void,
+  permissions: JournalPermissions
+): ColumnDef<IJournal>[] => [
+    {
+      accessorKey: "entryDate",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-8 px-2"
+        >
+          Date
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <div className="text-left font-medium min-w-[100px]">
+          <div>{formatDisplayDate(row.original.entryDate)}</div>
+          <div className="text-xs text-muted-foreground">
+            {formatTime(row.original.entryDate)}
+          </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "journalNumber",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-8 px-2"
+        >
+          Journal #
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <Badge
+          variant="secondary"
+          appearance="outline"
+          className="font-mono cursor-pointer hover:opacity-70 transition-opacity"
+          onClick={() => copyToClipboard(row.original.journalNumber)}
+        >
+          {row.original.journalNumber}
+        </Badge>
+      ),
+      meta: {
+        label: "Journal #",
+        placeholder: "Search journal no...",
+        variant: "text",
+      },
+      enableColumnFilter: true,
+    },
+    {
+      accessorKey: "referenceNumber",
+      header: "Reference",
+      cell: ({ row }) => {
+        const refNumber = row.original.referenceNumber;
+        const refType = row.original.referenceType;
+
+        if (!refNumber) {
+          return <span className="text-sm text-muted-foreground">—</span>;
+        }
+
+        return (
+          <Badge
+            variant={getReferenceTypeVariant(refType) as any}
+            appearance="outline"
+            className="font-mono cursor-pointer hover:opacity-70 transition-opacity"
+            onClick={() => copyToClipboard(refNumber)}
+          >
+            {refNumber}
+          </Badge>
+        );
+      },
+      meta: {
+        label: "Reference",
+        placeholder: "Search reference...",
+        variant: "text",
+      },
+      enableColumnFilter: true,
+    },
+    {
+      id: "partyReference",
+      header: "Party",
+      cell: ({ row }) => {
+        const partyType = row.original.partyType;
+        const partyName = row.original.partyName;
+
+        if (!partyType || !partyName) {
+          return <span className="text-xs text-muted-foreground">—</span>;
+        }
+
+        // Determine badge variant based on party type
+        const getPartyVariant = (type: string) => {
+          switch (type) {
+            case 'Customer': return 'success';
+            case 'Supplier': return 'warning';
+            case 'Payee': return 'cyan';
+            case 'Vendor': return 'secondary';
+            default: return 'secondary';
+          }
+        };
+
+        return (
+          <div className="min-w-[120px]">
+            <Badge
+              variant={getPartyVariant(partyType) as any}
+              appearance="outline"
+              className="text-xs"
+            >
+              {partyName}
+            </Badge>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "narration",
+      header: "Narration",
+      cell: ({ row }) => (
+        <div className="max-w-[250px]">
+          <div className="text-sm font-medium line-clamp-1">
+            {row.original.narration}
+          </div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            {row.original.entries.length} entries
+          </div>
+        </div>
+      ),
+      meta: {
+        label: "Narration",
+        placeholder: "Search narration...",
+        variant: "text",
+      },
+      enableColumnFilter: true,
+    },
+    {
+      accessorKey: "totalDebit",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-8 px-2 justify-end w-full"
+        >
+          Debit
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right text-green-600 min-w-[100px] font-medium">
+          {formatCurrency(row.original.totalDebit)}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "totalCredit",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-8 px-2 justify-end w-full"
+        >
+          Credit
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right text-red-600 min-w-[100px] font-medium">
+          {formatCurrency(row.original.totalCredit)}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => (
+        <Badge
+          variant={getStatusVariant(row.original.status) as any}
+          appearance="outline"
+          className="capitalize"
+        >
+          {row.original.status}
+        </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const journal = row.original;
+        const { canUpdate, canDelete, canVoid: hasVoidPermission } = permissions;
+
+        const canEdit = journal.status === 'draft' && canUpdate;
+        const canVoid = journal.status === 'posted' && hasVoidPermission;
+        const canDeleteAction = journal.status !== 'posted' && canDelete;
+
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+
+              <DropdownMenuItem
+                onClick={() => onView(journal)}
+                className="cursor-pointer"
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                View Details
+              </DropdownMenuItem>
+
+              {canEdit && (
+                <DropdownMenuItem
+                  onClick={() => onEdit(journal)}
+                  className="cursor-pointer"
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+              )}
+
+              {canVoid && (
+                <>
+                  <DropdownMenuSeparator />
+                  <VoidJournalDialog
+                    journal={journal}
+                    onVoid={onVoid}
+                    trigger={
+                      <DropdownMenuItem
+                        className="text-orange-600 cursor-pointer"
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Void Entry
+                      </DropdownMenuItem>
+                    }
+                  />
+                </>
+              )}
+
+              {canDeleteAction && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DeleteJournalDialog
+                    journal={journal}
+                    onDelete={onDelete}
+                    trigger={
+                      <DropdownMenuItem
+                        className="text-destructive cursor-pointer"
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    }
+                  />
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
