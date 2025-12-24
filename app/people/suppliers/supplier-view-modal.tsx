@@ -86,7 +86,7 @@ export function SupplierViewModal({
                           className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
                         />
                       </div>
-                      <Badge variant="primary" appearance="outline" className="mt-2">
+                      <Badge variant="warning" appearance="outline" className="mt-2">
                         Supplier
                       </Badge>
                     </div>
