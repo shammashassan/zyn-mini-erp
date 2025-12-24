@@ -1,4 +1,4 @@
-// app/documents/quotations/quotation-form.tsx - FIXED: VAT on Gross Total
+// app/documents/quotations/quotation-form.tsx - UPDATED: Added customer creation on submit
 
 "use client";
 
@@ -88,6 +88,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
   const [products, setProducts] = useState<IProduct[]>([]);
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [productPopovers, setProductPopovers] = useState<Record<number, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Responsive check
   const [isDesktop, setIsDesktop] = useState(true);
@@ -101,22 +102,15 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
 
   const watchedItems = watch("items");
   const discount = watch("discount");
+  const customerName = watch("customerName");
 
   const isEditMode = !!defaultValues?._id;
 
-  // ✅ FIXED: Correct calculation - VAT on Subtotal
-  // 1. Gross Total = Sum of all items
+  // Calculate totals
   const grossTotal = watchedItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
-  
-  // 2. Subtotal = Gross Total - Discount
   const subTotal = Math.max(grossTotal - (Number(discount) || 0), 0);
-
-  // 3. VAT = Subtotal × 5%
   const vatAmount = subTotal * (UAE_VAT_PERCENTAGE / 100);
-
-  // 4. Grand Total = Subtotal + VAT
   const grandTotal = subTotal + vatAmount;
-  
   const totalItems = watchedItems.filter(item => item.description).length;
 
   useEffect(() => {
@@ -147,6 +141,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
           discount: defaultValues.discount || 0,
           notes: defaultValues.notes || "",
         });
+        setSearchQuery(defaultValues.customerName || "");
       } else {
         reset({
           customerName: "",
@@ -156,6 +151,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
           discount: 0,
           notes: "",
         });
+        setSearchQuery("");
       }
     }
   }, [isOpen, defaultValues, reset]);
@@ -164,7 +160,17 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
     setValue("customerName", customer.name, { shouldDirty: true });
     setValue("customerPhone", customer.phone || "", { shouldDirty: true });
     setValue("customerEmail", customer.email || "", { shouldDirty: true });
+    setSearchQuery(customer.name);
     setCustomerPopoverOpen(false);
+  };
+
+  const handleCreateNew = () => {
+    if (searchQuery.trim()) {
+      setValue("customerName", searchQuery.trim(), { shouldDirty: true });
+      setValue("customerPhone", "", { shouldDirty: true });
+      setValue("customerEmail", "", { shouldDirty: true });
+      setCustomerPopoverOpen(false);
+    }
   };
 
   const handleProductSelect = (index: number, product: IProduct) => {
@@ -187,8 +193,12 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
     }
   };
 
+  const doesCustomerExist = customers.some(
+    (c) => c.name.toLowerCase() === searchQuery.trim().toLowerCase()
+  );
+
   const handleFormSubmit = async (data: QuotationFormData) => {
-    // Manual Validation with toast messages
+    // Validation
     if (!data.customerName || !data.customerName.trim()) {
       toast.error("Customer name is required", {
         description: "Please select or enter a customer name"
@@ -205,14 +215,49 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
     }
 
     const calculatedGrossTotal = validItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
-    const calculatedSubTotal = Math.max(calculatedGrossTotal - (Number(data.discount) || 0), 0);
-    const calculatedVatAmount = calculatedSubTotal * (UAE_VAT_PERCENTAGE / 100);
-
     if (data.discount > calculatedGrossTotal) {
       toast.error("Invalid discount amount", {
         description: "Discount cannot exceed the gross total"
       });
       return;
+    }
+
+    // Check if customer exists, if not create it
+    const customerExists = customers.some(
+      (c) => c.name.toLowerCase() === data.customerName.trim().toLowerCase()
+    );
+
+    if (!customerExists && !isEditMode) {
+      try {
+        const customerPayload = {
+          name: data.customerName.trim(),
+          phone: data.customerPhone.trim(),
+          email: data.customerEmail.trim(),
+        };
+
+        const customerRes = await fetch("/api/customers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(customerPayload),
+        });
+
+        if (customerRes.ok) {
+          toast.success(`Customer "${data.customerName}" created successfully`);
+          // Refresh customers list
+          const customersRes = await fetch("/api/customers");
+          if (customersRes.ok) setCustomers(await customersRes.json());
+        } else {
+          const error = await customerRes.json();
+          toast.error("Failed to create customer", {
+            description: error.error || "Please try again"
+          });
+          return;
+        }
+      } catch (error) {
+        console.error("Error creating customer:", error);
+        toast.error("Failed to create customer");
+        return;
+      }
     }
 
     const submitData = {
@@ -251,45 +296,46 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="customerName">Customer *</Label>
-                <Controller
-                  name="customerName"
-                  control={control}
-                  render={({ field }) => (
-                    <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          role="combobox"
-                          className="w-full justify-between"
-                        >
-                          {field.value || "Select or type customer..."}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                        <Command>
-                          <CommandInput
-                            placeholder="Search customer..."
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          />
-                          <CommandList
-                            className="max-h-[200px] overflow-y-auto"
-                            onWheel={(e) => e.stopPropagation()}
-                          >
-                            <CommandEmpty>
-                              No customer found.<br />
-                              Type to create a new one.
-                            </CommandEmpty>
-                            <CommandGroup>
-                              {customers.map((customer) => (
+                <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      {customerName || "Select or type customer..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder="Search customer..."
+                        value={searchQuery}
+                        onValueChange={setSearchQuery}
+                      />
+                      <CommandList
+                        className="max-h-[200px] overflow-y-auto"
+                        onWheel={(e) => e.stopPropagation()}
+                      >
+                        <CommandEmpty>
+                          {searchQuery.trim() ? "No customer found." : "Start typing to search..."}
+                        </CommandEmpty>
+                        
+                        {customers.length > 0 && (
+                          <CommandGroup heading="Existing Customers">
+                            {customers
+                              .filter(customer => 
+                                !searchQuery || customer.name.toLowerCase().includes(searchQuery.toLowerCase())
+                              )
+                              .map((customer) => (
                                 <CommandItem
                                   key={String(customer._id)}
                                   value={customer.name}
                                   onSelect={() => handleCustomerSelect(customer)}
                                 >
-                                  <Check className={cn("mr-2 h-4 w-4", field.value === customer.name ? "opacity-100" : "opacity-0")} />
+                                  <Check className={cn("mr-2 h-4 w-4", customerName === customer.name ? "opacity-100" : "opacity-0")} />
                                   <div>
                                     <div>{customer.name}</div>
                                     {customer.email && (
@@ -298,13 +344,25 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                                   </div>
                                 </CommandItem>
                               ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                />
+                          </CommandGroup>
+                        )}
+
+                        {searchQuery.trim() && !doesCustomerExist && (
+                          <CommandGroup heading="Create New">
+                            <CommandItem
+                              onSelect={handleCreateNew}
+                              className="text-primary"
+                              value={searchQuery}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Create "{searchQuery}"
+                            </CommandItem>
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -335,7 +393,6 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
             </CardHeader>
             <CardContent className="space-y-4">
               {isDesktop ? (
-                /* Desktop Table View */
                 <div className="w-full overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
@@ -423,7 +480,6 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                   </table>
                 </div>
               ) : (
-                /* Mobile Card View */
                 <div className="space-y-4">
                   {fields.map((field, index) => (
                     <Card key={field.id} className="border-2">
@@ -545,7 +601,6 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
             />
           </div>
 
-          {/* ✅ FIXED: Display correct calculation flow */}
           <Card className="bg-muted/50">
             <CardContent className="p-6">
               <div className="space-y-3">

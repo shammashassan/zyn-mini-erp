@@ -1,4 +1,4 @@
-// app/invoices/invoice-form.tsx - FIXED: VAT on Gross Total
+// app/invoices/invoice-form.tsx - UPDATED: Added customer creation on submit
 
 "use client";
 
@@ -100,6 +100,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
   const [quotationPopoverOpen, setQuotationPopoverOpen] = useState(false);
   const [productPopovers, setProductPopovers] = useState<Record<number, boolean>>({});
   const [loadingQuotations, setLoadingQuotations] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Responsive check
   const [isDesktop, setIsDesktop] = useState(true);
@@ -118,19 +119,11 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
 
   const isEditMode = !!defaultValues?._id;
 
-  // ✅ FIXED: Correct calculation - VAT on SubTotal
-  // 1. Gross Total = Sum of all items
+  // Calculate totals
   const grossTotal = watchedItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
-
-  // 2. Subtotal = Gross Total - Discount
   const subTotal = Math.max(grossTotal - (Number(discount) || 0), 0);
-
-  // 3. VAT = Subtotal × 5%
   const vatAmount = subTotal * (UAE_VAT_PERCENTAGE / 100);
-
-  // 4. Grand Total = Subtotal + VAT
   const grandTotal = subTotal + vatAmount;
-
   const totalItems = watchedItems.filter(item => item.description).length;
 
   useEffect(() => {
@@ -191,6 +184,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
           notes: defaultValues.notes || "",
           quotationId: "",
         });
+        setSearchQuery(defaultValues.customerName || "");
       } else {
         reset({
           customerName: "",
@@ -201,6 +195,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
           notes: "",
           quotationId: "",
         });
+        setSearchQuery("");
       }
     }
   }, [isOpen, defaultValues, reset]);
@@ -209,7 +204,17 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     setValue("customerName", customer.name, { shouldDirty: true });
     setValue("customerPhone", customer.phone || "", { shouldDirty: true });
     setValue("customerEmail", customer.email || "", { shouldDirty: true });
+    setSearchQuery(customer.name);
     setCustomerPopoverOpen(false);
+  };
+
+  const handleCreateNew = () => {
+    if (searchQuery.trim()) {
+      setValue("customerName", searchQuery.trim(), { shouldDirty: true });
+      setValue("customerPhone", "", { shouldDirty: true });
+      setValue("customerEmail", "", { shouldDirty: true });
+      setCustomerPopoverOpen(false);
+    }
   };
 
   const handleQuotationSelect = (quotation: ConnectedQuotation) => {
@@ -240,8 +245,12 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     }
   };
 
+  const doesCustomerExist = customers.some(
+    (c) => c.name.toLowerCase() === searchQuery.trim().toLowerCase()
+  );
+
   const handleFormSubmit = async (data: InvoiceFormData) => {
-    // Manual Validation
+    // Validation
     if (!data.customerName || !data.customerName.trim()) {
       toast.error("Please select a customer");
       return;
@@ -254,14 +263,49 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     }
 
     const calculatedGrossTotal = validItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
-    const calculatedSubTotal = Math.max(calculatedGrossTotal - (Number(data.discount) || 0), 0);
-    const calculatedVatAmount = calculatedSubTotal * (UAE_VAT_PERCENTAGE / 100);
-
     if (data.discount > calculatedGrossTotal) {
       toast.error("Discount cannot exceed gross total", {
         description: "Discount cannot exceed the gross total"
       });
       return;
+    }
+
+    // Check if customer exists, if not create it
+    const customerExists = customers.some(
+      (c) => c.name.toLowerCase() === data.customerName.trim().toLowerCase()
+    );
+
+    if (!customerExists && !isEditMode) {
+      try {
+        const customerPayload = {
+          name: data.customerName.trim(),
+          phone: data.customerPhone.trim(),
+          email: data.customerEmail.trim(),
+        };
+
+        const customerRes = await fetch("/api/customers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(customerPayload),
+        });
+
+        if (customerRes.ok) {
+          toast.success(`Customer "${data.customerName}" created successfully`);
+          // Refresh customers list
+          const customersRes = await fetch("/api/customers");
+          if (customersRes.ok) setCustomers(await customersRes.json());
+        } else {
+          const error = await customerRes.json();
+          toast.error("Failed to create customer", {
+            description: error.error || "Please try again"
+          });
+          return;
+        }
+      } catch (error) {
+        console.error("Error creating customer:", error);
+        toast.error("Failed to create customer");
+        return;
+      }
     }
 
     const submitData = {
@@ -300,41 +344,46 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="customerName">Customer *</Label>
-                <Controller
-                  name="customerName"
-                  control={control}
-                  render={({ field }) => (
-                    <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          role="combobox"
-                          className="w-full justify-between"
-                        >
-                          {field.value || "Select or type customer..."}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Search customer..." />
-                          <CommandList
-                            className="max-h-[200px] overflow-y-auto"
-                            onWheel={(e) => e.stopPropagation()}
-                          >
-                            <CommandEmpty>
-                              No customer found.<br />
-                              Type to create a new one.
-                            </CommandEmpty>
-                            <CommandGroup>
-                              {customers.map((customer) => (
+                <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      {customerName || "Select or type customer..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder="Search customer..."
+                        value={searchQuery}
+                        onValueChange={setSearchQuery}
+                      />
+                      <CommandList
+                        className="max-h-[200px] overflow-y-auto"
+                        onWheel={(e) => e.stopPropagation()}
+                      >
+                        <CommandEmpty>
+                          {searchQuery.trim() ? "No customer found." : "Start typing to search..."}
+                        </CommandEmpty>
+                        
+                        {customers.length > 0 && (
+                          <CommandGroup heading="Existing Customers">
+                            {customers
+                              .filter(customer => 
+                                !searchQuery || customer.name.toLowerCase().includes(searchQuery.toLowerCase())
+                              )
+                              .map((customer) => (
                                 <CommandItem
                                   key={String(customer._id)}
                                   value={customer.name}
                                   onSelect={() => handleCustomerSelect(customer)}
                                 >
-                                  <Check className={cn("mr-2 h-4 w-4", field.value === customer.name ? "opacity-100" : "opacity-0")} />
+                                  <Check className={cn("mr-2 h-4 w-4", customerName === customer.name ? "opacity-100" : "opacity-0")} />
                                   <div>
                                     <div>{customer.name}</div>
                                     {customer.email && (
@@ -343,13 +392,25 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                                   </div>
                                 </CommandItem>
                               ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                />
+                          </CommandGroup>
+                        )}
+
+                        {searchQuery.trim() && !doesCustomerExist && (
+                          <CommandGroup heading="Create New">
+                            <CommandItem
+                              onSelect={handleCreateNew}
+                              className="text-primary"
+                              value={searchQuery}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Create "{searchQuery}"
+                            </CommandItem>
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -439,7 +500,6 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
             </CardHeader>
             <CardContent className="space-y-4">
               {isDesktop ? (
-                /* Desktop Table */
                 <div className="w-full overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
@@ -544,7 +604,6 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                   </table>
                 </div>
               ) : (
-                /* Mobile Cards */
                 <div className="space-y-4">
                   {fields.map((field, index) => (
                     <Card key={field.id} className="border-2">
@@ -676,7 +735,6 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
             />
           </div>
 
-          {/* ✅ FIXED: Display correct calculation flow */}
           <Card className="bg-muted/50">
             <CardContent className="p-6">
               <div className="space-y-3">
