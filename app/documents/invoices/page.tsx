@@ -1,4 +1,4 @@
-// app/documents/invoices/page.tsx - UPDATED: Added Edit functionality
+// app/documents/invoices/page.tsx - UPDATED: Added Silent Background Fetch on Focus
 
 "use client";
 
@@ -49,7 +49,7 @@ export default function InvoicesPage() {
   const [selectedPdfUrl, setSelectedPdfUrl] = useState("");
   const [selectedPdfTitle, setSelectedPdfTitle] = useState("");
   const [isInvoiceFormOpen, setIsInvoiceFormOpen] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null); // ✅ ADDED
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
   // Date Range State (Default 6 months)
@@ -82,10 +82,14 @@ export default function InvoicesPage() {
     setIsMounted(true);
   }, []);
 
-  const fetchInvoices = useCallback(async () => {
+  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
+  const fetchInvoices = useCallback(async (background = false) => {
     if (!canRead) return;
     try {
-      setIsLoading(true);
+      // Only show loading spinner/skeleton if it's NOT a background fetch
+      if (!background) {
+        setIsLoading(true);
+      }
 
       const params = new URLSearchParams({
         page: urlState.page.toString(),
@@ -127,28 +131,50 @@ export default function InvoicesPage() {
         setInvoices(result);
       }
     } catch (error) {
-      console.error("Error fetching invoices:", error);
-      toast.error("Could not load invoices.");
+      // Only show toast error if it's a user interaction, not a background poll
+      if (!background) {
+        console.error("Error fetching invoices:", error);
+        toast.error("Could not load invoices.");
+      }
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
       setIsInitialLoad(false);
     }
   }, [canRead, urlState.page, urlState.pageSize, urlState.sort, urlState.filters, dateRange]);
 
+  // Standard fetch on dependency change
   useEffect(() => {
     if (isMounted && canRead) {
       fetchInvoices();
     }
   }, [isMounted, canRead, fetchInvoices]);
 
-  // ✅ ADDED: Handle open form for both create and edit
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // This triggers a silent "background" fetch when you tab back to this page.
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead) {
+        // Pass true to indicate this is a background fetch (no loading UI/opacity change)
+        fetchInvoices(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchInvoices, isMounted, canRead]);
+
   const handleOpenForm = (invoice: Invoice | null = null) => {
     if (invoice && !canUpdate) {
       toast.error("You don't have permission to edit invoices");
       return;
     }
 
-    // ✅ Prevent editing if status is not "pending"
+    // Prevent editing if status is not "pending"
     if (invoice && invoice.status !== 'pending') {
       toast.error("Cannot edit invoice", {
         description: "Only invoices with 'pending' status can be edited. Approved/cancelled invoices affect accounting records."
@@ -208,7 +234,6 @@ export default function InvoicesPage() {
     setIsModalOpen(true);
   }, []);
 
-  // ✅ UPDATED: Support both create and edit
   const handleInvoiceFormSubmit = async (data: any, id?: string) => {
     // 1. Immediate Lock
     if (isSubmittingRef.current) return;
@@ -263,7 +288,7 @@ export default function InvoicesPage() {
 
       // Close Form Modal
       setIsInvoiceFormOpen(false);
-      setSelectedInvoice(null); // ✅ ADDED
+      setSelectedInvoice(null);
 
       // Refresh Data
       fetchInvoices();
@@ -321,14 +346,14 @@ export default function InvoicesPage() {
 
   const columns = useMemo(() => getColumns(
     handleViewPdf,
-    handleOpenForm, // ✅ ADDED
+    handleOpenForm,
     (id: string) => {
       const invoiceToDelete = invoices.find((inv: Invoice) => inv._id === id);
       if (invoiceToDelete) {
         handleDelete([invoiceToDelete]);
       }
     },
-    { canDelete, canUpdate, canUpdateStatus, canCreateReceipt, canCreateDelivery }, // ✅ ADDED canUpdate
+    { canDelete, canUpdate, canUpdateStatus, canCreateReceipt, canCreateDelivery },
     fetchInvoices
   ), [invoices, canDelete, canUpdate, canUpdateStatus, canCreateReceipt, canCreateDelivery, handleViewPdf, fetchInvoices]);
 
@@ -423,7 +448,7 @@ export default function InvoicesPage() {
                   )}
                   {canCreate && (
                     <Button
-                      onClick={() => handleOpenForm()} // ✅ UPDATED
+                      onClick={() => handleOpenForm()}
                       className="gap-2 w-full sm:w-auto"
                     >
                       <Plus className="h-4 w-4" />
@@ -496,8 +521,7 @@ export default function InvoicesPage() {
                     />
                   ) : (
                     <div
-                      className={`transition-opacity duration-200 ${isLoading ? "opacity-50 pointer-events-none" : "opacity-100"
-                        }`}
+                      className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}
                     >
                       <DataTable table={table}>
                         <DataTableToolbar table={table} />
@@ -516,7 +540,7 @@ export default function InvoicesPage() {
                       Create your first invoice to get started
                     </p>
                     {canCreate && (
-                      <Button onClick={() => handleOpenForm()} className="gap-2"> {/* ✅ UPDATED */}
+                      <Button onClick={() => handleOpenForm()} className="gap-2">
                         <Plus className="h-4 w-4" />
                         Create Invoice
                       </Button>
@@ -529,7 +553,6 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      {/* ✅ UPDATED: Pass selectedInvoice as defaultValues */}
       <InvoiceForm
         isOpen={isInvoiceFormOpen}
         onClose={() => {
@@ -537,7 +560,7 @@ export default function InvoicesPage() {
           setSelectedInvoice(null);
         }}
         onSubmit={handleInvoiceFormSubmit}
-        defaultValues={selectedInvoice} // ✅ ADDED
+        defaultValues={selectedInvoice}
       />
 
       <PDFViewerModal

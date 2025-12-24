@@ -1,4 +1,4 @@
-// app/documents/vouchers/page.tsx - UPDATED: Stacked Actions and Filters on the right
+// app/documents/vouchers/page.tsx - UPDATED: Added Silent Background Fetch on Focus
 
 "use client";
 
@@ -80,10 +80,14 @@ export default function VouchersPage() {
     setIsMounted(true);
   }, []);
 
-  const fetchVouchers = useCallback(async () => {
+  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
+  const fetchVouchers = useCallback(async (background = false) => {
     if (!canRead) return;
     try {
-      setIsLoading(true);
+      // Only show loading spinner/skeleton if it's NOT a background fetch
+      if (!background) {
+        setIsLoading(true);
+      }
 
       const params = new URLSearchParams({
         page: urlState.page.toString(),
@@ -122,18 +126,41 @@ export default function VouchersPage() {
         setVouchers(result.filter((v: Voucher) => v.voucherType === activeTab));
       }
     } catch (error) {
-      toast.error("Could not load vouchers.");
+      // Only show toast error if it's a user interaction, not a background poll
+      if (!background) {
+        toast.error("Could not load vouchers.");
+      }
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
       setIsInitialLoad(false);
     }
   }, [canRead, urlState.page, urlState.pageSize, urlState.sort, urlState.filters, activeTab, dateRange]);
 
+  // Standard fetch on dependency change
   useEffect(() => {
     if (isMounted && canRead) {
       fetchVouchers();
     }
   }, [isMounted, canRead, fetchVouchers]);
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // This triggers a silent "background" fetch when you tab back to this page.
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead) {
+        // Pass true to indicate this is a background fetch (no loading UI/opacity change)
+        fetchVouchers(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchVouchers, isMounted, canRead]);
 
   useEffect(() => {
     setUrlState({ page: 1 });
@@ -460,7 +487,7 @@ export default function VouchersPage() {
                           rowCount={10}
                         />
                       ) : (
-                        <div className={isLoading ? "opacity-50 pointer-events-none transition-opacity" : ""}>
+                        <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
                           <DataTable table={table}>
                             <DataTableToolbar table={table} />
                           </DataTable>

@@ -1,6 +1,8 @@
+// app/accounting/ledger/page.tsx - UPDATED: Added Silent Background Fetch
+
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { BookOpen, CalendarIcon, Users, X, ChevronsUpDown, Check, Book } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -55,7 +57,7 @@ export default function LedgerPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  // ✅ UPDATED: Added payees state
+  // Payees state
   const [customers, setCustomers] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [payees, setPayees] = useState<any[]>([]);
@@ -98,12 +100,11 @@ export default function LedgerPage() {
       }
     };
     
-    if (session && canRead) {
+    if (canRead) {
       fetchAccounts();
     }
-  }, [session, canRead]);
+  }, [canRead]);
 
-  // ✅ UPDATED: Fetch payees as well
   useEffect(() => {
     const fetchPartyData = async () => {
       if (!canRead) return;
@@ -122,10 +123,10 @@ export default function LedgerPage() {
       }
     };
     
-    if (session && canRead) {
+    if (canRead) {
       fetchPartyData();
     }
-  }, [session, canRead]);
+  }, [canRead]);
 
   useEffect(() => {
     const fetchCompanyDetails = async () => {
@@ -141,10 +142,10 @@ export default function LedgerPage() {
       }
     };
 
-    if (session && canRead) {
+    if (canRead) {
       fetchCompanyDetails();
     }
-  }, [session, canRead]);
+  }, [canRead]);
 
   useEffect(() => {
     const code = searchParams.get('accountCode');
@@ -153,7 +154,8 @@ export default function LedgerPage() {
     }
   }, [searchParams, accounts]);
 
-  const fetchLedger = async () => {
+  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
+  const fetchLedger = useCallback(async (background = false) => {
     if (!canRead) return;
 
     if (!selectedAccountCode) {
@@ -161,12 +163,14 @@ export default function LedgerPage() {
     }
 
     if (!dateRange?.from || !dateRange?.to) {
-      toast.error("Please select a date range");
+      // Don't show toast on background fetch to avoid spamming
+      if (!background) toast.error("Please select a date range");
       return;
     }
 
     try {
-      setIsLoading(true);
+      if (!background) setIsLoading(true);
+      
       const params = new URLSearchParams();
       params.append('accountCode', selectedAccountCode);
       params.append('startDate', dateRange.from.toISOString());
@@ -181,19 +185,37 @@ export default function LedgerPage() {
       setLedgerData(data);
     } catch (error) {
       console.error("Error fetching ledger:", error);
-      toast.error("Could not load ledger data");
+      if (!background) toast.error("Could not load ledger data");
     } finally {
-      setIsLoading(false);
+      if (!background) setIsLoading(false);
     }
-  };
+  }, [canRead, selectedAccountCode, dateRange, partyTypeFilter, selectedPartyId]);
 
+  // Standard fetch on dependency change
+  // ✅ FIXED: Removed 'session' to prevent double-fetch on focus
   useEffect(() => {
-    if (selectedAccountCode && dateRange?.from && dateRange?.to && session && canRead) {
+    if (selectedAccountCode && dateRange?.from && dateRange?.to && canRead) {
       fetchLedger();
     }
-  }, [selectedAccountCode, dateRange, partyTypeFilter, selectedPartyId, session, canRead]);
+  }, [selectedAccountCode, dateRange, partyTypeFilter, selectedPartyId, canRead, fetchLedger]);
 
-  // ✅ UPDATED: Get current party list based on type including Payee
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // Triggers silent background fetch when returning to the tab (only if an account is selected)
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead && selectedAccountCode) {
+        fetchLedger(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchLedger, isMounted, canRead, selectedAccountCode]);
+
+  // Get current party list based on type including Payee
   const getCurrentPartyList = () => {
     switch (partyTypeFilter) {
       case "Customer": return customers;
@@ -496,7 +518,7 @@ export default function LedgerPage() {
                       </Select>
                     </div>
 
-                    {/* ✅ UPDATED: Party Filter with Payee and Vendor */}
+                    {/* Party Filter with Payee and Vendor */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t md:col-span-3">
                       <div className="space-y-2">
                         <Label className="flex items-center gap-2">
@@ -624,16 +646,12 @@ export default function LedgerPage() {
 
                 <Card>
                   <CardContent className="p-6">
-                    {isLoading ? (
-                      <DataTableSkeleton
-                        columnCount={columns.length}
-                        rowCount={10}
-                      />
-                    ) : (
+                    {/* ✅ UPDATED: Applied transition-opacity for smooth updates */}
+                    <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
                       <DataTable table={table}>
                         <DataTableToolbar table={table} />
                       </DataTable>
-                    )}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -653,7 +671,7 @@ export default function LedgerPage() {
               </div>
             )}
 
-            {isLoading && (
+            {isLoading && !ledgerData && (
               <div className="px-4 lg:px-6">
                 <Card>
                   <CardContent className="flex items-center justify-center py-12">

@@ -1,4 +1,4 @@
-// app/expenses/page.tsx - UPDATED: Added Duplicate & Fixed Connected Payments Display
+// app/expenses/page.tsx - UPDATED: Added Silent Background Fetch on Focus
 
 "use client";
 
@@ -90,10 +90,14 @@ export default function ExpensesPage() {
     setIsMounted(true);
   }, []);
 
-  const fetchExpenses = useCallback(async () => {
+  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
+  const fetchExpenses = useCallback(async (background = false) => {
     if (!canRead) return;
     try {
-      setIsLoading(true);
+      // Only show loading spinner/skeleton if it's NOT a background fetch
+      if (!background) {
+        setIsLoading(true);
+      }
 
       const params = new URLSearchParams({
         page: urlState.page.toString(),
@@ -139,19 +143,42 @@ export default function ExpensesPage() {
         setTotalCount(0);
       }
     } catch (error) {
-      console.error("Error fetching expenses:", error);
-      toast.error("Could not load expenses.");
+      // Only show toast error if it's a user interaction, not a background poll
+      if (!background) {
+        console.error("Error fetching expenses:", error);
+        toast.error("Could not load expenses.");
+      }
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
       setIsInitialLoad(false);
     }
   }, [canRead, urlState.page, urlState.pageSize, urlState.sort, urlState.filters, activeTab, dateRange]);
 
+  // Standard fetch on dependency change
   useEffect(() => {
     if (isMounted && canRead) {
       fetchExpenses();
     }
   }, [isMounted, canRead, fetchExpenses]);
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // This triggers a silent "background" fetch when you tab back to this page.
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead) {
+        // Pass true to indicate this is a background fetch (no loading UI/opacity change)
+        fetchExpenses(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchExpenses, isMounted, canRead]);
 
   useEffect(() => {
     setUrlState({ page: 1 });
@@ -258,7 +285,7 @@ export default function ExpensesPage() {
     setIsPdfModalOpen(true);
   };
 
-  // ✅ FIX: Fetch full expense details when viewing
+  // Fetch full expense details when viewing
   const handleViewExpense = async (expense: IExpense) => {
     try {
       // Always fetch full details to ensure connectedDocuments are populated
@@ -316,7 +343,7 @@ export default function ExpensesPage() {
 
   const columns = useMemo(() => getColumns(
     handleOpenForm,
-    handleViewExpense, // ✅ Use new handler that fetches full details
+    handleViewExpense, // Use new handler that fetches full details
     (id: string) => {
         const expenseToDelete = expenses.find(e => e._id === id);
         if(expenseToDelete) handleDelete([expenseToDelete]);
@@ -499,7 +526,7 @@ export default function ExpensesPage() {
                       {isInitialLoad ? (
                         <DataTableSkeleton columnCount={columns.length} rowCount={10} />
                       ) : (
-                        <div className={isLoading ? "opacity-50 pointer-events-none transition-opacity" : ""}>
+                        <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
                           <DataTable table={table}>
                             <DataTableToolbar table={table} />
                           </DataTable>

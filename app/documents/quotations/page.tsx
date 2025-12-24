@@ -1,4 +1,4 @@
-// app/documents/quotations/page.tsx - UPDATED: Added Edit functionality
+// app/documents/quotations/page.tsx - UPDATED: Added Silent Background Fetch on Focus
 
 "use client";
 
@@ -81,10 +81,14 @@ export default function QuotationsPage() {
     setIsMounted(true);
   }, []);
 
-  const fetchQuotations = useCallback(async () => {
+  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
+  const fetchQuotations = useCallback(async (background = false) => {
     if (!canRead) return;
     try {
-      setIsLoading(true);
+      // Only show loading spinner/skeleton if it's NOT a background fetch
+      if (!background) {
+        setIsLoading(true);
+      }
 
       const params = new URLSearchParams({
         page: urlState.page.toString(),
@@ -92,6 +96,7 @@ export default function QuotationsPage() {
         populate: 'true',
       });
 
+      // Add Date Range to params
       if (dateRange?.from) {
         params.append('startDate', dateRange.from.toISOString());
       }
@@ -121,18 +126,41 @@ export default function QuotationsPage() {
         setQuotations(result);
       }
     } catch (error) {
-      toast.error("Could not load quotations.");
+      // Only show toast error if it's a user interaction, not a background poll
+      if (!background) {
+        toast.error("Could not load quotations.");
+      }
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
       setIsInitialLoad(false);
     }
   }, [canRead, urlState.page, urlState.pageSize, urlState.sort, urlState.filters, dateRange]);
 
+  // Standard fetch on dependency change
   useEffect(() => {
     if (isMounted && canRead) {
       fetchQuotations();
     }
   }, [isMounted, canRead, fetchQuotations]);
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // This triggers a silent "background" fetch when you tab back to this page.
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead) {
+        // Pass true to indicate this is a background fetch (no loading UI/opacity change)
+        fetchQuotations(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchQuotations, isMounted, canRead]);
 
   const handleOpenForm = (quotation: Quotation | null = null) => {
     if (quotation && !canUpdate) {
@@ -447,7 +475,7 @@ export default function QuotationsPage() {
                       rowCount={10}
                     />
                   ) : (
-                    <div className={isLoading ? "opacity-50 pointer-events-none transition-opacity" : ""}>
+                    <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
                       <DataTable table={table}>
                         <DataTableToolbar table={table} />
                       </DataTable>

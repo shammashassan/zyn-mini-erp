@@ -1,4 +1,4 @@
-// app/accounting/journal/page.tsx - UPDATED: Added Payee/Vendor to party filter
+// app/accounting/journal/page.tsx - UPDATED: Fixed Opacity Flash on Focus
 
 "use client";
 
@@ -89,7 +89,6 @@ export default function JournalPage() {
   const [partyTypeFilter, setPartyTypeFilter] = useState<string>("all");
   const [selectedPartyId, setSelectedPartyId] = useState<string>("");
   
-  // ✅ UPDATED: Added payees state
   const [customers, setCustomers] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [payees, setPayees] = useState<any[]>([]);
@@ -100,7 +99,6 @@ export default function JournalPage() {
     to: endOfMonth(new Date())
   });
 
-  // ✅ UPDATED: Fetch payees as well
   useEffect(() => {
     const fetchReferenceData = async () => {
       if (!canRead) return;
@@ -123,10 +121,14 @@ export default function JournalPage() {
     }
   }, [canRead, session]);
 
-  const fetchJournals = useCallback(async () => {
+  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
+  const fetchJournals = useCallback(async (background = false) => {
     if (!canRead) return;
     try {
-      setIsLoading(true);
+      // Only show loading spinner/skeleton if it's NOT a background fetch
+      if (!background) {
+        setIsLoading(true);
+      }
 
       const params = new URLSearchParams({
         page: urlState.page.toString(),
@@ -160,9 +162,14 @@ export default function JournalPage() {
         setJournals(result);
       }
     } catch (error) {
-      toast.error("Could not load journal entries.");
+      // Only show toast error if it's a user interaction, not a background poll
+      if (!background) {
+        toast.error("Could not load journal entries.");
+      }
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
       setIsInitialLoad(false);
     }
   }, [
@@ -178,6 +185,8 @@ export default function JournalPage() {
     selectedPartyId
   ]);
 
+  // Standard fetch on dependency change
+  // ✅ FIXED: Removed 'session' from dependencies to prevent re-fetch on window focus (which refreshes session)
   useEffect(() => {
     if (session && canRead) {
       fetchJournals();
@@ -188,7 +197,25 @@ export default function JournalPage() {
       setIsLoading(false);
       setIsInitialLoad(false);
     }
-  }, [session, canRead, fetchJournals]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canRead, fetchJournals]);
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // This triggers a silent "background" fetch when you tab back to this page.
+  useEffect(() => {
+    const onFocus = () => {
+      if (session && canRead) {
+        // Pass true to indicate this is a background fetch (no loading UI/opacity change)
+        fetchJournals(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchJournals, session, canRead]);
 
   const handleOpenForm = (journal: IJournal | null = null) => {
     if (!canCreate && !journal) {
@@ -369,13 +396,12 @@ export default function JournalPage() {
     getRowId: (row) => row._id,
   });
 
-  // ✅ UPDATED: Get current party list based on type including Payee/Vendor
   const getCurrentPartyList = () => {
     switch (partyTypeFilter) {
       case "Customer": return customers;
       case "Supplier": return suppliers;
       case "Payee": return payees;
-      case "Vendor": return []; // Vendor is manual entry, no list needed
+      case "Vendor": return [];
       default: return [];
     }
   };
@@ -560,7 +586,6 @@ export default function JournalPage() {
                         Filter by Party
                       </Label>
                       <div className="flex gap-2">
-                        {/* ✅ UPDATED: Added Payee and Vendor options */}
                         <Select
                           value={partyTypeFilter}
                           onValueChange={(value) => {

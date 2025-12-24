@@ -1,4 +1,4 @@
-// app/inventory/stock-adjustment/page.tsx - UPDATED: Date Range Filter
+// app/inventory/stock-adjustment/page.tsx - UPDATED: Added Silent Background Fetch on Focus
 
 "use client";
 
@@ -100,11 +100,14 @@ export default function StockAdjustmentPage() {
     if (canRead) fetchMaterials();
   }, [canRead]);
 
-  // ✅ Server-side fetch for Adjustments
-  const fetchAdjustments = useCallback(async () => {
+  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
+  const fetchAdjustments = useCallback(async (background = false) => {
     if (!canRead) return;
     try {
-      setIsLoading(true);
+      // Only show loading spinner/skeleton if it's NOT a background fetch
+      if (!background) {
+        setIsLoading(true);
+      }
 
       const params = new URLSearchParams({
         page: urlState.page.toString(),
@@ -141,19 +144,41 @@ export default function StockAdjustmentPage() {
         setAdjustmentHistory(result); // Fallback
       }
     } catch (error) {
-      toast.error("Could not load history.");
+      // Only show toast error if it's a user interaction, not a background poll
+      if (!background) {
+        toast.error("Could not load history.");
+      }
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
       setIsInitialLoad(false);
     }
   }, [canRead, urlState.page, urlState.pageSize, urlState.sort, urlState.filters, dateRange]);
 
-  // Trigger fetch when state changes
+  // Standard fetch on dependency change
   useEffect(() => {
     if (isMounted && canRead) {
       fetchAdjustments();
     }
   }, [isMounted, canRead, fetchAdjustments]);
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // This triggers a silent "background" fetch when you tab back to this page.
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead) {
+        // Pass true to indicate this is a background fetch (no loading UI/opacity change)
+        fetchAdjustments(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchAdjustments, isMounted, canRead]);
 
   const handleFormSubmit = async (data: AdjustmentFormData) => {
     if (!canCreate) {

@@ -1,4 +1,4 @@
-// app/documents/delivery-notes/page.tsx - UPDATED: Date Range Filter & Responsive Layout
+// app/documents/delivery-notes/page.tsx - UPDATED: Enabled Silent Background Fetch on Focus
 
 "use client";
 
@@ -80,10 +80,14 @@ export default function DeliveryNotesPage() {
     setIsMounted(true);
   }, []);
 
-  const fetchDeliveryNotes = useCallback(async () => {
+  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
+  const fetchDeliveryNotes = useCallback(async (background = false) => {
     if (!canRead) return;
     try {
-      setIsLoading(true);
+      // Only show loading spinner/skeleton if it's NOT a background fetch
+      if (!background) {
+        setIsLoading(true);
+      }
 
       const params = new URLSearchParams({
         page: urlState.page.toString(),
@@ -121,18 +125,40 @@ export default function DeliveryNotesPage() {
         setDeliveryNotes(result);
       }
     } catch (error) {
-      toast.error("Could not load delivery notes.");
+      if (!background) {
+        toast.error("Could not load delivery notes.");
+      }
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
       setIsInitialLoad(false);
     }
   }, [canRead, urlState.page, urlState.pageSize, urlState.sort, urlState.filters, dateRange]);
 
+  // Standard fetch on dependency change (loading state visible)
   useEffect(() => {
     if (isMounted && canRead) {
       fetchDeliveryNotes();
     }
   }, [isMounted, canRead, fetchDeliveryNotes]);
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // This triggers a background fetch (true) when you tab back to this page.
+  // The table will NOT fade out or show a spinner.
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead) {
+        fetchDeliveryNotes(true); // Pass true for silent background fetch
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchDeliveryNotes, isMounted, canRead]);
 
   const handleDelete = async (selectedDeliveryNotes: DeliveryNote[]) => {
     if (!canDelete) {
@@ -451,7 +477,7 @@ export default function DeliveryNotesPage() {
                       rowCount={10}
                     />
                   ) : (
-                    <div className={isLoading ? "opacity-50 pointer-events-none transition-opacity" : ""}>
+                    <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
                       <DataTable table={table}>
                         <DataTableToolbar table={table} />
                       </DataTable>

@@ -1,4 +1,4 @@
-// app/purchases/page.tsx - UPDATED with Date Range Filter & Responsive Layout
+// app/purchases/page.tsx - UPDATED: Fixed opacity flash on window focus
 
 "use client";
 
@@ -86,11 +86,15 @@ export default function PurchasesPage() {
     setIsMounted(true);
   }, []);
 
-  const fetchPurchases = useCallback(async () => {
+  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
+  const fetchPurchases = useCallback(async (background = false) => {
     if (!canRead) return;
 
     try {
-      setIsLoading(true);
+      // Only show loading spinner/skeleton if it's NOT a background fetch
+      if (!background) {
+        setIsLoading(true);
+      }
 
       const params = new URLSearchParams({
         page: urlState.page.toString(),
@@ -117,7 +121,8 @@ export default function PurchasesPage() {
       const res = await fetch(`/api/purchases?${params.toString()}`);
 
       if (res.status === 403) {
-        toast.error("You don't have permission to view purchases");
+        // Only show toast error if it's a user interaction, not a background poll
+        if (!background) toast.error("You don't have permission to view purchases");
         return;
       }
 
@@ -133,14 +138,20 @@ export default function PurchasesPage() {
         setPurchases(result);
       }
     } catch (error) {
-      toast.error("Could not load purchases.");
-      console.error(error);
+      if (!background) {
+        toast.error("Could not load purchases.");
+        console.error(error);
+      }
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
       setIsInitialLoad(false);
     }
   }, [canRead, urlState.page, urlState.pageSize, urlState.sort, urlState.filters, dateRange]);
 
+  // Standard fetch on dependency change (loading state visible)
+  // ✅ FIXED: Removed 'session' from dependencies to prevent auto-fetch on window focus (which refreshes session)
   useEffect(() => {
     if (session && canRead) {
       fetchPurchases();
@@ -151,7 +162,25 @@ export default function PurchasesPage() {
       setIsLoading(false);
       setIsInitialLoad(false);
     }
-  }, [session, canRead, fetchPurchases]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canRead, fetchPurchases]); 
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // This triggers a silent "background" fetch when you tab back to this page.
+  useEffect(() => {
+    const onFocus = () => {
+      if (session && canRead) {
+        // Pass true to indicate this is a background fetch (no loading UI/opacity change)
+        fetchPurchases(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchPurchases, session, canRead]);
 
   const handleOpenForm = (purchase: IPurchase | null = null) => {
     if (purchase && !canUpdate) {
@@ -159,7 +188,6 @@ export default function PurchasesPage() {
       return;
     }
 
-    // ✅ NEW: Prevent editing if status is not "Ordered"
     if (purchase && purchase.status !== 'Ordered') {
       toast.error("Cannot edit purchase", {
         description: "Only purchases with 'Ordered' status can be edited. Other statuses affect stock and accounting records."
@@ -198,7 +226,6 @@ export default function PurchasesPage() {
   };
 
   const handleFormSubmit = async (data: any, id?: string) => {
-    // 1. Immediate Lock
     if (isSubmittingRef.current) return;
 
     if (id && !canUpdate) {
@@ -210,7 +237,6 @@ export default function PurchasesPage() {
       return;
     }
 
-    // 2. Lock & Load
     isSubmittingRef.current = true;
 
     const url = id ? `/api/purchases/${id}` : "/api/purchases";
@@ -224,9 +250,9 @@ export default function PurchasesPage() {
       });
 
       if (res.status === 403) {
-      const errorData = await res.json();
-      throw new Error(errorData.message || "You don't have permission to perform this action");
-    }
+        const errorData = await res.json();
+        throw new Error(errorData.message || "You don't have permission to perform this action");
+      }
 
       const result = await res.json();
 
@@ -234,21 +260,18 @@ export default function PurchasesPage() {
         throw new Error(result.error || result.message || "Failed to save purchase");
       }
 
-      // Success
       toast.success(`Purchase ${id ? "updated" : "added"} successfully.`);
-      fetchPurchases();
+      fetchPurchases(); // Trigger fresh fetch
       setIsFormOpen(false);
       setSelectedPurchase(null);
 
-      // ✅ AUTOMATICALLY OPEN PURCHASE VIEW MODAL
-      const savedPurchase = result.purchase || result; // Handle potential API response variations
+      const savedPurchase = result.purchase || result;
       setPurchaseToView(savedPurchase);
       setViewModalOpen(true);
 
     } catch (error: any) {
       toast.error(error.message || `Failed to ${id ? "update" : "add"} purchase.`);
     } finally {
-      // 3. Release Lock
       isSubmittingRef.current = false;
     }
   };
@@ -539,7 +562,7 @@ export default function PurchasesPage() {
                 </CardContent>
               </Card>
 
-              {/* ✅ Ensure empty state doesn't flash during initial load */}
+              {/* Empty State */}
               {purchases.length === 0 && !isInitialLoad && !isLoading && canCreate && (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">
