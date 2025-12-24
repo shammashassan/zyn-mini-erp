@@ -1,33 +1,61 @@
-// app/api/upload/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "fs/promises";
-import { join } from "path";
+import { v2 as cloudinary } from "cloudinary";
+
+// Configure Cloudinary with environment variables
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function POST(request: NextRequest) {
-  const data = await request.formData();
-  const file: File | null = data.get('file') as unknown as File;
-
-  if (!file) {
-    return NextResponse.json({ success: false, error: "No file found." });
-  }
-
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-
-  // Create a unique filename
-  const filename = `${Date.now()}-${file.name}`;
-  const path = join(process.cwd(), 'public/uploads', filename);
-  
   try {
-    await writeFile(path, buffer);
-    console.log(`File saved to ${path}`);
+    const data = await request.formData();
+    const file = data.get('file') as File | null;
 
-    // Return the public URL of the saved file
-    const imageUrl = `/uploads/${filename}`;
-    return NextResponse.json({ success: true, url: imageUrl });
+    if (!file) {
+      return NextResponse.json(
+        { success: false, error: "No file provided" },
+        { status: 400 }
+      );
+    }
+
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    // Upload to Cloudinary using a stream (efficient for serverless)
+    const result = await new Promise<any>((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: "user-avatars", // Creates this folder in your Cloudinary dashboard
+          resource_type: "image",
+          // Optional: Automatically optimize the image size/format
+          transformation: [
+            { width: 400, height: 400, crop: "fill", gravity: "face" }, // Smart crop to face
+            { quality: "auto", fetch_format: "auto" }
+          ]
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      
+      // Write the buffer to the upload stream
+      uploadStream.end(buffer);
+    });
+
+    // Return the secure URL from Cloudinary
+    return NextResponse.json({ 
+      success: true, 
+      url: result.secure_url 
+    });
+
   } catch (error) {
-    console.error("Error saving file:", error);
-    return NextResponse.json({ success: false, error: "Failed to save file." });
+    console.error("Cloudinary upload error:", error);
+    return NextResponse.json(
+      { success: false, error: "Upload failed due to server error." },
+      { status: 500 }
+    );
   }
 }
