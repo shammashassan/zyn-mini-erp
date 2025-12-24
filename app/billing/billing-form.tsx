@@ -1,4 +1,4 @@
-// app/billing/billing-form.tsx - UPDATED: xl:grid-cols-2 for better responsiveness
+// app/billing/billing-form.tsx - UPDATED: Added grossTotal prop
 
 "use client";
 
@@ -21,6 +21,7 @@ interface BillingFormProps {
   handleSubmit: () => void;
   isLoading: boolean;
   isFormValid: boolean;
+  grossTotal: number;
   subTotal: number;
   vatAmount: number;
   grandTotal: number;
@@ -39,6 +40,7 @@ export function BillingForm({
   handleSubmit,
   isLoading,
   isFormValid,
+  grossTotal,
   subTotal,
   vatAmount,
   grandTotal,
@@ -85,6 +87,7 @@ export function BillingForm({
         handleSubmit={handleSubmit}
         isLoading={isLoading}
         isFormValid={isFormValid}
+        grossTotal={grossTotal}
         subTotal={subTotal}
         vatAmount={vatAmount}
         grandTotal={grandTotal}

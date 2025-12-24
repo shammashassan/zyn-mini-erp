@@ -1,4 +1,4 @@
-// app/billing/summary-actions.tsx
+// app/billing/summary-actions.tsx - UPDATED: Detailed breakdown
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +12,7 @@ interface SummaryActionsProps {
   handleSubmit: () => void;
   isLoading: boolean;
   isFormValid: boolean;
+  grossTotal: number;
   subTotal: number;
   vatAmount: number;
   grandTotal: number;
@@ -23,10 +24,11 @@ export function SummaryActions({
     handleSubmit,
     isLoading,
     isFormValid,
-   subTotal,
-   vatAmount,
-   grandTotal,
-   vatPercentage,
+    grossTotal,
+    subTotal,
+    vatAmount,
+    grandTotal,
+    vatPercentage,
 }: SummaryActionsProps) {
   const hasNegativeTotal = grandTotal < 0;
 
@@ -37,10 +39,13 @@ export function SummaryActions({
         hasNegativeTotal && "border-destructive"
       )}>
         <CardContent className="p-4 space-y-2">
+          {/* Gross Total = Sum of line items (before discount, before VAT) */}
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Subtotal:</span>
-            <span className="font-medium">{formatCurrency(subTotal)}</span>
+            <span className="text-muted-foreground">Gross Total:</span>
+            <span className="font-medium">{formatCurrency(grossTotal)}</span>
           </div>
+          
+          {/* Discount */}
           <div className="flex justify-between">
             <span className="text-muted-foreground">Discount:</span>
             <span className={cn(
@@ -48,10 +53,20 @@ export function SummaryActions({
               hasNegativeTotal ? "text-destructive" : "text-destructive"
             )}>- {formatCurrency(discount)}</span>
           </div>
-           <div className="flex justify-between">
-            <span className="text-muted-foreground">UAE VAT ({vatPercentage}%):</span>
+          
+          {/* Subtotal = Gross Total - Discount (this is the amount VAT is calculated on) */}
+          <div className="flex justify-between border-t pt-2">
+            <span className="text-muted-foreground">Subtotal (after discount):</span>
+            <span className="font-medium">{formatCurrency(subTotal)}</span>
+          </div>
+          
+          {/* VAT = Subtotal × VAT% */}
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">VAT ({vatPercentage}%):</span>
             <span className="font-medium">{formatCurrency(vatAmount)}</span>
           </div>
+          
+          {/* Grand Total = Subtotal + VAT */}
           <div className={cn(
             "flex justify-between border-t pt-2 mt-2",
             hasNegativeTotal && "border-destructive"
@@ -62,10 +77,11 @@ export function SummaryActions({
               hasNegativeTotal && "text-destructive"
             )}>{formatCurrency(grandTotal)}</span>
           </div>
+          
           {hasNegativeTotal && (
             <div className="flex items-center gap-2 text-sm text-destructive pt-2">
               <AlertCircle className="h-4 w-4" />
-              <span>Discount exceeds subtotal</span>
+              <span>Discount exceeds gross total</span>
             </div>
           )}
         </CardContent>

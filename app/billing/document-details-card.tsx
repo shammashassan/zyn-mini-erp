@@ -1,4 +1,4 @@
-// app/billing/document-details-card.tsx
+// app/billing/document-details-card.tsx - UPDATED: Removed Delivery Note
 
 "use client";
 
@@ -19,7 +19,6 @@ const documentTypes = [
   { value: "invoice", label: "Invoice" },
   { value: "receipt", label: "Receipt Voucher" },
   { value: "payment", label: "Payment Voucher" },
-  { value: "delivery", label: "Delivery Note" },
 ];
 
 const paymentMethods = [
@@ -157,7 +156,7 @@ export function DocumentDetailsCard({ payload, onFieldChange }: DocumentDetailsP
             </div>
           )}
 
-          {/* Discount - Only for invoices/quotations/deliveries */}
+          {/* Discount - Only for invoices/quotations */}
           {!requiresPaymentMethod && (
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="discount">Discount</Label>

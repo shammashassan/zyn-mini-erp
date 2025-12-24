@@ -1,4 +1,4 @@
-// app/billing/customer-details-card.tsx
+// app/billing/customer-details-card.tsx - UPDATED: Allow both party types for vouchers
 
 "use client";
 
@@ -27,30 +27,37 @@ export function CustomerDetailsCard({ payload, onFieldChange, customers, supplie
   const [open, setOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
 
-  // Default to customer unless payment
+  // Default to customer
   const [partyType, setPartyType] = React.useState<'customer' | 'supplier'>('customer');
 
-  // STRICT RULE: Payment = Supplier, Everything else = Customer.
-  // We disable the toggle entirely so the user cannot manually switch.
-  const isToggleDisabled = true;
+  // Enable toggle for vouchers, disable for invoices and quotations
+  const isVoucher = payload.documentType === 'receipt' || payload.documentType === 'payment';
+  const isToggleDisabled = !isVoucher;
 
-  // Auto-switch mode AND CLEAR DATA based on document type
+  // Clear data when switching party type manually or when document type changes
   React.useEffect(() => {
-    // If document is 'payment', force 'supplier'. Otherwise, force 'customer'.
-    const targetType = payload.documentType === 'payment' ? 'supplier' : 'customer';
+    // For non-vouchers (invoice, quotation), always force customer
+    if (!isVoucher && partyType !== 'customer') {
+      setPartyType('customer');
+      onFieldChange("supplierName" as any, "");
+      onFieldChange("customerPhone", "");
+      onFieldChange("customerEmail", "");
+      setSearchQuery("");
+    }
+  }, [payload.documentType, isVoucher, partyType, onFieldChange]);
 
-    // Only run if the type is actually changing to prevent unnecessary wipes
-    if (partyType !== targetType) {
-      setPartyType(targetType);
-
-      // CLEAR ALL FIELDS to prevent data from the previous type persisting
+  const handlePartyTypeChange = (newType: string) => {
+    if (newType && (newType === 'customer' || newType === 'supplier')) {
+      setPartyType(newType as 'customer' | 'supplier');
+      
+      // Clear all party data when switching
       onFieldChange("customerName", "");
       onFieldChange("supplierName" as any, "");
       onFieldChange("customerPhone", "");
       onFieldChange("customerEmail", "");
       setSearchQuery("");
     }
-  }, [payload.documentType, partyType, onFieldChange]);
+  };
 
   const handleSelection = (party: ICustomer | ISupplier) => {
     if (partyType === 'customer') {
@@ -105,8 +112,9 @@ export function CustomerDetailsCard({ payload, onFieldChange, customers, supplie
           <ToggleGroup
             type="single"
             value={partyType}
+            onValueChange={handlePartyTypeChange}
             size="sm"
-            className="border rounded-md p-1 opacity-100 disabled:opacity-100" // Kept visible but disabled
+            className="border rounded-md p-1"
             disabled={isToggleDisabled}
           >
             <ToggleGroupItem value="customer" size="sm" className="gap-2 px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">

@@ -1,4 +1,4 @@
-// app/billing/page.tsx
+// app/billing/page.tsx - UPDATED: Detailed calculations for summary
 
 "use client";
 
@@ -18,7 +18,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 
 interface BillPayload extends Omit<OriginalBillPayload, 'documentType'> {
-  documentType: "invoice" | "receipt" | "payment" | "delivery" | "quotation";
+  documentType: "invoice" | "receipt" | "payment" | "quotation";
   supplierName?: string;
 }
 
@@ -55,13 +55,11 @@ export default function CreateBillPage() {
   const { permissions: invoicePerms } = useInvoicePermissions();
   const { permissions: quotePerms } = useQuotationPermissions();
   const { permissions: voucherPerms } = useVoucherPermissions();
-  const { permissions: deliveryPerms } = useDeliveryNotePermissions();
 
   const hasAnyCreatePermission = 
     invoicePerms.canCreate || 
     quotePerms.canCreate || 
-    voucherPerms.canCreate || 
-    deliveryPerms.canCreate;
+    voucherPerms.canCreate;
 
   useEffect(() => {
     setIsMounted(true);
@@ -139,16 +137,26 @@ export default function CreateBillPage() {
 
   const isVoucher = payload.documentType === 'receipt' || payload.documentType === 'payment';
 
-  const subTotal = isVoucher ? (payload.voucherAmount || 0) : payload.items.reduce((sum, item) => sum + item.total, 0);
-  const discountedTotal = isVoucher ? subTotal : (subTotal - payload.discount);
-  const vatAmount = isVoucher ? 0 : (discountedTotal * (UAE_VAT_PERCENTAGE / 100));
-  const grandTotal = isVoucher ? subTotal : (discountedTotal + vatAmount);
+  // Detailed calculation breakdown:
+  // Gross Total = Sum of line items (before discount, before VAT)
+  const grossTotal = isVoucher ? (payload.voucherAmount || 0) : payload.items.reduce((sum, item) => sum + item.total, 0);
+  
+  // Subtotal = Gross Total - Discount (this is the amount VAT is calculated on)
+  const subTotal = isVoucher ? grossTotal : (grossTotal - payload.discount);
+  
+  // VAT = Subtotal × VAT%
+  const vatAmount = isVoucher ? 0 : (subTotal * (UAE_VAT_PERCENTAGE / 100));
+  
+  // Grand Total = Subtotal + VAT
+  const grandTotal = isVoucher ? grossTotal : (subTotal + vatAmount);
 
   const isFormValid = useMemo(() => {
-    // STRICT VALIDATION: Payment = Supplier, Others = Customer
-    if (payload.documentType === 'payment') {
-      if (!payload.supplierName?.trim()) return false;
+    // For vouchers: Either customer or supplier must be provided
+    if (isVoucher) {
+      const hasParty = payload.customerName?.trim() || payload.supplierName?.trim();
+      if (!hasParty) return false;
     } else {
+      // For non-vouchers (invoice, quotation): Customer is required
       if (!payload.customerName?.trim()) return false;
     }
 
@@ -166,7 +174,7 @@ export default function CreateBillPage() {
     }
 
     return true;
-  }, [payload.customerName, payload.supplierName, payload.paymentMethod, payload.documentType, payload.items, payload.voucherAmount, grandTotal]);
+  }, [payload.customerName, payload.supplierName, payload.paymentMethod, payload.documentType, payload.items, payload.voucherAmount, grandTotal, isVoucher]);
 
   const handleSubmit = async () => {
     // 1. Immediate Lock: Prevent double submission
@@ -179,7 +187,6 @@ export default function CreateBillPage() {
     switch(currentType) {
         case 'invoice': canProceed = invoicePerms.canCreate; break;
         case 'quotation': canProceed = quotePerms.canCreate; break;
-        case 'delivery': canProceed = deliveryPerms.canCreate; break;
         case 'receipt': 
         case 'payment': canProceed = voucherPerms.canCreate; break;
     }
@@ -189,27 +196,29 @@ export default function CreateBillPage() {
         return;
     }
 
-    // STRICT SUBMISSION CHECK
-    if (payload.documentType === 'payment') {
-      if (!payload.supplierName?.trim()) {
-        toast.error("Supplier name is required for payment");
+    // Validation for vouchers: Either customer or supplier required
+    if (isVoucher) {
+      const hasParty = payload.customerName?.trim() || payload.supplierName?.trim();
+      if (!hasParty) {
+        toast.error("Either customer or supplier name is required");
         return;
       }
     } else {
+      // For non-vouchers: Customer required
       if (!payload.customerName?.trim()) {
         toast.error("Customer name is required");
         return;
       }
     }
 
-    const isVoucher = payload.documentType === 'receipt' || payload.documentType === 'payment';
+    const isVoucherCheck = payload.documentType === 'receipt' || payload.documentType === 'payment';
 
-    if (!isVoucher && grandTotal < 0) {
-      toast.error("Discount cannot exceed the subtotal");
+    if (!isVoucherCheck && grandTotal < 0) {
+      toast.error("Discount cannot exceed the gross total");
       return;
     }
 
-    if (isVoucher) {
+    if (isVoucherCheck) {
         if (!payload.paymentMethod?.trim()) {
             toast.error("Payment method is required");
             return;
@@ -272,17 +281,6 @@ export default function CreateBillPage() {
             }));
             break;
 
-        case "delivery":
-            endpoint = "/api/delivery-notes";
-            responseKey = "deliveryNote";
-            targetRoute = "/documents/delivery-notes";
-            payloadToSend.items = payload.items.map(item => ({
-                ...item,
-                quantity: Number(item.quantity) || 0,
-                rate: Number(item.rate) || 0,
-            }));
-            break;
-
         case "receipt":
         case "payment":
             endpoint = "/api/vouchers";
@@ -322,7 +320,6 @@ export default function CreateBillPage() {
         let pdfUrl = "";
         if (payload.documentType === 'invoice') pdfUrl = `/api/invoices/${docId}/pdf`;
         else if (payload.documentType === 'quotation') pdfUrl = `/api/quotations/${docId}/pdf`;
-        else if (payload.documentType === 'delivery') pdfUrl = `/api/delivery-notes/${docId}/pdf`;
         else pdfUrl = `/api/vouchers/${docId}/pdf?type=${payload.documentType}`;
 
         setSelectedPdfUrl(pdfUrl);
@@ -398,6 +395,7 @@ export default function CreateBillPage() {
           handleSubmit={handleSubmit}
           isLoading={isLoading}
           isFormValid={isFormValid}
+          grossTotal={grossTotal}
           subTotal={subTotal}
           vatAmount={vatAmount}
           grandTotal={grandTotal}
