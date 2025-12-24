@@ -1,8 +1,8 @@
-// app/accounting/journal/page.tsx - UPDATED: Fixed Opacity Flash on Focus
+// app/accounting/journal/page.tsx - FIXED: Added Suspense Boundary
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import { toast } from "sonner";
 import { NotebookPen, Plus, Trash2, Filter, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ import { useQueryStates, parseAsInteger } from "nuqs";
 import { getSortingStateParser, getFiltersStateParser } from "@/lib/data-table/parsers";
 import type { ExtendedColumnSort, ExtendedColumnFilter } from "@/types/data-table";
 
-export default function JournalPage() {
+function JournalPageContent() {
   const [journals, setJournals] = useState<IJournal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -121,11 +121,9 @@ export default function JournalPage() {
     }
   }, [canRead, session]);
 
-  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
   const fetchJournals = useCallback(async (background = false) => {
     if (!canRead) return;
     try {
-      // Only show loading spinner/skeleton if it's NOT a background fetch
       if (!background) {
         setIsLoading(true);
       }
@@ -162,7 +160,6 @@ export default function JournalPage() {
         setJournals(result);
       }
     } catch (error) {
-      // Only show toast error if it's a user interaction, not a background poll
       if (!background) {
         toast.error("Could not load journal entries.");
       }
@@ -185,8 +182,6 @@ export default function JournalPage() {
     selectedPartyId
   ]);
 
-  // Standard fetch on dependency change
-  // ✅ FIXED: Removed 'session' from dependencies to prevent re-fetch on window focus (which refreshes session)
   useEffect(() => {
     if (session && canRead) {
       fetchJournals();
@@ -197,15 +192,11 @@ export default function JournalPage() {
       setIsLoading(false);
       setIsInitialLoad(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canRead, fetchJournals]);
 
-  // ✅ NEW: Window Focus Listener - SILENT MODE
-  // This triggers a silent "background" fetch when you tab back to this page.
   useEffect(() => {
     const onFocus = () => {
       if (session && canRead) {
-        // Pass true to indicate this is a background fetch (no loading UI/opacity change)
         fetchJournals(true);
       }
     };
@@ -733,5 +724,17 @@ export default function JournalPage() {
         journal={selectedJournal}
       />
     </>
+  );
+}
+
+export default function JournalPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 items-center justify-center">
+        <Spinner className="size-10" />
+      </div>
+    }>
+      <JournalPageContent />
+    </Suspense>
   );
 }

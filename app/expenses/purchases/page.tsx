@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import { toast } from "sonner";
 import { ShoppingCart, Plus, BarChart3, Trash2, CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
 
-export default function PurchasesPage() {
+function PurchasesPageContent() {
   const [purchases, setPurchases] = useState<IPurchase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -611,5 +611,16 @@ export default function PurchasesPage() {
         onViewPdf={handleViewPdf}
       />
     </>
+  );
+}
+export default function Component() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 items-center justify-center">
+        <Spinner className="size-10" />
+      </div>
+    }>
+      <PurchasesPageContent />
+    </Suspense>
   );
 }

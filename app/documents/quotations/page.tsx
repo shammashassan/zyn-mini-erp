@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import { useQueryStates, parseAsInteger } from "nuqs";
 import { toast } from "sonner";
 import { FileClock, Plus, Trash2, CalendarIcon } from "lucide-react";
@@ -35,7 +35,7 @@ import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 
-export default function QuotationsPage() {
+function QuotationsPageContent() {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -523,5 +523,16 @@ export default function QuotationsPage() {
         title={selectedPdfTitle}
       />
     </>
+  );
+}
+export default function Component() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 items-center justify-center">
+        <Spinner className="size-10" />
+      </div>
+    }>
+      <QuotationsPageContent />
+    </Suspense>
   );
 }

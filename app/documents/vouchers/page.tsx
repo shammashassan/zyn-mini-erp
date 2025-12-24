@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef, Suspense } from "react";
 import { useQueryStates, parseAsInteger } from "nuqs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,7 @@ import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 
-export default function VouchersPage() {
+function VouchersPageContent() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -533,5 +533,16 @@ export default function VouchersPage() {
         title={selectedPdfTitle}
       />
     </>
+  );
+}
+export default function Component() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 items-center justify-center">
+        <Spinner className="size-10" />
+      </div>
+    }>
+      <VouchersPageContent />
+    </Suspense>
   );
 }

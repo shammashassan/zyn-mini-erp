@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import { toast } from "sonner";
 import { Banknote, Plus, BarChart3, Trash2, CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 
-export default function ExpensesPage() {
+function ExpensesPageContent() {
   const [expenses, setExpenses] = useState<IExpense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -586,5 +586,16 @@ export default function ExpensesPage() {
         title={pdfTitle}
       />
     </>
+  );
+}
+export default function Component() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 items-center justify-center">
+        <Spinner className="size-10" />
+      </div>
+    }>
+      <ExpensesPageContent />
+    </Suspense>
   );
 }

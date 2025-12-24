@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { toast } from "sonner";
 import { ArrowRightLeft, Plus, Trash2, CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,7 @@ type AdjustmentFormData = {
   adjustmentReason?: string;
 };
 
-export default function StockAdjustmentPage() {
+function StockAdjustmentPageContent() {
   const [materials, setMaterials] = useState<IMaterial[]>([]);
   const [adjustmentHistory, setAdjustmentHistory] = useState<IAdjustmentHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -513,5 +513,16 @@ export default function StockAdjustmentPage() {
         isLoadingMaterials={false} // Materials loaded on mount
       />
     </>
+  );
+}
+export default function Component() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 items-center justify-center">
+        <Spinner className="size-10" />
+      </div>
+    }>
+      <StockAdjustmentPageContent />
+    </Suspense>
   );
 }

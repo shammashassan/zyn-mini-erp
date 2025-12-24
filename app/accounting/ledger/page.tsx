@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { toast } from "sonner";
 import { BookOpen, CalendarIcon, Users, X, ChevronsUpDown, Check, Book } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,7 @@ interface LedgerData {
   totalCredit: number;
 }
 
-export default function LedgerPage() {
+function LedgerPageContent() {
   const searchParams = useSearchParams();
 
   const [accounts, setAccounts] = useState<IChartOfAccount[]>([]);
@@ -700,5 +700,16 @@ export default function LedgerPage() {
         title={`Ledger - ${ledgerData?.account.accountCode || ''}`}
       />
     </>
+  );
+}
+export default function Component() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 items-center justify-center">
+        <Spinner className="size-10" />
+      </div>
+    }>
+      <LedgerPageContent />
+    </Suspense>
   );
 }
