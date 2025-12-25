@@ -1,4 +1,4 @@
-// app/documents/vouchers/voucher-form.tsx - FIXED: Resolved import errors and added responsive party selection
+// app/documents/vouchers/voucher-form.tsx - UPDATED: Added automatic creation for Customer, Supplier, and Payee
 
 "use client";
 
@@ -48,7 +48,8 @@ import {
   Building2, 
   User, 
   Store,
-  Loader2 
+  Loader2,
+  Plus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -140,6 +141,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
   const [purchases, setPurchases] = useState<ConnectedPurchase[]>([]);
   const [partyPopoverOpen, setPartyPopoverOpen] = useState(false);
   const [selectedParty, setSelectedParty] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [vendorName, setVendorName] = useState("");
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [loadingPurchases, setLoadingPurchases] = useState(false);
@@ -203,7 +205,6 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
 
           let availableInvoices;
 
-          // ✅ RECEIPT: Show approved invoices with pending/partially paid status
           if (voucherType === 'receipt') {
             availableInvoices = fetchedInvoices
               .filter((inv: any) =>
@@ -222,10 +223,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
                 };
               })
               .filter((inv: any) => inv.remainingAmount > 0);
-          }
-
-          // ✅ REFUND: Show approved invoices with paidAmount > 0
-          else if (voucherType === 'refund') {
+          } else if (voucherType === 'refund') {
             availableInvoices = fetchedInvoices
               .filter((inv: any) =>
                 inv.status === 'approved' &&
@@ -295,6 +293,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
       setValue("discount", 0);
       setValue("notes", "");
       setSelectedParty("");
+      setSearchQuery("");
       setVendorName("");
       setSelectedInvoiceIds(new Set());
       setSelectedPurchaseIds(new Set());
@@ -316,9 +315,19 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
 
   const handlePartySelect = (party: ICustomer | ISupplier | IPayee) => {
     setSelectedParty(party.name);
+    setSearchQuery(party.name);
     setPartyPopoverOpen(false);
     setSelectedInvoiceIds(new Set());
     setSelectedPurchaseIds(new Set());
+  };
+
+  const handleCreateNew = () => {
+    if (searchQuery.trim()) {
+      setSelectedParty(searchQuery.trim());
+      setPartyPopoverOpen(false);
+      setSelectedInvoiceIds(new Set());
+      setSelectedPurchaseIds(new Set());
+    }
   };
 
   const toggleInvoiceSelection = (invoiceId: string) => {
@@ -364,6 +373,13 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
     }
   }, [hasLinkedDocuments, selectedInvoicesTotalAmount, selectedPurchasesTotalAmount, discount, voucherType, setValue]);
 
+  const doesPartyExist = () => {
+    const partyList = getPartyList();
+    return partyList.some(
+      (p) => p.name.toLowerCase() === searchQuery.trim().toLowerCase()
+    );
+  };
+
   const handleFormSubmit = async (data: VoucherFormData) => {
     if (!paymentMethod) {
       toast.error("Please select a payment method");
@@ -385,6 +401,73 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
       if (!selectedParty) {
         toast.error(`Please select a ${partyType}`);
         return;
+      }
+
+      // Check if party exists, if not create it
+      const partyList = getPartyList();
+      const partyExists = partyList.some(
+        (p) => p.name.toLowerCase() === selectedParty.trim().toLowerCase()
+      );
+
+      if (!partyExists) {
+        try {
+          let endpoint = '';
+          let partyPayload: any = { name: selectedParty.trim() };
+          let entityName = '';
+
+          switch (partyType) {
+            case 'customer':
+              endpoint = '/api/customers';
+              entityName = 'Customer';
+              break;
+            case 'supplier':
+              endpoint = '/api/suppliers';
+              entityName = 'Supplier';
+              break;
+            case 'payee':
+              endpoint = '/api/payees';
+              partyPayload.type = 'individual'; // Default type for payee
+              entityName = 'Payee';
+              break;
+          }
+
+          const createRes = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(partyPayload),
+          });
+
+          if (createRes.ok) {
+            toast.success(`${entityName} "${selectedParty}" created successfully`);
+            
+            // Refresh the party list
+            const refreshRes = await fetch(endpoint);
+            if (refreshRes.ok) {
+              const updatedList = await refreshRes.json();
+              switch (partyType) {
+                case 'customer':
+                  setCustomers(updatedList);
+                  break;
+                case 'supplier':
+                  setSuppliers(updatedList);
+                  break;
+                case 'payee':
+                  setPayees(updatedList);
+                  break;
+              }
+            }
+          } else {
+            const error = await createRes.json();
+            toast.error(`Failed to create ${entityName.toLowerCase()}`, {
+              description: error.error || "Please try again"
+            });
+            return;
+          }
+        } catch (error) {
+          console.error(`Error creating ${partyType}:`, error);
+          toast.error(`Failed to create ${partyType}`);
+          return;
+        }
       }
     }
 
@@ -447,6 +530,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
     if (value) {
       setValue("voucherType", value);
       setSelectedParty("");
+      setSearchQuery("");
       setVendorName("");
       setSelectedInvoiceIds(new Set());
       setSelectedPurchaseIds(new Set());
@@ -458,6 +542,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
     if (value) {
       setValue('partyType', value);
       setSelectedParty("");
+      setSearchQuery("");
       setVendorName("");
       setSelectedInvoiceIds(new Set());
       setSelectedPurchaseIds(new Set());
@@ -593,32 +678,58 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
                   <Popover open={partyPopoverOpen} onOpenChange={setPartyPopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" role="combobox" className="w-full justify-between">
-                        {selectedParty || `Select ${partyType}...`}
+                        {selectedParty || `Select or type ${partyType}...`}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder={`Search ${partyType}...`} />
+                      <Command shouldFilter={false}>
+                        <CommandInput 
+                          placeholder={`Search ${partyType}...`}
+                          value={searchQuery}
+                          onValueChange={setSearchQuery}
+                        />
                         <CommandList
                           className="max-h-[200px] overflow-y-auto"
                           onWheel={(e) => e.stopPropagation()}
                         >
-                          <CommandEmpty>No {partyType} found.</CommandEmpty>
-                          <CommandGroup>
-                            {partyList.map((party) => (
+                          <CommandEmpty>
+                            {searchQuery.trim() ? `No ${partyType} found.` : "Start typing to search..."}
+                          </CommandEmpty>
+                          
+                          {partyList.length > 0 && (
+                            <CommandGroup heading={`Existing ${partyType.charAt(0).toUpperCase() + partyType.slice(1)}s`}>
+                              {partyList
+                                .filter(party => 
+                                  !searchQuery || party.name.toLowerCase().includes(searchQuery.toLowerCase())
+                                )
+                                .map((party) => (
+                                  <CommandItem
+                                    key={String(party._id)}
+                                    value={party.name}
+                                    onSelect={() => handlePartySelect(party)}
+                                  >
+                                    <Check className={cn("mr-2 h-4 w-4", selectedParty === party.name ? "opacity-100" : "opacity-0")} />
+                                    <div>
+                                      <div>{party.name}</div>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                            </CommandGroup>
+                          )}
+
+                          {searchQuery.trim() && !doesPartyExist() && (
+                            <CommandGroup heading="Create New">
                               <CommandItem
-                                key={String(party._id)}
-                                value={party.name}
-                                onSelect={() => handlePartySelect(party)}
+                                onSelect={handleCreateNew}
+                                className="text-primary"
+                                value={searchQuery}
                               >
-                                <Check className={cn("mr-2 h-4 w-4", selectedParty === party.name ? "opacity-100" : "opacity-0")} />
-                                <div>
-                                  <div>{party.name}</div>
-                                </div>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Create "{searchQuery}"
                               </CommandItem>
-                            ))}
-                          </CommandGroup>
+                            </CommandGroup>
+                          )}
                         </CommandList>
                       </Command>
                     </PopoverContent>
