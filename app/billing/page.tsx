@@ -12,10 +12,11 @@ import type { IProduct } from "@/models/Product";
 import type { ISupplier } from "@/models/Supplier";
 import { ScrollText } from "lucide-react";
 import { UAE_VAT_PERCENTAGE } from '@/utils/constants';
-import { useInvoicePermissions, useQuotationPermissions, useVoucherPermissions, useDeliveryNotePermissions } from "@/hooks/use-permissions";
+import { useBillPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
+import { ca } from "date-fns/locale";
 
 interface BillPayload extends Omit<OriginalBillPayload, 'documentType'> {
   documentType: "invoice" | "receipt" | "payment" | "quotation";
@@ -25,7 +26,7 @@ interface BillPayload extends Omit<OriginalBillPayload, 'documentType'> {
 export default function CreateBillPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Ref to prevent double submission during network lag
   const isSubmittingRef = useRef(false);
 
@@ -33,12 +34,12 @@ export default function CreateBillPage() {
   const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
   const [products, setProducts] = useState<IProduct[]>([]);
   const [isMounted, setIsMounted] = useState(false);
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPdfUrl, setSelectedPdfUrl] = useState("");
   const [selectedPdfTitle, setSelectedPdfTitle] = useState("");
   const [redirectPath, setRedirectPath] = useState<string | null>(null);
-  
+
   const [payload, setPayload] = useState<BillPayload>({
     customerName: "",
     supplierName: "",
@@ -52,14 +53,7 @@ export default function CreateBillPage() {
     items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
   } as BillPayload);
 
-  const { permissions: invoicePerms } = useInvoicePermissions();
-  const { permissions: quotePerms } = useQuotationPermissions();
-  const { permissions: voucherPerms } = useVoucherPermissions();
-
-  const hasAnyCreatePermission = 
-    invoicePerms.canCreate || 
-    quotePerms.canCreate || 
-    voucherPerms.canCreate;
+  const { permissions: { canCreate } } = useBillPermissions();
 
   useEffect(() => {
     setIsMounted(true);
@@ -67,7 +61,7 @@ export default function CreateBillPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!hasAnyCreatePermission) return;
+      if (!canCreate) return;
 
       try {
         const [customersRes, productsRes, suppliersRes] = await Promise.all([
@@ -85,11 +79,11 @@ export default function CreateBillPage() {
         toast.error("Failed to load necessary data.");
       }
     };
-    
-    if (isMounted && hasAnyCreatePermission) {
+
+    if (isMounted && canCreate) {
       fetchData();
     }
-  }, [isMounted, hasAnyCreatePermission]);
+  }, [isMounted, canCreate]);
 
   const updateItem = (index: number, field: keyof Item, value: string | number) => {
     setPayload(prev => {
@@ -140,13 +134,13 @@ export default function CreateBillPage() {
   // Detailed calculation breakdown:
   // Gross Total = Sum of line items (before discount, before VAT)
   const grossTotal = isVoucher ? (payload.voucherAmount || 0) : payload.items.reduce((sum, item) => sum + item.total, 0);
-  
+
   // Subtotal = Gross Total - Discount (this is the amount VAT is calculated on)
   const subTotal = isVoucher ? grossTotal : (grossTotal - payload.discount);
-  
+
   // VAT = Subtotal × VAT%
   const vatAmount = isVoucher ? 0 : (subTotal * (UAE_VAT_PERCENTAGE / 100));
-  
+
   // Grand Total = Subtotal + VAT
   const grandTotal = isVoucher ? grossTotal : (subTotal + vatAmount);
 
@@ -179,21 +173,11 @@ export default function CreateBillPage() {
   const handleSubmit = async () => {
     // 1. Immediate Lock: Prevent double submission
     if (isSubmittingRef.current) return;
-    
+
     // 2. Synchronous Validations (Safety Net)
-    let canProceed = false;
-    const currentType = payload.documentType as string;
-
-    switch(currentType) {
-        case 'invoice': canProceed = invoicePerms.canCreate; break;
-        case 'quotation': canProceed = quotePerms.canCreate; break;
-        case 'receipt': 
-        case 'payment': canProceed = voucherPerms.canCreate; break;
-    }
-
-    if (!canProceed) {
-        toast.error(`You do not have permission to create a ${payload.documentType}`);
-        return;
+    if (!canCreate) {
+      toast.error(`You do not have permission to create a ${payload.documentType}`);
+      return;
     }
 
     // Validation for vouchers: Either customer or supplier required
@@ -219,14 +203,14 @@ export default function CreateBillPage() {
     }
 
     if (isVoucherCheck) {
-        if (!payload.paymentMethod?.trim()) {
-            toast.error("Payment method is required");
-            return;
-        }
-        if (!payload.voucherAmount || payload.voucherAmount <= 0) {
-            toast.error("Please enter a valid amount");
-            return;
-        }
+      if (!payload.paymentMethod?.trim()) {
+        toast.error("Payment method is required");
+        return;
+      }
+      if (!payload.voucherAmount || payload.voucherAmount <= 0) {
+        toast.error("Please enter a valid amount");
+        return;
+      }
     } else {
       if (payload.items.length === 0) {
         toast.error("At least one item is required");
@@ -260,47 +244,47 @@ export default function CreateBillPage() {
 
       switch (payload.documentType) {
         case "invoice":
-            endpoint = "/api/invoices";
-            responseKey = "invoice";
-            targetRoute = "/documents/invoices";
-            payloadToSend.items = payload.items.map(item => ({
-                ...item,
-                quantity: Number(item.quantity) || 0,
-                rate: Number(item.rate) || 0,
-            }));
-            break;
-        
+          endpoint = "/api/invoices";
+          responseKey = "invoice";
+          targetRoute = "/documents/invoices";
+          payloadToSend.items = payload.items.map(item => ({
+            ...item,
+            quantity: Number(item.quantity) || 0,
+            rate: Number(item.rate) || 0,
+          }));
+          break;
+
         case "quotation":
-            endpoint = "/api/quotations";
-            responseKey = "quotation";
-            targetRoute = "/documents/quotations";
-            payloadToSend.items = payload.items.map(item => ({
-                ...item,
-                quantity: Number(item.quantity) || 0,
-                rate: Number(item.rate) || 0,
-            }));
-            break;
+          endpoint = "/api/quotations";
+          responseKey = "quotation";
+          targetRoute = "/documents/quotations";
+          payloadToSend.items = payload.items.map(item => ({
+            ...item,
+            quantity: Number(item.quantity) || 0,
+            rate: Number(item.rate) || 0,
+          }));
+          break;
 
         case "receipt":
         case "payment":
-            endpoint = "/api/vouchers";
-            responseKey = "voucher";
-            targetRoute = "/documents/vouchers";
-            
-            payloadToSend = {
-                voucherType: payload.documentType, 
-                paymentMethod: payload.paymentMethod,
-                customerName: payload.customerName || undefined,
-                supplierName: payload.supplierName || undefined,
-                customerPhone: payload.customerPhone,
-                customerEmail: payload.customerEmail,
-                notes: payload.notes,
-                items: [], 
-                totalAmount: payload.voucherAmount,
-                grandTotal: payload.voucherAmount,
-                discount: 0,
-            };
-            break;
+          endpoint = "/api/vouchers";
+          responseKey = "voucher";
+          targetRoute = "/documents/vouchers";
+
+          payloadToSend = {
+            voucherType: payload.documentType,
+            paymentMethod: payload.paymentMethod,
+            customerName: payload.customerName || undefined,
+            supplierName: payload.supplierName || undefined,
+            customerPhone: payload.customerPhone,
+            customerEmail: payload.customerEmail,
+            notes: payload.notes,
+            items: [],
+            totalAmount: payload.voucherAmount,
+            grandTotal: payload.voucherAmount,
+            discount: 0,
+          };
+          break;
       }
 
       console.log(`📋 Creating ${payload.documentType} at ${endpoint}`);
@@ -316,7 +300,7 @@ export default function CreateBillPage() {
       if (res.ok) {
         const docId = data[responseKey]?._id;
         const docNumber = data[responseKey]?.invoiceNumber;
-        
+
         let pdfUrl = "";
         if (payload.documentType === 'invoice') pdfUrl = `/api/invoices/${docId}/pdf`;
         else if (payload.documentType === 'quotation') pdfUrl = `/api/quotations/${docId}/pdf`;
@@ -328,17 +312,17 @@ export default function CreateBillPage() {
         setIsModalOpen(true);
 
         toast.success(`${payload.documentType.toUpperCase()} ${docNumber} created successfully!`);
-        
+
         setPayload(prev => ({
-            ...prev,
-            customerName: "",
-            supplierName: "",
-            customerPhone: "",
-            customerEmail: "",
-            items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
-            notes: "",
-            voucherAmount: 0,
-            discount: 0
+          ...prev,
+          customerName: "",
+          supplierName: "",
+          customerPhone: "",
+          customerEmail: "",
+          items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
+          notes: "",
+          voucherAmount: 0,
+          discount: 0
         }));
 
       } else {
@@ -357,19 +341,19 @@ export default function CreateBillPage() {
   const handleModalClose = () => {
     setIsModalOpen(false);
     if (redirectPath) {
-        router.push(redirectPath);
+      router.push(redirectPath);
     }
   };
 
   if (!isMounted) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
   }
 
-  if (!hasAnyCreatePermission) {
+  if (!canCreate) {
     return <AccessDenied />
   }
 
