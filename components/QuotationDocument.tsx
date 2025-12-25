@@ -543,7 +543,7 @@ export const QuotationDocument: React.FC<QuotationDocumentProps> = ({ bill, comp
                 </View>
               </View>
 
-              {companyDetails?.termsAndConditions && (
+              {/* Terms Box - Conditional check removed so hardcoded text always shows */}
                 <View style={styles.termsBox}>
                   <Text style={styles.boxTitle}>Important Considerations</Text>
 
@@ -568,7 +568,6 @@ export const QuotationDocument: React.FC<QuotationDocumentProps> = ({ bill, comp
                     </Text>
                   </View>
                 </View>
-              )}
             </View>
           </View>
         </View>
