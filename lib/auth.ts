@@ -32,9 +32,7 @@ export const auth = betterAuth({
       enabled: true,
       maxAge: 60 * 60 * 2,   // Cache lasts 2 hours (was 15 mins)
       strategy: "compact",   // Compact strategy for performance
-      refreshCache: {
-        updateAge: 60 * 60   // Refresh cache when 1 hour remains
-      }
+      refreshCache: true
     }
   },
 

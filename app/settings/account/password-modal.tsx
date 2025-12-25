@@ -102,7 +102,7 @@ export function PasswordModal({ isOpen, onClose }: PasswordModalProps) {
       const { error } = await authClient.changePassword({
         currentPassword: data.currentPassword,
         newPassword: data.newPassword,
-        revokeOtherSessions: false,
+        revokeOtherSessions: true,
       });
 
       if (error) {
