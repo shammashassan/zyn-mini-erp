@@ -499,7 +499,7 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, co
                   <Text style={styles.boxContent}>{companyDetails.bankDetails}</Text>
                 </View>
               )}
-              {companyDetails?.termsAndConditions && (
+              {/* Terms Box - Conditional check removed so hardcoded text always shows */}
                 <View style={styles.termsBox}>
                 <Text style={styles.boxTitle}>Terms & Conditions</Text>
                 
@@ -524,7 +524,6 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, co
                   </Text>
                 </View>
               </View>
-              )}
             </View>
           </View>
         </View>
