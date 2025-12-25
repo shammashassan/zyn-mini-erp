@@ -22,15 +22,6 @@ export function SiteFooter() {
             >
               ASG
             </a>
-            . The source code is available on{" "}
-            <a
-              href="https://github.com/shammashassan"
-              target="_blank"
-              rel="noreferrer"
-              className="font-medium underline underline-offset-4"
-            >
-              GitHub
-            </a>
             .
           </div>
         </div>
