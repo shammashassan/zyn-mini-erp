@@ -222,12 +222,12 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
     // Validate discount
     const itemsGrossTotal = validItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
     const discountAmount = Number(data.discount) || 0;
-    
+
     if (discountAmount < 0) {
       toast.error("Discount cannot be negative");
       return;
     }
-    
+
     if (discountAmount > itemsGrossTotal) {
       toast.error("Discount cannot exceed gross total");
       return;
@@ -477,7 +477,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                     <tbody>
                       {fields.map((field, index) => {
                         const material = materials.find(m => m._id === watchedItems[index]?.materialId);
-                        
+
                         return (
                           <tr key={field.id} className="border-b hover:bg-muted/50">
                             <td className="p-3 text-sm text-muted-foreground">{index + 1}</td>
@@ -576,7 +576,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                 <div className="space-y-4">
                   {fields.map((field, index) => {
                     const material = materials.find(m => m._id === watchedItems[index]?.materialId);
-                    
+
                     return (
                       <Card key={field.id} className="border-2">
                         <CardHeader className="pb-2">
@@ -698,6 +698,27 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
             </CardContent>
           </Card>
 
+          <div className="space-y-2">
+            <Label htmlFor="discount">Discount:</Label>
+            <Input
+              id="discount"
+              type="number"
+              step="0.01"
+              min="0"
+              max={grossTotal}
+              placeholder="0.00"
+              {...register("discount", {
+                valueAsNumber: true,
+                validate: (value) => {
+                  const val = Number(value) || 0;
+                  if (val < 0) return "Discount cannot be negative";
+                  if (val > grossTotal) return "Discount cannot exceed gross total";
+                  return true;
+                }
+              })}
+            />
+          </div>
+
           <Card className="bg-muted/50">
             <CardContent className="p-6">
               <div className="space-y-3">
@@ -715,31 +736,11 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                   <span className="text-muted-foreground">Gross Total:</span>
                   <span className="font-medium">{formatCurrency(grossTotal)}</span>
                 </div>
-                
-                {/* Discount Input */}
-                <div className="flex justify-between items-center text-sm pt-2 border-t">
-                  <Label htmlFor="discount" className="text-muted-foreground">Discount:</Label>
-                  <Input
-                    id="discount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max={grossTotal}
-                    placeholder="0.00"
-                    className="w-32 h-8 text-left"
-                    {...register("discount", {
-                      valueAsNumber: true,
-                      validate: (value) => {
-                        const val = Number(value) || 0;
-                        if (val < 0) return "Discount cannot be negative";
-                        if (val > grossTotal) return "Discount cannot exceed gross total";
-                        return true;
-                      }
-                    })}
-                  />
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Discount:</span>
+                  <span className="font-medium text-destructive">-{formatCurrency(Number(discount) || 0)}</span>
                 </div>
-                
-                <div className="flex justify-between text-sm pt-2 border-t">
+                <div className="flex justify-between text-sm pt-2">
                   <span className="text-muted-foreground">Subtotal:</span>
                   <span className="font-medium">{formatCurrency(subtotal)}</span>
                 </div>
@@ -763,8 +764,8 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isSubmitting || (isEditMode && !isDirty)}
             >
               {isSubmitting ? (
