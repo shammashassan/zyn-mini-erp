@@ -28,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   Accordion,
   AccordionContent,
@@ -53,14 +54,18 @@ const HELP_RESOURCES: HelpResource[] = [
     title: "Documentation",
     description: "Browse our comprehensive documentation and guides",
     icon: BookOpen,
-    href: "#",
+    action: () => toast.info("Documentation is currently under development.", {
+      description: "Please check back later for updates."
+    }),
   },
   {
     id: "video-tutorials",
     title: "Video Tutorials",
     description: "Watch step-by-step video guides and tutorials",
     icon: Video,
-    href: "#",
+    action: () => toast.info("Video tutorials are coming soon!", {
+      description: "We are recording new content to help you get started."
+    }),
   },
   {
     id: "faq",
@@ -134,7 +139,7 @@ export default function GetHelpPage() {
 
   const filteredFAQ = React.useMemo(() => {
     if (!searchQuery.trim()) return FAQ_ITEMS;
-    
+
     const query = searchQuery.toLowerCase();
     return FAQ_ITEMS.filter(
       (item) =>
@@ -249,8 +254,8 @@ export default function GetHelpPage() {
                   })}
                 </ItemGroup>
               </div>
-              
-              <Separator/>
+
+              <Separator />
 
               {/* FAQ Section */}
               <Card id="faq-section">
@@ -295,7 +300,7 @@ export default function GetHelpPage() {
                 </CardContent>
               </Card>
 
-              <Separator/>
+              <Separator />
 
               {/* Contact Support */}
               <Card id="contact-section">
@@ -358,7 +363,7 @@ export default function GetHelpPage() {
                 </CardContent>
               </Card>
 
-              <Separator/>
+              <Separator />
 
               {/* System Information */}
               <Card>

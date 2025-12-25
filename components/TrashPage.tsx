@@ -337,7 +337,7 @@ export function TrashPage<T extends { _id: string; deletedAt?: Date | string; de
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleEmptyTrash}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className={cn(buttonVariants({ variant: "destructive" }))}
             >
               Empty Trash
             </AlertDialogAction>
