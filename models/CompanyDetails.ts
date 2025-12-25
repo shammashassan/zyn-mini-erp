@@ -9,7 +9,6 @@ export interface ICompanyDetails extends Document {
   telephone?: string;
   address?: string;
   bankDetails?: string;
-  termsAndConditions?: string;
 }
 
 const CompanyDetailsSchema: Schema<ICompanyDetails> = new Schema({
@@ -21,7 +20,6 @@ const CompanyDetailsSchema: Schema<ICompanyDetails> = new Schema({
   telephone: { type: String },
   address: { type: String },
   bankDetails: { type: String },
-  termsAndConditions: { type: String },
 });
 
 const CompanyDetails = models.CompanyDetails || model<ICompanyDetails>('CompanyDetails', CompanyDetailsSchema);

@@ -10,8 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Settings, Building2, Globe, Mail, 
+import {
+  Settings, Building2, Globe, Mail,
   Phone, MapPin, FileText, Camera, Wallet
 } from "lucide-react";
 import { useCompanyDetailsPermissions } from "@/hooks/use-permissions";
@@ -37,14 +37,13 @@ type CompanyDetailsFormData = {
   telephone?: string;
   address?: string;
   bankDetails?: string;
-  termsAndConditions?: string;
 };
 
 export default function CompanyDetailsPage() {
   const { register, handleSubmit, reset, watch, formState: { isSubmitting, isDirty } } = useForm<CompanyDetailsFormData>();
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
-  
+
   // Image Upload State
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [logoBlob, setLogoBlob] = useState<Blob | null>(null);
@@ -139,13 +138,13 @@ export default function CompanyDetailsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(finalData),
       }).then(async (res) => {
-         if(!res.ok) throw new Error("Failed");
-         // Cleanup upload state on success
-         setLogoBlob(null);
-         setWasLogoRemoved(false);
-         // Important: Reset form state so isDirty becomes false with new values
-         reset(finalData); 
-         return res;
+        if (!res.ok) throw new Error("Failed");
+        // Cleanup upload state on success
+        setLogoBlob(null);
+        setWasLogoRemoved(false);
+        // Important: Reset form state so isDirty becomes false with new values
+        reset(finalData);
+        return res;
       }),
       {
         loading: 'Saving details...',
@@ -158,7 +157,7 @@ export default function CompanyDetailsPage() {
   if (isPending || !isMounted) {
     return (
       <div className="flex flex-1 items-center justify-center min-h-screen">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
   }
@@ -174,7 +173,7 @@ export default function CompanyDetailsPage() {
         <Skeleton className="h-4 w-1/2" />
         <Card>
           <CardHeader>
-             <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-6 w-1/3" />
           </CardHeader>
           <CardContent className="space-y-4">
             <Skeleton className="h-40 w-full" />
@@ -192,7 +191,7 @@ export default function CompanyDetailsPage() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-primary/10 rounded-lg">
-             <Settings className="h-8 w-8 text-primary" />
+            <Settings className="h-8 w-8 text-primary" />
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Company Details</h1>
@@ -216,7 +215,7 @@ export default function CompanyDetailsPage() {
           <CardContent className="p-0">
             {/* Changed flex-row breakpoint from md (768px) to lg (1024px) to handle tablet sizing better */}
             <div className="flex flex-col lg:flex-row border-b">
-              
+
               {/* --- LEFT COLUMN: Visual Identity --- */}
               {/* Changed widths and borders to lg breakpoint */}
               <div className="w-full lg:w-1/3 border-b lg:border-b-0 lg:border-r bg-muted/10 p-8 flex flex-col items-center justify-start gap-6">
@@ -231,16 +230,16 @@ export default function CompanyDetailsPage() {
                     )}
                   >
                     {currentLogoUrl ? (
-                      <img 
-                        src={currentLogoUrl} 
-                        alt="Company Logo" 
+                      <img
+                        src={currentLogoUrl}
+                        alt="Company Logo"
                         // Changed object-contain and removed p-2. Use object-cover to fill frame.
-                        className="w-full h-full object-cover" 
+                        className="w-full h-full object-cover"
                       />
                     ) : (
                       <Building2 className="h-16 w-16 text-muted-foreground/50" />
                     )}
-                    
+
                     {canUpdate && (
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white">
                         <Camera className="h-8 w-8 mb-2" />
@@ -255,9 +254,9 @@ export default function CompanyDetailsPage() {
                     {watch("companyName") || "Company Name"}
                   </h3>
                   {watch("website") && (
-                    <a 
-                      href={watch("website")} 
-                      target="_blank" 
+                    <a
+                      href={watch("website")}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center justify-center gap-1 mt-1"
                     >
@@ -270,18 +269,18 @@ export default function CompanyDetailsPage() {
 
               {/* --- RIGHT COLUMN: Edit Form --- */}
               <div className="flex-1 p-8 space-y-8">
-                
+
                 {/* Identity & Online */}
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="companyName">Company Name</Label>
                     <div className="relative">
                       <Building2 className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        id="companyName" 
+                      <Input
+                        id="companyName"
                         className="pl-9"
-                        {...register("companyName", { required: true })} 
-                        disabled={!canUpdate} 
+                        {...register("companyName", { required: true })}
+                        disabled={!canUpdate}
                         placeholder="Acme Corp, Inc."
                       />
                     </div>
@@ -292,12 +291,12 @@ export default function CompanyDetailsPage() {
                       <Label htmlFor="website">Website</Label>
                       <div className="relative">
                         <Globe className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                          id="website" 
+                        <Input
+                          id="website"
                           className="pl-9"
-                          placeholder="https://example.com" 
-                          {...register("website")} 
-                          disabled={!canUpdate} 
+                          placeholder="https://example.com"
+                          {...register("website")}
+                          disabled={!canUpdate}
                         />
                       </div>
                     </div>
@@ -305,13 +304,13 @@ export default function CompanyDetailsPage() {
                       <Label htmlFor="email">Email</Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                          id="email" 
-                          type="email" 
+                        <Input
+                          id="email"
+                          type="email"
                           className="pl-9"
-                          placeholder="contact@example.com" 
-                          {...register("email")} 
-                          disabled={!canUpdate} 
+                          placeholder="contact@example.com"
+                          {...register("email")}
+                          disabled={!canUpdate}
                         />
                       </div>
                     </div>
@@ -342,62 +341,49 @@ export default function CompanyDetailsPage() {
               <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <MapPin className="h-4 w-4" /> Location & Legal
               </h3>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="address">Address</Label>
-                <Textarea 
-                  id="address" 
+                <Textarea
+                  id="address"
                   className="min-h-[80px] resize-y"
-                  {...register("address")} 
-                  disabled={!canUpdate} 
+                  {...register("address")}
+                  disabled={!canUpdate}
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="bankDetails" className="flex items-center gap-2">
-                    <Wallet className="h-3 w-3" /> Bank Details
-                  </Label>
-                  <Textarea 
-                    id="bankDetails" 
-                    placeholder="Bank Name, Account No, IFSC..." 
-                    className="min-h-[100px]"
-                    {...register("bankDetails")} 
-                    disabled={!canUpdate} 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="termsAndConditions" className="flex items-center gap-2">
-                      <FileText className="h-3 w-3" /> Terms & Conditions
-                  </Label>
-                  <Textarea 
-                    id="termsAndConditions" 
-                    className="min-h-[100px]"
-                    {...register("termsAndConditions")} 
-                    disabled={!canUpdate} 
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="bankDetails" className="flex items-center gap-2">
+                  <Wallet className="h-3 w-3" /> Bank Details
+                </Label>
+                <Textarea
+                  id="bankDetails"
+                  placeholder="Bank Name, Account No, IFSC..."
+                  className="min-h-[120px]"
+                  {...register("bankDetails")}
+                  disabled={!canUpdate}
+                />
               </div>
             </div>
           </CardContent>
 
           {/* Footer */}
           {canUpdate && (
-             <div className="border-t px-6 py-4 flex justify-between items-center bg-muted/30">
-               <p className="text-xs text-muted-foreground">
-                 {hasChanges ? "You have unsaved changes" : "All details are up to date"}
-               </p>
-               <Button type="submit" disabled={isSubmitting || !hasChanges}>
-                 {isSubmitting ? (
-                   <>
-                     <Spinner/>
-                     Saving...
-                   </>
-                 ) : (
-                   "Save Details"
-                 )}
-               </Button>
-             </div>
+            <div className="border-t px-6 py-4 flex justify-between items-center bg-muted/30">
+              <p className="text-xs text-muted-foreground">
+                {hasChanges ? "You have unsaved changes" : "All details are up to date"}
+              </p>
+              <Button type="submit" disabled={isSubmitting || !hasChanges}>
+                {isSubmitting ? (
+                  <>
+                    <Spinner />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Details"
+                )}
+              </Button>
+            </div>
           )}
         </Card>
       </form>
@@ -417,7 +403,7 @@ export default function CompanyDetailsPage() {
 
           <div className="py-4">
             <ImageUploader
-              initialImageUrl={currentLogoUrl ?? undefined} 
+              initialImageUrl={currentLogoUrl ?? undefined}
               onImageCropped={handleImageCropped}
             />
           </div>
@@ -430,11 +416,11 @@ export default function CompanyDetailsPage() {
             }}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={() => {
                 setIsImageModalOpen(false);
                 handleSubmit(onSubmit)();
-              }} 
+              }}
               disabled={(!logoBlob && !wasLogoRemoved) || isSubmitting}
             >
               Apply & Save

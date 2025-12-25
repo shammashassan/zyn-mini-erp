@@ -8,7 +8,7 @@ import { AppLayout } from "@/components/app-layout";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 
 export const metadata: Metadata = {
-  title: "Company Dashboard",
+  title: "Zyn Erp",
   description: "Visualize and manage your sales, stock, and performance",
 };
 
