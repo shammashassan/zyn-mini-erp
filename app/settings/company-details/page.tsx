@@ -342,27 +342,29 @@ export default function CompanyDetailsPage() {
                 <MapPin className="h-4 w-4" /> Location & Legal
               </h3>
 
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Textarea
-                  id="address"
-                  className="min-h-[80px] resize-y"
-                  {...register("address")}
-                  disabled={!canUpdate}
-                />
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="bankDetails" className="flex items-center gap-2">
+                    <Wallet className="h-3 w-3" /> Bank Details
+                  </Label>
+                  <Textarea
+                    id="bankDetails"
+                    placeholder="Bank Name, Account No, IFSC..."
+                    className="min-h-[100px]"
+                    {...register("bankDetails")}
+                    disabled={!canUpdate}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Textarea
+                    id="address"
+                    className="min-h-[100px] resize-y"
+                    {...register("address")}
+                    disabled={!canUpdate}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="bankDetails" className="flex items-center gap-2">
-                  <Wallet className="h-3 w-3" /> Bank Details
-                </Label>
-                <Textarea
-                  id="bankDetails"
-                  placeholder="Bank Name, Account No, IFSC..."
-                  className="min-h-[120px]"
-                  {...register("bankDetails")}
-                  disabled={!canUpdate}
-                />
               </div>
             </div>
           </CardContent>
