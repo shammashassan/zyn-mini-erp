@@ -1,9 +1,8 @@
-// page.tsx - Updated with responsive tabs
-// ============================================
+// app/accounting/financial-statements/page.tsx - UPDATED: Added FinancialReportSkeleton
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { toast } from "sonner";
 import {
   TrendingUp,
@@ -35,6 +34,7 @@ import {
 } from "@/utils/reportExports";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export interface AccountData {
   accountCode: string;
@@ -84,7 +84,89 @@ interface BSData {
   };
 }
 
+// ✅ ADDED: Financial Report Skeleton Component
+function FinancialReportSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Stats Cards Skeleton */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i} className="p-6 py-4">
+            <CardContent className="p-0 space-y-2">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-4 w-24" /> {/* Label */}
+                <Skeleton className="h-5 w-12 rounded-full" /> {/* Badge */}
+              </div>
+              <Skeleton className="h-8 w-32" /> {/* Value */}
+              <Skeleton className="h-3 w-40" /> {/* Subtext */}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Account Sections Skeleton */}
+      {[...Array(3)].map((_, i) => (
+        <Card key={i} className="mb-4">
+          <div className="p-4 flex items-center justify-between border-b">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 rounded-lg" /> {/* Icon */}
+              <div className="space-y-1">
+                <Skeleton className="h-5 w-32" /> {/* Title */}
+                <Skeleton className="h-3 w-20" /> {/* Subtitle */}
+              </div>
+            </div>
+            <Skeleton className="h-6 w-24" /> {/* Total */}
+          </div>
+          <div className="p-4 space-y-4">
+            {[...Array(3)].map((_, j) => (
+              <div key={j} className="flex justify-between items-center">
+                <div className="flex gap-2 items-center">
+                  <Skeleton className="h-5 w-16 rounded" /> {/* Code */}
+                  <Skeleton className="h-4 w-48" /> {/* Name */}
+                </div>
+                <Skeleton className="h-4 w-24" /> {/* Amount */}
+              </div>
+            ))}
+          </div>
+        </Card>
+      ))}
+
+      {/* Bottom Summary Card Skeleton */}
+      <Card className="border-2">
+        <CardContent className="p-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <Skeleton className="h-12 w-12 rounded-lg" /> {/* Icon */}
+              <div className="space-y-2 flex-1">
+                <Skeleton className="h-6 w-32" /> {/* Net Profit/Loss */}
+                <Skeleton className="h-4 w-48" /> {/* Date Range */}
+              </div>
+            </div>
+            <Skeleton className="h-10 w-40" /> {/* Total Amount */}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ✅ Wrapper component to provide Suspense boundary
 export default function FinancialStatementsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 items-center justify-center min-h-[400px]">
+        <Spinner className="size-10" />
+      </div>
+    }>
+      <FinancialStatementsPageContent />
+    </Suspense>
+  );
+}
+
+/**
+ * The main page component content
+ */
+function FinancialStatementsPageContent() {
   const [activeReport, setActiveReport] = useState<"profit-loss" | "balance-sheet" | "cash-flow">("profit-loss");
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(subMonths(new Date(), 5)),
@@ -128,32 +210,40 @@ export default function FinancialStatementsPage() {
       }
     };
 
-    if (session && canRead) {
+    if (canRead) {
       fetchCompanyDetails();
     }
-  }, [session, canRead]);
+  }, [canRead]);
 
-  const fetchFinancialData = async () => {
+  // ✅ UPDATED: Added 'background' param for silent refreshes
+  const fetchFinancialData = useCallback(async (background = false) => {
     if (!canRead) return;
     if (!dateRange?.from || !dateRange?.to) return;
 
     try {
-      setIsLoading(true);
+      // Only show spinner/skeleton if not a background fetch
+      if (!background) {
+        setIsLoading(true);
+      }
+      
       const params = new URLSearchParams();
       params.append('startDate', dateRange.from.toISOString());
       params.append('endDate', dateRange.to.toISOString());
 
+      // 1. Fetch Profit & Loss Data
       const res = await fetch(`/api/financial-statements?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch financial data");
       const result = await res.json();
       setData(result);
 
+      // 2. Fetch Cash Flow Data
       const cfRes = await fetch(`/api/financial-statements/cash-flow?${params.toString()}`);
       if (cfRes.ok) {
         const cfResult = await cfRes.json();
         setCashFlowData(cfResult);
       }
 
+      // 3. Fetch Balance Sheet Data
       const bsParams = new URLSearchParams();
       bsParams.append('asOfDate', dateRange.to.toISOString());
       const bsRes = await fetch(`/api/financial-statements/balance-sheet?${bsParams.toString()}`);
@@ -163,22 +253,39 @@ export default function FinancialStatementsPage() {
       }
     } catch (error) {
       console.error("Error fetching financial data:", error);
-      toast.error("Could not load financial statements");
+      if (!background) toast.error("Could not load financial statements");
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [canRead, dateRange]);
 
+  // ✅ UPDATED: Standard fetch on mount/date change
+  // Removed 'session' dependency to prevent double-fetch on focus
   useEffect(() => {
-    if (session && canRead) {
+    if (isMounted && canRead) {
       fetchFinancialData();
-    } else if (session && !canRead) {
+    } else if (isMounted && !canRead && !isPending) {
       toast.error("You don't have permission to view financial statements", {
         description: "Only managers and above can access this page",
       });
       setIsLoading(false);
     }
-  }, [session, canRead, dateRange]);
+  }, [isMounted, canRead, isPending, dateRange, fetchFinancialData]);
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // Triggers silent background fetch when returning to the tab
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead) {
+        fetchFinancialData(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchFinancialData, isMounted, canRead]);
 
   const handleQuickSelect = (period: string) => {
     const now = new Date();
@@ -374,12 +481,9 @@ export default function FinancialStatementsPage() {
                 </div>
 
                 <TabsContent value="profit-loss">
+                  {/* ✅ UPDATED: Use FinancialReportSkeleton */}
                   {isLoading ? (
-                    <Card>
-                      <CardContent className="flex flex-1 items-center justify-center py-12">
-                        <Spinner className="size-10" />
-                      </CardContent>
-                    </Card>
+                    <FinancialReportSkeleton />
                   ) : (
                     <ProfitLossReport
                       data={data}
@@ -392,12 +496,9 @@ export default function FinancialStatementsPage() {
                 </TabsContent>
 
                 <TabsContent value="balance-sheet">
+                  {/* ✅ UPDATED: Use FinancialReportSkeleton */}
                   {isLoading ? (
-                    <Card>
-                      <CardContent className="flex items-center justify-center py-12">
-                        <Spinner className="size-10" />
-                      </CardContent>
-                    </Card>
+                    <FinancialReportSkeleton />
                   ) : (
                     <BalanceSheetReport
                       balanceSheetData={balanceSheetData}
@@ -407,14 +508,9 @@ export default function FinancialStatementsPage() {
                 </TabsContent>
 
                 <TabsContent value="cash-flow">
+                  {/* ✅ UPDATED: Use FinancialReportSkeleton */}
                   {isLoading ? (
-                    <Card>
-                      <CardContent className="flex items-center justify-center py-12">
-                        <div className="text-center">
-                          <Spinner className="size-10" />
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <FinancialReportSkeleton />
                   ) : (
                     <CashFlowReport
                       cashFlowData={cashFlowData}

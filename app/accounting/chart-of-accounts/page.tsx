@@ -1,8 +1,8 @@
-// app/accounting/chart-of-accounts/page.tsx
+// app/accounting/chart-of-accounts/page.tsx - UPDATED: Added COA Loading Skeleton
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { toast } from "sonner";
 import { BookMarked, List, ListTree, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,8 +21,84 @@ import { StatsCards, type StatItem } from "@/components/stats-cards";
 import { useChartOfAccountsPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
+// ✅ ADDED: COA Page Skeleton Component
+function COAPageSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Stats Cards Skeleton */}
+      <div className="px-4 lg:px-6">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 w-full">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="p-6 py-4 w-full">
+              <CardContent className="p-0">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                  <Skeleton className="h-8 w-32" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Content Skeleton */}
+      <div className="px-4 lg:px-6">
+        <div className="flex items-center justify-between mb-4">
+           <Skeleton className="h-10 w-48" /> {/* Tabs Switcher */}
+        </div>
+        <Card>
+          <CardContent className="p-6 space-y-8">
+             {/* Mimic Tree View Groups */}
+             {[...Array(3)].map((_, i) => (
+               <div key={i} className="space-y-4">
+                 <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                       <Skeleton className="h-10 w-10 rounded-lg" /> {/* Group Icon */}
+                       <div className="space-y-1.5">
+                         <Skeleton className="h-5 w-40" /> {/* Group Name */}
+                         <Skeleton className="h-3 w-24" /> {/* Subtext */}
+                       </div>
+                    </div>
+                    <Skeleton className="h-9 w-28" /> {/* Action Button */}
+                 </div>
+                 {/* Mimic List Items inside Group */}
+                 <div className="pl-14 space-y-3">
+                    <Skeleton className="h-12 w-full rounded-md" />
+                    <Skeleton className="h-12 w-full rounded-md" />
+                 </div>
+               </div>
+             ))}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ✅ Wrapper component to provide Suspense boundary
 export default function ChartOfAccountsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 items-center justify-center min-h-[400px]">
+        <Spinner className="size-10" />
+      </div>
+    }>
+      <ChartOfAccountsPageContent />
+    </Suspense>
+  );
+}
+
+/**
+ * The main page component content
+ */
+function ChartOfAccountsPageContent() {
   const [accounts, setAccounts] = useState<IChartOfAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -50,32 +126,51 @@ export default function ChartOfAccountsPage() {
     setIsMounted(true);
   }, []);
 
-  const fetchAccounts = useCallback(async () => {
+  // Silent Background Fetch
+  const fetchAccounts = useCallback(async (background = false) => {
     if (!canRead) return;
     try {
-      setIsLoading(true);
+      if (!background) {
+        setIsLoading(true);
+      }
+      
       const res = await fetch("/api/chart-of-accounts");
       if (!res.ok) throw new Error("Failed to fetch chart of accounts");
       const data = await res.json();
       setAccounts(data);
     } catch (error) {
       console.error("Error fetching accounts:", error);
-      toast.error("Could not load chart of accounts.");
+      if (!background) toast.error("Could not load chart of accounts.");
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
     }
   }, [canRead]);
 
+  // Initial Fetch
   useEffect(() => {
-    if (session && canRead) {
+    if (isMounted && canRead) {
       fetchAccounts();
-    } else if (session && !canRead) {
+    } else if (isMounted && !canRead && !isPending) {
       toast.error("You don't have permission to view chart of accounts", {
         description: "Only managers and above can access this page",
       });
       setIsLoading(false);
     }
-  }, [session, canRead, fetchAccounts]);
+  }, [isMounted, canRead, isPending, fetchAccounts]);
+
+  // Window Focus Listener
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead) {
+        fetchAccounts(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchAccounts, isMounted, canRead]);
 
   const handleOpenForm = (account: IChartOfAccount | null = null, group?: string, subGroup?: string) => {
     if (!canCreate && !account) {
@@ -305,8 +400,10 @@ export default function ChartOfAccountsPage() {
               </div>
             </div>
 
-            {/* Show statistics and content only when there are accounts */}
-            {accounts.length > 0 && (
+            {/* ✅ SHOW SKELETON WHILE LOADING */}
+            {isLoading && accounts.length === 0 ? (
+              <COAPageSkeleton />
+            ) : accounts.length > 0 ? (
               <>
                 {/* Statistics Cards */}
                 <div className="px-4 lg:px-6">
@@ -330,36 +427,33 @@ export default function ChartOfAccountsPage() {
                     </div>
 
                     <TabsContent value="tree" className="mt-0">
-                      <GroupManagement
-                        accounts={accounts}
-                        onCreateAccount={(group, subGroup) => handleOpenForm(null, group, subGroup)}
-                        canCreate={canCreate}
-                      />
+                      {/* ✅ Applied opacity transition */}
+                      <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
+                        <GroupManagement
+                          accounts={accounts}
+                          onCreateAccount={(group, subGroup) => handleOpenForm(null, group, subGroup)}
+                          canCreate={canCreate}
+                        />
+                      </div>
                     </TabsContent>
 
                     <TabsContent value="table" className="mt-0">
                       <Card>
                         <CardContent className="p-6">
-                          {isLoading ? (
-                            <DataTableSkeleton
-                              columnCount={columns.length}
-                              rowCount={10}
-                            />
-                          ) : (
+                          {/* ✅ Applied opacity transition & Skeleton */}
+                          <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
                             <DataTable table={table}>
                               <DataTableToolbar table={table} />
                             </DataTable>
-                          )}
+                          </div>
                         </CardContent>
                       </Card>
                     </TabsContent>
                   </Tabs>
                 </div>
               </>
-            )}
-
-            {/* Empty State - Only show when no accounts and not loading */}
-            {accounts.length === 0 && !isLoading && (
+            ) : (
+              /* Empty State - Only show when no accounts and not loading */
               <div className="px-4 lg:px-6">
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">

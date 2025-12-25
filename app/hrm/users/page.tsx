@@ -1,6 +1,8 @@
+// app/users/page.tsx - UPDATED: Added Suspense & Silent Background Fetch
+
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +20,7 @@ import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { useUserManagementPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
+import { Spinner } from "@/components/ui/spinner";
 
 const useMediaQuery = (query: string) => {
   const [matches, setMatches] = useState(false);
@@ -31,10 +34,33 @@ const useMediaQuery = (query: string) => {
   return matches;
 };
 
-/**
- * The main page component for managing users.
- */
+// ✅ FIXED: Wrapper component to provide Suspense boundary
 export default function UsersPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-primary/10 rounded-full">
+            <BookUser className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <DataTableSkeleton columnCount={7} rowCount={10} />
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <UsersPageContent />
+    </Suspense>
+  );
+}
+
+/**
+ * The main page component content
+ */
+function UsersPageContent() {
   const router = useRouter();
   const [users, setUsers] = useState<BetterAuthUser[]>([]);
   const [currentUser, setCurrentUser] = useState<BetterAuthUser | null>(null);
@@ -68,17 +94,25 @@ export default function UsersPage() {
     setIsMounted(true);
   }, []);
 
+  // ✅ SEPARATE EFFECT: Sync current user from session
+  // This prevents fetchUsers from needing 'session' as a dependency
+  useEffect(() => {
+    if (session?.user) {
+      setCurrentUser(session.user as BetterAuthUser);
+    }
+  }, [session]);
+
   /**
    * Fetches the list of users from Better Auth Admin API.
+   * ✅ UPDATED: Added 'background' param for silent refreshes
    */
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async (background = false) => {
     if (!canList) return;
 
     try {
-      setIsLoading(true);
-
-      if (session?.user) {
-        setCurrentUser(session.user as BetterAuthUser);
+      // Only show spinner if not a background fetch
+      if (!background) {
+        setIsLoading(true);
       }
 
       const { data, error } = await authClient.admin.listUsers({
@@ -94,7 +128,7 @@ export default function UsersPage() {
           errorMessage.toLowerCase().includes("permission") ||
           errorMessage.toLowerCase().includes("unauthorized")) {
 
-          if (!hasShownAccessError.current) {
+          if (!hasShownAccessError.current && !background) {
             hasShownAccessError.current = true;
             toast.error("Access denied", {
               description: "You do not have permission to view users."
@@ -118,27 +152,43 @@ export default function UsersPage() {
       setUsers(transformedUsers);
     } catch (error: any) {
       console.error("Fetch users error:", error);
-      if (!hasShownAccessError.current) {
+      if (!hasShownAccessError.current && !background) {
         toast.error("Failed to load users", {
           description: error.message
         });
       }
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [canList]);
 
-  // Fetch users on component mount
+  // ✅ UPDATED: Standard fetch on mount/permission change
+  // Removed 'session' dependency to prevent double-fetch on focus
   useEffect(() => {
-    if (session && canList) {
+    if (isMounted && canList) {
       fetchUsers();
-    } else if (session && !canList) {
+    } else if (isMounted && !canList && !isPending) {
       toast.error("You don't have permission to view users", {
         description: "Only admins and above can access this page",
       });
       setIsLoading(false);
     }
-  }, [session, canList]);
+  }, [isMounted, canList, isPending, fetchUsers]);
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // Triggers silent background fetch when returning to the tab
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canList) {
+        fetchUsers(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchUsers, isMounted, canList]);
 
   /**
    * Check if current user can manage target user based on role hierarchy

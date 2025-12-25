@@ -1,6 +1,8 @@
+// app/accounting/profit-loss/page.tsx - UPDATED: Added Skeleton for Chart Card
+
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { toast } from "sonner";
 import { TrendingUp, CalendarIcon, Calculator } from "lucide-react";
 import { Button as UIButton } from "@/components/ui/button";
@@ -25,6 +27,7 @@ import { ExportMenu } from "@/components/export-menu";
 import { exportProfitLossToPDF, exportProfitLossToExcel, type CompanyDetails } from "@/utils/reportExports";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ProfitLossSummary {
   totalRevenueExTax: number;
@@ -64,12 +67,28 @@ interface Trends {
 interface ApiResponse {
   summary: ProfitLossSummary;
   monthlyBreakdown: MonthlyBreakdown[];
-  trends?: Trends; // Added trends to interface
+  trends?: Trends;
   incomeDetails?: any[]; 
   expenseDetails?: any[];
 }
 
+// ✅ FIXED: Wrapper component to provide Suspense boundary
 export default function ProfitLossPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 items-center justify-center min-h-[400px]">
+        <Spinner className="size-10" />
+      </div>
+    }>
+      <ProfitLossPageContent />
+    </Suspense>
+  );
+}
+
+/**
+ * The main page component content
+ */
+function ProfitLossPageContent() {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [detailedData, setDetailedData] = useState<any>(null); // For exports
   const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
@@ -111,19 +130,24 @@ export default function ProfitLossPage() {
       }
     };
 
-    if (session && canRead) {
+    if (canRead) {
       fetchCompanyDetails();
     }
-  }, [session, canRead]);
+  }, [canRead]);
 
-  const fetchData = useCallback(async () => {
+  // ✅ UPDATED: Added 'background' param for silent refreshes
+  const fetchData = useCallback(async (background = false) => {
     if (!canRead) return;
     
     if (!dateRange?.from || !dateRange?.to) {
       return;
     }
 
-    setIsLoading(true);
+    // Only show spinner if not a background fetch
+    if (!background) {
+      setIsLoading(true);
+    }
+
     try {
       const params = new URLSearchParams({
         startDate: dateRange.from.toISOString(),
@@ -145,22 +169,39 @@ export default function ProfitLossPage() {
       setData(apiData);
       setDetailedData(details);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to load data");
+      if (!background) toast.error(error instanceof Error ? error.message : "Failed to load data");
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
     }
   }, [dateRange, canRead]);
 
+  // ✅ UPDATED: Standard fetch on mount/date change
+  // Removed 'session' dependency to prevent double-fetch on focus
   useEffect(() => {
-    if (session && canRead) {
+    if (isMounted && canRead) {
       fetchData();
-    } else if (session && !canRead) {
+    } else if (isMounted && !canRead && !isPending) {
       toast.error("You don't have permission to view profit & loss", {
         description: "Only managers and above can access this page",
       });
       setIsLoading(false);
     }
-  }, [session, canRead, dateRange, fetchData]);
+  }, [isMounted, canRead, isPending, dateRange, fetchData]);
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // Triggers silent background fetch when returning to the tab
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead) {
+        fetchData(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchData, isMounted, canRead]);
 
   const handleQuickSelect = (period: string) => {
     const now = new Date();
@@ -393,19 +434,55 @@ export default function ProfitLossPage() {
           </div>
 
           <div className="px-4 lg:px-6">
-             <StatsCards data={cardsData} columns={4} />
+             {isLoading && !data ? (
+                // ✅ Stats Cards Skeleton
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 w-full">
+                  {[...Array(4)].map((_, i) => (
+                    <Card key={i} className="p-6 py-4 w-full">
+                      <CardContent className="p-0">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Skeleton className="h-4 w-24" />
+                            <Skeleton className="h-5 w-16 rounded-full" />
+                          </div>
+                          <Skeleton className="h-8 w-32" />
+                          <Skeleton className="h-3 w-20" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+             ) : (
+                <StatsCards data={cardsData} columns={4} />
+             )}
           </div>
 
           <div className="px-4 lg:px-6">
-            {dateRange?.from && dateRange?.to && data && (
-              <ProfitLossChart
-                profit={data.summary.profit}
-                expenses={data.summary.totalExpenses}
-                purchases={data.summary.totalPurchasesExTax}
-                netTax={data.summary.netTax}
-                dateRange={{ from: dateRange.from, to: dateRange.to }}
-              />
-            )}
+            {/* ✅ UPDATED: Applied transition-opacity for smooth updates */}
+            <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
+              {/* ✅ ADDED: Chart Card Skeleton */}
+              {isLoading && !data ? (
+                <Card className="col-span-4">
+                  <CardHeader>
+                    <Skeleton className="h-6 w-48 mb-2" />
+                    <Skeleton className="h-4 w-32" />
+                  </CardHeader>
+                  <CardContent className="pl-2">
+                    <Skeleton className="h-[350px] w-full" />
+                  </CardContent>
+                </Card>
+              ) : (
+                dateRange?.from && dateRange?.to && data && (
+                  <ProfitLossChart
+                    profit={data.summary.profit}
+                    expenses={data.summary.totalExpenses}
+                    purchases={data.summary.totalPurchasesExTax}
+                    netTax={data.summary.netTax}
+                    dateRange={{ from: dateRange.from, to: dateRange.to }}
+                  />
+                )
+              )}
+            </div>
           </div>
 
           <div className="px-4 lg:px-6">
@@ -417,16 +494,12 @@ export default function ProfitLossPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {isLoading ? (
-                  <DataTableSkeleton
-                    columnCount={columns.length}
-                    rowCount={10}
-                  />
-                ) : (
+                {/* ✅ UPDATED: Applied transition-opacity for smooth updates */}
+                <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
                   <DataTable table={table}>
                     <DataTableToolbar table={table} />
                   </DataTable>
-                )}
+                </div>
               </CardContent>
             </Card>
           </div>

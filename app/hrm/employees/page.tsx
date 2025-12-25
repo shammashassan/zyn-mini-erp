@@ -1,6 +1,8 @@
+// app/employees/page.tsx - UPDATED: Added Suspense & Silent Background Fetch
+
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback, Suspense } from "react";
 import { toast } from "sonner";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
@@ -17,6 +19,8 @@ import Link from "next/link";
 import React from "react";
 import { useEmployeePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
+import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
 
 const useMediaQuery = (query: string) => {
   const [matches, setMatches] = useState(false);
@@ -30,10 +34,23 @@ const useMediaQuery = (query: string) => {
   return matches;
 };
 
-/**
- * The main page component for managing employees.
- */
+// ✅ FIXED: Wrapper component to provide Suspense boundary
 export default function EmployeesPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 items-center justify-center min-h-[400px]">
+        <Spinner className="size-10" />
+      </div>
+    }>
+      <EmployeesPageContent />
+    </Suspense>
+  );
+}
+
+/**
+ * The main page component content
+ */
+function EmployeesPageContent() {
   const [employees, setEmployees] = useState<IEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -61,16 +78,21 @@ export default function EmployeesPage() {
 
   /**
    * Fetches the list of employees from the API.
+   * ✅ UPDATED: Added 'background' param for silent refreshes
    */
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async (background = false) => {
     if (!canRead) return;
 
     try {
-      setIsLoading(true);
+      // Only show spinner if not a background fetch
+      if (!background) {
+        setIsLoading(true);
+      }
+      
       const res = await fetch("/api/employees");
 
       if (res.status === 403) {
-        toast.error("You don't have permission to view employees");
+        if (!background) toast.error("You don't have permission to view employees");
         return;
       }
 
@@ -78,23 +100,39 @@ export default function EmployeesPage() {
       const data = await res.json();
       setEmployees(data);
     } catch (error) {
-      toast.error("Could not load employees.");
+      if (!background) toast.error("Could not load employees.");
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [canRead]);
 
-  // Fetch employees on component mount
+  // ✅ UPDATED: Standard fetch on mount/permission change
+  // Removed 'session' dependency to prevent double-fetch on focus
   useEffect(() => {
-    if (session && canRead) {
+    if (isMounted && canRead) {
       fetchEmployees();
-    } else if (session && !canRead) {
+    } else if (isMounted && !canRead && !isPending) {
       toast.error("You don't have permission to view employees", {
         description: "Only managers and above can access this page",
       });
       setIsLoading(false);
     }
-  }, [session, canRead]);
+  }, [isMounted, canRead, isPending, fetchEmployees]);
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // Triggers silent background fetch when returning to the tab
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead) {
+        fetchEmployees(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchEmployees, isMounted, canRead]);
 
   /**
    * Handles viewing an employee (opens view modal).
@@ -307,7 +345,7 @@ export default function EmployeesPage() {
                     Employees
                   </h1>
                   <p className="text-muted-foreground">
-                    Manage your company's employees
+                    Loading...
                   </p>
                 </div>
               </div>
@@ -375,16 +413,12 @@ export default function EmployeesPage() {
             <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
               <Card>
                 <CardContent className="p-6">
-                  {isLoading ? (
-                    <DataTableSkeleton
-                      columnCount={columns.length}
-                      rowCount={10}
-                    />
-                  ) : (
+                  {/* ✅ UPDATED: Applied transition-opacity for smooth updates */}
+                  <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
                     <DataTable table={table}>
                       <DataTableToolbar table={table} />
                     </DataTable>
-                  )}
+                  </div>
                 </CardContent>
               </Card>
 

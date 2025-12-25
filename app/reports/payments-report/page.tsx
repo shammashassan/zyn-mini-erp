@@ -1,8 +1,8 @@
-// app/reports/payments-report/page.tsx
+// app/reports/payments-report/page.tsx - UPDATED: Added Suspense, Silent Fetch & Skeleton
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { toast } from "sonner";
 import { Wallet, CalendarIcon } from "lucide-react";
 import { Button as UIButton } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { formatCompactCurrency } from "@/utils/formatters/currency";
 import { useReportPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface PaymentsSummary {
   totalCashIn: number;
@@ -42,13 +43,63 @@ interface ApiResponse {
   monthlyBreakdown: MonthlyReportData[];
 }
 
+// ✅ ADDED: Payments Report Skeleton Component
+function PaymentsReportSkeleton() {
+  return (
+    <div className="space-y-6 animate-in fade-in-50">
+      {/* 1. Stats Cards Skeleton */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={`stat-${i}`} className="p-6 py-4">
+            <CardContent className="p-0 space-y-3">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-4 w-24" /> {/* Label */}
+                <Skeleton className="h-5 w-14 rounded-full" /> {/* Badge */}
+              </div>
+              <Skeleton className="h-9 w-32" /> {/* Value */}
+              <Skeleton className="h-3 w-20" /> {/* Subtext */}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* 2. Chart Skeleton */}
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48 mb-2" />
+          <Skeleton className="h-4 w-32" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-[350px] w-full" />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ✅ FIXED: Wrapper component to provide Suspense boundary
 export default function PaymentsReportPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 items-center justify-center min-h-[400px]">
+        <Spinner className="size-10" />
+      </div>
+    }>
+      <PaymentsReportPageContent />
+    </Suspense>
+  );
+}
+
+/**
+ * The main page component content
+ */
+function PaymentsReportPageContent() {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(subMonths(new Date(), 5)), // Default to 6 months to show trends
+    from: startOfMonth(subMonths(new Date(), 5)),
     to: endOfMonth(new Date())
   });
 
@@ -62,15 +113,20 @@ export default function PaymentsReportPage() {
     setIsMounted(true);
   }, []);
 
-  const fetchData = useCallback(async () => {
+  // ✅ UPDATED: Added 'background' param for silent refreshes
+  const fetchData = useCallback(async (background = false) => {
     if (!canRead) return;
 
     if (!dateRange?.from || !dateRange?.to) {
       return;
     }
 
-    setIsLoading(true);
     try {
+      // Only show spinner/skeleton if not a background fetch
+      if (!background) {
+        setIsLoading(true);
+      }
+
       const params = new URLSearchParams({
         startDate: dateRange.from.toISOString(),
         endDate: dateRange.to.toISOString()
@@ -85,22 +141,39 @@ export default function PaymentsReportPage() {
       const apiData: ApiResponse = await response.json();
       setData(apiData);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to load payments data");
+      if (!background) toast.error(error instanceof Error ? error.message : "Failed to load payments data");
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
     }
   }, [dateRange, canRead]);
 
+  // ✅ UPDATED: Standard fetch on mount/date change
+  // Removed 'session' dependency to prevent double-fetch on focus
   useEffect(() => {
-    if (session && canRead) {
+    if (isMounted && canRead) {
       fetchData();
-    } else if (session && !canRead) {
+    } else if (isMounted && !canRead && !isPending) {
       toast.error("You don't have permission to view payments reports", {
         description: "Only managers and above can access this page",
       });
       setIsLoading(false);
     }
-  }, [session, canRead, fetchData]);
+  }, [isMounted, canRead, isPending, fetchData]);
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // Triggers silent background fetch when returning to the tab
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead) {
+        fetchData(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchData, isMounted, canRead]);
 
   const handleQuickSelect = (period: string) => {
     const now = new Date();
@@ -140,14 +213,13 @@ export default function PaymentsReportPage() {
     return `${format(dateRange.from, "MMM dd, yyyy")} - ${format(dateRange.to, "MMM dd, yyyy")}`;
   };
 
-  // SWITCHED to Monthly Columns
   const columns = useMemo(() => getMonthlyColumns(), []);
 
   const { table } = useDataTable({
     data: data?.monthlyBreakdown || [],
     columns: columns,
     initialState: {
-      sorting: [{ id: "month", desc: true }], // Sort by Month desc by default
+      sorting: [{ id: "month", desc: true }],
       pagination: {
         pageSize: 10,
         pageIndex: 0
@@ -202,24 +274,6 @@ export default function PaymentsReportPage() {
 
   if (!canRead) {
     return <AccessDenied />
-  }
-
-  if (isLoading && !data) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner className="size-10" />
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground">No data available</p>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -286,19 +340,30 @@ export default function PaymentsReportPage() {
             </div>
           </div>
 
-          {/* Summary Cards */}
           <div className="px-4 lg:px-6">
-            <StatsCards data={cardsData} columns={4} />
-          </div>
+            {/* ✅ UPDATED: Applied transition-opacity & Skeleton */}
+            <div className={cn("transition-opacity duration-200", isLoading && !data ? "opacity-50" : "opacity-100")}>
+              {isLoading && !data ? (
+                <PaymentsReportSkeleton />
+              ) : (
+                <>
+                  {/* Summary Cards */}
+                  <div className="mb-6">
+                    <StatsCards data={cardsData} columns={4} />
+                  </div>
 
-          {/* Chart */}
-          <div className="px-4 lg:px-6">
-            {dateRange?.from && dateRange?.to && data?.monthlyBreakdown && data.monthlyBreakdown.length > 0 && (
-              <PaymentsChart
-                data={data.monthlyBreakdown}
-                dateRange={{ from: dateRange.from, to: dateRange.to }}
-              />
-            )}
+                  {/* Chart */}
+                  <div className="mb-6">
+                    {dateRange?.from && dateRange?.to && data?.monthlyBreakdown && data.monthlyBreakdown.length > 0 && (
+                      <PaymentsChart
+                        data={data.monthlyBreakdown}
+                        dateRange={{ from: dateRange.from, to: dateRange.to }}
+                      />
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Table */}
@@ -311,16 +376,19 @@ export default function PaymentsReportPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {isLoading ? (
-                  <DataTableSkeleton
-                    columnCount={columns.length}
-                    rowCount={6}
-                  />
-                ) : (
-                  <DataTable table={table}>
-                    <DataTableToolbar table={table} />
-                  </DataTable>
-                )}
+                {/* ✅ UPDATED: Applied transition-opacity for smooth updates */}
+                <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
+                  {isLoading && !data ? (
+                    <DataTableSkeleton
+                      columnCount={columns.length}
+                      rowCount={6}
+                    />
+                  ) : (
+                    <DataTable table={table}>
+                      <DataTableToolbar table={table} />
+                    </DataTable>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>

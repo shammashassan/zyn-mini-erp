@@ -1,6 +1,8 @@
+// app/accounting/trial-balance/page.tsx - UPDATED: Used shadcn Skeleton for stats loading
+
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -14,13 +16,16 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatCompactCurrency } from "@/utils/formatters/currency";
-import { columns, type TrialBalanceItem } from "./columns";
+// ✅ FIXED: Imported 'columns' to preserve table structure
+import { columns, type TrialBalanceItem } from "./columns"; 
 import { useTrialBalancePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { ExportMenu } from "@/components/export-menu";
 import { exportTrialBalanceToPDF, exportTrialBalanceToExcel, type CompanyDetails } from "@/utils/reportExports";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { Spinner } from "@/components/ui/spinner";
+// ✅ IMPORTED: Shadcn Skeleton
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface TrialBalanceSummary {
   totalDebits: number;
@@ -30,7 +35,23 @@ interface TrialBalanceSummary {
   accountsCount: number;
 }
 
+// ✅ FIXED: Wrapper component to provide Suspense boundary
 export default function TrialBalancePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-1 items-center justify-center min-h-[400px]">
+        <Spinner className="size-10" />
+      </div>
+    }>
+      <TrialBalancePageContent />
+    </Suspense>
+  );
+}
+
+/**
+ * The main page component content
+ */
+function TrialBalancePageContent() {
   const [trialBalance, setTrialBalance] = useState<TrialBalanceItem[]>([]);
   const [summary, setSummary] = useState<TrialBalanceSummary | null>(null);
   const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
@@ -69,16 +90,20 @@ export default function TrialBalancePage() {
       }
     };
 
-    if (session && canRead) {
+    if (canRead) {
       fetchCompanyDetails();
     }
-  }, [session, canRead]);
+  }, [canRead]);
 
-  const fetchTrialBalance = async () => {
+  // ✅ UPDATED: Added 'background' param for silent refreshes
+  const fetchTrialBalance = useCallback(async (background = false) => {
     if (!canRead) return;
 
     try {
-      setIsLoading(true);
+      // Only show spinner if not a background fetch
+      if (!background) {
+        setIsLoading(true);
+      }
 
       const params = new URLSearchParams();
       if (asOfDate) {
@@ -88,7 +113,7 @@ export default function TrialBalancePage() {
       const res = await fetch(`/api/trial-balance?${params.toString()}`);
 
       if (res.status === 403) {
-        toast.error("You don't have permission to view trial balance");
+        if (!background) toast.error("You don't have permission to view trial balance");
         return;
       }
 
@@ -99,28 +124,44 @@ export default function TrialBalancePage() {
       setSummary(data.summary);
     } catch (error) {
       console.error("Error fetching trial balance:", error);
-      toast.error("Could not load trial balance");
+      if (!background) toast.error("Could not load trial balance");
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [canRead, asOfDate]);
 
+  // ✅ UPDATED: Standard fetch on mount/date change
+  // Removed 'session' dependency to prevent double-fetch on focus
   useEffect(() => {
-    if (session && canRead) {
+    if (isMounted && canRead) {
       fetchTrialBalance();
-    } else if (session && !canRead) {
+    } else if (isMounted && !canRead && !isPending) {
       toast.error("You don't have permission to view trial balance", {
         description: "Only managers and above can access this page",
       });
       setIsLoading(false);
     }
-  }, [asOfDate, session, canRead]);
+  }, [isMounted, canRead, isPending, asOfDate, fetchTrialBalance]);
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  // Triggers silent background fetch when returning to the tab
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead) {
+        fetchTrialBalance(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchTrialBalance, isMounted, canRead]);
 
   const handleExportPDF = () => {
     if (!trialBalance.length) return;
     setIsExporting(true);
     try {
-      // Corrected: added companyDetails argument before 'blob'
       const url = exportTrialBalanceToPDF(trialBalance, summary, asOfDate, companyDetails, 'blob');
       setPdfUrl(url);
       setIsPdfViewerOpen(true);
@@ -136,7 +177,6 @@ export default function TrialBalancePage() {
     if (!trialBalance.length) return;
     setIsExporting(true);
     try {
-      // Corrected: added companyDetails argument
       exportTrialBalanceToExcel(trialBalance, asOfDate, companyDetails);
       toast.success("Exported to Excel");
     } catch (error) {
@@ -188,6 +228,7 @@ export default function TrialBalancePage() {
       { label: "Expenses", value: "Expenses", count: trialBalance.filter(item => item.groupName === "Expenses").length },
     ].filter(opt => opt.count > 0);
 
+    // ✅ FIXED: Map over imported columns instead of hardcoding
     return columns.map((col: any) => {
       if (col.accessorKey === "groupName") {
         return { ...col, meta: { ...col.meta, options: groupOptions } };
@@ -273,43 +314,58 @@ export default function TrialBalancePage() {
             </div>
 
             <div className="px-4 lg:px-6">
-              <StatsCards data={summaryCards} columns={4} />
+              {isLoading && !summary ? (
+                // ✅ UPDATED: Using shadcn Skeleton components
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 w-full">
+                  {[...Array(4)].map((_, i) => (
+                    <Card key={i} className="p-6 py-4 w-full">
+                      <CardContent className="p-0">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Skeleton className="h-4 w-24" /> {/* Label */}
+                            <Skeleton className="h-5 w-16 rounded-full" /> {/* Badge */}
+                          </div>
+                          <Skeleton className="h-8 w-32" /> {/* Value */}
+                          <Skeleton className="h-3 w-20" /> {/* Subtext */}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <StatsCards data={summaryCards} columns={4} />
+              )}
             </div>
 
             <div className="px-4 lg:px-6">
-              {isLoading ? (
-                <Card>
-                  <CardContent className="p-12 text-center">
-                    <div className="flex flex-1 items-center justify-center">
-                      <Spinner className="size-10" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : trialBalance.length === 0 ? (
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <Scale className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No transactions found</h3>
-                    <p className="text-muted-foreground text-center max-w-md">
-                      No journal entries exist for the selected date. Post some transactions to see the trial balance.
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Trial Balance as of {format(asOfDate, "PPP")}</CardTitle>
-                    <CardDescription>
-                      Showing {trialBalance.length} accounts with non-zero balances
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <DataTable table={table}>
-                      <DataTableToolbar table={table} />
-                    </DataTable>
-                  </CardContent>
-                </Card>
-              )}
+              {/* ✅ UPDATED: Applied transition-opacity for smooth updates */}
+              <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
+                {trialBalance.length === 0 && !isLoading ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <Scale className="h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">No transactions found</h3>
+                      <p className="text-muted-foreground text-center max-w-md">
+                        No journal entries exist for the selected date. Post some transactions to see the trial balance.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Trial Balance as of {format(asOfDate, "PPP")}</CardTitle>
+                      <CardDescription>
+                        Showing {trialBalance.length} accounts with non-zero balances
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <DataTable table={table}>
+                        <DataTableToolbar table={table} />
+                      </DataTable>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
           </div>
         </div>
