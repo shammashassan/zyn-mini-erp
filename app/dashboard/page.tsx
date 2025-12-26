@@ -1,13 +1,14 @@
-// app/dashboard/page.tsx - UPDATED: Uses Invoice PDF route
+// app/dashboard/page.tsx - UPDATED: Smooth transitions like tax-report
 
 "use client";
 
 import * as React from "react";
-import { useEffect, useState, useMemo, Suspense } from "react";
+import { useEffect, useState, useMemo, Suspense, useCallback } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
+import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { useDataTable } from "@/hooks/use-data-table";
 import { ChartAreaInteractive } from "./dashboard-chart";
 import { SectionCards, type CardData } from "@/components/section-cards";
@@ -23,6 +24,7 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } f
 import { Banknote, ChevronRight, FileClock, FileText, ShoppingCart, Ticket, Truck } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 interface DailySummary {
   date: string;
@@ -56,6 +58,73 @@ interface DashboardData {
   recentSales: RecentSale[];
 }
 
+// ✅ ADDED: Dashboard Skeleton Component
+function DashboardSkeleton({ isBasicUser }: { isBasicUser: boolean }) {
+  return (
+    <div className="space-y-6 animate-in fade-in-50 px-4 lg:px-6">
+      {/* Metrics Cards Skeleton */}
+      {!isBasicUser && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-[100px]" />
+                <Skeleton className="h-4 w-4 rounded-full" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-[120px] mb-2" />
+                <Skeleton className="h-3 w-[160px]" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Chart Skeleton */}
+      {!isBasicUser && (
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-[200px] mb-2" />
+            <Skeleton className="h-4 w-[300px]" />
+          </CardHeader>
+          <CardContent className="pl-2">
+            <Skeleton className="h-[300px] w-full" />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Quick Actions Skeleton for Basic Users */}
+      {isBasicUser && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="flex items-center gap-4 p-4">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-[120px]" />
+                  <Skeleton className="h-3 w-[180px]" />
+                </div>
+                <Skeleton className="h-5 w-5" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Recent Invoices Table Skeleton */}
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-[150px] mb-2" />
+          <Skeleton className="h-4 w-[250px]" />
+        </CardHeader>
+        <CardContent>
+          <DataTableSkeleton columnCount={5} rowCount={5} />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function DashboardContent() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -84,11 +153,16 @@ function DashboardContent() {
     }
   }, [session, isPending, router, isMounted]);
 
-  const fetchDashboardData = async () => {
+  // ✅ UPDATED: Added 'background' param for silent refreshes
+  const fetchDashboardData = useCallback(async (background = false) => {
     if (!canRead) return;
 
     try {
-      setIsLoading(true);
+      // Only show spinner if not a background fetch
+      if (!background) {
+        setIsLoading(true);
+      }
+
       const response = await fetch("/api/dashboard");
 
       if (!response.ok) {
@@ -99,17 +173,34 @@ function DashboardContent() {
       setDashboardData(data);
     } catch (error) {
       console.error("Dashboard fetch error:", error);
-      toast.error("Could not load dashboard data.");
+      if (!background) {
+        toast.error("Could not load dashboard data.");
+      }
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [canRead]);
 
+  // ✅ UPDATED: Standard fetch on mount
   useEffect(() => {
     if (isMounted && session && canRead) {
       fetchDashboardData();
     }
-  }, [session, canRead, isMounted]);
+  }, [session, canRead, isMounted, fetchDashboardData]);
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead) {
+        fetchDashboardData(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchDashboardData, isMounted, canRead]);
 
   const handleViewPdf = (sale: RecentSale) => {
     if (!sale || !sale._id) {
@@ -117,7 +208,6 @@ function DashboardContent() {
       return;
     }
 
-    // ✅ UPDATED: Use the Invoice API route directly
     setSelectedPdfUrl(`/api/invoices/${sale._id}/pdf`);
     setSelectedPdfTitle(sale.invoiceNumber || "Invoice");
     setIsModalOpen(true);
@@ -204,94 +294,6 @@ function DashboardContent() {
     return <AccessDenied />;
   }
 
-  if (isLoading && !dashboardData) {
-    return (
-      <div className="flex flex-1 flex-col">
-        {showWelcome && (
-          <Preloader
-            mode="reveal"
-            onComplete={() => {
-              router.replace("/dashboard", { scroll: false });
-            }}
-          />
-        )}
-
-        <div className="@container/main flex flex-1 flex-col gap-2">
-          <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-            {/* Header Skeleton */}
-            <div className="px-4 lg:px-6 space-y-2">
-              <Skeleton className="h-8 w-[250px]" />
-              <Skeleton className="h-4 w-[350px]" />
-            </div>
-
-            {/* Metrics Cards Skeleton */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 px-4 lg:px-6">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Card key={i}>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <Skeleton className="h-4 w-[100px]" />
-                    <Skeleton className="h-4 w-4 rounded-full" />
-                  </CardHeader>
-                  <CardContent>
-                    <Skeleton className="h-8 w-[120px] mb-2" />
-                    <Skeleton className="h-3 w-[160px]" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Chart/Actions Area Skeleton */}
-            <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
-              <Card>
-                <CardHeader>
-                  <Skeleton className="h-6 w-[200px] mb-2" />
-                  <Skeleton className="h-4 w-[300px]" />
-                </CardHeader>
-                <CardContent className="pl-2">
-                  <Skeleton className="h-[300px] w-full" />
-                </CardContent>
-              </Card>
-
-              {/* Recent Invoices Table Skeleton */}
-              <Card>
-                <CardHeader>
-                  <Skeleton className="h-6 w-[150px] mb-2" />
-                  <Skeleton className="h-4 w-[250px]" />
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Table Header */}
-                    <div className="flex items-center justify-between">
-                       <Skeleton className="h-10 w-[250px]" />
-                       <Skeleton className="h-10 w-[100px]" />
-                    </div>
-                    {/* Table Rows */}
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <div key={i} className="flex items-center justify-between py-2">
-                        <div className="flex items-center gap-4">
-                          <Skeleton className="h-10 w-10 rounded-full" />
-                          <div className="space-y-2">
-                            <Skeleton className="h-4 w-[150px]" />
-                            <Skeleton className="h-3 w-[100px]" />
-                          </div>
-                        </div>
-                        <Skeleton className="h-4 w-[80px]" />
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!dashboardData) {
-    return null;
-  }
-
   // Check if user role is "user" for simplified dashboard
   const isBasicUser = session?.user?.role === "user";
 
@@ -320,150 +322,162 @@ function DashboardContent() {
               </p>
             </div>
 
-            {!isBasicUser && <SectionCards cards={cards} />}
-
-            <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
-              {!isBasicUser && <ChartAreaInteractive chartData={dashboardData.chartData} />}
-
-              {isBasicUser && (
+            {/* ✅ UPDATED: Applied transition-opacity & Skeleton */}
+            <div className={cn("transition-opacity duration-200", isLoading && !dashboardData ? "opacity-50" : "opacity-100")}>
+              {isLoading && !dashboardData ? (
+                <DashboardSkeleton isBasicUser={isBasicUser} />
+              ) : (
                 <>
-                  <ItemGroup className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    <Item
-                      asChild
-                      variant="outline"
-                      className="cursor-pointer transition-all hover:bg-muted/50"
-                    >
-                      <button
-                        onClick={() => router.push('/documents/invoices')}
-                        className="w-full text-left"
-                      >
-                        <ItemMedia variant="icon">
-                          <FileText className="h-5 w-5" />
-                        </ItemMedia>
-                        <ItemContent>
-                          <ItemTitle>Create Invoice</ItemTitle>
-                          <ItemDescription>Generate new invoice for customers</ItemDescription>
-                        </ItemContent>
-                        <div className="ml-auto">
-                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      </button>
-                    </Item>
+                  {!isBasicUser && <SectionCards cards={cards} />}
 
-                    <Item
-                      asChild
-                      variant="outline"
-                      className="cursor-pointer transition-all hover:bg-muted/50"
-                    >
-                      <button
-                        onClick={() => router.push('/documents//quotations')}
-                        className="w-full text-left"
-                      >
-                        <ItemMedia variant="icon">
-                          <FileClock className="h-5 w-5" />
-                        </ItemMedia>
-                        <ItemContent>
-                          <ItemTitle>Create Quotation</ItemTitle>
-                          <ItemDescription>Prepare quotes for potential orders</ItemDescription>
-                        </ItemContent>
-                        <div className="ml-auto">
-                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      </button>
-                    </Item>
+                  <div className="flex flex-col gap-4 xl:gap-6 mt-4 md:mt-6 px-4 lg:px-6">
+                    {!isBasicUser && <ChartAreaInteractive chartData={dashboardData?.chartData || []} />}
 
-                    <Item
-                      asChild
-                      variant="outline"
-                      className="cursor-pointer transition-all hover:bg-muted/50"
-                    >
-                      <button
-                        onClick={() => router.push('/documents/vouchers')}
-                        className="w-full text-left"
-                      >
-                        <ItemMedia variant="icon">
-                          <Ticket className="h-5 w-5" />
-                        </ItemMedia>
-                        <ItemContent>
-                          <ItemTitle>Create Voucher</ItemTitle>
-                          <ItemDescription>Issue payment or receipt vouchers</ItemDescription>
-                        </ItemContent>
-                        <div className="ml-auto">
-                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      </button>
-                    </Item>
+                    {isBasicUser && (
+                      <>
+                        <ItemGroup className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                          <Item
+                            asChild
+                            variant="outline"
+                            className="cursor-pointer transition-all hover:bg-muted/50"
+                          >
+                            <button
+                              onClick={() => router.push('/documents/invoices')}
+                              className="w-full text-left"
+                            >
+                              <ItemMedia variant="icon">
+                                <FileText className="h-5 w-5" />
+                              </ItemMedia>
+                              <ItemContent>
+                                <ItemTitle>Create Invoice</ItemTitle>
+                                <ItemDescription>Generate new invoice for customers</ItemDescription>
+                              </ItemContent>
+                              <div className="ml-auto">
+                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                            </button>
+                          </Item>
 
-                    <Item
-                      asChild
-                      variant="outline"
-                      className="cursor-pointer transition-all hover:bg-muted/50"
-                    >
-                      <button
-                        onClick={() => router.push('/documents/delivery-notes')}
-                        className="w-full text-left"
-                      >
-                        <ItemMedia variant="icon">
-                          <Truck className="h-5 w-5" />
-                        </ItemMedia>
-                        <ItemContent>
-                          <ItemTitle>Create Delivery Note</ItemTitle>
-                          <ItemDescription>Track product deliveries to customers</ItemDescription>
-                        </ItemContent>
-                        <div className="ml-auto">
-                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      </button>
-                    </Item>
+                          <Item
+                            asChild
+                            variant="outline"
+                            className="cursor-pointer transition-all hover:bg-muted/50"
+                          >
+                            <button
+                              onClick={() => router.push('/documents/quotations')}
+                              className="w-full text-left"
+                            >
+                              <ItemMedia variant="icon">
+                                <FileClock className="h-5 w-5" />
+                              </ItemMedia>
+                              <ItemContent>
+                                <ItemTitle>Create Quotation</ItemTitle>
+                                <ItemDescription>Prepare quotes for potential orders</ItemDescription>
+                              </ItemContent>
+                              <div className="ml-auto">
+                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                            </button>
+                          </Item>
 
-                    <Item
-                      asChild
-                      variant="outline"
-                      className="cursor-pointer transition-all hover:bg-muted/50"
-                    >
-                      <button
-                        onClick={() => router.push('/purchases')}
-                        className="w-full text-left"
-                      >
-                        <ItemMedia variant="icon">
-                          <ShoppingCart className="h-5 w-5" />
-                        </ItemMedia>
-                        <ItemContent>
-                          <ItemTitle>Create Purchase</ItemTitle>
-                          <ItemDescription>Record material purchases from suppliers</ItemDescription>
-                        </ItemContent>
-                        <div className="ml-auto">
-                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      </button>
-                    </Item>
+                          <Item
+                            asChild
+                            variant="outline"
+                            className="cursor-pointer transition-all hover:bg-muted/50"
+                          >
+                            <button
+                              onClick={() => router.push('/documents/vouchers')}
+                              className="w-full text-left"
+                            >
+                              <ItemMedia variant="icon">
+                                <Ticket className="h-5 w-5" />
+                              </ItemMedia>
+                              <ItemContent>
+                                <ItemTitle>Create Voucher</ItemTitle>
+                                <ItemDescription>Issue payment or receipt vouchers</ItemDescription>
+                              </ItemContent>
+                              <div className="ml-auto">
+                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                            </button>
+                          </Item>
 
-                    <Item
-                      asChild
-                      variant="outline"
-                      className="cursor-pointer transition-all hover:bg-muted/50"
-                    >
-                      <button
-                        onClick={() => router.push('/expenses')}
-                        className="w-full text-left"
-                      >
-                        <ItemMedia variant="icon">
-                          <Banknote className="h-5 w-5" />
-                        </ItemMedia>
-                        <ItemContent>
-                          <ItemTitle>Create Expense</ItemTitle>
-                          <ItemDescription>Track and record business expenses</ItemDescription>
-                        </ItemContent>
-                        <div className="ml-auto">
-                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      </button>
-                    </Item>
-                  </ItemGroup>
-                  <Separator />
+                          <Item
+                            asChild
+                            variant="outline"
+                            className="cursor-pointer transition-all hover:bg-muted/50"
+                          >
+                            <button
+                              onClick={() => router.push('/documents/delivery-notes')}
+                              className="w-full text-left"
+                            >
+                              <ItemMedia variant="icon">
+                                <Truck className="h-5 w-5" />
+                              </ItemMedia>
+                              <ItemContent>
+                                <ItemTitle>Create Delivery Note</ItemTitle>
+                                <ItemDescription>Track product deliveries to customers</ItemDescription>
+                              </ItemContent>
+                              <div className="ml-auto">
+                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                            </button>
+                          </Item>
+
+                          <Item
+                            asChild
+                            variant="outline"
+                            className="cursor-pointer transition-all hover:bg-muted/50"
+                          >
+                            <button
+                              onClick={() => router.push('/purchases')}
+                              className="w-full text-left"
+                            >
+                              <ItemMedia variant="icon">
+                                <ShoppingCart className="h-5 w-5" />
+                              </ItemMedia>
+                              <ItemContent>
+                                <ItemTitle>Create Purchase</ItemTitle>
+                                <ItemDescription>Record purchases from suppliers</ItemDescription>
+                              </ItemContent>
+                              <div className="ml-auto">
+                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                            </button>
+                          </Item>
+
+                          <Item
+                            asChild
+                            variant="outline"
+                            className="cursor-pointer transition-all hover:bg-muted/50"
+                          >
+                            <button
+                              onClick={() => router.push('/expenses')}
+                              className="w-full text-left"
+                            >
+                              <ItemMedia variant="icon">
+                                <Banknote className="h-5 w-5" />
+                              </ItemMedia>
+                              <ItemContent>
+                                <ItemTitle>Create Expense</ItemTitle>
+                                <ItemDescription>Track and record business expenses</ItemDescription>
+                              </ItemContent>
+                              <div className="ml-auto">
+                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                            </button>
+                          </Item>
+                        </ItemGroup>
+                        <Separator />
+                      </>
+                    )}
+                  </div>
                 </>
               )}
+            </div>
 
+            {/* ✅ UPDATED: Table with smooth opacity transition */}
+            <div className="px-4 lg:px-6">
               <Card>
                 <CardHeader>
                   <CardTitle>Recent Invoices</CardTitle>
@@ -472,14 +486,20 @@ function DashboardContent() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <DataTable table={table}>
-                    <DataTableToolbar table={table} />
-                  </DataTable>
+                  <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
+                    {isLoading && !dashboardData ? (
+                      <DataTableSkeleton columnCount={columns.length} rowCount={5} />
+                    ) : (
+                      <DataTable table={table}>
+                        <DataTableToolbar table={table} />
+                      </DataTable>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
-              {dashboardData.recentSales.length === 0 && !isLoading && (
-                <Card>
+              {dashboardData?.recentSales.length === 0 && !isLoading && (
+                <Card className="mt-4">
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <h3 className="text-lg font-semibold mb-2">No approved invoices</h3>
                     <p className="text-muted-foreground text-center mb-4">
