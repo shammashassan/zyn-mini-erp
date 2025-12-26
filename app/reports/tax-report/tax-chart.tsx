@@ -39,7 +39,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function TaxReportChart({ data, dateRange }: TaxReportChartProps) {
-  // Transform data for the stacked bar chart
+  // Transform data for the bar chart
   const chartData = React.useMemo(() => {
     return data.map(item => ({
       month: item.period.slice(0, 3),
@@ -100,25 +100,27 @@ export function TaxReportChart({ data, dateRange }: TaxReportChartProps) {
   }
 
   return (
-    <Card className="@container/card">
-      <CardHeader>
-        <CardTitle>Tax Analysis</CardTitle>
-        <CardDescription>
-          <span className="hidden @[540px]/card:block">
-            {formatDateRange()} • Sales tax collected vs Purchase tax paid
-          </span>
-          <span className="@[540px]/card:hidden">
-            {formatMonth(dateRange.from)} - {formatMonthKey(dateRange.to)}
-          </span>
-        </CardDescription>
+    <Card className="@container/chart">
+      <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
+        <div className="grid flex-1 gap-1">
+          <CardTitle>Tax Analysis</CardTitle>
+          <CardDescription>
+            <span className="hidden @[540px]/chart:block">
+              {formatDateRange()} • Sales tax collected vs Purchase tax paid
+            </span>
+            <span className="@[540px]/chart:hidden">
+              {formatMonth(dateRange.from)} - {formatMonthKey(dateRange.to)}
+            </span>
+          </CardDescription>
+        </div>
       </CardHeader>
       <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-        <div className="flex flex-col @[800px]/card:flex-row gap-6">
+        <div className="flex flex-col @[800px]/chart:flex-row gap-6">
           {/* Chart Section */}
           <div className="flex-1">
             <ChartContainer
               config={chartConfig}
-              className="mx-auto aspect-square max-h-[300px]"
+              className="aspect-auto h-[250px] w-full"
             >
               <BarChart accessibilityLayer data={chartData}>
                 <CartesianGrid vertical={false} />
@@ -136,25 +138,23 @@ export function TaxReportChart({ data, dateRange }: TaxReportChartProps) {
                 <ChartLegend content={<ChartLegendContent />} />
                 <Bar
                   dataKey="salesTax"
-                  stackId="a"
                   fill="var(--color-salesTax)"
-                  radius={[0, 0, 4, 4]}
+                  radius={4}
                 />
                 <Bar
                   dataKey="purchaseTax"
-                  stackId="a"
                   fill="var(--color-purchaseTax)"
-                  radius={[4, 4, 0, 0]}
+                  radius={4}
                 />
               </BarChart>
             </ChartContainer>
           </div>
 
-          {/* Summary Section - Right Side */}
-          <div className="w-full @[800px]/card:w-72 flex-shrink-0">
+          {/* Metrics Section */}
+          <div className="w-full @[800px]/chart:w-72 flex-shrink-0">
             <div className="space-y-4">
               <div>
-                <h4 className="font-medium text-sm text-muted-foreground mb-3">Tax Summary</h4>
+                <h4 className="font-medium text-sm text-muted-foreground mb-3">Performance Metrics</h4>
                 
                 {/* Net Tax Liability */}
                 <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
@@ -168,24 +168,38 @@ export function TaxReportChart({ data, dateRange }: TaxReportChartProps) {
                       {totals.totalNetTax >= 0 ? "Net Liability" : "Net Refund"}
                     </span>
                   </div>
-                  <span className={`font-bold text-sm ${totals.totalNetTax >= 0 ? "text-orange-600" : "text-green-600"}`}>
-                    {formatCompactCurrency(Math.abs(totals.totalNetTax))}
+                  <div className="text-right">
+                    <div className={`font-bold text-sm ${totals.totalNetTax >= 0 ? "text-orange-600" : "text-green-600"}`}>
+                      {formatCompactCurrency(Math.abs(totals.totalNetTax))}
+                    </div>
+                    {totals.trendPercentage !== 0 && (
+                      <div className={`text-xs ${totals.isIncreasing ? "text-orange-600" : "text-green-600"}`}>
+                        {totals.isIncreasing ? "↗" : "↘"} {Math.abs(totals.trendPercentage).toFixed(1)}%
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sales Tax */}
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
+                  <span className="font-medium text-sm">Total Sales Tax</span>
+                  <span className="font-bold text-sm">
+                    {formatCompactCurrency(totals.totalSalesTax)}
                   </span>
                 </div>
 
-                {/* Trend */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
-                  <span className="font-medium text-sm">Monthly Trend</span>
-                  <span className={`font-bold text-sm flex items-center gap-1 ${totals.isIncreasing ? "text-orange-600" : "text-green-600"}`}>
-                    {totals.isIncreasing ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    {Math.abs(totals.trendPercentage).toFixed(1)}%
+                {/* Purchase Tax */}
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <span className="font-medium text-sm">Total Purchase Tax</span>
+                  <span className="font-bold text-sm">
+                    {formatCompactCurrency(totals.totalPurchaseTax)}
                   </span>
                 </div>
               </div>
 
               {/* Tax Breakdown */}
               <div className="space-y-3">
-                <h4 className="font-medium text-sm text-muted-foreground">Tax Breakdown</h4>
+                <h4 className="font-medium text-sm text-muted-foreground">Period Summary</h4>
                 <div className="space-y-2">
                   {totals.totalSalesTax > 0 && (
                     <div className="flex justify-between items-center text-sm">
@@ -206,21 +220,8 @@ export function TaxReportChart({ data, dateRange }: TaxReportChartProps) {
                     </div>
                   )}
                   <div className="border-t pt-2 mt-2">
-                    <div className="flex justify-between items-center text-sm font-semibold">
-                      <span className="flex items-center gap-2">
-                        {totals.totalNetTax >= 0 ? (
-                          <div className="w-3 h-3 rounded-full bg-orange-600"></div>
-                        ) : (
-                          <div className="w-3 h-3 rounded-full bg-green-600"></div>
-                        )}
-                        Net Amount
-                      </span>
-                      <span className={totals.totalNetTax >= 0 ? "text-orange-600" : "text-green-600"}>
-                        {formatCompactCurrency(Math.abs(totals.totalNetTax))}
-                      </span>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {totals.totalNetTax >= 0 ? "Amount owed to government" : "Refund expected from government"}
+                    <div className="text-xs text-muted-foreground">
+                      {totals.totalNetTax >= 0 ? "Amount owed to government" : "Refund expected"}
                     </div>
                   </div>
                 </div>

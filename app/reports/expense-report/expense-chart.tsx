@@ -84,32 +84,59 @@ export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRang
   const topCategory = categoryData[0];
   const totalExpenses = categoryData.reduce((sum, cat) => sum + cat.count, 0);
 
+  // Calculate trend for monthly view
+  const calculateTrend = () => {
+    if (monthlyTrend.length < 2) return { direction: "neutral", percentage: 0 };
+
+    const midpoint = Math.floor(monthlyTrend.length / 2);
+    const firstHalf = monthlyTrend.slice(0, midpoint);
+    const secondHalf = monthlyTrend.slice(midpoint);
+
+    const firstHalfAvg = firstHalf.reduce((sum, item) => sum + item.amount, 0) / firstHalf.length;
+    const secondHalfAvg = secondHalf.reduce((sum, item) => sum + item.amount, 0) / secondHalf.length;
+
+    if (firstHalfAvg === 0) return { direction: "neutral", percentage: 0 };
+
+    const percentage = ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100;
+    const direction = percentage > 0 ? "up" : percentage < 0 ? "down" : "neutral";
+
+    return { direction, percentage: Math.abs(percentage) };
+  };
+
+  const trend = calculateTrend();
+
+  const formatDateRange = () => {
+    return `${formatMonthKey(dateRange.from)} - ${formatMonthKey(dateRange.to)}`;
+  };
+
   return (
-    <Card className="@container/card">
-      <CardHeader>
-        <CardTitle>Expense Analysis</CardTitle>
-        <CardDescription>
-          <span className="hidden @[540px]/card:block">
-            {formatMonthDay(dateRange.from)} - {formatDisplayDate(dateRange.to)} • Detailed expense breakdown and trends
-          </span>
-          <span className="@[540px]/card:hidden">
-            {formatMonth(dateRange.from)} - {formatMonthKey(dateRange.to)}
-          </span>
-        </CardDescription>
-        <CardAction>
+    <Card className="@container/chart">
+      <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
+        <div className="grid flex-1 gap-1">
+          <CardTitle>Expense Analysis</CardTitle>
+          <CardDescription>
+            <span className="hidden @[540px]/chart:block">
+              {formatDateRange()} • Detailed expense breakdown and trends
+            </span>
+            <span className="@[540px]/chart:hidden">
+              {formatMonth(dateRange.from)} - {formatMonthKey(dateRange.to)}
+            </span>
+          </CardDescription>
+        </div>
+        <div className="flex gap-2">
           <ToggleGroup
             type="single"
             value={chartView}
             onValueChange={setChartView}
             variant="outline"
-            className="hidden *:data-[slot=toggle-group-item]:!px-4 @[767px]/card:flex"
+            className="hidden *:data-[slot=toggle-group-item]:!px-4 @[767px]/chart:flex"
           >
             <ToggleGroupItem value="category">By Category</ToggleGroupItem>
             <ToggleGroupItem value="trend">Monthly Trend</ToggleGroupItem>
           </ToggleGroup>
           <Select value={chartView} onValueChange={setChartView}>
             <SelectTrigger
-              className="flex w-32 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate @[767px]/card:hidden"
+              className="flex w-32 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate @[767px]/chart:hidden"
               size="sm"
               aria-label="Select chart view"
             >
@@ -124,17 +151,17 @@ export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRang
               </SelectItem>
             </SelectContent>
           </Select>
-        </CardAction>
+        </div>
       </CardHeader>
       <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-        <div className="flex flex-col @[800px]/card:flex-row gap-6">
+        <div className="flex flex-col @[800px]/chart:flex-row gap-6">
           {/* Chart Section */}
           <div className="flex-1">
             <ChartContainer
               config={chartConfig}
               className={cn(
                 "mx-auto",
-                chartView === "category" ? "aspect-square max-h-[300px]" : "w-full h-[300px]"
+                chartView === "category" ? "aspect-square max-h-[300px]" : "aspect-auto h-[250px] w-full"
               )}
             >
               {chartView === "category" ? (
@@ -216,11 +243,11 @@ export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRang
             </ChartContainer>
           </div>
 
-          {/* Summary Metrics */}
-          <div className="w-full @[800px]/card:w-72 flex-shrink-0">
+          {/* Metrics Section */}
+          <div className="w-full @[800px]/chart:w-72 flex-shrink-0">
             <div className="space-y-4">
               <div>
-                <h4 className="font-medium text-sm text-muted-foreground mb-3">Expense Summary</h4>
+                <h4 className="font-medium text-sm text-muted-foreground mb-3">Performance Metrics</h4>
                 
                 {/* Total Expenses */}
                 <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
@@ -228,9 +255,16 @@ export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRang
                     <TrendingUp className="h-4 w-4 text-red-600" />
                     <span className="font-medium text-sm">Total Expenses</span>
                   </div>
-                  <span className="font-bold text-sm text-red-600">
-                    {formatCompactCurrency(totalAmount)}
-                  </span>
+                  <div className="text-right">
+                    <div className="font-bold text-sm text-red-600">
+                      {formatCompactCurrency(totalAmount)}
+                    </div>
+                    {chartView === "trend" && trend.direction !== "neutral" && (
+                      <div className={`text-xs ${trend.direction === "up" ? "text-red-600" : "text-green-600"}`}>
+                        {trend.direction === "up" ? "↗" : "↘"} {trend.percentage.toFixed(1)}%
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Average per Expense */}
@@ -245,7 +279,7 @@ export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRang
               {/* Category Breakdown */}
               <div className="space-y-3">
                 <h4 className="font-medium text-sm text-muted-foreground">
-                  {chartView === "category" ? "Top Categories" : "Monthly Trend"}
+                  {chartView === "category" ? "Period Summary" : "Period Summary"}
                 </h4>
                 <div className="space-y-2">
                   {chartView === "category" ? (
@@ -261,13 +295,14 @@ export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRang
                           </span>
                           <div className="text-right">
                             <span className="font-medium">{formatCompactCurrency(category.amount)}</span>
-                            <div className="text-xs text-muted-foreground">{category.count} items</div>
                           </div>
                         </div>
                       ))}
                       {categoryData.length > 3 && (
-                        <div className="text-xs text-muted-foreground text-center pt-2">
-                          +{categoryData.length - 3} more categories
+                        <div className="border-t pt-2 mt-2">
+                          <div className="text-xs text-muted-foreground">
+                            +{categoryData.length - 3} more categories
+                          </div>
                         </div>
                       )}
                     </>
@@ -282,6 +317,11 @@ export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRang
                           <span className="font-medium">{formatCompactCurrency(month.amount)}</span>
                         </div>
                       ))}
+                      <div className="border-t pt-2 mt-2">
+                        <div className="text-xs text-muted-foreground">
+                          Showing data for selected period
+                        </div>
+                      </div>
                     </>
                   )}
                 </div>

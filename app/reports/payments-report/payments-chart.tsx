@@ -89,24 +89,27 @@ export function PaymentsChart({ data, dateRange }: PaymentsChartProps) {
   }
 
   return (
-    <Card className="@container/card">
-      <CardHeader>
-        <CardTitle>Cash Flow Analysis</CardTitle>
-        <CardDescription>
-          <span className="hidden @[540px]/card:block">
-            {formatDateRange()} • Inflows vs Outflows
-          </span>
-          <span className="@[540px]/card:hidden">
-            {formatMonth(dateRange.from)} - {formatMonthKey(dateRange.to)}
-          </span>
-        </CardDescription>
+    <Card className="@container/chart">
+      <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
+        <div className="grid flex-1 gap-1">
+          <CardTitle>Cash Flow Analysis</CardTitle>
+          <CardDescription>
+            <span className="hidden @[540px]/chart:block">
+              {formatDateRange()} • Inflows vs Outflows
+            </span>
+            <span className="@[540px]/chart:hidden">
+              {formatMonth(dateRange.from)} - {formatMonthKey(dateRange.to)}
+            </span>
+          </CardDescription>
+        </div>
       </CardHeader>
       <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-        <div className="flex flex-col @[800px]/card:flex-row gap-6">
+        <div className="flex flex-col @[800px]/chart:flex-row gap-6">
+          {/* Chart Section */}
           <div className="flex-1">
             <ChartContainer
               config={chartConfig}
-              className="mx-auto aspect-square max-h-[300px]"
+              className="aspect-auto h-[250px] w-full"
             >
               <BarChart accessibilityLayer data={chartData}>
                 <CartesianGrid vertical={false} />
@@ -124,13 +127,11 @@ export function PaymentsChart({ data, dateRange }: PaymentsChartProps) {
                 <ChartLegend content={<ChartLegendContent />} />
                 <Bar
                   dataKey="inflow"
-                  stackId="a"
                   fill="var(--color-inflow)"
                   radius={4}
                 />
                 <Bar
                   dataKey="outflow"
-                  stackId="b"
                   fill="var(--color-outflow)"
                   radius={4}
                 />
@@ -138,10 +139,11 @@ export function PaymentsChart({ data, dateRange }: PaymentsChartProps) {
             </ChartContainer>
           </div>
 
-          <div className="w-full @[800px]/card:w-72 flex-shrink-0">
+          {/* Metrics Section */}
+          <div className="w-full @[800px]/chart:w-72 flex-shrink-0">
             <div className="space-y-4">
               <div>
-                <h4 className="font-medium text-sm text-muted-foreground mb-3">Payment Summary</h4>
+                <h4 className="font-medium text-sm text-muted-foreground mb-3">Performance Metrics</h4>
                 
                 <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
                   <div className="flex items-center gap-2">
@@ -172,7 +174,7 @@ export function PaymentsChart({ data, dateRange }: PaymentsChartProps) {
               </div>
 
               <div className="space-y-3">
-                <h4 className="font-medium text-sm text-muted-foreground">Breakdown</h4>
+                <h4 className="font-medium text-sm text-muted-foreground">Period Summary</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-sm">
                     <span className="flex items-center gap-2">
@@ -187,6 +189,11 @@ export function PaymentsChart({ data, dateRange }: PaymentsChartProps) {
                       Cash Outflow
                     </span>
                     <span className="font-medium">{formatCompactCurrency(totals.totalOutflow)}</span>
+                  </div>
+                  <div className="border-t pt-2 mt-2">
+                    <div className="text-xs text-muted-foreground">
+                      Showing data for selected period
+                    </div>
                   </div>
                 </div>
               </div>
