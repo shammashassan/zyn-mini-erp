@@ -38,8 +38,18 @@ const useMediaQuery = (query: string) => {
 export default function EmployeesPage() {
   return (
     <Suspense fallback={
-      <div className="flex flex-1 items-center justify-center min-h-[400px]">
-        <Spinner className="size-10" />
+      <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-primary/10 rounded-full">
+            <Briefcase className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">Employees</h1>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <DataTableSkeleton columnCount={6} rowCount={10} />
+          </CardContent>
+        </Card>
       </div>
     }>
       <EmployeesPageContent />
@@ -88,7 +98,7 @@ function EmployeesPageContent() {
       if (!background) {
         setIsLoading(true);
       }
-      
+
       const res = await fetch("/api/employees");
 
       if (res.status === 403) {
@@ -263,8 +273,7 @@ function EmployeesPageContent() {
       await Promise.all(deletePromises);
 
       toast.success(
-        `${selectedEmployees.length} ${
-          selectedEmployees.length === 1 ? "employee" : "employees"
+        `${selectedEmployees.length} ${selectedEmployees.length === 1 ? "employee" : "employees"
         } moved to trash.`
       );
 
@@ -415,9 +424,16 @@ function EmployeesPageContent() {
                 <CardContent className="p-6">
                   {/* ✅ UPDATED: Applied transition-opacity for smooth updates */}
                   <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
-                    <DataTable table={table}>
-                      <DataTableToolbar table={table} />
-                    </DataTable>
+                    {isLoading ? (
+                      <DataTableSkeleton
+                        columnCount={columns.length}
+                        rowCount={10}
+                      />
+                    ) : (
+                      <DataTable table={table}>
+                        <DataTableToolbar table={table} />
+                      </DataTable>
+                    )}
                   </div>
                 </CardContent>
               </Card>
