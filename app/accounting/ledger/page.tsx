@@ -1,4 +1,4 @@
-// app/accounting/ledger/page.tsx - UPDATED: Added Silent Background Fetch
+// app/accounting/ledger/page.tsx - UPDATED: Uniform loading with Tax Report
 
 "use client";
 
@@ -37,6 +37,7 @@ import { AccessDenied } from "@/components/access-denied";
 import { ExportMenu } from "@/components/export-menu";
 import { exportLedgerToPDF, exportLedgerToExcel, type CompanyDetails } from "@/utils/reportExports";
 import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface LedgerData {
   account: IChartOfAccount;
@@ -45,6 +46,29 @@ interface LedgerData {
   entries: LedgerEntry[];
   totalDebit: number;
   totalCredit: number;
+}
+
+// ✅ UPDATED: Skeleton matching Tax Report style
+function LedgerSkeleton() {
+  return (
+    <div className="space-y-6 animate-in fade-in-50">
+      {/* Stats Cards Skeleton */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={`stat-${i}`} className="p-6 py-4">
+            <CardContent className="p-0 space-y-3">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-5 w-14 rounded-full" />
+              </div>
+              <Skeleton className="h-9 w-32" />
+              <Skeleton className="h-3 w-20" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function LedgerPageContent() {
@@ -57,7 +81,6 @@ function LedgerPageContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  // Payees state
   const [customers, setCustomers] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [payees, setPayees] = useState<any[]>([]);
@@ -154,7 +177,6 @@ function LedgerPageContent() {
     }
   }, [searchParams, accounts]);
 
-  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
   const fetchLedger = useCallback(async (background = false) => {
     if (!canRead) return;
 
@@ -163,7 +185,6 @@ function LedgerPageContent() {
     }
 
     if (!dateRange?.from || !dateRange?.to) {
-      // Don't show toast on background fetch to avoid spamming
       if (!background) toast.error("Please select a date range");
       return;
     }
@@ -191,16 +212,12 @@ function LedgerPageContent() {
     }
   }, [canRead, selectedAccountCode, dateRange, partyTypeFilter, selectedPartyId]);
 
-  // Standard fetch on dependency change
-  // ✅ FIXED: Removed 'session' to prevent double-fetch on focus
   useEffect(() => {
     if (selectedAccountCode && dateRange?.from && dateRange?.to && canRead) {
       fetchLedger();
     }
   }, [selectedAccountCode, dateRange, partyTypeFilter, selectedPartyId, canRead, fetchLedger]);
 
-  // ✅ NEW: Window Focus Listener - SILENT MODE
-  // Triggers silent background fetch when returning to the tab (only if an account is selected)
   useEffect(() => {
     const onFocus = () => {
       if (isMounted && canRead && selectedAccountCode) {
@@ -215,13 +232,12 @@ function LedgerPageContent() {
     };
   }, [fetchLedger, isMounted, canRead, selectedAccountCode]);
 
-  // Get current party list based on type including Payee
   const getCurrentPartyList = () => {
     switch (partyTypeFilter) {
       case "Customer": return customers;
       case "Supplier": return suppliers;
       case "Payee": return payees;
-      case "Vendor": return []; // Vendor is manual entry, no list needed
+      case "Vendor": return [];
       default: return [];
     }
   };
@@ -518,7 +534,6 @@ function LedgerPageContent() {
                       </Select>
                     </div>
 
-                    {/* Party Filter with Payee and Vendor */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t md:col-span-3">
                       <div className="space-y-2">
                         <Label className="flex items-center gap-2">
@@ -640,17 +655,28 @@ function LedgerPageContent() {
                   </CardHeader>
                 </Card>
 
-                <div className="mb-6">
-                  <StatsCards data={statsData} columns={4} />
+                {/* ✅ UPDATED: Matching Tax Report transition */}
+                <div className={cn("transition-opacity duration-200", isLoading && !ledgerData ? "opacity-50" : "opacity-100")}>
+                  {isLoading && statsData.length === 0 ? (
+                    <LedgerSkeleton />
+                  ) : (
+                    <div className="mb-6">
+                      <StatsCards data={statsData} columns={4} />
+                    </div>
+                  )}
                 </div>
 
                 <Card>
                   <CardContent className="p-6">
-                    {/* ✅ UPDATED: Applied transition-opacity for smooth updates */}
+                    {/* ✅ UPDATED: Smooth table transition */}
                     <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
-                      <DataTable table={table}>
-                        <DataTableToolbar table={table} />
-                      </DataTable>
+                      {isLoading && !ledgerData.entries.length ? (
+                        <DataTableSkeleton columnCount={columns.length} rowCount={10} />
+                      ) : (
+                        <DataTable table={table}>
+                          <DataTableToolbar table={table} />
+                        </DataTable>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -702,6 +728,7 @@ function LedgerPageContent() {
     </>
   );
 }
+
 export default function Component() {
   return (
     <Suspense fallback={

@@ -1,4 +1,4 @@
-// app/accounting/profit-loss/page.tsx - UPDATED: Added Skeleton for Chart Card
+// app/accounting/profit-loss/page.tsx - UPDATED: Uniform loading with Tax Report
 
 "use client";
 
@@ -72,7 +72,40 @@ interface ApiResponse {
   expenseDetails?: any[];
 }
 
-// ✅ FIXED: Wrapper component to provide Suspense boundary
+// ✅ UPDATED: Skeleton matching Tax Report style
+function ProfitLossSkeleton() {
+  return (
+    <div className="space-y-6 animate-in fade-in-50">
+      {/* Stats Cards Skeleton */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={`stat-${i}`} className="p-6 py-4">
+            <CardContent className="p-0 space-y-3">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-5 w-14 rounded-full" />
+              </div>
+              <Skeleton className="h-9 w-32" />
+              <Skeleton className="h-3 w-20" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Chart Card Skeleton */}
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48 mb-2" />
+          <Skeleton className="h-4 w-32" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-[350px] w-full" />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function ProfitLossPage() {
   return (
     <Suspense fallback={
@@ -85,12 +118,9 @@ export default function ProfitLossPage() {
   );
 }
 
-/**
- * The main page component content
- */
 function ProfitLossPageContent() {
   const [data, setData] = useState<ApiResponse | null>(null);
-  const [detailedData, setDetailedData] = useState<any>(null); // For exports
+  const [detailedData, setDetailedData] = useState<any>(null);
   const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
@@ -100,7 +130,6 @@ function ProfitLossPageContent() {
     to: endOfMonth(new Date())
   });
    
-  // Export States
   const [pdfUrl, setPdfUrl] = useState<string>("");
   const [isPdfViewerOpen, setIsPdfViewerOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -115,7 +144,6 @@ function ProfitLossPageContent() {
     setIsMounted(true);
   }, []);
 
-  // Fetch Company Details
   useEffect(() => {
     const fetchCompanyDetails = async () => {
       if (!canRead) return;
@@ -135,7 +163,6 @@ function ProfitLossPageContent() {
     }
   }, [canRead]);
 
-  // ✅ UPDATED: Added 'background' param for silent refreshes
   const fetchData = useCallback(async (background = false) => {
     if (!canRead) return;
     
@@ -143,7 +170,6 @@ function ProfitLossPageContent() {
       return;
     }
 
-    // Only show spinner if not a background fetch
     if (!background) {
       setIsLoading(true);
     }
@@ -155,8 +181,6 @@ function ProfitLossPageContent() {
       });
 
       const response = await fetch(`/api/profit-loss?${params}`);
-      
-      // Also fetch detailed financial statements for the export function to work best
       const detailsRes = await fetch(`/api/financial-statements?${params}`);
 
       if (!response.ok) {
@@ -177,8 +201,6 @@ function ProfitLossPageContent() {
     }
   }, [dateRange, canRead]);
 
-  // ✅ UPDATED: Standard fetch on mount/date change
-  // Removed 'session' dependency to prevent double-fetch on focus
   useEffect(() => {
     if (isMounted && canRead) {
       fetchData();
@@ -190,8 +212,6 @@ function ProfitLossPageContent() {
     }
   }, [isMounted, canRead, isPending, dateRange, fetchData]);
 
-  // ✅ NEW: Window Focus Listener - SILENT MODE
-  // Triggers silent background fetch when returning to the tab
   useEffect(() => {
     const onFocus = () => {
       if (isMounted && canRead) {
@@ -308,7 +328,6 @@ function ProfitLossPageContent() {
 
     const { summary, trends } = data;
 
-    // Helper to format percentage with sign
     const formatTrend = (value: number | undefined) => {
       if (value === undefined) return "0%";
       const sign = value > 0 ? "+" : "";
@@ -342,7 +361,6 @@ function ProfitLossPageContent() {
         stat: formatCompactCurrency(Math.abs(summary.netTax)),
         change: formatTrend(trends?.netTax),
         subtext: summary.netTax >= 0 ? "Payable (Due)" : "Recoverable",
-        // Tax increasing is usually bad (negative)
         changeType: (trends?.netTax || 0) <= 0 ? "positive" : "negative"
       }
     ];
@@ -434,53 +452,30 @@ function ProfitLossPageContent() {
           </div>
 
           <div className="px-4 lg:px-6">
-             {isLoading && !data ? (
-                // ✅ Stats Cards Skeleton
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 w-full">
-                  {[...Array(4)].map((_, i) => (
-                    <Card key={i} className="p-6 py-4 w-full">
-                      <CardContent className="p-0">
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <Skeleton className="h-4 w-24" />
-                            <Skeleton className="h-5 w-16 rounded-full" />
-                          </div>
-                          <Skeleton className="h-8 w-32" />
-                          <Skeleton className="h-3 w-20" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-             ) : (
-                <StatsCards data={cardsData} columns={4} />
-             )}
-          </div>
-
-          <div className="px-4 lg:px-6">
-            {/* ✅ UPDATED: Applied transition-opacity for smooth updates */}
-            <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
-              {/* ✅ ADDED: Chart Card Skeleton */}
+            {/* ✅ UPDATED: Matching Tax Report transition */}
+            <div className={cn("transition-opacity duration-200", isLoading && !data ? "opacity-50" : "opacity-100")}>
               {isLoading && !data ? (
-                <Card className="col-span-4">
-                  <CardHeader>
-                    <Skeleton className="h-6 w-48 mb-2" />
-                    <Skeleton className="h-4 w-32" />
-                  </CardHeader>
-                  <CardContent className="pl-2">
-                    <Skeleton className="h-[350px] w-full" />
-                  </CardContent>
-                </Card>
+                <ProfitLossSkeleton />
               ) : (
-                dateRange?.from && dateRange?.to && data && (
-                  <ProfitLossChart
-                    profit={data.summary.profit}
-                    expenses={data.summary.totalExpenses}
-                    purchases={data.summary.totalPurchasesExTax}
-                    netTax={data.summary.netTax}
-                    dateRange={{ from: dateRange.from, to: dateRange.to }}
-                  />
-                )
+                <>
+                  {/* Stats Cards */}
+                  <div className="mb-6">
+                    <StatsCards data={cardsData} columns={4} />
+                  </div>
+
+                  {/* Chart */}
+                  <div className="mb-6">
+                    {dateRange?.from && dateRange?.to && data && (
+                      <ProfitLossChart
+                        profit={data.summary.profit}
+                        expenses={data.summary.totalExpenses}
+                        purchases={data.summary.totalPurchasesExTax}
+                        netTax={data.summary.netTax}
+                        dateRange={{ from: dateRange.from, to: dateRange.to }}
+                      />
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -494,11 +489,15 @@ function ProfitLossPageContent() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {/* ✅ UPDATED: Applied transition-opacity for smooth updates */}
+                {/* ✅ UPDATED: Table transition like Tax Report */}
                 <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
-                  <DataTable table={table}>
-                    <DataTableToolbar table={table} />
-                  </DataTable>
+                  {isLoading && !data ? (
+                    <DataTableSkeleton columnCount={columns.length} rowCount={10} />
+                  ) : (
+                    <DataTable table={table}>
+                      <DataTableToolbar table={table} />
+                    </DataTable>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -1,4 +1,4 @@
-// app/accounting/journal/page.tsx - FIXED: Added Suspense Boundary
+// app/accounting/journal/page.tsx - UPDATED: Uniform loading with Tax Report
 
 "use client";
 
@@ -49,7 +49,7 @@ function JournalPageContent() {
   const [journals, setJournals] = useState<IJournal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedJournal, setSelectedJournal] = useState<IJournal | null>(null);
@@ -88,7 +88,7 @@ function JournalPageContent() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [partyTypeFilter, setPartyTypeFilter] = useState<string>("all");
   const [selectedPartyId, setSelectedPartyId] = useState<string>("");
-  
+
   const [customers, setCustomers] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [payees, setPayees] = useState<any[]>([]);
@@ -149,7 +149,7 @@ function JournalPageContent() {
 
       const res = await fetch(`/api/journal?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch journals");
-      
+
       const result = await res.json();
 
       if (result.data && result.pageCount !== undefined) {
@@ -170,10 +170,10 @@ function JournalPageContent() {
       setIsInitialLoad(false);
     }
   }, [
-    canRead, 
-    urlState.page, 
-    urlState.pageSize, 
-    urlState.sort, 
+    canRead,
+    urlState.page,
+    urlState.pageSize,
+    urlState.sort,
     urlState.filters,
     statusFilter,
     typeFilter,
@@ -202,7 +202,7 @@ function JournalPageContent() {
     };
 
     window.addEventListener("focus", onFocus);
-    
+
     return () => {
       window.removeEventListener("focus", onFocus);
     };
@@ -379,9 +379,9 @@ function JournalPageContent() {
       setUrlState({ sort: sorting as ExtendedColumnSort<IJournal>[] });
     },
     onColumnFiltersChange: (filters) => {
-      setUrlState({ 
+      setUrlState({
         filters: filters as ExtendedColumnFilter<IJournal>[],
-        page: 1, 
+        page: 1,
       });
     },
     getRowId: (row) => row._id,
@@ -606,8 +606,8 @@ function JournalPageContent() {
                               disabled={partyTypeFilter === "all" || partyTypeFilter === "Vendor"}
                             >
                               <span className="truncate">
-                                {partyTypeFilter === "Vendor" 
-                                  ? "Manual entries only" 
+                                {partyTypeFilter === "Vendor"
+                                  ? "Manual entries only"
                                   : selectedParty?.name || `Select ${partyTypeFilter?.toLowerCase() || 'party'}...`}
                               </span>
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -669,18 +669,19 @@ function JournalPageContent() {
             <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
               <Card>
                 <CardContent className="p-6">
-                  {isInitialLoad ? (
-                    <DataTableSkeleton
-                      columnCount={columns.length}
-                      rowCount={10}
-                    />
-                  ) : (
-                    <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
+                  {/* ✅ UPDATED: Matching Tax Report pattern */}
+                  <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
+                    {isInitialLoad ? (
+                      <DataTableSkeleton
+                        columnCount={columns.length}
+                        rowCount={10}
+                      />
+                    ) : (
                       <DataTable table={table}>
                         <DataTableToolbar table={table} />
                       </DataTable>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 

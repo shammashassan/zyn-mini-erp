@@ -1,10 +1,10 @@
-// app/accounting/chart-of-accounts/page.tsx - UPDATED: Added COA Loading Skeleton
+// app/accounting/chart-of-accounts/page.tsx - UPDATED: Uniform loading with Tax Report
 
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { toast } from "sonner";
-import { BookMarked, List, ListTree, Trash2 } from "lucide-react";
+import { List, ListTree, Trash2 } from "lucide-react"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,65 +24,58 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// ✅ ADDED: COA Page Skeleton Component
+// ✅ UPDATED: Skeleton matching Tax Report style
 function COAPageSkeleton() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in-50">
       {/* Stats Cards Skeleton */}
-      <div className="px-4 lg:px-6">
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 w-full">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="p-6 py-4 w-full">
-              <CardContent className="p-0">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-5 w-16 rounded-full" />
-                  </div>
-                  <Skeleton className="h-8 w-32" />
-                  <Skeleton className="h-3 w-20" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={`stat-${i}`} className="p-6 py-4">
+            <CardContent className="p-0 space-y-3">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-5 w-14 rounded-full" />
+              </div>
+              <Skeleton className="h-9 w-32" />
+              <Skeleton className="h-3 w-20" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Tabs Switcher Skeleton */}
+      <div className="flex justify-center">
+        <Skeleton className="h-10 w-80" />
       </div>
 
       {/* Content Skeleton */}
-      <div className="px-4 lg:px-6">
-        <div className="flex items-center justify-between mb-4">
-           <Skeleton className="h-10 w-48" /> {/* Tabs Switcher */}
-        </div>
-        <Card>
-          <CardContent className="p-6 space-y-8">
-             {/* Mimic Tree View Groups */}
-             {[...Array(3)].map((_, i) => (
-               <div key={i} className="space-y-4">
-                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                       <Skeleton className="h-10 w-10 rounded-lg" /> {/* Group Icon */}
-                       <div className="space-y-1.5">
-                         <Skeleton className="h-5 w-40" /> {/* Group Name */}
-                         <Skeleton className="h-3 w-24" /> {/* Subtext */}
-                       </div>
-                    </div>
-                    <Skeleton className="h-9 w-28" /> {/* Action Button */}
-                 </div>
-                 {/* Mimic List Items inside Group */}
-                 <div className="pl-14 space-y-3">
-                    <Skeleton className="h-12 w-full rounded-md" />
-                    <Skeleton className="h-12 w-full rounded-md" />
-                 </div>
-               </div>
-             ))}
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="p-6 space-y-8">
+          {[...Array(3)].map((_, i) => (
+            <div key={`group-${i}`} className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Skeleton className="h-10 w-10 rounded-lg" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-5 w-40" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+                <Skeleton className="h-9 w-28" />
+              </div>
+              <div className="pl-14 space-y-3">
+                <Skeleton className="h-12 w-full rounded-md" />
+                <Skeleton className="h-12 w-full rounded-md" />
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-// ✅ Wrapper component to provide Suspense boundary
 export default function ChartOfAccountsPage() {
   return (
     <Suspense fallback={
@@ -95,9 +88,6 @@ export default function ChartOfAccountsPage() {
   );
 }
 
-/**
- * The main page component content
- */
 function ChartOfAccountsPageContent() {
   const [accounts, setAccounts] = useState<IChartOfAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -126,7 +116,6 @@ function ChartOfAccountsPageContent() {
     setIsMounted(true);
   }, []);
 
-  // Silent Background Fetch
   const fetchAccounts = useCallback(async (background = false) => {
     if (!canRead) return;
     try {
@@ -148,7 +137,6 @@ function ChartOfAccountsPageContent() {
     }
   }, [canRead]);
 
-  // Initial Fetch
   useEffect(() => {
     if (isMounted && canRead) {
       fetchAccounts();
@@ -160,7 +148,6 @@ function ChartOfAccountsPageContent() {
     }
   }, [isMounted, canRead, isPending, fetchAccounts]);
 
-  // Window Focus Listener
   useEffect(() => {
     const onFocus = () => {
       if (isMounted && canRead) {
@@ -321,7 +308,6 @@ function ChartOfAccountsPageContent() {
     };
   }, [accounts, existingSubGroups]);
 
-  // Prepared data for StatsCards
   const statsData: StatItem[] = useMemo(() => [
     {
       name: "Total Accounts",
@@ -400,79 +386,76 @@ function ChartOfAccountsPageContent() {
               </div>
             </div>
 
-            {/* ✅ SHOW SKELETON WHILE LOADING */}
-            {isLoading && accounts.length === 0 ? (
-              <COAPageSkeleton />
-            ) : accounts.length > 0 ? (
-              <>
-                {/* Statistics Cards */}
-                <div className="px-4 lg:px-6">
-                  <StatsCards data={statsData} columns={4} />
-                </div>
-
-                {/* View Toggle and Content */}
-                <div className="px-4 lg:px-6">
-                  <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "table" | "tree")}>
-                    <div className="flex items-center justify-between mb-4">
-                      <TabsList className="grid w-auto grid-cols-2">
-                        <TabsTrigger value="tree" className="flex items-center gap-2">
-                          <ListTree className="h-4 w-4" />
-                          <span className="hidden sm:inline">Tree View</span>
-                        </TabsTrigger>
-                        <TabsTrigger value="table" className="flex items-center gap-2">
-                          <List className="h-4 w-4" />
-                          <span className="hidden sm:inline">Table View</span>
-                        </TabsTrigger>
-                      </TabsList>
+            <div className="px-4 lg:px-6">
+              {/* ✅ UPDATED: Matching Tax Report transition pattern */}
+              <div className={cn("transition-opacity duration-200", isLoading && accounts.length === 0 ? "opacity-50" : "opacity-100")}>
+                {isLoading && accounts.length === 0 ? (
+                  <COAPageSkeleton />
+                ) : accounts.length > 0 ? (
+                  <>
+                    {/* Statistics Cards */}
+                    <div className="mb-6">
+                      <StatsCards data={statsData} columns={4} />
                     </div>
 
-                    <TabsContent value="tree" className="mt-0">
-                      {/* ✅ Applied opacity transition */}
-                      <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
+                    {/* View Toggle and Content */}
+                    <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "table" | "tree")}>
+                      <div className="flex justify-center pt-6 mb-6">
+                        <TabsList className="flex justify-center w-full max-w-2xl grid-cols-3">
+                          <TabsTrigger value="tree" className="flex items-center gap-2">
+                            <ListTree className="h-4 w-4" />
+                            <span className="hidden sm:inline">Tree View</span>
+                          </TabsTrigger>
+                          <TabsTrigger value="table" className="flex items-center gap-2">
+                            <List className="h-4 w-4" />
+                            <span className="hidden sm:inline">Table View</span>
+                          </TabsTrigger>
+                        </TabsList>
+                      </div>
+
+                      <TabsContent value="tree" className="mt-0">
                         <GroupManagement
                           accounts={accounts}
                           onCreateAccount={(group, subGroup) => handleOpenForm(null, group, subGroup)}
                           canCreate={canCreate}
                         />
-                      </div>
-                    </TabsContent>
+                      </TabsContent>
 
-                    <TabsContent value="table" className="mt-0">
-                      <Card>
-                        <CardContent className="p-6">
-                          {/* ✅ Applied opacity transition & Skeleton */}
-                          <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
-                            <DataTable table={table}>
-                              <DataTableToolbar table={table} />
-                            </DataTable>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                  </Tabs>
-                </div>
-              </>
-            ) : (
-              /* Empty State - Only show when no accounts and not loading */
-              <div className="px-4 lg:px-6">
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <ListTree className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No accounts in chart yet</h3>
-                    <p className="text-muted-foreground text-center mb-4 max-w-md">
-                      Start building your chart of accounts by creating account entries.
-                      These will be used to categorize all financial transactions.
-                    </p>
-                    {canCreate && (
-                      <Button onClick={() => handleOpenForm()} className="gap-2">
-                        <ListTree className="h-4 w-4" />
-                        Create First Account
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
+                      <TabsContent value="table" className="mt-0">
+                        <Card>
+                          <CardContent className="p-6">
+                            {/* ✅ UPDATED: Table transition like Tax Report */}
+                            <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
+                              <DataTable table={table}>
+                                <DataTableToolbar table={table} />
+                              </DataTable>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+                    </Tabs>
+                  </>
+                ) : (
+                  /* Empty State */
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <ListTree className="h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">No accounts in chart yet</h3>
+                      <p className="text-muted-foreground text-center mb-4 max-w-md">
+                        Start building your chart of accounts by creating account entries.
+                        These will be used to categorize all financial transactions.
+                      </p>
+                      {canCreate && (
+                        <Button onClick={() => handleOpenForm()} className="gap-2">
+                          <ListTree className="h-4 w-4" />
+                          Create First Account
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

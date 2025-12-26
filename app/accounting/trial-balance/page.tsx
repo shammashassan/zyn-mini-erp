@@ -1,4 +1,4 @@
-// app/accounting/trial-balance/page.tsx - UPDATED: Used shadcn Skeleton for stats loading
+// app/accounting/trial-balance/page.tsx - UPDATED: Uniform loading with Tax Report
 
 "use client";
 
@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
+import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { useDataTable } from "@/hooks/use-data-table";
 import { StatsCards, type StatItem } from "@/components/stats-cards";
 import { Scale, Calendar as CalendarIcon } from "lucide-react";
@@ -16,15 +17,13 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatCompactCurrency } from "@/utils/formatters/currency";
-// ✅ FIXED: Imported 'columns' to preserve table structure
-import { columns, type TrialBalanceItem } from "./columns"; 
+import { columns, type TrialBalanceItem } from "./columns";
 import { useTrialBalancePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { ExportMenu } from "@/components/export-menu";
 import { exportTrialBalanceToPDF, exportTrialBalanceToExcel, type CompanyDetails } from "@/utils/reportExports";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { Spinner } from "@/components/ui/spinner";
-// ✅ IMPORTED: Shadcn Skeleton
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface TrialBalanceSummary {
@@ -35,7 +34,29 @@ interface TrialBalanceSummary {
   accountsCount: number;
 }
 
-// ✅ FIXED: Wrapper component to provide Suspense boundary
+// ✅ UPDATED: Skeleton matching Tax Report style
+function TrialBalanceSkeleton() {
+  return (
+    <div className="space-y-6 animate-in fade-in-50">
+      {/* Stats Cards Skeleton */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={`stat-${i}`} className="p-6 py-4">
+            <CardContent className="p-0 space-y-3">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-5 w-14 rounded-full" />
+              </div>
+              <Skeleton className="h-9 w-32" />
+              <Skeleton className="h-3 w-20" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function TrialBalancePage() {
   return (
     <Suspense fallback={
@@ -48,9 +69,6 @@ export default function TrialBalancePage() {
   );
 }
 
-/**
- * The main page component content
- */
 function TrialBalancePageContent() {
   const [trialBalance, setTrialBalance] = useState<TrialBalanceItem[]>([]);
   const [summary, setSummary] = useState<TrialBalanceSummary | null>(null);
@@ -59,12 +77,10 @@ function TrialBalancePageContent() {
   const [asOfDate, setAsOfDate] = useState<Date>(new Date());
   const [isMounted, setIsMounted] = useState(false);
 
-  // Export States
   const [pdfUrl, setPdfUrl] = useState<string>("");
   const [isPdfViewerOpen, setIsPdfViewerOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Use the custom hook for permissions
   const {
     permissions: { canRead, canExport },
     session,
@@ -75,7 +91,6 @@ function TrialBalancePageContent() {
     setIsMounted(true);
   }, []);
 
-  // Fetch Company Details
   useEffect(() => {
     const fetchCompanyDetails = async () => {
       if (!canRead) return;
@@ -95,12 +110,10 @@ function TrialBalancePageContent() {
     }
   }, [canRead]);
 
-  // ✅ UPDATED: Added 'background' param for silent refreshes
   const fetchTrialBalance = useCallback(async (background = false) => {
     if (!canRead) return;
 
     try {
-      // Only show spinner if not a background fetch
       if (!background) {
         setIsLoading(true);
       }
@@ -132,8 +145,6 @@ function TrialBalancePageContent() {
     }
   }, [canRead, asOfDate]);
 
-  // ✅ UPDATED: Standard fetch on mount/date change
-  // Removed 'session' dependency to prevent double-fetch on focus
   useEffect(() => {
     if (isMounted && canRead) {
       fetchTrialBalance();
@@ -145,8 +156,6 @@ function TrialBalancePageContent() {
     }
   }, [isMounted, canRead, isPending, asOfDate, fetchTrialBalance]);
 
-  // ✅ NEW: Window Focus Listener - SILENT MODE
-  // Triggers silent background fetch when returning to the tab
   useEffect(() => {
     const onFocus = () => {
       if (isMounted && canRead) {
@@ -228,7 +237,6 @@ function TrialBalancePageContent() {
       { label: "Expenses", value: "Expenses", count: trialBalance.filter(item => item.groupName === "Expenses").length },
     ].filter(opt => opt.count > 0);
 
-    // ✅ FIXED: Map over imported columns instead of hardcoding
     return columns.map((col: any) => {
       if (col.accessorKey === "groupName") {
         return { ...col, meta: { ...col.meta, options: groupOptions } };
@@ -314,31 +322,20 @@ function TrialBalancePageContent() {
             </div>
 
             <div className="px-4 lg:px-6">
-              {isLoading && !summary ? (
-                // ✅ UPDATED: Using shadcn Skeleton components
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 w-full">
-                  {[...Array(4)].map((_, i) => (
-                    <Card key={i} className="p-6 py-4 w-full">
-                      <CardContent className="p-0">
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <Skeleton className="h-4 w-24" /> {/* Label */}
-                            <Skeleton className="h-5 w-16 rounded-full" /> {/* Badge */}
-                          </div>
-                          <Skeleton className="h-8 w-32" /> {/* Value */}
-                          <Skeleton className="h-3 w-20" /> {/* Subtext */}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <StatsCards data={summaryCards} columns={4} />
-              )}
+              {/* ✅ UPDATED: Matching Tax Report transition */}
+              <div className={cn("transition-opacity duration-200", isLoading && !summary ? "opacity-50" : "opacity-100")}>
+                {isLoading && !summary ? (
+                  <TrialBalanceSkeleton />
+                ) : (
+                  <div className="mb-6">
+                    <StatsCards data={summaryCards} columns={4} />
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="px-4 lg:px-6">
-              {/* ✅ UPDATED: Applied transition-opacity for smooth updates */}
+              {/* ✅ UPDATED: Smooth table transition */}
               <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
                 {trialBalance.length === 0 && !isLoading ? (
                   <Card>
@@ -359,9 +356,15 @@ function TrialBalancePageContent() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <DataTable table={table}>
-                        <DataTableToolbar table={table} />
-                      </DataTable>
+                      <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
+                        {isLoading && !trialBalance.length ? (
+                          <DataTableSkeleton columnCount={columns.length} rowCount={20} />
+                        ) : (
+                          <DataTable table={table}>
+                            <DataTableToolbar table={table} />
+                          </DataTable>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 )}

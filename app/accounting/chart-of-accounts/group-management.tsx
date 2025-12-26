@@ -89,19 +89,6 @@ export function GroupManagement({ accounts, onCreateAccount, canCreate }: GroupM
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ListTree className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-semibold">Chart of Accounts</h2>
-        </div>
-        {canCreate && (
-          <Button onClick={() => onCreateAccount()} className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Account
-          </Button>
-        )}
-      </div>
-
       <div className="grid grid-cols-1 gap-6">
         {Object.keys(groupedAccounts).sort().map(group => {
           const subGroups = Object.keys(groupedAccounts[group]);

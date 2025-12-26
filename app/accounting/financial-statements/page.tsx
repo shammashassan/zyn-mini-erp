@@ -1,4 +1,4 @@
-// app/accounting/financial-statements/page.tsx - UPDATED: Added FinancialReportSkeleton
+// app/accounting/financial-statements/page.tsx - UPDATED: Uniform loading with Tax Report
 
 "use client";
 
@@ -84,21 +84,21 @@ interface BSData {
   };
 }
 
-// ✅ ADDED: Financial Report Skeleton Component
+// ✅ UPDATED: Skeleton matching Tax Report style
 function FinancialReportSkeleton() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in-50">
       {/* Stats Cards Skeleton */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
-          <Card key={i} className="p-6 py-4">
-            <CardContent className="p-0 space-y-2">
+          <Card key={`stat-${i}`} className="p-6 py-4">
+            <CardContent className="p-0 space-y-3">
               <div className="flex justify-between items-center">
-                <Skeleton className="h-4 w-24" /> {/* Label */}
-                <Skeleton className="h-5 w-12 rounded-full" /> {/* Badge */}
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-5 w-14 rounded-full" />
               </div>
-              <Skeleton className="h-8 w-32" /> {/* Value */}
-              <Skeleton className="h-3 w-40" /> {/* Subtext */}
+              <Skeleton className="h-9 w-32" />
+              <Skeleton className="h-3 w-20" />
             </CardContent>
           </Card>
         ))}
@@ -106,25 +106,25 @@ function FinancialReportSkeleton() {
 
       {/* Account Sections Skeleton */}
       {[...Array(3)].map((_, i) => (
-        <Card key={i} className="mb-4">
+        <Card key={`section-${i}`} className="mb-4">
           <div className="p-4 flex items-center justify-between border-b">
             <div className="flex items-center gap-3">
-              <Skeleton className="h-10 w-10 rounded-lg" /> {/* Icon */}
-              <div className="space-y-1">
-                <Skeleton className="h-5 w-32" /> {/* Title */}
-                <Skeleton className="h-3 w-20" /> {/* Subtitle */}
+              <Skeleton className="h-10 w-10 rounded-lg" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-3 w-20" />
               </div>
             </div>
-            <Skeleton className="h-6 w-24" /> {/* Total */}
+            <Skeleton className="h-7 w-28" />
           </div>
           <div className="p-4 space-y-4">
             {[...Array(3)].map((_, j) => (
-              <div key={j} className="flex justify-between items-center">
-                <div className="flex gap-2 items-center">
-                  <Skeleton className="h-5 w-16 rounded" /> {/* Code */}
-                  <Skeleton className="h-4 w-48" /> {/* Name */}
+              <div key={`item-${j}`} className="flex justify-between items-center">
+                <div className="flex gap-3 items-center w-full max-w-md">
+                  <Skeleton className="h-5 w-16 rounded bg-muted" />
+                  <Skeleton className="h-4 w-full max-w-[200px]" />
                 </div>
-                <Skeleton className="h-4 w-24" /> {/* Amount */}
+                <Skeleton className="h-4 w-24" />
               </div>
             ))}
           </div>
@@ -134,15 +134,15 @@ function FinancialReportSkeleton() {
       {/* Bottom Summary Card Skeleton */}
       <Card className="border-2">
         <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <Skeleton className="h-12 w-12 rounded-lg" /> {/* Icon */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-4 w-full sm:w-auto">
+              <Skeleton className="h-14 w-14 rounded-lg" />
               <div className="space-y-2 flex-1">
-                <Skeleton className="h-6 w-32" /> {/* Net Profit/Loss */}
-                <Skeleton className="h-4 w-48" /> {/* Date Range */}
+                <Skeleton className="h-7 w-40" />
+                <Skeleton className="h-4 w-32" />
               </div>
             </div>
-            <Skeleton className="h-10 w-40" /> {/* Total Amount */}
+            <Skeleton className="h-10 w-48" />
           </div>
         </CardContent>
       </Card>
@@ -150,7 +150,6 @@ function FinancialReportSkeleton() {
   );
 }
 
-// ✅ Wrapper component to provide Suspense boundary
 export default function FinancialStatementsPage() {
   return (
     <Suspense fallback={
@@ -163,9 +162,6 @@ export default function FinancialStatementsPage() {
   );
 }
 
-/**
- * The main page component content
- */
 function FinancialStatementsPageContent() {
   const [activeReport, setActiveReport] = useState<"profit-loss" | "balance-sheet" | "cash-flow">("profit-loss");
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -173,10 +169,7 @@ function FinancialStatementsPageContent() {
     to: endOfMonth(new Date())
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [data, setData] = useState<FinancialData>({
-    income: [],
-    expenses: [],
-  });
+  const [data, setData] = useState<FinancialData | null>(null);
   const [cashFlowData, setCashFlowData] = useState<CFData | null>(null);
   const [balanceSheetData, setBalanceSheetData] = useState<BSData | null>(null);
   const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
@@ -215,13 +208,11 @@ function FinancialStatementsPageContent() {
     }
   }, [canRead]);
 
-  // ✅ UPDATED: Added 'background' param for silent refreshes
   const fetchFinancialData = useCallback(async (background = false) => {
     if (!canRead) return;
     if (!dateRange?.from || !dateRange?.to) return;
 
     try {
-      // Only show spinner/skeleton if not a background fetch
       if (!background) {
         setIsLoading(true);
       }
@@ -230,20 +221,17 @@ function FinancialStatementsPageContent() {
       params.append('startDate', dateRange.from.toISOString());
       params.append('endDate', dateRange.to.toISOString());
 
-      // 1. Fetch Profit & Loss Data
       const res = await fetch(`/api/financial-statements?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch financial data");
       const result = await res.json();
       setData(result);
 
-      // 2. Fetch Cash Flow Data
       const cfRes = await fetch(`/api/financial-statements/cash-flow?${params.toString()}`);
       if (cfRes.ok) {
         const cfResult = await cfRes.json();
         setCashFlowData(cfResult);
       }
 
-      // 3. Fetch Balance Sheet Data
       const bsParams = new URLSearchParams();
       bsParams.append('asOfDate', dateRange.to.toISOString());
       const bsRes = await fetch(`/api/financial-statements/balance-sheet?${bsParams.toString()}`);
@@ -261,8 +249,6 @@ function FinancialStatementsPageContent() {
     }
   }, [canRead, dateRange]);
 
-  // ✅ UPDATED: Standard fetch on mount/date change
-  // Removed 'session' dependency to prevent double-fetch on focus
   useEffect(() => {
     if (isMounted && canRead) {
       fetchFinancialData();
@@ -274,8 +260,6 @@ function FinancialStatementsPageContent() {
     }
   }, [isMounted, canRead, isPending, dateRange, fetchFinancialData]);
 
-  // ✅ NEW: Window Focus Listener - SILENT MODE
-  // Triggers silent background fetch when returning to the tab
   useEffect(() => {
     const onFocus = () => {
       if (isMounted && canRead) {
@@ -317,13 +301,13 @@ function FinancialStatementsPageContent() {
   };
 
   const totalIncome = useMemo(() =>
-    data.income.reduce((sum, item) => sum + item.amount, 0),
-    [data.income]
+    data?.income.reduce((sum, item) => sum + item.amount, 0) || 0,
+    [data]
   );
 
   const totalExpenses = useMemo(() =>
-    data.expenses.reduce((sum, item) => sum + item.amount, 0),
-    [data.expenses]
+    data?.expenses.reduce((sum, item) => sum + item.amount, 0) || 0,
+    [data]
   );
 
   const netProfit = totalIncome - totalExpenses;
@@ -333,7 +317,7 @@ function FinancialStatementsPageContent() {
     setIsExporting(true);
     try {
       let url = "";
-      if (activeReport === "profit-loss") {
+      if (activeReport === "profit-loss" && data) {
         url = exportProfitLossToPDF(
           data.income,
           data.expenses,
@@ -366,7 +350,7 @@ function FinancialStatementsPageContent() {
     if (!dateRange?.from || !dateRange?.to) return;
     setIsExporting(true);
     try {
-      if (activeReport === "profit-loss") {
+      if (activeReport === "profit-loss" && data) {
         exportProfitLossToExcel(
           data.income,
           data.expenses,
@@ -481,42 +465,46 @@ function FinancialStatementsPageContent() {
                 </div>
 
                 <TabsContent value="profit-loss">
-                  {/* ✅ UPDATED: Use FinancialReportSkeleton */}
-                  {isLoading ? (
-                    <FinancialReportSkeleton />
-                  ) : (
-                    <ProfitLossReport
-                      data={data}
-                      totalIncome={totalIncome}
-                      totalExpenses={totalExpenses}
-                      netProfit={netProfit}
-                      dateRange={dateRange}
-                    />
-                  )}
+                  {/* ✅ UPDATED: Matching Tax Report transition */}
+                  <div className={cn("transition-opacity duration-200", isLoading && !data ? "opacity-50" : "opacity-100")}>
+                    {isLoading && !data ? (
+                      <FinancialReportSkeleton />
+                    ) : (
+                      <ProfitLossReport
+                        data={data || { income: [], expenses: [] }}
+                        totalIncome={totalIncome}
+                        totalExpenses={totalExpenses}
+                        netProfit={netProfit}
+                        dateRange={dateRange}
+                      />
+                    )}
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="balance-sheet">
-                  {/* ✅ UPDATED: Use FinancialReportSkeleton */}
-                  {isLoading ? (
-                    <FinancialReportSkeleton />
-                  ) : (
-                    <BalanceSheetReport
-                      balanceSheetData={balanceSheetData}
-                      dateRange={dateRange}
-                    />
-                  )}
+                  <div className={cn("transition-opacity duration-200", isLoading && !balanceSheetData ? "opacity-50" : "opacity-100")}>
+                    {isLoading && !balanceSheetData ? (
+                      <FinancialReportSkeleton />
+                    ) : (
+                      <BalanceSheetReport
+                        balanceSheetData={balanceSheetData}
+                        dateRange={dateRange}
+                      />
+                    )}
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="cash-flow">
-                  {/* ✅ UPDATED: Use FinancialReportSkeleton */}
-                  {isLoading ? (
-                    <FinancialReportSkeleton />
-                  ) : (
-                    <CashFlowReport
-                      cashFlowData={cashFlowData}
-                      dateRange={dateRange}
-                    />
-                  )}
+                  <div className={cn("transition-opacity duration-200", isLoading && !cashFlowData ? "opacity-50" : "opacity-100")}>
+                    {isLoading && !cashFlowData ? (
+                      <FinancialReportSkeleton />
+                    ) : (
+                      <CashFlowReport
+                        cashFlowData={cashFlowData}
+                        dateRange={dateRange}
+                      />
+                    )}
+                  </div>
                 </TabsContent>
               </Tabs>
             </div>
