@@ -253,7 +253,7 @@ function SalesReportPageContent() {
     data: summaryTableData,
     columns: summaryColumns,
     initialState: {
-      sorting: [{ id: "month", desc: true }],
+      sorting: [],
       pagination: {
         pageSize: 10,
         pageIndex: 0

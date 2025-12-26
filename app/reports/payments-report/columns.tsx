@@ -44,24 +44,21 @@ export const getMonthlyColumns = (): ColumnDef<MonthlyReportData>[] => [
         {row.original.month}
       </div>
     ),
-    sortingFn: (rowA, rowB) => {
-      const dateA = new Date(rowA.original.rawDate).getTime();
-      const dateB = new Date(rowB.original.rawDate).getTime();
-      return dateA - dateB;
-    },
     meta: {
-      label: "Date",
-      placeholder: "Search date...",
+      label: "Month",
+      placeholder: "Search month...",
       variant: "text",
     },
     enableColumnFilter: true,
-    filterFn: (row, id, value) => {
-      return formatDisplayDate(row.original.month).toLowerCase().includes(value.toLowerCase());
-    },
   },
   {
     accessorKey: "inflowCount",
-    header: "Receipts (Qty)",
+    header: ({ column }) => (
+      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+        Receipts (Qty)
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => (
       <div className="text-center text-muted-foreground">
         {row.original.inflowCount}
@@ -88,7 +85,12 @@ export const getMonthlyColumns = (): ColumnDef<MonthlyReportData>[] => [
   },
   {
     accessorKey: "outflowCount",
-    header: "Payments (Qty)",
+    header: ({ column }) => (
+      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+        Payments (Qty)
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
     cell: ({ row }) => (
       <div className="text-center text-muted-foreground">
         {row.original.outflowCount}

@@ -49,8 +49,8 @@ export const getTaxColumns = (taxView: "sales" | "purchase"): ColumnDef<TaxRepor
         </Button>
       ),
       cell: ({ row }) => (
-        <div className="text-right font-medium">
-          <div>{formatCurrency(row.original.revenueAmount)}</div>
+        <div className="text-right">
+          <div className="font-mono">{formatCurrency(row.original.revenueAmount)}</div>
           <div className="text-xs text-muted-foreground">
             {row.original.salesTransactions} sales
           </div>
@@ -66,8 +66,8 @@ export const getTaxColumns = (taxView: "sales" | "purchase"): ColumnDef<TaxRepor
         </Button>
       ),
       cell: ({ row }) => (
-        <div className="text-right font-medium">
-          <div className="text-green-600 font-bold">{formatCurrency(row.original.salesTax)}</div>
+        <div className="text-right">
+          <div className="text-green-600 font-mono">{formatCurrency(row.original.salesTax)}</div>
           <div className="text-xs text-muted-foreground">
             {formatPercentage(row.original.salesTaxRate)} effective rate
           </div>
@@ -98,8 +98,8 @@ export const getTaxColumns = (taxView: "sales" | "purchase"): ColumnDef<TaxRepor
         </Button>
       ),
       cell: ({ row }) => (
-        <div className="text-right font-medium">
-          <div>{formatCurrency(row.original.purchaseAmount)}</div>
+        <div className="text-right">
+          <div className="font-mono">{formatCurrency(row.original.purchaseAmount)}</div>
           <div className="text-xs text-muted-foreground">
             {row.original.purchaseTransactions} purchases
           </div>
@@ -116,7 +116,7 @@ export const getTaxColumns = (taxView: "sales" | "purchase"): ColumnDef<TaxRepor
       ),
       cell: ({ row }) => (
         <div className="text-right font-medium">
-          <div className="text-blue-600 font-bold">{formatCurrency(row.original.purchaseTax)}</div>
+          <div className="text-blue-600 font-mono">{formatCurrency(row.original.purchaseTax)}</div>
           <div className="text-xs text-muted-foreground">
             Already paid to suppliers
           </div>
@@ -153,8 +153,8 @@ export const getTaxColumns = (taxView: "sales" | "purchase"): ColumnDef<TaxRepor
       if (taxView === "purchase") {
         // For purchase view, show the purchase tax as a credit
         return (
-          <div className="text-right font-bold text-green-600">
-            <div>{formatCurrency(purchaseTax)}</div>
+          <div className="text-right text-green-600">
+            <div className="font-mono">{formatCurrency(purchaseTax)}</div>
             <div className="text-xs font-normal text-muted-foreground">
               Credit against sales tax
             </div>
@@ -168,10 +168,10 @@ export const getTaxColumns = (taxView: "sales" | "purchase"): ColumnDef<TaxRepor
       // For sales view, show net liability
       return (
         <div className={cn(
-          "text-right font-bold",
+          "text-right",
           netTax >= 0 ? "text-orange-600" : "text-green-600"
         )}>
-          <div>{formatCurrency(Math.abs(netTax))}</div>
+          <div className="font-mono">{formatCurrency(Math.abs(netTax))}</div>
           <div className="text-xs font-normal text-muted-foreground">
             {netTax >= 0 ? "Owe government" : "Government owes you"}
           </div>

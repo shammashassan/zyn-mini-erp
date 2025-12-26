@@ -39,6 +39,7 @@ const getCategoryColor = (category: string) => {
     'Rent': 'red',
     'Insurance': 'teal',
     'Training': 'violet',
+    'Salary': 'orange',
     'Miscellaneous': 'gray'
   };
   return colors[category] || 'gray';
@@ -66,12 +67,7 @@ const formatTrendPercentage = (percentage?: number) => {
 export const getExpenseColumns = (): ColumnDef<ExpenseReportData>[] => [
   {
     accessorKey: "period",
-    header: ({ column }) => (
-      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Month
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: "Month",
     cell: ({ row }) => (
       <div className="font-medium">
         {row.original.period}
@@ -104,7 +100,7 @@ export const getExpenseColumns = (): ColumnDef<ExpenseReportData>[] => [
       </Button>
     ),
     cell: ({ row }) => (
-      <div className="font-medium">
+      <div className="font-mono text-muted-foreground">
         {formatCurrency(row.original.highestExpense)}
       </div>
     ),
@@ -118,7 +114,7 @@ export const getExpenseColumns = (): ColumnDef<ExpenseReportData>[] => [
       </Button>
     ),
     cell: ({ row }) => (
-      <div className="font-medium text-center">
+      <div className="font-medium text-center text-muted-foreground">
         {row.original.totalExpenses}
       </div>
     ),
@@ -132,7 +128,7 @@ export const getExpenseColumns = (): ColumnDef<ExpenseReportData>[] => [
       </Button>
     ),
     cell: ({ row }) => (
-      <div className=" text-red-600">
+      <div className="text-right font-mono text-red-600">
         {formatCurrency(row.original.totalAmount)}
       </div>
     ),
@@ -140,6 +136,10 @@ export const getExpenseColumns = (): ColumnDef<ExpenseReportData>[] => [
   {
     accessorKey: "trendVsLastMonth",
     header: "Trend vs Last Month",
-    cell: ({ row }) => formatTrendPercentage(row.original.trendVsLastMonth),
+    cell: ({ row }) => (
+      <div className="text-right">
+        {formatTrendPercentage(row.original.trendVsLastMonth)}
+      </div>
+    ),
   },
 ];

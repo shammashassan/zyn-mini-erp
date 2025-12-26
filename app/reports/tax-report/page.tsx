@@ -225,7 +225,7 @@ function TaxReportPageContent() {
     data: data?.monthlyBreakdown || [],
     columns: columnsWithOptions,
     initialState: {
-      sorting: [{ id: "period", desc: true }],
+      sorting: [],
       pagination: {
         pageSize: 10,
         pageIndex: 0

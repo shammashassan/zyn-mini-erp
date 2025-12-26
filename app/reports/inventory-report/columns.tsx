@@ -36,15 +36,7 @@ const getStatusVariant = (status: string) => {
 export const getInventoryColumns = (): ColumnDef<InventoryItemData>[] => [
   {
     accessorKey: "name",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Material Name
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
+    header: "Material Name",
     cell: ({ row }) => (
       <div className="min-w-[150px]">
         <div className="font-medium">{row.original.name}</div>
@@ -78,7 +70,7 @@ export const getInventoryColumns = (): ColumnDef<InventoryItemData>[] => [
       </Button>
     ),
     cell: ({ row }) => (
-      <div className="text-right font-medium">
+      <div className="text-center">
         {row.original.openingQty.toLocaleString()}
       </div>
     ),
@@ -98,10 +90,10 @@ export const getInventoryColumns = (): ColumnDef<InventoryItemData>[] => [
     cell: ({ row }) => {
       const qty = row.original.purchased;
       if (qty === 0) {
-        return <div className="text-right text-muted-foreground">—</div>;
+        return <div className="text-center text-muted-foreground">—</div>;
       }
       return (
-        <div className="text-right font-medium text-green-600">
+        <div className="text-center text-green-600">
           +{qty.toLocaleString()}
         </div>
       );
@@ -122,11 +114,11 @@ export const getInventoryColumns = (): ColumnDef<InventoryItemData>[] => [
     cell: ({ row }) => {
       const qty = row.original.adjusted;
       if (qty === 0) {
-        return <div className="text-right text-muted-foreground">—</div>;
+        return <div className="text-center text-muted-foreground">—</div>;
       }
       return (
         <div className={cn(
-          "text-right font-medium",
+          "text-center font-medium",
           qty > 0 ? "text-green-600" : "text-red-600"
         )}>
           {qty > 0 ? '+' : ''}{qty.toLocaleString()}
@@ -147,7 +139,7 @@ export const getInventoryColumns = (): ColumnDef<InventoryItemData>[] => [
       </Button>
     ),
     cell: ({ row }) => (
-      <div className="text-right font-bold text-blue-600">
+      <div className="text-center text-blue-600">
         {row.original.closingQty.toLocaleString()}
       </div>
     ),
@@ -165,7 +157,7 @@ export const getInventoryColumns = (): ColumnDef<InventoryItemData>[] => [
       </Button>
     ),
     cell: ({ row }) => (
-      <div className="text-right font-medium">
+      <div className="text-right font-mono">
         {formatCurrency(row.original.unitCost)}
       </div>
     ),
@@ -183,7 +175,7 @@ export const getInventoryColumns = (): ColumnDef<InventoryItemData>[] => [
       </Button>
     ),
     cell: ({ row }) => (
-      <div className="text-right font-bold">
+      <div className="text-right font-mono">
         {formatCurrency(row.original.stockValue)}
       </div>
     ),
@@ -195,8 +187,6 @@ export const getInventoryColumns = (): ColumnDef<InventoryItemData>[] => [
       const status = row.original.status;
       return (
         <div className="flex items-center gap-2">
-          {status === 'Low Stock' && <AlertTriangle className="h-4 w-4 text-orange-600" />}
-          {status === 'Out of Stock' && <AlertTriangle className="h-4 w-4 text-red-600" />}
           <Badge variant={getStatusVariant(status)} appearance="outline">
             {status}
           </Badge>

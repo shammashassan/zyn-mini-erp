@@ -49,6 +49,17 @@ export const formatYearMonthKey = (date: Date | string | number | undefined | nu
 };
 
 /**
+ * Format a date as month-year key for sorting (MM-yyyy)
+ */
+export const formatMonthYearKey = (date: Date | string | number | undefined | null): string => {
+  const d = getValidDate(date);
+  if (!d) return 'N/A';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${month}-${year}`;
+};
+
+/**
  * Format a date as "DD MMM YYYY" (e.g., "07 Nov 2025")
  */
 export const formatDisplayDate = (date: Date | string | number | undefined | null): string => {

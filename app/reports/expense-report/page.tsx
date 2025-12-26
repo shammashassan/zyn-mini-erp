@@ -233,7 +233,7 @@ function ExpenseReportPageContent() {
     data: data?.monthlyBreakdown || [],
     columns,
     initialState: {
-      sorting: [{ id: "period", desc: true }],
+      sorting: [],
       pagination: {
         pageSize: 10,
         pageIndex: 0

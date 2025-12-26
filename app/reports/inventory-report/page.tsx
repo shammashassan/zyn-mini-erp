@@ -216,7 +216,7 @@ function InventoryReportPageContent() {
     data: data?.inventory || [],
     columns,
     initialState: {
-      sorting: [{ id: "name", desc: false }],
+      sorting: [],
       pagination: {
         pageSize: 10,
         pageIndex: 0

@@ -20,27 +20,12 @@ export interface SummaryPurchaseData {
 export const getSummaryPurchaseColumns = (): ColumnDef<SummaryPurchaseData>[] => [
   {
     accessorKey: "month",
-    header: ({ column }) => (
-      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Month
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
+    header: "Month",
+    cell: ({ row }) => (
+      <div className="font-medium">
+        {row.original.month}
+      </div>
     ),
-    cell: ({ row }) => {
-      const monthStr = row.original.month;
-      // If month is in format "2024-01", convert to "Jan 2024"
-      let displayMonth = monthStr;
-      if (monthStr.match(/^\d{4}-\d{2}$/)) {
-        const [year, month] = monthStr.split('-');
-        const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-        displayMonth = formatMonthKey(date);
-      }
-      return (
-        <div className="font-medium">
-          {displayMonth}
-        </div>
-      );
-    },
     meta: {
       label: "Month",
       placeholder: "Search month...",
@@ -52,16 +37,16 @@ export const getSummaryPurchaseColumns = (): ColumnDef<SummaryPurchaseData>[] =>
     accessorKey: "purchaseCount",
     header: ({ column }) => (
       <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Purchases
+        Purchases (Qty)
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
     cell: ({ row }) => (
-      <div className="text-center font-medium">
+      <div className="text-center text-muted-foreground">
         {row.original.purchaseCount}
-        <div className="text-xs text-muted-foreground">
+        {/* <div className="text-xs text-muted-foreground">
           received
-        </div>
+        </div> */}
       </div>
     ),
   },
@@ -74,11 +59,11 @@ export const getSummaryPurchaseColumns = (): ColumnDef<SummaryPurchaseData>[] =>
       </Button>
     ),
     cell: ({ row }) => (
-      <div className="text-right font-bold text-red-600">
+      <div className="text-right font-mono text-red-600">
         {formatCurrency(row.original.totalAmount)}
-        <div className="text-xs text-muted-foreground">
+        {/* <div className="text-xs text-muted-foreground">
           ex-tax
-        </div>
+        </div> */}
       </div>
     ),
   },
@@ -91,7 +76,7 @@ export const getSummaryPurchaseColumns = (): ColumnDef<SummaryPurchaseData>[] =>
       </Button>
     ),
     cell: ({ row }) => (
-      <div className="text-right font-medium text-orange-600">
+      <div className="text-right font-mono text-orange-600">
         {formatCurrency(row.original.totalTax)}
       </div>
     ),
@@ -105,11 +90,11 @@ export const getSummaryPurchaseColumns = (): ColumnDef<SummaryPurchaseData>[] =>
       </Button>
     ),
     cell: ({ row }) => (
-      <div className="text-right font-bold text-blue-600">
+      <div className="text-right font-mono text-blue-600">
         {formatCurrency(row.original.totalNetTotal)}
-        <div className="text-xs text-muted-foreground">
+        {/* <div className="text-xs text-muted-foreground">
           Avg: {formatCurrency(row.original.avgPurchaseValue)}
-        </div>
+        </div> */}
       </div>
     ),
   },
