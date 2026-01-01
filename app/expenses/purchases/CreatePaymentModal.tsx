@@ -156,7 +156,7 @@ export function CreatePaymentModal({
           paidAmount: newPaidAmount,
           remainingAmount: displayTotal - newPaidAmount,
           // Calculate status based on amounts
-          paymentStatus: (newPaidAmount >= displayTotal) ? 'Paid' : 'Partially Paid'
+          paymentStatus: (newPaidAmount >= displayTotal) ? 'paid' : 'partially paid'
         }),
       });
 

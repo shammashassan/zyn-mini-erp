@@ -1,14 +1,16 @@
+// app/expenses/purchases/columns.tsx - UPDATED: Merged Total Amount into Payment Status
+
 "use client";
 
 import * as React from "react";
 import { ColumnDef } from "@tanstack/react-table";
-import { 
-  MoreHorizontal, 
-  ArrowUpDown, 
-  Edit, 
-  Trash2, 
-  Copy, 
-  Wallet, 
+import {
+  MoreHorizontal,
+  ArrowUpDown,
+  Edit,
+  Trash2,
+  Copy,
+  Wallet,
   Eye,
   CheckCircle,
   Clock,
@@ -16,7 +18,11 @@ import {
   Package,
   DollarSign,
   CreditCard,
-  AlertCircle
+  AlertCircle,
+  FileCheck,
+  FileClock,
+  FileX,
+  CircleX
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,64 +49,83 @@ import type { IPurchase } from "@/models/Purchase";
 import { CreatePaymentModal } from "./CreatePaymentModal";
 import { ConnectedPaymentsBadges } from "./ConnectedPaymentsBadges";
 import { PurchaseStatusUpdateModal } from "./PurchaseStatusUpdateModal";
+import { InventoryStatusUpdateModal } from "./InventoryStatusUpdateModal";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { formatDisplayDate, formatTime } from "@/utils/formatters/date";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-// ✅ Export the interface for the page to use
 export type { IPurchase } from "@/models/Purchase";
 
-const getStatusVariant = (status: string) => {
+// ✅ Purchase Status helpers
+const getPurchaseStatusVariant = (status: string) => {
   switch (status) {
-    case 'Received': return 'success';
-    case 'Partially Received': return 'primary';
-    case 'Cancelled': return 'destructive';
-    case 'Ordered': return 'warning';
+    case 'approved': return 'success';
+    case 'pending': return 'warning';
+    case 'cancelled': return 'destructive';
     default: return 'neutral';
   }
 };
 
 const getPurchaseStatusIcon = (status: string) => {
   switch (status) {
-    case 'Received': return CheckCircle;
-    case 'Partially Received': return Package;
-    case 'Cancelled': return XCircle;
-    case 'Ordered': return Clock;
+    case 'approved': return CheckCircle;
+    case 'pending': return Clock;
+    case 'cancelled': return XCircle;
     default: return AlertCircle;
   }
 };
 
+// ✅ Inventory Status helpers
+const getInventoryStatusVariant = (status: string) => {
+  switch (status) {
+    case 'received': return 'success';
+    case 'partially received': return 'primary';
+    case 'pending': return 'warning';
+    default: return 'neutral';
+  }
+};
+
+const getInventoryStatusIcon = (status: string) => {
+  switch (status) {
+    case 'received': return CheckCircle;
+    case 'partially received': return Package;
+    case 'pending': return Clock;
+    default: return AlertCircle;
+  }
+};
+
+// Payment Status helpers (unchanged)
 const getPaymentStatusVariant = (status: string) => {
   switch (status) {
-    case 'Paid': return 'success';
-    case 'Partially Paid': return 'primary';
-    case 'Pending': return 'warning';
+    case 'paid': return 'success';
+    case 'partially paid': return 'primary';
+    case 'pending': return 'warning';
     default: return 'neutral';
   }
 };
 
 const getPaymentStatusIcon = (status: string) => {
   switch (status) {
-    case 'Paid': return CheckCircle;
-    case 'Partially Paid': return CreditCard;
-    case 'Pending': return Clock;
+    case 'paid': return CheckCircle;
+    case 'partially paid': return CreditCard;
+    case 'pending': return Clock;
     default: return AlertCircle;
   }
 };
 
-const CreatePaymentButton = ({ 
-  purchase, 
+const CreatePaymentButton = ({
+  purchase,
   onRefresh,
-  canCreatePayment 
-}: { 
-  purchase: IPurchase; 
+  canCreatePayment
+}: {
+  purchase: IPurchase;
   onRefresh: () => void;
   canCreatePayment: boolean;
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
 
-  if (purchase.paymentStatus === 'Paid' || !canCreatePayment) {
+  if (purchase.paymentStatus === 'paid' || !canCreatePayment) {
     return null;
   }
 
@@ -155,9 +180,9 @@ const RowActions = ({
 }: RowActionsProps) => {
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
   const hasPayments = purchase.connectedDocuments?.paymentIds && purchase.connectedDocuments.paymentIds.length > 0;
-  
-  // ✅ Check if purchase can be edited (only "Ordered" status)
-  const canEdit = canUpdate && purchase.status === 'Ordered';
+
+  // ✅ UPDATED: Can only edit when purchaseStatus is 'pending'
+  const canEdit = canUpdate && purchase.purchaseStatus === 'pending';
 
   return (
     <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
@@ -258,252 +283,286 @@ export const getColumns = (
   canUpdateStatus: boolean = true,
   canCreatePayment: boolean = true
 ): ColumnDef<IPurchase>[] => [
-  {
-    id: "date",
-    accessorKey: "date",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-8 px-2"
-      >
-        Date
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <div className="text-left font-medium min-w-[100px]">
-        <div>{formatDisplayDate(row.original.date)}</div>
-        <div className="text-xs text-muted-foreground">
-          {formatTime(row.original.date)}
-        </div>
-      </div>
-    ),
-  },
-  {
-    id: "referenceNumber",
-    accessorKey: "referenceNumber",
-    header: "Purchase No.",
-    cell: ({ row }) => (
-      <span className="font-mono font-medium">
-        {row.getValue("referenceNumber")}
-      </span>
-    ),
-    meta: {
-      label: "Purchase No",
-      placeholder: "search purchase no...",
-      variant: "text"
-    },
-    enableColumnFilter: true,
-  },
-  {
-    id: "supplierName",
-    accessorKey: "supplierName",
-    header: "Supplier",
-    cell: ({ row }) => {
-      const supplierName = row.original.supplierName;
-      return supplierName ? (
-        <Badge variant="warning" appearance="outline">
-          {supplierName}
-        </Badge>
-      ) : (
-        <span className="text-muted-foreground">-</span>
-      );
-    },
-    meta: {
-      label: "Supplier",
-      placeholder: "search supplier name...",
-      variant: "text"
-    },
-    enableColumnFilter: true,
-  },
-  {
-    id: "itemsCount",
-    header: "Items",
-    cell: ({ row }) => {
-      const items = row.original.items || [];
-      const displayItems = items.slice(0, 2); // ✅ CHANGED: Show 2 items
-      const remainingCount = items.length - 2; // ✅ CHANGED: Calc remaining
-      
-      return (
-        <div className="flex flex-col gap-0.5 text-sm">
-          {displayItems.map((item, idx) => (
-            <div key={idx} className="text-muted-foreground">
-              {item.materialName}: <span className="font-medium text-foreground">{item.quantity}</span>
-            </div>
-          ))}
-          {remainingCount > 0 && (
-            <div className="text-muted-foreground">
-              +{remainingCount} more
-            </div>
-          )}
-        </div>
-      );
-    },
-  },
-  {
-    id: "totalAmount",
-    accessorKey: "totalAmount",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-8 px-2 justify-end w-full"
-      >
-        Total Amount
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const purchase = row.original;
-      const grandTotal = purchase.grandTotal || (purchase.totalAmount + (purchase.vatAmount || 0));
-      return (
-        <div className="text-right min-w-[120px]">
-          <div className="font-medium text-green-600">
-            {formatCurrency(grandTotal)}
+    {
+      id: "date",
+      accessorKey: "date",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-8 px-2"
+        >
+          Date
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <div className="text-left font-medium min-w-[100px]">
+          <div>{formatDisplayDate(row.original.date)}</div>
+          <div className="text-xs text-muted-foreground">
+            {formatTime(row.original.date)}
           </div>
         </div>
-      );
+      ),
     },
-  },
-  {
-    id: "status",
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const [isOpen, setIsOpen] = React.useState(false);
-      const purchase = row.original;
-      const refresh = onRefresh || (() => { });
-      const StatusIcon = getPurchaseStatusIcon(purchase.status);
-
-      if (!canUpdateStatus) {
-        return (
-          <Badge
-            variant={getStatusVariant(purchase.status) as any}
-            appearance="outline"
-            className="gap-1 pr-2.5"
-          >
-            <StatusIcon className="h-3 w-3" />
-            {purchase.status}
+    {
+      id: "referenceNumber",
+      accessorKey: "referenceNumber",
+      header: "Purchase No.",
+      cell: ({ row }) => (
+        <span className="font-mono font-medium">
+          {row.getValue("referenceNumber")}
+        </span>
+      ),
+      meta: {
+        label: "Purchase No",
+        placeholder: "search purchase no...",
+        variant: "text"
+      },
+      enableColumnFilter: true,
+    },
+    {
+      id: "supplierName",
+      accessorKey: "supplierName",
+      header: "Supplier",
+      cell: ({ row }) => {
+        const supplierName = row.original.supplierName;
+        return supplierName ? (
+          <Badge variant="warning" appearance="outline">
+            {supplierName}
           </Badge>
+        ) : (
+          <span className="text-muted-foreground">-</span>
         );
-      }
-
-      return (
-        <>
-          <Badge
-            variant={getStatusVariant(purchase.status) as any}
-            appearance="outline"
-            className="gap-1 pr-2.5 cursor-pointer hover:bg-accent transition-colors"
-            onClick={() => setIsOpen(true)}
-          >
-            <StatusIcon className="h-3 w-3" />
-            {purchase.status}
-          </Badge>
-
-          <PurchaseStatusUpdateModal
-            isOpen={isOpen}
-            onClose={() => setIsOpen(false)}
-            purchase={purchase as any}
-            onRefresh={refresh}
-          />
-        </>
-      );
+      },
+      meta: {
+        label: "Supplier",
+        placeholder: "search supplier name...",
+        variant: "text"
+      },
+      enableColumnFilter: true,
     },
-    meta: {
-      label: "Status",
-      variant: "select",
-      icon: AlertCircle,
-      options: [
-        { label: "Ordered", value: "Ordered", icon: Clock },
-        { label: "Received", value: "Received", icon: CheckCircle },
-        { label: "Partially Received", value: "Partially Received", icon: Package },
-        { label: "Cancelled", value: "Cancelled", icon: XCircle },
-      ],
-    },
-    enableColumnFilter: true,
-  },
-  {
-    id: "paymentStatus",
-    accessorKey: "paymentStatus",
-    header: "Payment",
-    cell: ({ row }) => {
-      const purchase = row.original;
-      const paidAmount = purchase.paidAmount || 0;
-      const grandTotal = purchase.grandTotal || (purchase.totalAmount + (purchase.vatAmount || 0));
-      const PaymentIcon = getPaymentStatusIcon(purchase.paymentStatus);
+    {
+      id: "itemsCount",
+      header: "Items",
+      cell: ({ row }) => {
+        const items = row.original.items || [];
+        const displayItems = items.slice(0, 2);
+        const remainingCount = items.length - 2;
 
-      return (
-        <div className="space-y-1">
-          <Badge
-            variant={getPaymentStatusVariant(purchase.paymentStatus) as any}
-            appearance="outline"
-            className="gap-1 pr-2.5"
-          >
-            <PaymentIcon className="h-3 w-3" />
-            {purchase.paymentStatus}
-          </Badge>
-          {paidAmount > 0 && (
+        return (
+          <div className="flex flex-col gap-0.5 text-sm">
+            {displayItems.map((item, idx) => (
+              <div key={idx} className="text-muted-foreground">
+                {item.materialName}: <span className="font-medium text-foreground">{item.quantity}</span>
+              </div>
+            ))}
+            {remainingCount > 0 && (
+              <div className="text-muted-foreground">
+                +{remainingCount} more
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    // ✅ MOVED Total Amount into Payment Status column & Removed independent Total Column
+    // ✅ NEW: Purchase Status Column
+    {
+      id: "purchaseStatus",
+      accessorKey: "purchaseStatus",
+      header: "Purchase",
+      cell: ({ row }) => {
+        const [isOpen, setIsOpen] = React.useState(false);
+        const purchase = row.original;
+        const refresh = onRefresh || (() => { });
+        const PurchaseIcon = getPurchaseStatusIcon(purchase.purchaseStatus);
+
+        if (!canUpdateStatus) {
+          return (
+            <Badge
+              variant={getPurchaseStatusVariant(purchase.purchaseStatus) as any}
+              appearance="outline"
+              className="gap-1 pr-2.5 capitalize"
+            >
+              <PurchaseIcon className="h-3 w-3" />
+              {purchase.purchaseStatus}
+            </Badge>
+          );
+        }
+
+        return (
+          <>
+            <Badge
+              variant={getPurchaseStatusVariant(purchase.purchaseStatus) as any}
+              appearance="outline"
+              className="gap-1 pr-2.5 cursor-pointer hover:bg-accent transition-colors capitalize"
+              onClick={() => setIsOpen(true)}
+            >
+              <PurchaseIcon className="h-3 w-3" />
+              {purchase.purchaseStatus}
+            </Badge>
+
+            <PurchaseStatusUpdateModal
+              isOpen={isOpen}
+              onClose={() => setIsOpen(false)}
+              purchase={purchase as any}
+              onRefresh={refresh}
+            />
+          </>
+        );
+      },
+      meta: {
+        label: "Purchase",
+        variant: "select",
+        icon: FileCheck,
+        options: [
+          { label: "Pending", value: "pending", icon: Clock },
+          { label: "Approved", value: "approved", icon: CheckCircle },
+          { label: "Cancelled", value: "cancelled", icon: CircleX },
+        ],
+      },
+      enableColumnFilter: true,
+    },
+    // ✅ UPDATED: Inventory Status Column (with modal)
+    {
+      id: "inventoryStatus",
+      accessorKey: "inventoryStatus",
+      header: "Inventory",
+      cell: ({ row }) => {
+        const [isOpen, setIsOpen] = React.useState(false);
+        const purchase = row.original;
+        const refresh = onRefresh || (() => { });
+        const InventoryIcon = getInventoryStatusIcon(purchase.inventoryStatus);
+
+        if (!canUpdateStatus) {
+          return (
+            <Badge
+              variant={getInventoryStatusVariant(purchase.inventoryStatus) as any}
+              appearance="outline"
+              className="gap-1 pr-2.5 capitalize"
+            >
+              <InventoryIcon className="h-3 w-3" />
+              {purchase.inventoryStatus}
+            </Badge>
+          );
+        }
+
+        return (
+          <>
+            <Badge
+              variant={getInventoryStatusVariant(purchase.inventoryStatus) as any}
+              appearance="outline"
+              className="gap-1 pr-2.5 cursor-pointer hover:bg-accent transition-colors capitalize"
+              onClick={() => setIsOpen(true)}
+            >
+              <InventoryIcon className="h-3 w-3" />
+              {purchase.inventoryStatus}
+            </Badge>
+
+            <InventoryStatusUpdateModal
+              isOpen={isOpen}
+              onClose={() => setIsOpen(false)}
+              purchase={purchase as any}
+              onRefresh={refresh}
+            />
+          </>
+        );
+      },
+      meta: {
+        label: "Inventory",
+        variant: "select",
+        icon: Package,
+        options: [
+          { label: "Pending", value: "pending", icon: Clock },
+          { label: "Received", value: "received", icon: CheckCircle },
+          { label: "Partially Received", value: "partially received", icon: Package },
+        ],
+      },
+      enableColumnFilter: true,
+    },
+    // Payment Status (Updated to include total)
+    {
+      id: "paymentStatus",
+      accessorKey: "paymentStatus",
+      header: "Payment",
+      cell: ({ row }) => {
+        const purchase = row.original;
+        const paidAmount = purchase.paidAmount || 0;
+        const grandTotal = purchase.grandTotal || (purchase.totalAmount + (purchase.vatAmount || 0));
+        const PaymentIcon = getPaymentStatusIcon(purchase.paymentStatus);
+
+        return (
+          <div className="space-y-1">
+            <Badge
+              variant={getPaymentStatusVariant(purchase.paymentStatus) as any}
+              appearance="outline"
+              className="gap-1 pr-2.5 capitalize"
+            >
+              <PaymentIcon className="h-3 w-3" />
+              {purchase.paymentStatus}
+            </Badge>
             <div className="text-xs text-muted-foreground">
-              {formatCurrency(paidAmount)} / {formatCurrency(grandTotal)}
+              <span className="font-mono">{formatCurrency(paidAmount)}</span>
+              <span className="mx-1">/</span>
+              <span className="text-green-600 font-mono">{formatCurrency(grandTotal)}</span>
             </div>
-          )}
-        </div>
-      );
+          </div>
+        );
+      },
+      meta: {
+        label: "Payment",
+        variant: "select",
+        icon: DollarSign,
+        options: [
+          { label: "Paid", value: "paid", icon: CheckCircle },
+          { label: "Partially Paid", value: "partially paid", icon: CreditCard },
+          { label: "Pending", value: "pending", icon: Clock },
+        ],
+      },
+      enableColumnFilter: true,
     },
-    meta: {
-      label: "Payment Status",
-      variant: "select",
-      icon: DollarSign,
-      options: [
-        { label: "Paid", value: "Paid", icon: CheckCircle },
-        { label: "Partially Paid", value: "Partially Paid", icon: CreditCard },
-        { label: "Pending", value: "Pending", icon: Clock },
-      ],
+    {
+      id: "connectedPayments",
+      header: "Connected Payments",
+      cell: ({ row }) => {
+        const purchase = row.original;
+        return onViewPdf ? (
+          <ConnectedPaymentsBadges
+            purchase={purchase as any}
+            onViewPdf={onViewPdf}
+          />
+        ) : (
+          <span className="text-sm text-muted-foreground">—</span>
+        );
+      },
     },
-    enableColumnFilter: true,
-  },
-  {
-    id: "connectedPayments",
-    header: "Connected Payments",
-    cell: ({ row }) => {
-      const purchase = row.original;
-      return onViewPdf ? (
-        <ConnectedPaymentsBadges
-          purchase={purchase as any}
-          onViewPdf={onViewPdf}
-        />
-      ) : (
-        <span className="text-sm text-muted-foreground">—</span>
-      );
-    },
-  },
-  {
-    id: "quickActions",
-    cell: ({ row }) => {
-      const purchase = row.original;
-      const refresh = onRefresh || (() => { });
+    {
+      id: "quickActions",
+      cell: ({ row }) => {
+        const purchase = row.original;
+        const refresh = onRefresh || (() => { });
 
-      return <CreatePaymentButton 
-        purchase={purchase} 
-        onRefresh={refresh}
-        canCreatePayment={canCreatePayment}
-      />;
+        return <CreatePaymentButton
+          purchase={purchase}
+          onRefresh={refresh}
+          canCreatePayment={canCreatePayment}
+        />;
+      },
     },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => (
-      <RowActions
-        purchase={row.original}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onDuplicate={onDuplicate}
-        onView={onView}
-        canUpdate={canUpdate}
-        canDelete={canDelete}
-        canCreate={canCreate}
-      />
-    ),
-  },
-];
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <RowActions
+          purchase={row.original}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onDuplicate={onDuplicate}
+          onView={onView}
+          canUpdate={canUpdate}
+          canDelete={canDelete}
+          canCreate={canCreate}
+        />
+      ),
+    },
+  ];

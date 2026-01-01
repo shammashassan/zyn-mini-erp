@@ -163,7 +163,7 @@ function PurchasesPageContent() {
       setIsInitialLoad(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canRead, fetchPurchases]); 
+  }, [canRead, fetchPurchases]);
 
   // ✅ NEW: Window Focus Listener - SILENT MODE
   // This triggers a silent "background" fetch when you tab back to this page.
@@ -176,7 +176,7 @@ function PurchasesPageContent() {
     };
 
     window.addEventListener("focus", onFocus);
-    
+
     return () => {
       window.removeEventListener("focus", onFocus);
     };
@@ -188,9 +188,9 @@ function PurchasesPageContent() {
       return;
     }
 
-    if (purchase && purchase.status !== 'Ordered') {
+    if (purchase && purchase.purchaseStatus !== 'pending') {
       toast.error("Cannot edit purchase", {
-        description: "Only purchases with 'Ordered' status can be edited. Other statuses affect stock and accounting records."
+        description: "Only purchases with 'pending' status can be edited. Other statuses affect stock and accounting records."
       });
       return;
     }
@@ -214,8 +214,9 @@ function PurchasesPageContent() {
       ...plainPurchase,
       date: new Date(),
       _id: undefined,
-      status: 'Ordered',
-      paymentStatus: 'Pending',
+      purchaseStatus: 'pending',
+      inventoryStatus: 'pending',
+      paymentStatus: 'pending',
       paidAmount: 0,
       totalPaid: 0,
       remainingAmount: plainPurchase.totalAmount,
@@ -442,7 +443,7 @@ function PurchasesPageContent() {
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <div className="flex flex-col lg:flex-row lg:justify-between px-4 lg:px-6 gap-4">
-              
+
               {/* Left: Title */}
               <div className="flex items-center gap-3 self-start lg:self-center">
                 <div className="p-3 bg-primary/10 rounded-full">
@@ -465,7 +466,7 @@ function PurchasesPageContent() {
 
               {/* Right: Actions & Filters Group */}
               <div className="flex flex-col gap-3 w-full lg:w-auto lg:items-end">
-                
+
                 {/* Row 1: Actions */}
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                   {canViewTrash && (

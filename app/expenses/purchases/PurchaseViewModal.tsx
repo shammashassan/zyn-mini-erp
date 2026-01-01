@@ -1,4 +1,4 @@
-// app/expenses/purchases/PurchaseViewModal.tsx - FIXED: Display Discount
+// app/expenses/purchases/PurchaseViewModal.tsx - FIXED: Correct Status Badges
 
 "use client";
 
@@ -21,7 +21,11 @@ import {
   TrendingUp,
   FileText,
   CircleUserRound,
-  Percent
+  Percent,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  XCircle
 } from "lucide-react";
 import type { IPurchase } from "@/models/Purchase";
 import { ConnectedPaymentsBadges } from "./ConnectedPaymentsBadges";
@@ -33,26 +37,63 @@ import { Spinner } from "@/components/ui/spinner";
 interface PurchaseViewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  purchase: IPurchase | any | null; 
+  purchase: IPurchase | any | null;
   onViewPdf?: (bill: any) => void;
 }
 
-const getStatusVariant = (status: string) => {
+// ✅ Purchase Status helpers
+const getPurchaseStatusVariant = (status: string) => {
   switch (status) {
-    case 'Received': return 'success';
-    case 'Partially Received': return 'primary';
-    case 'Cancelled': return 'destructive';
-    case 'Ordered': return 'warning';
+    case 'approved': return 'success';
+    case 'pending': return 'warning';
+    case 'cancelled': return 'destructive';
     default: return 'gray';
+  }
+};
+
+const getPurchaseStatusIcon = (status: string) => {
+  switch (status) {
+    case 'approved': return CheckCircle;
+    case 'pending': return Clock;
+    case 'cancelled': return XCircle;
+    default: return AlertCircle;
+  }
+};
+
+// ✅ Inventory Status helpers
+const getInventoryStatusVariant = (status: string) => {
+  switch (status) {
+    case 'received': return 'success';
+    case 'partially received': return 'primary';
+    case 'pending': return 'warning';
+    default: return 'gray';
+  }
+};
+
+const getInventoryStatusIcon = (status: string) => {
+  switch (status) {
+    case 'received': return CheckCircle;
+    case 'partially received': return Package;
+    case 'pending': return Clock;
+    default: return Clock;
   }
 };
 
 const getPaymentStatusVariant = (status: string) => {
   switch (status) {
-    case 'Paid': return 'success';
-    case 'Partially Paid': return 'primary';
-    case 'Pending': return 'warning';
+    case 'paid': return 'success';
+    case 'partially paid': return 'primary';
+    case 'pending': return 'warning';
     default: return 'gray';
+  }
+};
+
+const getPaymentStatusIcon = (status: string) => {
+  switch (status) {
+    case 'paid': return CheckCircle;
+    case 'partially paid': return Wallet;
+    case 'pending': return Clock;
+    default: return Clock;
   }
 };
 
@@ -103,19 +144,23 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
   if (!isOpen) return null;
 
   const currentData = purchase || initialPurchase || {};
-  
+
   const creatorUsername = getCreatorUsername(currentData);
   const totalItems = currentData.items?.length || 0;
   const totalQuantity = currentData.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0;
   const totalReceived = currentData.items?.reduce((sum: number, item: any) => sum + (item.receivedQuantity || 0), 0) || 0;
-  const hasPartialReceipt = currentData.status === 'Partially Received';
+  const hasPartialReceipt = currentData.inventoryStatus === 'partially received';
 
-  // ✅ FIXED: Calculate amounts with discount
   const grossTotal = currentData.totalAmount || 0;
   const discount = currentData.discount || 0;
   const subtotal = grossTotal - discount;
   const vatAmount = currentData.vatAmount || 0;
   const displayTotal = currentData.grandTotal || (subtotal + vatAmount);
+
+  // Status Icons
+  const PurchaseIcon = getPurchaseStatusIcon(currentData.purchaseStatus);
+  const InventoryIcon = getInventoryStatusIcon(currentData.inventoryStatus);
+  const PaymentIcon = getPaymentStatusIcon(currentData.paymentStatus);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -129,11 +174,11 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
 
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <Spinner className="size-10"/>
+            <Spinner className="size-10" />
           </div>
         ) : !currentData.items ? (
           <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-             <p className="text-sm">Details unavailable.</p>
+            <p className="text-sm">Details unavailable.</p>
           </div>
         ) : (
           <div className="space-y-4 sm:space-y-6">
@@ -145,19 +190,34 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                     <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
                     <span className="text-xs sm:text-sm">Purchase Order - {currentData.referenceNumber}</span>
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    {/* Purchase Status */}
                     <Badge
-                      variant={getStatusVariant(currentData.status)}
+                      variant={getPurchaseStatusVariant(currentData.purchaseStatus) as any}
                       appearance="outline"
-                      className="capitalize text-xs"
+                      className="capitalize text-xs gap-1"
                     >
-                      {currentData.status}
+                      <PurchaseIcon className="h-3 w-3" />
+                      {currentData.purchaseStatus}
                     </Badge>
+
+                    {/* Inventory Status */}
                     <Badge
-                      variant={getPaymentStatusVariant(currentData.paymentStatus)}
+                      variant={getInventoryStatusVariant(currentData.inventoryStatus) as any}
+                      appearance="outline"
+                      className="capitalize text-xs gap-1"
+                    >
+                      <InventoryIcon className="h-3 w-3" />
+                      {currentData.inventoryStatus}
+                    </Badge>
+
+                    {/* Payment Status */}
+                    <Badge
+                      variant={getPaymentStatusVariant(currentData.paymentStatus) as any}
                       appearance="outline"
                       className="capitalize text-xs"
                     >
+                      <PaymentIcon className="h-3 w-3" />
                       {currentData.paymentStatus}
                     </Badge>
                   </div>
@@ -281,15 +341,19 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                           {formatCurrency(grossTotal)}
                         </td>
                       </tr>
-                      {/* ✅ ADDED: Display Discount */}
                       {discount > 0 && (
                         <tr className="bg-muted/50">
-                          <td colSpan={hasPartialReceipt ? 4 : 3} className="p-3 text-right text-orange-600 flex items-center justify-end gap-2">
-                            <Percent className="h-3 w-3" />
-                            Discount:
+                          <td
+                            colSpan={hasPartialReceipt ? 4 : 3}
+                            className="p-3 text-right text-orange-600"
+                          >
+                            <div className="flex items-center justify-end gap-2">
+                              <Percent className="h-3 w-3" />
+                              Discount:
+                            </div>
                           </td>
                           <td className="p-3 text-right font-semibold text-orange-600" colSpan={2}>
-                            -{formatCurrency(discount)}
+                            - {formatCurrency(discount)}
                           </td>
                         </tr>
                       )}
@@ -334,7 +398,7 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                             <div className="font-medium text-sm break-words">{item.materialName}</div>
                           </div>
                         </div>
-                        
+
                         <div className="grid grid-cols-2 gap-3 pt-2 border-t text-sm">
                           <div>
                             <div className="text-xs text-muted-foreground mb-0.5">Quantity</div>
@@ -382,7 +446,6 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                         <span className="text-muted-foreground">Gross Total</span>
                         <span className="font-semibold">{formatCurrency(grossTotal)}</span>
                       </div>
-                      {/* ✅ ADDED: Display Discount on Mobile */}
                       {discount > 0 && (
                         <div className="flex justify-between text-xs sm:text-sm">
                           <span className="text-muted-foreground flex items-center gap-1">

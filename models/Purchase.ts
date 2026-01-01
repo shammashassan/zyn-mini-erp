@@ -1,4 +1,4 @@
-// models/Purchase.ts - ENHANCED with Discount Field
+// models/Purchase.ts - UPDATED: Separate Purchase and Inventory Status
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -35,14 +35,17 @@ export interface IPurchase extends Document {
   supplierId?: string;
   supplierName?: string;
   items: IPurchaseItem[];
-  totalAmount: number; // Gross Total (sum of items)
-  discount: number; // NEW: Discount amount
+  totalAmount: number;
+  discount: number;
   isTaxPayable: boolean;
   vatAmount: number;
   grandTotal: number;
   date: Date;
-  status: 'Ordered' | 'Received' | 'Partially Received' | 'Cancelled';
-  paymentStatus: 'Paid' | 'Pending' | 'Partially Paid';
+  
+  // ✅ NEW: Three separate statuses
+  purchaseStatus: 'pending' | 'approved' | 'cancelled';
+  inventoryStatus: 'pending' | 'received' | 'partially received';
+  paymentStatus: 'pending' | 'paid' | 'partially paid';
   
   paymentAllocations: IPaymentAllocation[];
   paidAmount: number;
@@ -117,21 +120,28 @@ const PurchaseSchema: Schema<IPurchase> = new Schema({
   supplierId: { type: String, required: false },
   supplierName: { type: String, required: false, trim: true },
   items: [PurchaseItemSchema],
-  totalAmount: { type: Number, required: true, min: 0 }, // Gross Total
-  discount: { type: Number, default: 0, min: 0 }, // NEW: Discount
+  totalAmount: { type: Number, required: true, min: 0 },
+  discount: { type: Number, default: 0, min: 0 },
   isTaxPayable: { type: Boolean, default: true },
   vatAmount: { type: Number, default: 0, min: 0 },
   grandTotal: { type: Number, min: 0 },
   date: { type: Date, required: true },
-  status: { 
+  
+  // ✅ NEW: Three separate statuses
+  purchaseStatus: { 
     type: String, 
-    enum: ['Ordered', 'Received', 'Partially Received', 'Cancelled'],
-    default: 'Ordered'
+    enum: ['pending', 'approved', 'cancelled'],
+    default: 'pending'
+  },
+  inventoryStatus: { 
+    type: String, 
+    enum: ['pending', 'received', 'partially received'],
+    default: 'pending'
   },
   paymentStatus: {
     type: String,
-    enum: ['Paid', 'Pending', 'Partially Paid'],
-    default: 'Pending'
+    enum: ['pending', 'paid', 'partially paid'],
+    default: 'pending'
   },
   
   paymentAllocations: [PaymentAllocationSchema],
@@ -160,20 +170,14 @@ const PurchaseSchema: Schema<IPurchase> = new Schema({
 
 // Compound indexes
 PurchaseSchema.index({ isDeleted: 1, date: -1 });
-PurchaseSchema.index({ status: 1, paymentStatus: 1 });
+PurchaseSchema.index({ purchaseStatus: 1, inventoryStatus: 1, paymentStatus: 1 });
 PurchaseSchema.index({ supplierName: 1 });
 PurchaseSchema.index({ 'connectedDocuments.paymentIds': 1 });
 PurchaseSchema.index({ date: 1 });
 PurchaseSchema.index({ 'paymentAllocations.voucherId': 1 });
 
-// Pre-save middleware with discount handling
+// Pre-save middleware
 PurchaseSchema.pre('save', function(next) {
-  // Calculate grandTotal with discount:
-  // Gross Total = totalAmount (sum of items)
-  // Subtotal = Gross Total - Discount
-  // VAT = Subtotal × VAT%
-  // Grand Total = Subtotal + VAT
-  
   const grossTotal = this.totalAmount;
   const discount = this.discount || 0;
   const subtotal = grossTotal - discount;
@@ -182,7 +186,6 @@ PurchaseSchema.pre('save', function(next) {
   this.vatAmount = vatAmount;
   this.grandTotal = subtotal + vatAmount;
   
-  // Calculate paid amount from allocations
   if (this.paymentAllocations && this.paymentAllocations.length > 0) {
     this.paidAmount = this.paymentAllocations.reduce(
       (sum: number, alloc: IPaymentAllocation) => sum + alloc.allocatedAmount, 
@@ -195,11 +198,11 @@ PurchaseSchema.pre('save', function(next) {
   
   // Auto-calculate payment status
   if (this.paidAmount >= this.grandTotal) {
-    this.paymentStatus = 'Paid';
+    this.paymentStatus = 'paid';
   } else if (this.paidAmount > 0) {
-    this.paymentStatus = 'Partially Paid';
+    this.paymentStatus = 'partially paid';
   } else {
-    this.paymentStatus = 'Pending';
+    this.paymentStatus = 'pending';
   }
   
   next();

@@ -468,13 +468,7 @@ async function extractPurchasePartyAndItemInfo(purchase: any) {
 }
 
 /**
- * ✅ FIXED: Auto-create journal entry for Purchase with proper discount handling
- * 
- * This function now correctly:
- * 1. Ensures discount defaults to 0 if missing
- * 2. Calculates subtotal = grossTotal - discount
- * 3. Ensures VAT is calculated on subtotal (after discount)
- * 4. Creates balanced journal entries
+ * ✅ UPDATED: Auto-create journal entry for Purchase when inventoryStatus is 'received'
  */
 export async function createJournalForPurchase(
   purchase: any,
@@ -482,25 +476,31 @@ export async function createJournalForPurchase(
   username: string | null = null
 ) {
   try {
+    // ✅ UPDATED: Check inventoryStatus instead of status
+    if (purchase.inventoryStatus !== 'received') {
+      console.log(`⏭️ Skipping journal creation - inventory status is '${purchase.inventoryStatus}', not 'received'`);
+      return null;
+    }
+
     const entries: JournalEntryData[] = [];
     const { partyType, partyId, partyName, itemType, itemName } = await extractPurchasePartyAndItemInfo(purchase);
 
-    // ✅ FIX: Ensure discount is always a valid number, default to 0
+    // Ensure discount is always a valid number
     const grossTotal = Number(purchase.totalAmount) || 0;
     const discount = Number(purchase.discount) || 0;
     
-    // ✅ FIX: Recalculate subtotal to ensure consistency
+    // Recalculate subtotal
     const subtotal = grossTotal - discount;
     
-    // ✅ FIX: Recalculate VAT to ensure it's based on subtotal
+    // Recalculate VAT based on subtotal
     const vatAmount = purchase.isTaxPayable 
       ? (subtotal * 0.05) 
       : 0;
     
-    // ✅ FIX: Recalculate grand total to ensure consistency
+    // Recalculate grand total
     const grandTotal = subtotal + vatAmount;
 
-    // ✅ VALIDATION: Check for calculation errors
+    // Validation
     const expectedGrandTotal = Number(purchase.grandTotal) || 0;
     const difference = Math.abs(grandTotal - expectedGrandTotal);
     
@@ -516,7 +516,7 @@ export async function createJournalForPurchase(
       ? `Purchase from ${purchase.supplierName || 'Supplier'} - ${purchase.items.length} item(s) (Discount: ${discount.toFixed(2)})${purchase.isTaxPayable ? ' (Tax Payable)' : ' (Tax Free)'}`
       : `Purchase from ${purchase.supplierName || 'Supplier'} - ${purchase.items.length} item(s)${purchase.isTaxPayable ? ' (Tax Payable)' : ' (Tax Free)'}`;
 
-    // ✅ Dr. Inventory = Subtotal (after discount)
+    // Dr. Inventory = Subtotal (after discount)
     entries.push({
       accountCode: 'A1200',
       accountName: 'Inventory',
@@ -524,7 +524,7 @@ export async function createJournalForPurchase(
       credit: 0,
     });
 
-    // ✅ Dr. VAT Receivable (if applicable)
+    // Dr. VAT Receivable (if applicable)
     if (purchase.isTaxPayable && vatAmount > 0) {
       entries.push({
         accountCode: 'A1300',
@@ -534,7 +534,7 @@ export async function createJournalForPurchase(
       });
     }
 
-    // ✅ Cr. Accounts Payable = Grand Total
+    // Cr. Accounts Payable = Grand Total
     entries.push({
       accountCode: 'L1001',
       accountName: 'Accounts Payable',
@@ -559,7 +559,7 @@ export async function createJournalForPurchase(
     console.log(`   Total Credit: ${totalCredit.toFixed(2)}`);
     console.log(`   Balanced: ${Math.abs(totalDebit - totalCredit) < 0.01 ? '✅ YES' : '❌ NO'}`);
 
-    // ✅ CRITICAL: Verify balance before saving
+    // Verify balance before saving
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
       throw new Error(
         `Journal entry is not balanced! Debit: ${totalDebit.toFixed(2)}, Credit: ${totalCredit.toFixed(2)}. ` +
@@ -591,7 +591,7 @@ export async function createJournalForPurchase(
       postedBy: userId,
       postedAt: new Date(),
       actionHistory: [{
-        action: 'Auto-created from Purchase',
+        action: 'Auto-created from Purchase (Inventory Received)',
         userId,
         username,
         timestamp: new Date(),
@@ -611,27 +611,39 @@ export async function createJournalForPurchase(
 }
 
 /**
- * Handle journal for purchase status change
+ * ✅ UPDATED: Handle journal for purchase inventory status change
+ * This is called when inventoryStatus changes
  */
-export async function handlePurchaseStatusChange(
+export async function handlePurchaseInventoryStatusChange(
   purchase: any,
-  oldStatus: string,
-  newStatus: string,
+  oldInventoryStatus: string,
+  newInventoryStatus: string,
   userId: string | null = null,
   username: string | null = null
 ) {
   try {
-    if (oldStatus === 'Received' && newStatus !== 'Received') {
-      await voidJournalsForReference(purchase._id, userId, username, 'Purchase status changed from Received');
+    console.log(`📝 Handling inventory status change: ${oldInventoryStatus} → ${newInventoryStatus}`);
+
+    // Void journal when moving away from 'received'
+    if (oldInventoryStatus === 'received' && newInventoryStatus !== 'received') {
+      console.log('🔴 Voiding journal - inventory status changed from received');
+      await voidJournalsForReference(
+        purchase._id, 
+        userId, 
+        username, 
+        `Inventory status changed from ${oldInventoryStatus} to ${newInventoryStatus}`
+      );
       return;
     }
 
-    if (oldStatus !== 'Received' && newStatus === 'Received') {
+    // Create journal when moving to 'received'
+    if (oldInventoryStatus !== 'received' && newInventoryStatus === 'received') {
+      console.log('✅ Creating journal - inventory status changed to received');
       await createJournalForPurchase(purchase, userId, username);
       return;
     }
   } catch (error) {
-    console.error('Error handling purchase status change:', error);
+    console.error('Error handling purchase inventory status change:', error);
   }
 }
 

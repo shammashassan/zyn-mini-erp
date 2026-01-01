@@ -1,4 +1,4 @@
-// app/expenses/purchases/purchase-form.tsx - FIXED: Discount initialization
+// app/expenses/purchases/purchase-form.tsx - UPDATED: Removed Inventory Status Dropdown
 
 "use client";
 
@@ -60,7 +60,8 @@ type PurchaseFormData = {
   supplierName: string;
   items: PurchaseItem[];
   date: Date;
-  status: 'Ordered' | 'Received' | 'Partially Received' | 'Cancelled';
+  purchaseStatus: 'pending' | 'approved' | 'cancelled';
+  inventoryStatus: 'pending' | 'received' | 'partially received';
   discount: number;
   isTaxPayable: boolean;
 };
@@ -86,7 +87,8 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
       items: [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
       discount: 0,
       isTaxPayable: true,
-      status: 'Ordered',
+      purchaseStatus: 'pending',
+      inventoryStatus: 'pending',
     }
   });
 
@@ -141,22 +143,23 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
     fetchData();
   }, []);
 
-  // ✅ FIXED: Properly initialize discount when editing
+  // ✅ UPDATED: Initialize with three statuses
   useEffect(() => {
     if (isOpen) {
       if (defaultValues) {
         console.log('🔧 Initializing form with:', {
+          purchaseStatus: defaultValues.purchaseStatus,
+          inventoryStatus: defaultValues.inventoryStatus,
           discount: defaultValues.discount,
-          totalAmount: defaultValues.totalAmount,
-          grandTotal: defaultValues.grandTotal
         });
 
         reset({
           supplierName: defaultValues.supplierName || "",
           items: defaultValues.items || [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
           date: defaultValues.date ? new Date(defaultValues.date) : new Date(),
-          status: defaultValues.status || 'Ordered',
-          discount: defaultValues.discount || 0, // ✅ CRITICAL: Initialize discount
+          purchaseStatus: defaultValues.purchaseStatus || 'pending',
+          inventoryStatus: defaultValues.inventoryStatus || 'pending',
+          discount: defaultValues.discount || 0,
           isTaxPayable: defaultValues.isTaxPayable !== undefined ? defaultValues.isTaxPayable : true,
         });
       } else {
@@ -164,7 +167,8 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
           supplierName: "",
           items: [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
           date: new Date(),
-          status: 'Ordered',
+          purchaseStatus: 'pending',
+          inventoryStatus: 'pending',
           discount: 0,
           isTaxPayable: true,
         });
@@ -243,7 +247,9 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
       discount: discountAmount,
       subtotal: calculatedSubtotal,
       vatAmount: calculatedVatAmount,
-      grandTotal: calculatedGrandTotal
+      grandTotal: calculatedGrandTotal,
+      purchaseStatus: data.purchaseStatus,
+      // inventoryStatus no longer in form, using default
     });
 
     const submitData = {
@@ -253,14 +259,16 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
         quantity: Number(item.quantity) || 0,
         total: Number(item.total) || 0
       })),
-      totalAmount: itemsGrossTotal, // Gross total
-      discount: discountAmount, // ✅ CRITICAL: Include discount
+      totalAmount: itemsGrossTotal,
+      discount: discountAmount,
       isTaxPayable: data.isTaxPayable,
       vatAmount: calculatedVatAmount,
       grandTotal: calculatedGrandTotal,
       date: data.date,
-      status: isEditMode ? data.status : 'Ordered',
-      paymentStatus: 'Pending',
+      purchaseStatus: isEditMode ? data.purchaseStatus : 'pending',
+      // ✅ UPDATED: Preserve existing status or default to pending, as field is removed from form
+      inventoryStatus: isEditMode ? (defaultValues?.inventoryStatus || 'pending') : 'pending',
+      paymentStatus: 'pending',
       totalPaid: 0,
       remainingAmount: calculatedGrandTotal,
     };
@@ -280,6 +288,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
         </DialogHeader>
 
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+          {/* ✅ UPDATED: Removed Inventory Status Dropdown */}
           <div className={cn("grid grid-cols-1 gap-4", isEditMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
             <div className="space-y-2">
               <Label>Supplier <span className="text-destructive">*</span></Label>
@@ -401,11 +410,12 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
               />
             </div>
 
+            {/* Purchase Status (only in edit mode) */}
             {isEditMode && (
               <div className="space-y-2">
-                <Label>Status</Label>
+                <Label>Purchase Status</Label>
                 <Controller
-                  name="status"
+                  name="purchaseStatus"
                   control={control}
                   render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
@@ -413,10 +423,9 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Ordered">Ordered</SelectItem>
-                        <SelectItem value="Received">Received</SelectItem>
-                        <SelectItem value="Partially Received">Partially Received</SelectItem>
-                        <SelectItem value="Cancelled">Cancelled</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
                     </Select>
                   )}
@@ -684,7 +693,6 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                   })}
                 </div>
               )}
-
               <Button
                 type="button"
                 variant="outline"

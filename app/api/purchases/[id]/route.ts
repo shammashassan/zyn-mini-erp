@@ -1,14 +1,13 @@
-// app/api/purchases/[id]/route.ts - COMPLETE
+// app/api/purchases/[id]/route.ts - UPDATED: Three Separate Statuses
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Purchase from "@/models/Purchase";
 import Material from "@/models/Material";
 import StockAdjustment from "@/models/StockAdjustment";
-import Voucher from "@/models/Voucher";
 import { softDelete } from "@/utils/softDelete";
 import { getUserInfo } from "@/lib/auth-helpers";
-import { handlePurchaseStatusChange, createJournalForPurchase } from '@/utils/journalAutoCreate';
+import { createJournalForPurchase } from '@/utils/journalAutoCreate';
 import { voidJournalsForReference } from '@/utils/journalManager';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 
@@ -58,10 +57,11 @@ export async function GET(request: Request, context: RequestContext) {
 function detectChanges(oldPurchase: any, newData: any) {
   const changes: Array<{ field: string; oldValue: any; newValue: any }> = [];
   const fieldsToTrack = [
-    'status', 
+    'purchaseStatus',
+    'inventoryStatus',
     'paymentStatus', 
     'totalAmount', 
-    'discount',  // NEW: Track discount changes
+    'discount',
     'supplierName', 
     'paidAmount', 
     'date'
@@ -123,26 +123,26 @@ function haveItemsChanged(oldItems: any[], newItems: any[]) {
 /**
  * Helper to get actual received quantity for an item
  */
-function getReceivedQuantity(item: any, purchaseStatus: string): number {
-  if (purchaseStatus === 'Received') {
+function getReceivedQuantity(item: any, inventoryStatus: string): number {
+  if (inventoryStatus === 'received') {
     return item.quantity;
-  } else if (purchaseStatus === 'Partially Received') {
+  } else if (inventoryStatus === 'partially received') {
     return item.receivedQuantity || 0;
   }
   return 0;
 }
 
 /**
- * Process item changes when editing Received/Partially Received purchase
+ * Process item changes when editing purchases with inventory status
  */
 async function processItemChanges(
   oldItems: any[],
   newItems: any[],
   purchaseRef: string,
-  oldStatus: string
+  oldInventoryStatus: string
 ) {
   console.log('\n📦 Processing item changes...');
-  console.log(`   Old status: ${oldStatus}`);
+  console.log(`   Old inventory status: ${oldInventoryStatus}`);
 
   const oldItemsMap = new Map(oldItems.map(item => [item.materialId, item]));
   const newItemsMap = new Map(newItems.map(item => [item.materialId, item]));
@@ -160,7 +160,7 @@ async function processItemChanges(
 
     // CASE 2: ITEM REMOVED
     if (oldItem && !newItem) {
-      const oldReceivedQty = getReceivedQuantity(oldItem, oldStatus);
+      const oldReceivedQty = getReceivedQuantity(oldItem, oldInventoryStatus);
 
       if (oldReceivedQty > 0) {
         const material = await Material.findById(materialId);
@@ -191,7 +191,7 @@ async function processItemChanges(
 
     // CASE 3: ORDERED QUANTITY CHANGED
     if (oldItem && newItem && oldItem.quantity !== newItem.quantity) {
-      const oldReceivedQty = getReceivedQuantity(oldItem, oldStatus);
+      const oldReceivedQty = getReceivedQuantity(oldItem, oldInventoryStatus);
 
       // If new ordered < old received, cap received at new ordered
       if (newItem.quantity < oldReceivedQty) {
@@ -225,7 +225,7 @@ async function processItemChanges(
         newItem.receivedQuantity = oldReceivedQty;
       }
     } else if (oldItem && newItem) {
-      const oldReceivedQty = getReceivedQuantity(oldItem, oldStatus);
+      const oldReceivedQty = getReceivedQuantity(oldItem, oldInventoryStatus);
       newItem.receivedQuantity = oldReceivedQty;
     }
   }
@@ -233,11 +233,11 @@ async function processItemChanges(
   return newItems;
 }
 
-function determineStatusAfterEdit(items: any[], oldStatus: string): string {
+function determineInventoryStatusAfterEdit(items: any[], oldInventoryStatus: string): string {
   const hasNewItems = items.some(item => !item.receivedQuantity || item.receivedQuantity === 0);
 
   if (hasNewItems) {
-    return 'Partially Received';
+    return 'partially received';
   }
 
   const allFullyReceived = items.every(item => {
@@ -246,19 +246,14 @@ function determineStatusAfterEdit(items: any[], oldStatus: string): string {
   });
 
   if (allFullyReceived) {
-    return 'Received';
+    return 'received';
   }
 
-  return 'Partially Received';
+  return 'partially received';
 }
 
 /**
- * PUT - Update a purchase with proper discount handling
- * 
- * Key fixes:
- * 1. Recalculate amounts if items or discount changed
- * 2. Preserve discount when not explicitly changed
- * 3. Ensure journal entries are balanced
+ * PUT - Update a purchase
  */
 export async function PUT(request: Request, context: RequestContext) {
   try {
@@ -284,20 +279,25 @@ export async function PUT(request: Request, context: RequestContext) {
       }, { status: 400 });
     }
 
-    const oldStatus = currentPurchase.status;
-    const newStatus = body.status || oldStatus;
+    const oldPurchaseStatus = currentPurchase.purchaseStatus;
+    const oldInventoryStatus = currentPurchase.inventoryStatus;
+    
+    const newPurchaseStatus = body.purchaseStatus || oldPurchaseStatus;
+    const newInventoryStatus = body.inventoryStatus || oldInventoryStatus;
+    
     const itemsChanged = body.items && haveItemsChanged(currentPurchase.items, body.items);
 
-    console.log(`\n📄 Purchase Update: ${currentPurchase.referenceNumber}`);
-    console.log(`   Old Status: ${oldStatus}, New Status: ${newStatus}`);
+    console.log(`\n📝 Purchase Update: ${currentPurchase.referenceNumber}`);
+    console.log(`   Old Purchase Status: ${oldPurchaseStatus}, New: ${newPurchaseStatus}`);
+    console.log(`   Old Inventory Status: ${oldInventoryStatus}, New: ${newInventoryStatus}`);
     console.log(`   Items Changed: ${itemsChanged}`);
 
-    // SCENARIO 1: Editing items while status is Received or Partially Received
-    if ((oldStatus === 'Received' || oldStatus === 'Partially Received') && itemsChanged) {
-      console.log(`\n🔧 Editing ${oldStatus} purchase...`);
+    // SCENARIO 1: Editing items while inventory status is received or partially received
+    if ((oldInventoryStatus === 'received' || oldInventoryStatus === 'partially received') && itemsChanged) {
+      console.log(`\n🔧 Editing ${oldInventoryStatus} purchase...`);
 
-      // 1. Void existing journal if status was Received
-      if (oldStatus === 'Received') {
+      // 1. Void existing journal if inventory status was received
+      if (oldInventoryStatus === 'received') {
         await voidJournalsForReference(
           currentPurchase._id,
           user.id,
@@ -311,23 +311,23 @@ export async function PUT(request: Request, context: RequestContext) {
         currentPurchase.items,
         body.items,
         currentPurchase.referenceNumber,
-        oldStatus
+        oldInventoryStatus
       );
 
       body.items = updatedItems;
 
-      // 3. Determine new status
-      const newDeterminedStatus = determineStatusAfterEdit(updatedItems, oldStatus);
-      body.status = newDeterminedStatus;
+      // 3. Determine new inventory status
+      const newDeterminedInventoryStatus = determineInventoryStatusAfterEdit(updatedItems, oldInventoryStatus);
+      body.inventoryStatus = newDeterminedInventoryStatus;
     }
 
-    // SCENARIO 2: Status change via modal
-    if (oldStatus !== newStatus && !itemsChanged) {
+    // SCENARIO 2: Inventory status change
+    if (oldInventoryStatus !== newInventoryStatus && !itemsChanged) {
       // TO Received
-      if (newStatus === 'Received' && oldStatus !== 'Received') {
+      if (newInventoryStatus === 'received' && oldInventoryStatus !== 'received') {
         const itemsToUse = body.items || currentPurchase.items;
         for (const item of itemsToUse) {
-          const previouslyReceived = getReceivedQuantity(item, oldStatus);
+          const previouslyReceived = getReceivedQuantity(item, oldInventoryStatus);
           const remainingToAdd = item.quantity - previouslyReceived;
 
           if (remainingToAdd > 0) {
@@ -360,13 +360,13 @@ export async function PUT(request: Request, context: RequestContext) {
       }
 
       // TO Partially Received
-      if (newStatus === 'Partially Received') {
+      if (newInventoryStatus === 'partially received') {
         const itemsWithReceived = body.items || currentPurchase.items;
         for (const item of itemsWithReceived) {
           const newReceivedQty = item.receivedQuantity || 0;
           const oldReceivedQty = getReceivedQuantity(
             currentPurchase.items.find((i: any) => i.materialId === item.materialId),
-            oldStatus
+            oldInventoryStatus
           );
           const qtyDifference = newReceivedQty - oldReceivedQty;
 
@@ -398,11 +398,11 @@ export async function PUT(request: Request, context: RequestContext) {
         }
       }
 
-      // FROM Received/Partially Received TO Ordered/Cancelled
-      if ((oldStatus === 'Received' || oldStatus === 'Partially Received') &&
-        newStatus !== 'Received' && newStatus !== 'Partially Received') {
+      // FROM Received/Partially Received TO Pending
+      if ((oldInventoryStatus === 'received' || oldInventoryStatus === 'partially received') &&
+        newInventoryStatus === 'pending') {
         for (const item of currentPurchase.items) {
-          const qtyToRemove = getReceivedQuantity(item, oldStatus);
+          const qtyToRemove = getReceivedQuantity(item, oldInventoryStatus);
           if (qtyToRemove > 0) {
             const material = await Material.findById(item.materialId);
             if (material) {
@@ -419,7 +419,7 @@ export async function PUT(request: Request, context: RequestContext) {
                 newStock,
                 oldUnitCost: material.unitCost,
                 newUnitCost: material.unitCost,
-                adjustmentReason: `Purchase status changed to ${newStatus}`,
+                adjustmentReason: `Inventory status changed to ${newInventoryStatus}`,
                 createdAt: new Date(),
               });
               await newAdjustment.save();
@@ -440,7 +440,7 @@ export async function PUT(request: Request, context: RequestContext) {
 
     const updateData = { ...body };
     
-    // ✅ FIX: Recalculate amounts if items or discount changed
+    // Recalculate amounts if items or discount changed
     if (body.items || body.discount !== undefined) {
       const itemsToUse = body.items || currentPurchase.items;
       const grossTotal = itemsToUse.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0);
@@ -457,7 +457,6 @@ export async function PUT(request: Request, context: RequestContext) {
       console.log(`   VAT (5%): ${vatAmount.toFixed(2)}`);
       console.log(`   Grand Total: ${grandTotal.toFixed(2)}`);
 
-      // Update with recalculated values
       updateData.totalAmount = grossTotal;
       updateData.discount = discount;
       updateData.vatAmount = vatAmount;
@@ -476,24 +475,24 @@ export async function PUT(request: Request, context: RequestContext) {
 
     await currentPurchase.save();
 
-    // Handle status change for Journal entries
-    const finalStatus = currentPurchase.status;
+    const finalInventoryStatus = currentPurchase.inventoryStatus;
 
-    if (oldStatus !== newStatus) {
-      if (newStatus === 'Received') {
+    // ✅ Handle journal for inventory status changes
+    if (oldInventoryStatus !== newInventoryStatus) {
+      if (newInventoryStatus === 'received') {
         // Create new journal for Received state
         await createJournalForPurchase(
           currentPurchase.toObject(),
           user.id,
           user.username || user.name
         );
-      } else if (oldStatus === 'Received') {
+      } else if (oldInventoryStatus === 'received') {
         // Void old journal if moving away from Received
         await voidJournalsForReference(
           currentPurchase._id,
           user.id,
           user.username,
-          `Purchase status changed from ${oldStatus} to ${newStatus}`
+          `Inventory status changed from ${oldInventoryStatus} to ${newInventoryStatus}`
         );
       }
     }
@@ -540,10 +539,10 @@ export async function DELETE(request: Request, context: RequestContext) {
       'Purchase soft deleted'
     );
 
-    // Revert stock logic
-    if (purchaseToDelete.status === 'Received' || purchaseToDelete.status === 'Partially Received') {
+    // Revert stock based on inventory status
+    if (purchaseToDelete.inventoryStatus === 'received' || purchaseToDelete.inventoryStatus === 'partially received') {
        for (const item of purchaseToDelete.items) {
-          const qtyToRemove = getReceivedQuantity(item, purchaseToDelete.status);
+          const qtyToRemove = getReceivedQuantity(item, purchaseToDelete.inventoryStatus);
           if (qtyToRemove > 0) {
             const material = await Material.findById(item.materialId);
             if (material) {

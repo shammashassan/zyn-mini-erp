@@ -1,4 +1,4 @@
-// app/api/purchases/route.ts - FIXED: Proper Discount Handling
+// app/api/purchases/route.ts - UPDATED: Three Separate Statuses
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -6,7 +6,6 @@ import Purchase from "@/models/Purchase";
 import Supplier from "@/models/Supplier";
 import Material from "@/models/Material";
 import StockAdjustment from "@/models/StockAdjustment";
-import { getActive } from "@/utils/softDelete";
 import { getUserInfo } from "@/lib/auth-helpers";
 import { createJournalForPurchase } from '@/utils/journalAutoCreate';
 import generateInvoiceNumber from '@/utils/invoiceNumber';
@@ -109,7 +108,7 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST - Create a new purchase with auto-supplier creation and tax handling
+ * POST - Create a new purchase
  */
 export async function POST(request: Request) {
   try {
@@ -138,7 +137,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // ✅ FIX 1: Explicitly extract and validate discount
+    // Validate discount
     const discount = Number(body.discount) || 0;
     
     if (discount < 0) {
@@ -188,20 +187,27 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    // ✅ FIX 2: Recalculate amounts server-side to ensure consistency
+    // Recalculate amounts server-side
     const grossTotal = Number(body.totalAmount) || 0;
     const subtotal = grossTotal - discount;
     const vatAmount = body.isTaxPayable ? (subtotal * 0.05) : 0;
     const grandTotal = subtotal + vatAmount;
 
-    // ✅ FIX 4: Create purchase with explicitly calculated values
+    // ✅ NEW: Set default statuses
+    const purchaseStatus = 'pending';
+    const inventoryStatus = 'pending';
+
+    // Create purchase
     const newPurchase = new Purchase({
       ...body,
       referenceNumber,
-      discount,          // ✅ Explicit discount
-      totalAmount: grossTotal,  // ✅ Gross total
-      vatAmount,         // ✅ Recalculated VAT
-      grandTotal,        // ✅ Recalculated grand total
+      discount,
+      totalAmount: grossTotal,
+      vatAmount,
+      grandTotal,
+      purchaseStatus,     // ✅ NEW
+      inventoryStatus,    // ✅ NEW
+      paymentStatus: 'pending',
       isDeleted: false,
       deletedAt: null,
       deletedBy: null,
@@ -217,12 +223,15 @@ export async function POST(request: Request) {
 
     const savedPurchase = await newPurchase.save();
     
-    // Update material stock ONLY if status is "Received" or "Partially Received"
-    if (body.status === 'Received' || body.status === 'Partially Received') {
-      for (const item of body.items) {
+    // ✅ BACKWARD COMPATIBILITY: Handle direct creation with received/partially received status
+    // This allows users to create purchases that are already received (legacy workflow)
+    if (savedPurchase.inventoryStatus === 'received' || savedPurchase.inventoryStatus === 'partially received') {
+      console.log(`📦 Processing stock for directly created ${savedPurchase.inventoryStatus} purchase`);
+      
+      for (const item of savedPurchase.items) {
         const material = await Material.findById(item.materialId);
         if (material) {
-          const qtyToAdd = body.status === 'Received'
+          const qtyToAdd = savedPurchase.inventoryStatus === 'received'
             ? item.quantity
             : (item.receivedQuantity || 0);
 
@@ -232,9 +241,9 @@ export async function POST(request: Request) {
 
             await Material.findByIdAndUpdate(item.materialId, { stock: newStock });
 
-            const adjustmentReason = body.status === 'Received'
-              ? `Purchase ${referenceNumber} fully received`
-              : `Purchase ${referenceNumber} partially received (${qtyToAdd} of ${item.quantity} total)`;
+            const adjustmentReason = savedPurchase.inventoryStatus === 'received'
+              ? `Purchase ${referenceNumber} created as fully received`
+              : `Purchase ${referenceNumber} created as partially received (${qtyToAdd} of ${item.quantity} total)`;
 
             const newAdjustment = new StockAdjustment({
               materialId: item.materialId,
@@ -250,13 +259,14 @@ export async function POST(request: Request) {
             });
 
             await newAdjustment.save();
+            console.log(`  ✅ Added ${qtyToAdd} units of ${item.materialName} to stock`);
           }
         }
       }
     }
 
-    // AUTO-CREATE JOURNAL ENTRY - ONLY FOR "RECEIVED" STATUS
-    if (body.status === 'Received') {
+    // ✅ AUTO-CREATE JOURNAL ENTRY - ONLY if inventoryStatus is "received" on creation
+    if (savedPurchase.inventoryStatus === 'received') {
       try {
         await createJournalForPurchase(
           savedPurchase.toObject(),

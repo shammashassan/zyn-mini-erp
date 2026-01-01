@@ -34,7 +34,7 @@ export const statement = {
   deliveryNote: ["read", "create", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Financial Resources
-  purchase: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
+  purchase: ["read", "create", "update", "update_purchase_status", "update_inventory_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
   expense: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Reports Resources
@@ -88,7 +88,7 @@ export const user = ac.newRole({
   deliveryNote: ["read", "create", "update_status"],
 
   // Financial - View, create, update only
-  purchase: ["read", "create", "update", "update_status"],
+  purchase: ["read", "create", "update", "update_inventory_status", "update_purchase_status"],
   expense: ["read", "create", "update"],
 
   // No report access
@@ -132,7 +132,7 @@ export const manager = ac.newRole({
   deliveryNote: ["read", "create", "update_status", "soft_delete"],
 
   // Financial - Add soft delete and payment creation
-  purchase: ["read", "create", "update", "update_status", "soft_delete", "create_payment"],
+  purchase: ["read", "create", "update", "update_inventory_status", "update_purchase_status", "soft_delete", "create_payment"],
   expense: ["read", "create", "update", "soft_delete"],
 
   // Reports - Full report access
@@ -183,7 +183,7 @@ export const admin = ac.newRole({
   deliveryNote: ["read", "create", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Financial - Full access
-  purchase: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
+  purchase: ["read", "create", "update", "update_inventory_status", "update_purchase_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
   expense: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Reports - Full access
@@ -239,7 +239,7 @@ export const owner = ac.newRole({
   deliveryNote: ["read", "create", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Financial - Full access
-  purchase: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
+  purchase: ["read", "create", "update", "update_inventory_status", "update_purchase_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
   expense: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Reports - Full access
