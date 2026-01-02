@@ -121,6 +121,10 @@ export const getColumns = (
     {
       accessorKey: "email",
       header: "Email",
+      cell: ({ row }) => {
+        const email = row.getValue("email") as string | undefined;
+        return email ? email : <span className="text-muted-foreground">N/A</span>;
+      }
     },
     {
       accessorKey: "contactNumbers",
@@ -135,6 +139,7 @@ export const getColumns = (
             {contacts.length > 2 && (
               <div className="text-xs text-muted-foreground">+{contacts.length - 2} more</div>
             )}
+            {contacts.length === 0 && <div className="text-muted-foreground">N/A</div>}
           </div>
         );
       },

@@ -190,6 +190,10 @@ export const getColumns = (
     {
       accessorKey: "email",
       header: "Email",
+      cell: ({ row }) => {
+        const email = row.getValue("email") as string | undefined;
+        return email ? email : <span className="text-muted-foreground">N/A</span>;
+      }
     },
     {
       accessorKey: "mobiles",
@@ -198,7 +202,7 @@ export const getColumns = (
         const mobiles = row.getValue("mobiles") as string[] | undefined;
 
         if (!mobiles || mobiles.length === 0) {
-          return <span>N/A</span>;
+          return <span className="text-muted-foreground">N/A</span>;
         }
 
         return (
@@ -220,7 +224,7 @@ export const getColumns = (
       ),
       cell: ({ row }) => {
         const joinedDate = row.getValue("joinedDate") as Date | undefined;
-        return <span>{joinedDate ? formatDisplayDate(joinedDate) : 'N/A'}</span>
+        return joinedDate ? formatDisplayDate(joinedDate) : <span className="text-muted-foreground">N/A</span>;
       }
     },
     {

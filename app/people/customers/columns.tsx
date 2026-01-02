@@ -135,10 +135,18 @@ export const getColumns = (
     {
       accessorKey: "email",
       header: "Email",
+      cell: ({ row }) => {
+        const email = row.getValue("email") as string | undefined;
+        return email ? email : <span className="text-muted-foreground">N/A</span>;
+      }
     },
     {
       accessorKey: "phone",
       header: "Phone",
+      cell: ({ row }) => {
+        const phone = row.getValue("phone") as string | undefined;
+        return phone ? phone : <span className="text-muted-foreground">N/A</span>;
+      }
     },
     {
       id: "actions",
