@@ -327,9 +327,7 @@ function TrialBalancePageContent() {
                 {isLoading && !summary ? (
                   <TrialBalanceSkeleton />
                 ) : (
-                  <div className="mb-6">
-                    <StatsCards data={summaryCards} columns={4} />
-                  </div>
+                  <StatsCards data={summaryCards} columns={4} />
                 )}
               </div>
             </div>

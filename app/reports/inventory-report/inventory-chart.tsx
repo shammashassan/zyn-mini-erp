@@ -1,3 +1,5 @@
+// app/inventory/inventory-chart.tsx - UPDATED: Responsive Y-Axis for Mobile
+
 "use client";
 
 import * as React from "react";
@@ -50,6 +52,21 @@ const materialColors = [
 ];
 
 export function InventoryChart({ data, dateRange }: InventoryChartProps) {
+  // Responsive check for mobile view
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640); // sm breakpoint
+    };
+    
+    // Initial check
+    checkMobile();
+    
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   // Filter only materials and get top 5 by stock value for the chart
   const topMaterials = React.useMemo(() => {
     return [...data]
@@ -64,14 +81,17 @@ export function InventoryChart({ data, dateRange }: InventoryChartProps) {
   }, [topMaterials]);
 
   const chartData = React.useMemo(() => {
+    // Truncate labels more aggressively on mobile
+    const charLimit = isMobile ? 12 : 20;
+    
     return topMaterials.map((item, index) => ({
-      material: item.name.length > 20 ? item.name.slice(0, 20) + '...' : item.name,
+      material: item.name.length > charLimit ? item.name.slice(0, charLimit) + '...' : item.name,
       fullName: item.name,
       stockValue: item.stockValue,
       quantity: item.closingQty,
       fill: materialColors[index % materialColors.length]
     }));
-  }, [topMaterials]);
+  }, [topMaterials, isMobile]);
 
   const totals = React.useMemo(() => {
     const materials = data.filter(item => item.type === 'Material');
@@ -126,9 +146,10 @@ export function InventoryChart({ data, dateRange }: InventoryChartProps) {
                   dataKey="material"
                   type="category"
                   tickLine={false}
-                  tickMargin={10}
+                  tickMargin={isMobile ? 5 : 10}
                   axisLine={false}
-                  width={150}
+                  width={isMobile ? 90 : 150} // Responsive width
+                  fontSize={isMobile ? 12 : 14}
                 />
                 <XAxis dataKey="stockValue" type="number" hide />
                 <ChartTooltip
@@ -147,7 +168,7 @@ export function InventoryChart({ data, dateRange }: InventoryChartProps) {
                 <h4 className="font-medium text-sm text-muted-foreground mb-3">Performance Metrics</h4>
                 
                 {/* Total Value */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
+                <div className="flex items-center justify-between p-1 rounded-lg bg-muted/50 mb-1">
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-blue-600" />
                     <span className="font-medium text-sm">Total Value</span>
@@ -160,7 +181,7 @@ export function InventoryChart({ data, dateRange }: InventoryChartProps) {
                 </div>
 
                 {/* Materials Count */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
+                <div className="flex items-center justify-between p-1 rounded-lg bg-muted/50 mb-1">
                   <span className="font-medium text-sm">Total Materials</span>
                   <span className="font-bold text-sm">
                     {totals.itemCount}
@@ -168,7 +189,7 @@ export function InventoryChart({ data, dateRange }: InventoryChartProps) {
                 </div>
 
                 {/* Average Value */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center justify-between p-1 rounded-lg bg-muted/50 mb-1">
                   <span className="font-medium text-sm">Avg Value</span>
                   <span className="font-bold text-sm">
                     {formatCompactCurrency(totals.avgValue)}

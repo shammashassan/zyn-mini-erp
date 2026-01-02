@@ -145,7 +145,7 @@ export function PaymentsChart({ data, dateRange }: PaymentsChartProps) {
               <div>
                 <h4 className="font-medium text-sm text-muted-foreground mb-3">Performance Metrics</h4>
                 
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
+                <div className="flex items-center justify-between p-1 rounded-lg bg-muted/50 mb-1">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-green-600" />
                     <span className="font-medium text-sm">Total Inflow</span>
@@ -155,7 +155,7 @@ export function PaymentsChart({ data, dateRange }: PaymentsChartProps) {
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
+                <div className="flex items-center justify-between p-1 rounded-lg bg-muted/50 mb-1">
                   <div className="flex items-center gap-2">
                     <TrendingDown className="h-4 w-4 text-red-600" />
                     <span className="font-medium text-sm">Total Outflow</span>
@@ -165,7 +165,7 @@ export function PaymentsChart({ data, dateRange }: PaymentsChartProps) {
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center justify-between p-1 rounded-lg bg-muted/50 mb-1">
                   <span className="font-medium text-sm">Net Movement</span>
                   <span className={`font-bold text-sm ${totals.netMovement >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {formatCompactCurrency(Math.abs(totals.netMovement))}

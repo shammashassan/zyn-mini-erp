@@ -1,4 +1,4 @@
-// app/accounting/chart-of-accounts/page.tsx - UPDATED: Uniform loading with Tax Report
+// app/accounting/chart-of-accounts/page.tsx - UPDATED: Skeleton Toggle Size Fix
 
 "use client";
 
@@ -24,14 +24,14 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// ✅ UPDATED: Skeleton matching Tax Report style
+// ✅ UPDATED: Skeleton matching Tax Report style and Toggle Size
 function COAPageSkeleton() {
   return (
     <div className="space-y-6 animate-in fade-in-50">
       {/* Stats Cards Skeleton */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
-          <Card key={`stat-${i}`} className="p-6 py-4">
+          <Card key={`stat-${i}`} className="p-6 py-3">
             <CardContent className="p-0 space-y-3">
               <div className="flex justify-between items-center">
                 <Skeleton className="h-4 w-24" />
@@ -44,9 +44,9 @@ function COAPageSkeleton() {
         ))}
       </div>
 
-      {/* Tabs Switcher Skeleton */}
-      <div className="flex justify-center">
-        <Skeleton className="h-10 w-80" />
+      {/* Tabs Switcher Skeleton - UPDATED WIDTH */}
+      <div className="flex justify-center items-center mb-4">
+        <Skeleton className="h-10 w-full max-w-2xl rounded-md" />
       </div>
 
       {/* Content Skeleton */}
@@ -400,7 +400,7 @@ function ChartOfAccountsPageContent() {
 
                     {/* View Toggle and Content */}
                     <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "table" | "tree")}>
-                      <div className="flex justify-center pt-6 mb-6">
+                      <div className="flex justify-center items-center mb-4">
                         <TabsList className="flex justify-center w-full max-w-2xl grid-cols-3">
                           <TabsTrigger value="tree" className="flex items-center gap-2">
                             <ListTree className="h-4 w-4" />

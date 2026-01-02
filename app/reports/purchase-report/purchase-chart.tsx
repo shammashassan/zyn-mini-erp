@@ -201,7 +201,7 @@ export function PurchaseChart({ data, totalPurchases, totalOrders, dateRange }: 
                 <h4 className="font-medium text-sm text-muted-foreground mb-3">Performance Metrics</h4>
 
                 {/* Current Metric */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
+                <div className="flex items-center justify-between p-1 rounded-lg bg-muted/50 mb-1">
                   <div className="flex items-center gap-2">
                     {trend.direction === "up" ? (
                       <TrendingUp className="h-4 w-4 text-green-600" />
@@ -227,7 +227,7 @@ export function PurchaseChart({ data, totalPurchases, totalOrders, dateRange }: 
                 </div>
 
                 {/* Average Order Value */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
+                <div className="flex items-center justify-between p-1 rounded-lg bg-muted/50 mb-1">
                   <span className="font-medium text-sm">Avg Order Value</span>
                   <span className="font-bold text-sm">
                     {formatCurrency(totalOrders > 0 ? totalPurchases / totalOrders : 0)}

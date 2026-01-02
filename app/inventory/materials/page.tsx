@@ -1,10 +1,10 @@
-// app/materials/page.tsx
+// app/materials/page.tsx - UPDATED: Smooth transitions with silent refresh
 
 "use client";
 
 import * as React from "react";
 import { useSession } from "@/lib/auth-client";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { useDataTable } from "@/hooks/use-data-table";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
@@ -20,7 +20,7 @@ import Link from "next/link";
 import { useMaterialPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
-
+import { cn } from "@/lib/utils";
 
 const useMediaQuery = (query: string) => {
   const [matches, setMatches] = useState(false);
@@ -71,28 +71,51 @@ export default function MaterialsPage() {
 
   /**
    * Fetches the list of materials from the API.
+   * @param {boolean} background - If true, fetches silently without showing loading state
    */
-  const fetchMaterials = async () => {
+  const fetchMaterials = useCallback(async (background = false) => {
     if (!canRead) return;
+    
     try {
-      setIsLoading(true);
+      // Only show loading spinner if not a background fetch
+      if (!background) {
+        setIsLoading(true);
+      }
+
       const res = await fetch("/api/materials");
       if (!res.ok) throw new Error("Failed to fetch materials");
       const data = await res.json();
       setMaterials(data);
     } catch (error) {
-      toast.error("Could not load materials.");
+      console.error("Materials fetch error:", error);
+      if (!background) {
+        toast.error("Could not load materials.");
+      }
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [canRead]);
 
-  // Fetch materials on component mount
+  // Standard fetch on component mount
   useEffect(() => {
     if (isMounted && canRead) {
       fetchMaterials();
     }
-  }, [isMounted, canRead]);
+  }, [isMounted, canRead, fetchMaterials]);
+
+  // ✅ NEW: Window Focus Listener - SILENT MODE
+  useEffect(() => {
+    const onFocus = () => {
+      if (isMounted && canRead) {
+        fetchMaterials(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchMaterials, isMounted, canRead]);
 
   const handleOpenForm = (material: IMaterial | null = null) => {
     if (!canCreate && !material) {
@@ -201,7 +224,7 @@ export default function MaterialsPage() {
     return Array.from(types);
   }, [materials]);
 
-  // Extract existing units from materials (NEW)
+  // Extract existing units from materials
   const existingUnits = React.useMemo(() => {
     const units = new Set(materials.map(mat => mat.unit).filter(Boolean));
     return Array.from(units);
@@ -269,21 +292,25 @@ export default function MaterialsPage() {
               </div>
             </div>
 
+            {/* ✅ UPDATED: Table with smooth opacity transition */}
             <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
               <Card>
                 <CardContent className="p-6">
-                  {isLoading ? (
-                    <DataTableSkeleton
-                      columnCount={columnsWithOptions.length}
-                      rowCount={10}
-                    />
-                  ) : (
-                    <>
+                  <div className={cn(
+                    "transition-opacity duration-200",
+                    isLoading && !materials.length ? "opacity-50" : "opacity-100"
+                  )}>
+                    {isLoading && !materials.length ? (
+                      <DataTableSkeleton
+                        columnCount={columnsWithOptions.length}
+                        rowCount={10}
+                      />
+                    ) : (
                       <DataTable table={table}>
                         <DataTableToolbar table={table} />
                       </DataTable>
-                    </>
-                  )}
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -309,7 +336,7 @@ export default function MaterialsPage() {
             </div>
           </div>
         </div>
-      </div >
+      </div>
 
       <MaterialForm
         isOpen={isFormOpen}

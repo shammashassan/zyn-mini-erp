@@ -324,24 +324,6 @@ export const getColumns = (
       enableColumnFilter: true,
     },
     {
-      accessorKey: "grandTotal",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-8 px-2 justify-end w-full"
-        >
-          Total Amount
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => (
-        <div className="text-right text-green-600 min-w-[120px] font-medium">
-          {formatCurrency(row.original.grandTotal)}
-        </div>
-      ),
-    },
-    {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
@@ -362,6 +344,24 @@ export const getColumns = (
         ],
       },
       enableColumnFilter: true,
+    },
+    {
+      accessorKey: "grandTotal",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-8 px-2 justify-end w-full"
+        >
+          Total Amount
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <div className="text-right text-green-600 min-w-[120px] font-medium">
+          {formatCurrency(row.original.grandTotal)}
+        </div>
+      ),
     },
     {
       id: "connectedDocs",

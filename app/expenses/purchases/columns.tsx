@@ -503,9 +503,9 @@ export const getColumns = (
               {purchase.paymentStatus}
             </Badge>
             <div className="text-xs text-muted-foreground">
-              <span className="font-mono">{formatCurrency(paidAmount)}</span>
+              <span>{formatCurrency(paidAmount)}</span>
               <span className="mx-1">/</span>
-              <span className="text-green-600 font-mono">{formatCurrency(grandTotal)}</span>
+              <span className="text-green-600">{formatCurrency(grandTotal)}</span>
             </div>
           </div>
         );

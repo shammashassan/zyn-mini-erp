@@ -1,3 +1,5 @@
+// app/expenses/columns.tsx - UPDATED: Center align trend column
+
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
@@ -46,13 +48,17 @@ const getCategoryColor = (category: string) => {
 };
 
 const formatTrendPercentage = (percentage?: number) => {
-  if (percentage === undefined) return "—";
+  // Return muted "N/A" if value is missing, matching the style of missing categories
+  if (percentage === undefined || percentage === null) {
+    return <span className="text-muted-foreground font-normal">N/A</span>;
+  }
+  
   const isPositive = percentage > 0;
   const isNegative = percentage < 0;
 
   return (
     <div className={cn(
-      "flex items-center gap-1 text-sm font-medium",
+      "flex items-center justify-center gap-1 text-sm font-medium", // Added justify-center
       isPositive && "text-red-600",
       isNegative && "text-green-600"
     )}>
@@ -83,13 +89,20 @@ export const getExpenseColumns = (): ColumnDef<ExpenseReportData>[] => [
   {
     accessorKey: "topCategory",
     header: "Top Category",
-    cell: ({ row }) => (
-      <div className="space-y-1">
-        <Badge variant={getCategoryColor(row.original.topCategory) as any} appearance="outline">
-          {row.original.topCategory}
-        </Badge>
-      </div>
-    ),
+    cell: ({ row }) => {
+      const category = row.original.topCategory;
+      return (
+        <div className="space-y-1">
+          <Badge 
+            variant={(category ? getCategoryColor(category) : "secondary") as any} 
+            appearance="outline"
+            className={!category ? "text-muted-foreground font-normal" : ""}
+          >
+            {category || "N/A"}
+          </Badge>
+        </div>
+      );
+    },
   },
   {
     accessorKey: "highestExpense",
@@ -135,9 +148,9 @@ export const getExpenseColumns = (): ColumnDef<ExpenseReportData>[] => [
   },
   {
     accessorKey: "trendVsLastMonth",
-    header: "Trend vs Last Month",
+    header: () => <div className="text-center">Trend vs Last Month</div>, // Centered Header
     cell: ({ row }) => (
-      <div className="text-right">
+      <div className="text-center flex justify-center"> {/* Centered Cell */}
         {formatTrendPercentage(row.original.trendVsLastMonth)}
       </div>
     ),

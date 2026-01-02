@@ -4,12 +4,12 @@
 
 import * as React from "react";
 import { ColumnDef } from "@tanstack/react-table";
-import { 
-  MoreHorizontal, 
-  ArrowUpDown, 
-  Trash2, 
-  Receipt, 
-  FileText, 
+import {
+  MoreHorizontal,
+  ArrowUpDown,
+  Trash2,
+  Receipt,
+  FileText,
   Truck,
   CheckCircle,
   Clock,
@@ -339,195 +339,195 @@ export const getColumns = (
   permissions: InvoicePermissions,
   onRefresh?: () => void
 ): ColumnDef<Invoice>[] => [
-  {
-    accessorKey: "createdAt",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-8 px-2"
-      >
-        Date
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const date = new Date(row.original.createdAt);
-      return (
-        <div className="text-left font-medium">
-          <div>{formatDisplayDate(date)}</div>
-          <div className="text-xs text-muted-foreground">
-            {formatTime(date)}
-          </div>
-        </div>
-      );
-    },
-    sortingFn: (rowA, rowB) => {
-      const dateA = new Date(rowA.original.createdAt);
-      const dateB = new Date(rowB.original.createdAt);
-      return dateB.getTime() - dateA.getTime();
-    },
-  },
-  {
-    accessorKey: "invoiceNumber",
-    header: "Invoice No.",
-    cell: ({ row }) => (
-      <span className="font-mono font-medium">
-        {row.getValue("invoiceNumber")}
-      </span>
-    ),
-    meta: {
-      label: "Invoice No",
-      placeholder: "Search invoice no...",
-      variant: "text",
-    },
-    enableColumnFilter: true,
-  },
-  {
-    id: "customerName",
-    accessorKey: "customerName",
-    header: "Customer",
-    cell: ({ row }) => {
-      const customerName = row.original.customerName;
-      return customerName ? (
-        <Badge variant="primary" appearance="outline">
-          {customerName}
-        </Badge>
-      ) : (
-        <span className="text-muted-foreground">-</span>
-      );
-    },
-    meta: {
-      label: "Customer",
-      placeholder: "Search customer...",
-      variant: "text",
-    },
-    enableColumnFilter: true,
-  },
-  {
-    accessorKey: "grandTotal",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-8 px-2 justify-end w-full"
-      >
-        Total Amount
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <div className="text-right text-green-600 min-w-[120px] font-medium">
-        {formatCurrency(row.original.grandTotal)}
-      </div>
-    ),
-  },
-  {
-    id: "status",
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const invoice = row.original;
-      const refresh = onRefresh || (() => { });
-
-      return <StatusBadgeButton invoice={invoice} onRefresh={refresh} canUpdateStatus={permissions.canUpdateStatus} />;
-    },
-    meta: {
-      label: "Status",
-      variant: "select",
-      icon: AlertCircle,
-      options: [
-        { label: "Approved", value: "approved", icon: CheckCircle },
-        { label: "Pending", value: "pending", icon: Clock },
-        { label: "Cancelled", value: "cancelled", icon: XCircle },
-      ],
-    },
-    enableColumnFilter: true,
-  },
-  {
-    id: "paymentStatus",
-    accessorKey: "paymentStatus",
-    header: "Payment",
-    cell: ({ row }) => {
-      const invoice = row.original;
-      const paidAmount = invoice.paidAmount || 0;
-      const Icon = getPaymentStatusIcon(invoice.paymentStatus); // ✅ ADDED: Get icon
-
-      return (
-        <div className="space-y-1">
-          <Badge
-            variant={getPaymentStatusVariant(invoice.paymentStatus) as any}
-            appearance="outline"
-            className="gap-1 pr-2.5" // ✅ ADDED: Spacing
-          >
-            <Icon className="h-3 w-3" /> {/* ✅ ADDED: Icon */}
-            {invoice.paymentStatus}
-          </Badge>
-          {paidAmount > 0 && (
+    {
+      accessorKey: "createdAt",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-8 px-2"
+        >
+          Date
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const date = new Date(row.original.createdAt);
+        return (
+          <div className="text-left font-medium">
+            <div>{formatDisplayDate(date)}</div>
             <div className="text-xs text-muted-foreground">
-              {formatCurrency(paidAmount)} / {formatCurrency(invoice.grandTotal)}
+              {formatTime(date)}
             </div>
-          )}
-        </div>
-      );
+          </div>
+        );
+      },
+      sortingFn: (rowA, rowB) => {
+        const dateA = new Date(rowA.original.createdAt);
+        const dateB = new Date(rowB.original.createdAt);
+        return dateB.getTime() - dateA.getTime();
+      },
     },
-    meta: {
-      label: "Payment",
-      variant: "select",
-      icon: DollarSign,
-      options: [
-        { label: "Paid", value: "Paid", icon: CheckCircle },
-        { label: "Partially Paid", value: "Partially Paid", icon: CreditCard },
-        { label: "Pending", value: "Pending", icon: Clock },
-        { label: "Refunded", value: "Refunded", icon: RotateCcw },
-      ],
+    {
+      accessorKey: "invoiceNumber",
+      header: "Invoice No.",
+      cell: ({ row }) => (
+        <span className="font-mono font-medium">
+          {row.getValue("invoiceNumber")}
+        </span>
+      ),
+      meta: {
+        label: "Invoice No",
+        placeholder: "Search invoice no...",
+        variant: "text",
+      },
+      enableColumnFilter: true,
     },
-    enableColumnFilter: true,
-  },
-  {
-    id: "connectedDocs",
-    header: "Connected",
-    cell: ({ row }) => {
-      const invoice = row.original;
-      return (
-        <div className="flex flex-col gap-1 min-w-[150px]">
-          {onViewPdf && (
-            <ConnectedDocumentsBadges
-              invoice={invoice}
-              onViewPdf={onViewPdf}
-            />
-          )}
-        </div>
-      );
+    {
+      id: "customerName",
+      accessorKey: "customerName",
+      header: "Customer",
+      cell: ({ row }) => {
+        const customerName = row.original.customerName;
+        return customerName ? (
+          <Badge variant="primary" appearance="outline">
+            {customerName}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
+      },
+      meta: {
+        label: "Customer",
+        placeholder: "Search customer...",
+        variant: "text",
+      },
+      enableColumnFilter: true,
     },
-  },
-  {
-    id: "quickActions",
-    header: "",
-    cell: ({ row }) => {
-      const invoice = row.original;
-      const refresh = onRefresh || (() => { });
+    // {
+    //   accessorKey: "grandTotal",
+    //   header: ({ column }) => (
+    //     <Button
+    //       variant="ghost"
+    //       onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+    //       className="h-8 px-2 justify-end w-full"
+    //     >
+    //       Total Amount
+    //       <ArrowUpDown className="ml-2 h-4 w-4" />
+    //     </Button>
+    //   ),
+    //   cell: ({ row }) => (
+    //     <div className="text-right text-green-600 min-w-[120px] font-medium">
+    //       {formatCurrency(row.original.grandTotal)}
+    //     </div>
+    //   ),
+    // },
+    {
+      id: "status",
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const invoice = row.original;
+        const refresh = onRefresh || (() => { });
 
-      return (
-        <div className="flex gap-2">
-          <CreateReceiptButton invoice={invoice} onRefresh={refresh} canCreateReceipt={permissions.canCreateReceipt} />
-          <CreateDeliveryButton invoice={invoice} onRefresh={refresh} canCreateDelivery={permissions.canCreateDelivery} />
-        </div>
-      );
+        return <StatusBadgeButton invoice={invoice} onRefresh={refresh} canUpdateStatus={permissions.canUpdateStatus} />;
+      },
+      meta: {
+        label: "Status",
+        variant: "select",
+        icon: AlertCircle,
+        options: [
+          { label: "Approved", value: "approved", icon: CheckCircle },
+          { label: "Pending", value: "pending", icon: Clock },
+          { label: "Cancelled", value: "cancelled", icon: XCircle },
+        ],
+      },
+      enableColumnFilter: true,
     },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      return (
-        <RowActions
-          invoice={row.original}
-          onViewPdf={onViewPdf}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          permissions={permissions}
-        />
-      );
+    {
+      id: "paymentStatus",
+      accessorKey: "paymentStatus",
+      header: "Payment",
+      cell: ({ row }) => {
+        const invoice = row.original;
+        const paidAmount = invoice.paidAmount || 0;
+        const Icon = getPaymentStatusIcon(invoice.paymentStatus);
+
+        return (
+          <div className="space-y-1">
+            <Badge
+              variant={getPaymentStatusVariant(invoice.paymentStatus) as any}
+              appearance="outline"
+              className="gap-1 pr-2.5"
+            >
+              <Icon className="h-3 w-3" />
+              {invoice.paymentStatus}
+            </Badge>
+            <div className="text-xs text-muted-foreground">
+              <span>{formatCurrency(paidAmount)}</span>
+              <span className="mx-1">/</span>
+              <span className="text-green-600">{formatCurrency(invoice.grandTotal)}</span>
+            </div>
+          </div>
+        );
+      },
+      meta: {
+        label: "Payment",
+        variant: "select",
+        icon: DollarSign,
+        options: [
+          { label: "Paid", value: "Paid", icon: CheckCircle },
+          { label: "Partially Paid", value: "Partially Paid", icon: CreditCard },
+          { label: "Pending", value: "Pending", icon: Clock },
+          { label: "Refunded", value: "Refunded", icon: RotateCcw },
+        ],
+      },
+      enableColumnFilter: true,
     },
-  },
-];
+    {
+      id: "connectedDocs",
+      header: "Connected",
+      cell: ({ row }) => {
+        const invoice = row.original;
+        return (
+          <div className="flex flex-col gap-1 min-w-[150px]">
+            {onViewPdf && (
+              <ConnectedDocumentsBadges
+                invoice={invoice}
+                onViewPdf={onViewPdf}
+              />
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: "quickActions",
+      header: "",
+      cell: ({ row }) => {
+        const invoice = row.original;
+        const refresh = onRefresh || (() => { });
+
+        return (
+          <div className="flex gap-2">
+            <CreateReceiptButton invoice={invoice} onRefresh={refresh} canCreateReceipt={permissions.canCreateReceipt} />
+            <CreateDeliveryButton invoice={invoice} onRefresh={refresh} canCreateDelivery={permissions.canCreateDelivery} />
+          </div>
+        );
+      },
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        return (
+          <RowActions
+            invoice={row.original}
+            onViewPdf={onViewPdf}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            permissions={permissions}
+          />
+        );
+      },
+    },
+  ];

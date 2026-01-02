@@ -59,11 +59,21 @@ const categoryColors = [
   "var(--chart-3)",
   "var(--chart-4)",
   "var(--chart-5)",
+  "var(--chart-6)",
+  "var(--chart-7)",
+  "var(--chart-8)",
+  "var(--chart-9)",
+  "var(--chart-10)",
   "hsl(var(--chart-1))",
   "hsl(var(--chart-2))",
   "hsl(var(--chart-3))",
   "hsl(var(--chart-4))",
   "hsl(var(--chart-5))",
+  "hsl(var(--chart-6))",
+  "hsl(var(--chart-7))",
+  "hsl(var(--chart-8))",
+  "hsl(var(--chart-9))",
+  "hsl(var(--chart-10))"
 ];
 
 export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRange }: ExpenseChartProps) {
@@ -250,7 +260,7 @@ export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRang
                 <h4 className="font-medium text-sm text-muted-foreground mb-3">Performance Metrics</h4>
                 
                 {/* Total Expenses */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
+                <div className="flex items-center justify-between p-1 rounded-lg bg-muted/50 mb-1">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-red-600" />
                     <span className="font-medium text-sm">Total Expenses</span>
@@ -268,7 +278,7 @@ export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRang
                 </div>
 
                 {/* Average per Expense */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
+                <div className="flex items-center justify-between p-1 rounded-lg bg-muted/50 mb-1">
                   <span className="font-medium text-sm">Average per Expense</span>
                   <span className="font-bold text-sm">
                     {formatCompactCurrency(totalExpenses > 0 ? totalAmount / totalExpenses : 0)}
@@ -284,7 +294,7 @@ export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRang
                 <div className="space-y-2">
                   {chartView === "category" ? (
                     <>
-                      {categoryData.slice(0, 3).map((category, index) => (
+                      {categoryData.slice(0, 4).map((category, index) => (
                         <div key={category.category} className="flex justify-between items-center text-sm">
                           <span className="flex items-center gap-2">
                             <div 

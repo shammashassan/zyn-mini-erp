@@ -105,8 +105,7 @@ export async function GET(request: Request) {
       };
     }
 
-    // 2. Calculate Current Period Totals (Detailed Aggregation for Charts)
-    // We still need the monthly breakdown logic for the chart, so we keep the original aggregation flow for current period
+    // 2. Calculate Current Period Totals with Transaction Counts
     const currentAggregation = await Journal.aggregate([
       {
         $match: {
@@ -128,10 +127,48 @@ export async function GET(request: Request) {
       }
     ]);
 
+    // ✅ NEW: Get transaction counts per month
+    const transactionCounts = await Journal.aggregate([
+      {
+        $match: {
+          status: 'posted',
+          isDeleted: false,
+          entryDate: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            month: { $dateToString: { format: "%Y-%m", date: "$entryDate" } },
+            referenceType: "$referenceType"
+          },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
     const months = eachMonthOfInterval({ start: startDate, end: endDate });
     const monthlyBreakdown = months.map(month => {
       const monthKey = format(month, 'yyyy-MM');
       const monthBuckets = currentAggregation.filter((r: any) => r._id.month === monthKey);
+
+      // ✅ Get transaction counts for this month
+      const monthTransactions = transactionCounts.filter((t: any) => t._id.month === monthKey);
+      
+      // Count orders (Invoice + Receipt)
+      const orderCount = monthTransactions
+        .filter((t: any) => ['Invoice', 'Receipt'].includes(t._id.referenceType))
+        .reduce((sum: number, t: any) => sum + t.count, 0);
+      
+      // Count purchases
+      const purchaseCount = monthTransactions
+        .filter((t: any) => t._id.referenceType === 'Purchase')
+        .reduce((sum: number, t: any) => sum + t.count, 0);
+      
+      // Count expenses
+      const expenseCount = monthTransactions
+        .filter((t: any) => t._id.referenceType === 'Expense')
+        .reduce((sum: number, t: any) => sum + t.count, 0);
 
       let revenue = 0;
       let expenses = 0;
@@ -159,11 +196,11 @@ export async function GET(request: Request) {
         period: format(month, 'MMM yyyy'),
         revenue,
         expenses,
-        orderAmount: 0,
-        orders: 0,
+        orderAmount: revenue,           // ✅ FIXED: Use calculated revenue
+        orders: orderCount,             // ✅ FIXED: Use actual order count
         purchaseAmount: purchasesExTax,
-        purchases: 0,
-        expenseCount: 0,
+        purchases: purchaseCount,       // ✅ FIXED: Use actual purchase count
+        expenseCount: expenseCount,     // ✅ FIXED: Use actual expense count
         salesTax,
         purchaseTax,
         profit,
@@ -177,6 +214,8 @@ export async function GET(request: Request) {
       acc.totalPurchasesExTax += month.purchaseAmount;
       acc.salesTax += month.salesTax;
       acc.purchaseTax += month.purchaseTax;
+      acc.totalOrders += month.orders;              // ✅ Sum up orders
+      acc.totalOrderAmount += month.orderAmount;    // ✅ Sum up order amounts
       return acc;
     }, {
       totalRevenueExTax: 0,
@@ -200,7 +239,6 @@ export async function GET(request: Request) {
       : 0;
 
     // 3. Calculate Previous Period for Trends
-    // Calculate previous date range with same duration
     const durationMs = differenceInMilliseconds(endDate, startDate);
     const prevEndDate = subMilliseconds(startDate, 1);
     const prevStartDate = subMilliseconds(prevEndDate, durationMs);
@@ -223,7 +261,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       summary,
       monthlyBreakdown: monthlyBreakdown.reverse(),
-      trends // Send trends to frontend
+      trends
     });
 
   } catch (error) {

@@ -46,7 +46,7 @@ export const getColumns = (): ColumnDef<ProfitLossData>[] => [
     ),
     cell: ({ row }) => (
       <div className="text-center font-medium">
-        <div className="text-green-600">{formatCurrency(row.original.orderAmount || 0)}</div>
+        <div className="text-blue-600 font-mono">{formatCurrency(row.original.orderAmount || 0)}</div>
         <div className="text-xs text-muted-foreground">
           {row.original.orders} orders
         </div>
@@ -63,7 +63,7 @@ export const getColumns = (): ColumnDef<ProfitLossData>[] => [
     ),
     cell: ({ row }) => (
       <div className="text-center font-medium text-yellow-600">
-        <div>{formatCurrency(row.original.purchaseAmount || 0)}</div>
+        <div className="font-mono">{formatCurrency(row.original.purchaseAmount || 0)}</div>
         <div className="text-xs text-muted-foreground">
           {row.original.purchases} purchases
         </div>
@@ -80,7 +80,7 @@ export const getColumns = (): ColumnDef<ProfitLossData>[] => [
     ),
     cell: ({ row }) => (
       <div className="text-center font-medium">
-        <div className="text-red-600">{formatCurrency(row.original.expenses)}</div>
+        <div className="text-red-600 font-mono">{formatCurrency(row.original.expenses)}</div>
         <div className="text-xs text-muted-foreground">
           {row.original.expenseCount || 0} expenses
         </div>
@@ -91,7 +91,7 @@ export const getColumns = (): ColumnDef<ProfitLossData>[] => [
     accessorKey: "salesTax",
     header: "Sales Tax",
     cell: ({ row }) => (
-      <div className="text-center font-medium text-orange-600">
+      <div className="text-center font-medium text-orange-600 font-mono">
         {formatCurrency(row.original.salesTax)}
       </div>
     ),
@@ -100,7 +100,7 @@ export const getColumns = (): ColumnDef<ProfitLossData>[] => [
     accessorKey: "purchaseTax",
     header: "Purchase Tax",
     cell: ({ row }) => (
-      <div className="text-center font-medium text-orange-600">
+      <div className="text-center font-medium text-orange-600 font-mono">
         {formatCurrency(row.original.purchaseTax)}
       </div>
     ),
@@ -117,7 +117,7 @@ export const getColumns = (): ColumnDef<ProfitLossData>[] => [
       const profit = row.original.profit;
       return (
         <div className={cn(
-          "text-center font-bold",
+          "text-center font-mono",
           profit >= 0 ? "text-green-600" : "text-red-600"
         )}>
           <div>{formatCurrency(profit)}</div>

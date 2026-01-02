@@ -157,7 +157,7 @@ export function TaxReportChart({ data, dateRange }: TaxReportChartProps) {
                 <h4 className="font-medium text-sm text-muted-foreground mb-3">Performance Metrics</h4>
                 
                 {/* Net Tax Liability */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
+                <div className="flex items-center justify-between p-1 rounded-lg bg-muted/50 mb-1">
                   <div className="flex items-center gap-2">
                     {totals.totalNetTax >= 0 ? (
                       <TrendingUp className="h-4 w-4 text-orange-600" />
@@ -181,7 +181,7 @@ export function TaxReportChart({ data, dateRange }: TaxReportChartProps) {
                 </div>
 
                 {/* Sales Tax */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-3">
+                <div className="flex items-center justify-between p-1 rounded-lg bg-muted/50 mb-1">
                   <span className="font-medium text-sm">Total Sales Tax</span>
                   <span className="font-bold text-sm">
                     {formatCompactCurrency(totals.totalSalesTax)}
@@ -189,7 +189,7 @@ export function TaxReportChart({ data, dateRange }: TaxReportChartProps) {
                 </div>
 
                 {/* Purchase Tax */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center justify-between p-1 rounded-lg bg-muted/50 mb-1">
                   <span className="font-medium text-sm">Total Purchase Tax</span>
                   <span className="font-bold text-sm">
                     {formatCompactCurrency(totals.totalPurchaseTax)}

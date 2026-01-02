@@ -239,21 +239,17 @@ export const getColumns = (
 
         if (expense.payeeId && typeof expense.payeeId === 'object') {
           return (
-            <div className="flex flex-col gap-1">
               <Badge variant="cyan" appearance="outline">
                 {expense.payeeId.name}
               </Badge>
-            </div>
           );
         }
 
         if (expense.supplierId && typeof expense.supplierId === 'object') {
           return (
-            <div className="flex flex-col gap-1">
               <Badge variant="warning" appearance="outline">
                 {expense.supplierId.name}
               </Badge>
-            </div>
           );
         }
 
@@ -305,15 +301,15 @@ export const getColumns = (
       },
       enableColumnFilter: true,
     },
-    {
-      accessorKey: "amount",
-      header: () => <div className="text-right">Amount</div>,
-      cell: ({ row }) => (
-        <div className="text-right font-medium">
-          {formatCurrency(row.getValue("amount"))}
-        </div>
-      ),
-    },
+    // {
+    //   accessorKey: "amount",
+    //   header: () => <div className="text-right">Amount</div>,
+    //   cell: ({ row }) => (
+    //     <div className="text-right font-medium">
+    //       {formatCurrency(row.getValue("amount"))}
+    //     </div>
+    //   ),
+    // },
     {
       accessorKey: "status",
       header: "Status",
@@ -361,11 +357,11 @@ export const getColumns = (
                 {status}
               </Badge>
             </div>
-            {(status === 'Partially Paid' || status === 'Paid') && amount > 0 && (
-              <div className="text-xs text-muted-foreground">
-                {formatCurrency(paid)} / {formatCurrency(amount)}
-              </div>
-            )}
+            <div className="text-xs text-muted-foreground">
+              <span>{formatCurrency(paid)}</span>
+              <span className="mx-1">/</span>
+              <span className="text-green-600">{formatCurrency(amount)}</span>
+            </div>
           </div>
         );
       },
