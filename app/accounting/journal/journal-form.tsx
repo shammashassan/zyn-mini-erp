@@ -107,9 +107,9 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [payees, setPayees] = useState<any[]>([]);
   const [partyPopoverOpen, setPartyPopoverOpen] = useState(false);
+  const [partySearchQuery, setPartySearchQuery] = useState("");
 
   // Responsive check
-  // Updated to 1024px to cover the 768-1022px middle ground
   const [isDesktop, setIsDesktop] = useState(true);
 
   useEffect(() => {
@@ -178,6 +178,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
           ],
           status: defaultValues.status,
         });
+        setPartySearchQuery(defaultValues.partyName || "");
       } else {
         reset({
           entryDate: new Date(),
@@ -193,6 +194,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
           ],
           status: 'draft',
         });
+        setPartySearchQuery("");
       }
     }
   }, [isOpen, defaultValues, reset]);
@@ -210,6 +212,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
     setValue('partyType', partyType, { shouldDirty: true });
     setValue('partyId', party._id, { shouldDirty: true });
     setValue('partyName', party.name, { shouldDirty: true });
+    setPartySearchQuery(party.name);
     setPartyPopoverOpen(false);
   };
 
@@ -217,6 +220,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
     setValue('partyType', undefined, { shouldDirty: true });
     setValue('partyId', undefined, { shouldDirty: true });
     setValue('partyName', undefined, { shouldDirty: true });
+    setPartySearchQuery("");
   };
 
   const handleDebitChange = (index: number, value: string) => {
@@ -426,6 +430,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                           field.onChange(value || undefined);
                           setValue('partyId', undefined, { shouldDirty: true });
                           setValue('partyName', undefined, { shouldDirty: true });
+                          setPartySearchQuery("");
                         }}
                       >
                         <SelectTrigger className="w-full sm:w-[120px]">
@@ -442,7 +447,13 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                   />
 
                   {watchedPartyType && watchedPartyType !== 'Vendor' && (
-                    <Popover open={partyPopoverOpen} onOpenChange={setPartyPopoverOpen}>
+                    <Popover 
+                      open={partyPopoverOpen} 
+                      onOpenChange={(open) => {
+                        setPartyPopoverOpen(open);
+                        if(open) setPartySearchQuery(watch('partyName') || "");
+                      }}
+                    >
                       <PopoverTrigger asChild>
                         <Button
                           type="button"
@@ -457,29 +468,35 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-[300px] p-0">
-                        <Command>
-                          <CommandInput placeholder={`Search ${watchedPartyType?.toLowerCase()}s...`} />
+                        <Command shouldFilter={false}>
+                          <CommandInput 
+                            placeholder={`Search ${watchedPartyType?.toLowerCase()}s...`} 
+                            value={partySearchQuery}
+                            onValueChange={setPartySearchQuery}
+                          />
                           <CommandList
                             className="max-h-[200px] overflow-y-auto"
                             onWheel={(e) => e.stopPropagation()}
                           >
                             <CommandEmpty>No {watchedPartyType?.toLowerCase()} found.</CommandEmpty>
                             <CommandGroup>
-                              {currentPartyList.map((party) => (
-                                <CommandItem
-                                  key={party._id}
-                                  value={party.name}
-                                  onSelect={() => handlePartySelect(watchedPartyType!, party)}
-                                >
-                                  <Check className={cn("mr-2 h-4 w-4", watch('partyId') === party._id ? "opacity-100" : "opacity-0")} />
-                                  <div className="flex-1">
-                                    <div>{party.name}</div>
-                                    {party.email && (
-                                      <div className="text-xs text-muted-foreground">{party.email}</div>
-                                    )}
-                                  </div>
-                                </CommandItem>
-                              ))}
+                              {currentPartyList
+                                .filter(party => !partySearchQuery || party.name.toLowerCase().includes(partySearchQuery.toLowerCase()))
+                                .map((party) => (
+                                  <CommandItem
+                                    key={party._id}
+                                    value={party.name}
+                                    onSelect={() => handlePartySelect(watchedPartyType!, party)}
+                                  >
+                                    <Check className={cn("mr-2 h-4 w-4", watch('partyId') === party._id ? "opacity-100" : "opacity-0")} />
+                                    <div className="flex-1">
+                                      <div>{party.name}</div>
+                                      {party.email && (
+                                        <div className="text-xs text-muted-foreground">{party.email}</div>
+                                      )}
+                                    </div>
+                                  </CommandItem>
+                                ))}
                             </CommandGroup>
                           </CommandList>
                         </Command>

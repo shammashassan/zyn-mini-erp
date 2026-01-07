@@ -1,4 +1,4 @@
-// app/expenses/expense-form.tsx - FIXED: Populated fields handling & Validation
+// app/expenses/expense-form.tsx - UPDATED: Populated combobox inputs
 
 "use client";
 
@@ -165,19 +165,23 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
         notes: defaultValues?.notes || "",
         status: defaultValues?.status || 'pending',
       });
+
+      // Set initial search queries
+      setPayeeSearchQuery(initialPartyType === 'payee' ? initialPartyName : "");
+      setSupplierSearchQuery(initialPartyType === 'supplier' ? initialPartyName : "");
     }
   }, [isOpen, defaultValues, reset, payees, suppliers]);
 
   const handlePayeeSelect = (payeeName: string) => {
     setValue('payeeName', payeeName, { shouldDirty: true });
     setPayeePopoverOpen(false);
-    setPayeeSearchQuery("");
+    setPayeeSearchQuery(payeeName);
   };
 
   const handleSupplierSelect = (supplierName: string) => {
     setValue('supplierName', supplierName, { shouldDirty: true });
     setSupplierPopoverOpen(false);
-    setSupplierSearchQuery("");
+    setSupplierSearchQuery(supplierName);
   };
 
   const handleFormSubmit: SubmitHandler<ExpenseFormData> = async (data) => {
@@ -319,7 +323,7 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
                         open={payeePopoverOpen}
                         onOpenChange={(isOpen) => {
                           setPayeePopoverOpen(isOpen);
-                          if (isOpen) setPayeeSearchQuery("");
+                          if (isOpen) setPayeeSearchQuery(field.value || "");
                         }}
                       >
                         <PopoverTrigger asChild>
@@ -402,7 +406,7 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
                         open={supplierPopoverOpen}
                         onOpenChange={(isOpen) => {
                           setSupplierPopoverOpen(isOpen);
-                          if (isOpen) setSupplierSearchQuery("");
+                          if (isOpen) setSupplierSearchQuery(field.value || "");
                         }}
                       >
                         <PopoverTrigger asChild>

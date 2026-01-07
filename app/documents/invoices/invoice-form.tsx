@@ -1,5 +1,3 @@
-// app/invoices/invoice-form.tsx - UPDATED: Added customer creation on submit
-
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -538,7 +536,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                                   </PopoverTrigger>
                                   <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
                                     <Command>
-                                      <CommandInput placeholder="Search products..." />
+                                      <CommandInput placeholder="Search products..." value={field.value} onValueChange={field.onChange} />
                                       <CommandList
                                         className="max-h-[200px] overflow-y-auto"
                                         onWheel={(e) => e.stopPropagation()}
@@ -642,7 +640,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[300px] p-0" align="start">
                                   <Command>
-                                    <CommandInput placeholder="Search products..." />
+                                    <CommandInput placeholder="Search products..." value={field.value} onValueChange={field.onChange} />
                                     <CommandList
                                       className="max-h-[200px] overflow-y-auto"
                                       onWheel={(e) => e.stopPropagation()}

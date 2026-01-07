@@ -1,4 +1,4 @@
-// app/billing/customer-details-card.tsx - UPDATED: Allow both party types for vouchers
+// app/billing/customer-details-card.tsx - UPDATED: Sync search query with selection on open
 
 "use client";
 
@@ -33,6 +33,16 @@ export function CustomerDetailsCard({ payload, onFieldChange, customers, supplie
   // Enable toggle for vouchers, disable for invoices and quotations
   const isVoucher = payload.documentType === 'receipt' || payload.documentType === 'payment';
   const isToggleDisabled = !isVoucher;
+
+  // Get current name for button label and search sync
+  const currentName = partyType === 'customer' ? payload.customerName : (payload as any).supplierName;
+
+  // Sync search query with current selection when opening
+  React.useEffect(() => {
+    if (open) {
+      setSearchQuery(currentName || "");
+    }
+  }, [open, currentName]);
 
   // Clear data when switching party type manually or when document type changes
   React.useEffect(() => {
@@ -97,8 +107,6 @@ export function CustomerDetailsCard({ payload, onFieldChange, customers, supplie
   };
 
   const listToRender = partyType === 'customer' ? customers : suppliers;
-  // Get current name for button label
-  const currentName = partyType === 'customer' ? payload.customerName : (payload as any).supplierName;
 
   const doesPartyExist = listToRender.some(
     (p) => p.name.toLowerCase() === searchQuery.trim().toLowerCase()
@@ -131,12 +139,7 @@ export function CustomerDetailsCard({ payload, onFieldChange, customers, supplie
           <Label htmlFor="partyName">{partyType === 'customer' ? 'Customer Name' : 'Supplier Name'}</Label>
           <Popover
             open={open}
-            onOpenChange={(isOpen) => {
-              setOpen(isOpen);
-              if (isOpen) {
-                setSearchQuery("");
-              }
-            }}
+            onOpenChange={setOpen}
           >
             <PopoverTrigger asChild>
               <Button

@@ -1,4 +1,4 @@
-// app/expenses/purchases/purchase-form.tsx - UPDATED: Removed Inventory Status Dropdown
+// app/expenses/purchases/purchase-form.tsx - UPDATED: Populated combobox inputs
 
 "use client";
 
@@ -143,16 +143,9 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
     fetchData();
   }, []);
 
-  // ✅ UPDATED: Initialize with three statuses
   useEffect(() => {
     if (isOpen) {
       if (defaultValues) {
-        console.log('🔧 Initializing form with:', {
-          purchaseStatus: defaultValues.purchaseStatus,
-          inventoryStatus: defaultValues.inventoryStatus,
-          discount: defaultValues.discount,
-        });
-
         reset({
           supplierName: defaultValues.supplierName || "",
           items: defaultValues.items || [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
@@ -162,6 +155,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
           discount: defaultValues.discount || 0,
           isTaxPayable: defaultValues.isTaxPayable !== undefined ? defaultValues.isTaxPayable : true,
         });
+        setSupplierSearchQuery(defaultValues.supplierName || "");
       } else {
         reset({
           supplierName: "",
@@ -172,6 +166,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
           discount: 0,
           isTaxPayable: true,
         });
+        setSupplierSearchQuery("");
       }
     }
   }, [isOpen, defaultValues, reset]);
@@ -242,16 +237,6 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
     const calculatedVatAmount = data.isTaxPayable ? calculatedSubtotal * (UAE_VAT_PERCENTAGE / 100) : 0;
     const calculatedGrandTotal = calculatedSubtotal + calculatedVatAmount;
 
-    console.log('📝 Submitting purchase with:', {
-      grossTotal: itemsGrossTotal,
-      discount: discountAmount,
-      subtotal: calculatedSubtotal,
-      vatAmount: calculatedVatAmount,
-      grandTotal: calculatedGrandTotal,
-      purchaseStatus: data.purchaseStatus,
-      // inventoryStatus no longer in form, using default
-    });
-
     const submitData = {
       supplierName: data.supplierName.trim(),
       items: validItems.map(item => ({
@@ -266,7 +251,6 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
       grandTotal: calculatedGrandTotal,
       date: data.date,
       purchaseStatus: isEditMode ? data.purchaseStatus : 'pending',
-      // ✅ UPDATED: Preserve existing status or default to pending, as field is removed from form
       inventoryStatus: isEditMode ? (defaultValues?.inventoryStatus || 'pending') : 'pending',
       paymentStatus: 'pending',
       totalPaid: 0,
@@ -288,7 +272,6 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
         </DialogHeader>
 
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-          {/* ✅ UPDATED: Removed Inventory Status Dropdown */}
           <div className={cn("grid grid-cols-1 gap-4", isEditMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
             <div className="space-y-2">
               <Label>Supplier <span className="text-destructive">*</span></Label>
@@ -300,7 +283,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                     open={supplierPopoverOpen}
                     onOpenChange={(isOpen) => {
                       setSupplierPopoverOpen(isOpen);
-                      if (isOpen) setSupplierSearchQuery("");
+                      if (isOpen) setSupplierSearchQuery(field.value);
                     }}
                   >
                     <PopoverTrigger asChild>
@@ -339,15 +322,15 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                                   value={supplier.name}
                                   onSelect={() => {
                                     field.onChange(supplier.name);
+                                    setSupplierSearchQuery(supplier.name);
                                     setSupplierPopoverOpen(false);
-                                    setSupplierSearchQuery("");
                                   }}
                                 >
                                   <Check className={cn("mr-2 h-4 w-4", field.value === supplier.name ? "opacity-100" : "opacity-0")} />
                                   <div className="flex-1">
                                     <span>{supplier.name}</span>
                                     {supplier.city && supplier.district && (
-                                      <div className="text-[10px] text-muted-foreground leading-none mt-0.5">
+                                      <div className="text-xs text-muted-foreground">
                                         {supplier.city}, {supplier.district}
                                       </div>
                                     )}
@@ -362,7 +345,6 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                                 onSelect={() => {
                                   field.onChange(supplierSearchQuery.trim());
                                   setSupplierPopoverOpen(false);
-                                  setSupplierSearchQuery("");
                                 }}
                                 className="text-primary"
                                 value={supplierSearchQuery}
@@ -514,7 +496,11 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                                       </PopoverTrigger>
                                       <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
                                         <Command>
-                                          <CommandInput placeholder="Search materials..." />
+                                          <CommandInput 
+                                            placeholder="Search materials..." 
+                                            value={watchedItems[index]?.materialName || ""}
+                                            onValueChange={(val) => setValue(`items.${index}.materialName`, val)}
+                                          />
                                           <CommandList
                                             className="max-h-[200px] overflow-y-auto"
                                             onWheel={(e) => e.stopPropagation()}
@@ -632,7 +618,11 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[300px] p-0" align="start">
                                       <Command>
-                                        <CommandInput placeholder="Search materials..." />
+                                        <CommandInput 
+                                            placeholder="Search materials..." 
+                                            value={watchedItems[index]?.materialName || ""}
+                                            onValueChange={(val) => setValue(`items.${index}.materialName`, val)}
+                                        />
                                         <CommandList
                                           className="max-h-[200px] overflow-y-auto"
                                           onWheel={(e) => e.stopPropagation()}

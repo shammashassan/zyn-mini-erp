@@ -1,4 +1,4 @@
-// app/inventory/materials/material-form.tsx - FIXED: Standardized validation and dirty state check
+// app/inventory/materials/material-form.tsx - UPDATED: Sync search input with selection
 
 "use client";
 
@@ -86,13 +86,14 @@ export function MaterialForm({
     register, 
     handleSubmit, 
     reset, 
-    control, 
+    control,
+    watch,
     formState: { isSubmitting, isDirty } 
   } = useForm<MaterialFormData>({
     defaultValues: {
       name: "",
       type: "",
-      unit: "pcs",
+      unit: "piece",
       stock: 0,
       unitCost: 0,
     }
@@ -101,10 +102,12 @@ export function MaterialForm({
   // State for Type/Category Popover
   const [isTypePopoverOpen, setIsTypePopoverOpen] = React.useState(false);
   const [customType, setCustomType] = React.useState("");
+  const watchedType = watch("type");
 
   // State for Unit Popover
   const [isUnitPopoverOpen, setIsUnitPopoverOpen] = React.useState(false);
   const [customUnit, setCustomUnit] = React.useState("");
+  const watchedUnit = watch("unit");
 
   // Combine predefined units with existing units from DB and remove duplicates
   const allUnits = React.useMemo(() => {
@@ -116,7 +119,7 @@ export function MaterialForm({
       reset({
         name: defaultValues?.name || "",
         type: defaultValues?.type || "",
-        unit: defaultValues?.unit || "pcs",
+        unit: defaultValues?.unit || "piece",
         stock: defaultValues?.stock || 0,
         unitCost: defaultValues?.unitCost || 0,
       });
@@ -124,6 +127,20 @@ export function MaterialForm({
       setCustomUnit("");
     }
   }, [isOpen, defaultValues, reset]);
+
+  // Sync Type Input
+  React.useEffect(() => {
+    if (isTypePopoverOpen) {
+      setCustomType(watchedType || "");
+    }
+  }, [isTypePopoverOpen, watchedType]);
+
+  // Sync Unit Input
+  React.useEffect(() => {
+    if (isUnitPopoverOpen) {
+      setCustomUnit(watchedUnit || "");
+    }
+  }, [isUnitPopoverOpen, watchedUnit]);
 
   const handleFormSubmit: SubmitHandler<MaterialFormData> = (data) => {
     // Manual Validation
@@ -208,7 +225,7 @@ export function MaterialForm({
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                    <Command>
+                    <Command shouldFilter={false}>
                       <CommandInput
                         placeholder="Search or type new type..."
                         value={customType}
@@ -218,15 +235,16 @@ export function MaterialForm({
                         className="max-h-[200px] overflow-y-auto"
                         onWheel={(e) => e.stopPropagation()}
                       >
-                        {existingTypes.length > 0 ? (
+                        {existingTypes.length > 0 && (
                           <CommandGroup heading="Existing Types">
-                            {existingTypes.map((type) => (
+                            {existingTypes.filter(t => !customType || t.toLowerCase().includes(customType.toLowerCase())).map((type) => (
                               <CommandItem
                                 key={type}
                                 value={type}
                                 onSelect={() => {
                                   field.onChange(type);
                                   setIsTypePopoverOpen(false);
+                                  setCustomType("");
                                 }}
                               >
                                 <Check className={cn("mr-2 h-4 w-4", field.value === type ? "opacity-100" : "opacity-0")} />
@@ -234,15 +252,14 @@ export function MaterialForm({
                               </CommandItem>
                             ))}
                           </CommandGroup>
-                        ) : (
-                          <CommandEmpty>No types found</CommandEmpty>
                         )}
 
-                        {customType.trim() && !existingTypes.includes(customType.trim()) && (
+                        {customType.trim() && !existingTypes.some(t => t.toLowerCase() === customType.trim().toLowerCase()) && (
                           <CommandGroup heading="Create New">
                             <CommandItem
                               onSelect={() => handleAddCustomType(field)}
                               className="text-primary"
+                              value={customType}
                             >
                               <Plus className="mr-2 h-4 w-4" />
                               Create "{customType.trim()}"
@@ -296,7 +313,7 @@ export function MaterialForm({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                      <Command>
+                      <Command shouldFilter={false}>
                         <CommandInput
                           placeholder="Search or add unit..."
                           value={customUnit}
@@ -307,13 +324,14 @@ export function MaterialForm({
                           onWheel={(e) => e.stopPropagation()}
                         >
                           <CommandGroup heading="Select Unit">
-                            {allUnits.map((u) => (
+                            {allUnits.filter(u => !customUnit || u.toLowerCase().includes(customUnit.toLowerCase())).map((u) => (
                               <CommandItem
                                 key={u}
                                 value={u}
                                 onSelect={() => {
                                   field.onChange(u);
                                   setIsUnitPopoverOpen(false);
+                                  setCustomUnit("");
                                 }}
                               >
                                 <Check className={cn("mr-2 h-4 w-4", field.value === u ? "opacity-100" : "opacity-0")} />
@@ -322,11 +340,12 @@ export function MaterialForm({
                             ))}
                           </CommandGroup>
 
-                          {customUnit.trim() && !allUnits.includes(customUnit.trim()) && (
+                          {customUnit.trim() && !allUnits.some(u => u.toLowerCase() === customUnit.trim().toLowerCase()) && (
                             <CommandGroup heading="Create New">
                               <CommandItem
                                 onSelect={() => handleAddCustomUnit(field)}
                                 className="text-primary"
+                                value={customUnit}
                               >
                                 <Plus className="mr-2 h-4 w-4" />
                                 Create "{customUnit.trim()}"

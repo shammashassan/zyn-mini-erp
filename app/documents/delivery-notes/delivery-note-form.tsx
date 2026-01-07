@@ -1,4 +1,4 @@
-// app/documents/delivery-notes/delivery-note-form.tsx - UPDATED: Uses /api/invoices
+// app/documents/delivery-notes/delivery-note-form.tsx - UPDATED: Populated combobox input
 
 "use client";
 
@@ -72,6 +72,7 @@ export function DeliveryNoteForm({ isOpen, onClose, onSubmit }: DeliveryNoteForm
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<ConnectedInvoice | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const invoiceId = watch("invoiceId");
 
@@ -122,6 +123,7 @@ export function DeliveryNoteForm({ isOpen, onClose, onSubmit }: DeliveryNoteForm
     if (isOpen) {
       setValue("invoiceId", "");
       setSelectedCustomer("");
+      setSearchQuery("");
       setSelectedInvoice(null);
       setInvoices([]);
     }
@@ -130,6 +132,7 @@ export function DeliveryNoteForm({ isOpen, onClose, onSubmit }: DeliveryNoteForm
   // Handle customer selection
   const handleCustomerSelect = (customer: ICustomer) => {
     setSelectedCustomer(customer.name);
+    setSearchQuery(customer.name);
     setCustomerPopoverOpen(false);
     setInvoices([]);
     setValue("invoiceId", "");
@@ -196,29 +199,37 @@ export function DeliveryNoteForm({ isOpen, onClose, onSubmit }: DeliveryNoteForm
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search customer..." />
+                    <Command shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="Search customer..." 
+                        value={searchQuery}
+                        onValueChange={setSearchQuery}
+                      />
                       <CommandList
                         className="max-h-[200px] overflow-y-auto"
                         onWheel={(e) => e.stopPropagation()}
                       >
                         <CommandEmpty>No customer found.</CommandEmpty>
                         <CommandGroup>
-                          {customers.map((customer) => (
-                            <CommandItem
-                              key={String(customer._id)}
-                              value={customer.name}
-                              onSelect={() => handleCustomerSelect(customer)}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", selectedCustomer === customer.name ? "opacity-100" : "opacity-0")} />
-                              <div>
-                                <div>{customer.name}</div>
-                                {customer.email && (
-                                  <div className="text-xs text-muted-foreground">{customer.email}</div>
-                                )}
-                              </div>
-                            </CommandItem>
-                          ))}
+                          {customers
+                            .filter(customer => 
+                              !searchQuery || customer.name.toLowerCase().includes(searchQuery.toLowerCase())
+                            )
+                            .map((customer) => (
+                              <CommandItem
+                                key={String(customer._id)}
+                                value={customer.name}
+                                onSelect={() => handleCustomerSelect(customer)}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", selectedCustomer === customer.name ? "opacity-100" : "opacity-0")} />
+                                <div>
+                                  <div>{customer.name}</div>
+                                  {customer.email && (
+                                    <div className="text-xs text-muted-foreground">{customer.email}</div>
+                                  )}
+                                </div>
+                              </CommandItem>
+                            ))}
                         </CommandGroup>
                       </CommandList>
                     </Command>

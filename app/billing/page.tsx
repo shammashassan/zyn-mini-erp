@@ -1,4 +1,4 @@
-// app/billing/page.tsx - UPDATED: Detailed calculations for summary
+// app/billing/page.tsx - UPDATED: Disable create button if rate is empty
 
 "use client";
 
@@ -97,11 +97,16 @@ export default function CreateBillPage() {
         case "quantity":
         case "rate":
           const strValue = String(value);
-          if (strValue === "" || strValue === "-") {
+          // Allow empty string to be set so users can clear the input
+          if (strValue === "") {
+            currentItem[field] = "" as any;
+          } else if (strValue === "-") {
+            // If user types just "-", default to 0 to prevent NaN issues if needed, 
+            // or keep as 0. Most number inputs return "" for invalid state anyway.
             currentItem[field] = 0;
           } else {
             const numValue = parseFloat(strValue);
-            currentItem[field] = isNaN(numValue) ? "" : numValue;
+            currentItem[field] = isNaN(numValue) ? 0 : numValue;
           }
           break;
       }
@@ -162,8 +167,15 @@ export default function CreateBillPage() {
       if (!payload.voucherAmount || payload.voucherAmount <= 0) return false;
     } else {
       if (payload.items.length === 0) return false;
-      const hasValidItem = payload.items.some(item => item.description.trim() && Number(item.quantity) > 0);
-      if (!hasValidItem) return false;
+      
+      // Ensure ALL items have a description, positive quantity, and a non-empty rate
+      const allItemsValid = payload.items.every(item => 
+        item.description.trim() && 
+        Number(item.quantity) > 0 && 
+        (item.rate as any) !== "" // Check that rate is not an empty string
+      );
+      
+      if (!allItemsValid) return false;
       if (grandTotal < 0) return false;
     }
 

@@ -1,3 +1,5 @@
+// app/hr/employees/employee-form.tsx - UPDATED: Populated role combobox input
+
 "use client";
 
 import * as React from "react";
@@ -44,7 +46,6 @@ import { ImageUploader } from "@/components/image-uploader";
 import type { IEmployee } from "@/models/Employee";
 import { Spinner } from "@/components/ui/spinner";
 
-// ... (Keep existing types: EmployeeFormData, EmployeeFormProps) ...
 type EmployeeFormData = {
   firstName: string;
   lastName: string;
@@ -71,7 +72,6 @@ interface EmployeeFormProps {
 }
 
 export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existingRoles = [] }: EmployeeFormProps) {
-  // ... (Keep existing hooks: useForm, useFieldArray, useState, useEffects) ...
   const { register, handleSubmit, reset, control, formState: { isSubmitting } } = useForm<EmployeeFormData>({
     defaultValues: {
       firstName: "",
@@ -127,7 +127,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
       });
       setAvatarBlob(null);
       setWasAvatarRemoved(false);
-      setCustomRole("");
+      setCustomRole(defaultValues?.role || "");
     }
   }, [isOpen, defaultValues, reset]);
 
@@ -146,10 +146,15 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
   const handleAddCustomRole = (field: any) => {
     if (customRole.trim()) {
       field.onChange(customRole.trim());
-      setCustomRole("");
+      setCustomRole(customRole.trim());
       setIsRolePopoverOpen(false);
     }
   };
+
+  // Filter roles based on search input
+  const filteredRoles = existingRoles.filter(role => 
+    !customRole || role.toLowerCase().includes(customRole.toLowerCase())
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -184,7 +189,13 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
                 name="role"
                 rules={{ required: "Role is required" }}
                 render={({ field }) => (
-                  <Popover open={isRolePopoverOpen} onOpenChange={setIsRolePopoverOpen}>
+                  <Popover 
+                    open={isRolePopoverOpen} 
+                    onOpenChange={(open) => {
+                      setIsRolePopoverOpen(open);
+                      if (open) setCustomRole(field.value || "");
+                    }}
+                  >
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
@@ -196,7 +207,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                      <Command>
+                      <Command shouldFilter={false}>
                         <CommandInput
                           placeholder="Search or type new role..."
                           value={customRole}
@@ -206,14 +217,17 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
                           className="max-h-[200px] overflow-y-auto"
                           onWheel={(e) => e.stopPropagation()}
                         >
-                          {existingRoles.length > 0 ? (
+                          <CommandEmpty>No roles found.</CommandEmpty>
+                          
+                          {filteredRoles.length > 0 && (
                             <CommandGroup heading="Existing Roles">
-                              {existingRoles.map((role) => (
+                              {filteredRoles.map((role) => (
                                 <CommandItem
                                   key={role}
                                   value={role}
                                   onSelect={() => {
                                     field.onChange(role);
+                                    setCustomRole(role);
                                     setIsRolePopoverOpen(false);
                                   }}
                                 >
@@ -222,15 +236,14 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
                                 </CommandItem>
                               ))}
                             </CommandGroup>
-                          ) : (
-                            <CommandEmpty>No roles found</CommandEmpty>
                           )}
 
-                          {customRole.trim() && !existingRoles.includes(customRole.trim()) && (
+                          {customRole.trim() && !existingRoles.some(r => r.toLowerCase() === customRole.trim().toLowerCase()) && (
                             <CommandGroup heading="Create New">
                               <CommandItem
                                 onSelect={() => handleAddCustomRole(field)}
                                 className="text-primary"
+                                value={customRole}
                               >
                                 <Plus className="mr-2 h-4 w-4" />
                                 Create "{customRole.trim()}"

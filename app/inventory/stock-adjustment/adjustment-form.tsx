@@ -1,4 +1,4 @@
-// app/inventory/adjustments/adjustment-form.tsx - FIXED: Removed dirty check for create-only form
+// app/inventory/adjustments/adjustment-form.tsx - UPDATED: Sync search input with selection
 
 "use client";
 
@@ -56,6 +56,7 @@ export function AdjustmentForm({ isOpen, onClose, onSubmit, materials, isLoading
 
   const [adjustmentMode, setAdjustmentMode] = useState<'stock' | 'price'>('stock');
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const watchedMaterialId = watch("materialId");
 
   useEffect(() => {
@@ -68,8 +69,19 @@ export function AdjustmentForm({ isOpen, onClose, onSubmit, materials, isLoading
         newUnitCost: undefined,
         adjustmentReason: ""
       });
+      setSearchQuery("");
     }
   }, [isOpen, reset]);
+
+  // Sync Search Query
+  useEffect(() => {
+    if (isPopoverOpen && watchedMaterialId) {
+       const selected = materials.find(m => m._id === watchedMaterialId);
+       if (selected) {
+         setSearchQuery(selected.name);
+       }
+    }
+  }, [isPopoverOpen, watchedMaterialId, materials]);
 
   const handleFormSubmit: SubmitHandler<AdjustmentFormData> = (data) => {
     // Manual Validation
@@ -138,21 +150,26 @@ export function AdjustmentForm({ isOpen, onClose, onSubmit, materials, isLoading
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search material..." />
+                    <Command shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="Search material..." 
+                        value={searchQuery}
+                        onValueChange={setSearchQuery}
+                      />
                       <CommandList
                         className="max-h-[200px] overflow-y-auto"
                         onWheel={(e) => e.stopPropagation()}
                       >
                         <CommandEmpty>No material found.</CommandEmpty>
                         <CommandGroup>
-                          {materials.map((material) => (
+                          {materials.filter(m => !searchQuery || m.name.toLowerCase().includes(searchQuery.toLowerCase())).map((material) => (
                             <CommandItem
                               key={material._id}
                               value={material.name}
                               onSelect={() => {
                                 field.onChange(material._id);
                                 setIsPopoverOpen(false);
+                                setSearchQuery("");
                               }}
                               className="flex items-start gap-2 py-2"
                             >

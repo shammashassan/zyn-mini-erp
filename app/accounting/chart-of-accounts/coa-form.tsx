@@ -106,16 +106,15 @@ export function COAForm({ isOpen, onClose, onSubmit, defaultValues, existingSubG
   });
 
   const [subGroupPopoverOpen, setSubGroupPopoverOpen] = useState(false);
-  const [customSubGroup, setCustomSubGroup] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   
   const selectedGroup = watch("groupName");
   const accountCode = watch("accountCode");
   const isActive = watch("isActive");
 
+  // Combine common subgroups for the selected group with any existing custom subgroups
   const availableSubGroups = selectedGroup
-    ? [...new Set([...COMMON_SUBGROUPS[selectedGroup], ...existingSubGroups.filter(sg =>
-      existingSubGroups.includes(sg)
-    )])]
+    ? [...new Set([...COMMON_SUBGROUPS[selectedGroup], ...existingSubGroups])]
     : [];
 
   useEffect(() => {
@@ -130,6 +129,7 @@ export function COAForm({ isOpen, onClose, onSubmit, defaultValues, existingSubG
           description: defaultValues.description || "",
           isActive: defaultValues.isActive,
         });
+        setSearchQuery(defaultValues.subGroup || "");
       } else {
         reset({
           accountCode: "",
@@ -140,6 +140,7 @@ export function COAForm({ isOpen, onClose, onSubmit, defaultValues, existingSubG
           description: "",
           isActive: true,
         });
+        setSearchQuery("");
       }
     }
   }, [isOpen, defaultValues, reset]);
@@ -214,9 +215,8 @@ export function COAForm({ isOpen, onClose, onSubmit, defaultValues, existingSubG
   };
 
   const handleAddCustomSubGroup = () => {
-    if (customSubGroup.trim()) {
-      setValue('subGroup', customSubGroup.trim(), { shouldDirty: true });
-      setCustomSubGroup("");
+    if (searchQuery.trim()) {
+      setValue('subGroup', searchQuery.trim(), { shouldDirty: true });
       setSubGroupPopoverOpen(false);
     }
   };
@@ -332,7 +332,13 @@ export function COAForm({ isOpen, onClose, onSubmit, defaultValues, existingSubG
               name="subGroup"
               control={control}
               render={({ field }) => (
-                <Popover open={subGroupPopoverOpen} onOpenChange={setSubGroupPopoverOpen}>
+                <Popover 
+                  open={subGroupPopoverOpen} 
+                  onOpenChange={(open) => {
+                    setSubGroupPopoverOpen(open);
+                    if (open) setSearchQuery(field.value || "");
+                  }}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       ref={field.ref} // Added ref={field.ref} for scrolling
@@ -346,44 +352,48 @@ export function COAForm({ isOpen, onClose, onSubmit, defaultValues, existingSubG
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                    <Command>
+                    <Command shouldFilter={false}>
                       <CommandInput
                         placeholder="Search or type new subgroup..."
-                        value={customSubGroup}
-                        onValueChange={setCustomSubGroup}
+                        value={searchQuery}
+                        onValueChange={setSearchQuery}
                       />
                       <CommandList
                         className="max-h-[200px] overflow-y-auto"
                         onWheel={(e) => e.stopPropagation()}
                       >
-                        {availableSubGroups.length > 0 ? (
+                        <CommandEmpty>No subgroups found</CommandEmpty>
+                        
+                        {availableSubGroups.length > 0 && (
                           <CommandGroup heading="Existing Subgroups">
-                            {availableSubGroups.map((sg) => (
-                              <CommandItem
-                                key={sg}
-                                value={sg}
-                                onSelect={() => {
-                                  field.onChange(sg);
-                                  setSubGroupPopoverOpen(false);
-                                }}
-                              >
-                                <Check className={cn("mr-2 h-4 w-4", field.value === sg ? "opacity-100" : "opacity-0")} />
-                                {sg}
-                              </CommandItem>
-                            ))}
+                            {availableSubGroups
+                              .filter(sg => !searchQuery || sg.toLowerCase().includes(searchQuery.toLowerCase()))
+                              .map((sg) => (
+                                <CommandItem
+                                  key={sg}
+                                  value={sg}
+                                  onSelect={() => {
+                                    field.onChange(sg);
+                                    setSearchQuery(sg);
+                                    setSubGroupPopoverOpen(false);
+                                  }}
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", field.value === sg ? "opacity-100" : "opacity-0")} />
+                                  {sg}
+                                </CommandItem>
+                              ))}
                           </CommandGroup>
-                        ) : (
-                          <CommandEmpty>No subgroups found</CommandEmpty>
                         )}
 
-                        {customSubGroup.trim() && !availableSubGroups.includes(customSubGroup.trim()) && (
+                        {searchQuery.trim() && !availableSubGroups.some(sg => sg.toLowerCase() === searchQuery.trim().toLowerCase()) && (
                           <CommandGroup heading="Create New">
                             <CommandItem
                               onSelect={handleAddCustomSubGroup}
                               className="text-primary"
+                              value={searchQuery}
                             >
                               <Plus className="mr-2 h-4 w-4" />
-                              Create "{customSubGroup.trim()}"
+                              Create "{searchQuery.trim()}"
                             </CommandItem>
                           </CommandGroup>
                         )}

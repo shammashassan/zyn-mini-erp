@@ -1,4 +1,4 @@
-// app/documents/products/product-form.tsx - FIXED: Standardized validation and dirty state check
+// app/documents/products/product-form.tsx - UPDATED: Sync search input with selection
 
 "use client";
 
@@ -60,7 +60,8 @@ export function ProductForm({
     register, 
     handleSubmit, 
     reset, 
-    control, 
+    control,
+    watch,
     formState: { isSubmitting, isDirty } 
   } = useForm<ProductFormData>({
     defaultValues: {
@@ -72,6 +73,7 @@ export function ProductForm({
 
   const [isTypePopoverOpen, setIsTypePopoverOpen] = React.useState(false);
   const [customType, setCustomType] = React.useState("");
+  const watchedType = watch("type");
 
   React.useEffect(() => {
     if (isOpen) {
@@ -83,6 +85,13 @@ export function ProductForm({
       setCustomType("");
     }
   }, [isOpen, defaultValues, reset]);
+
+  // Sync Type Input
+  React.useEffect(() => {
+    if (isTypePopoverOpen) {
+      setCustomType(watchedType || "");
+    }
+  }, [isTypePopoverOpen, watchedType]);
 
   const handleFormSubmit: SubmitHandler<ProductFormData> = (data) => {
     // Manual Validation
@@ -150,7 +159,7 @@ export function ProductForm({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                      <Command>
+                      <Command shouldFilter={false}>
                         <CommandInput
                           placeholder="Search or type new type..."
                           value={customType}
@@ -160,15 +169,16 @@ export function ProductForm({
                           className="max-h-[200px] overflow-y-auto"
                           onWheel={(e) => e.stopPropagation()}
                         >
-                          {existingTypes.length > 0 ? (
+                          {existingTypes.length > 0 && (
                             <CommandGroup heading="Existing Types">
-                              {existingTypes.map((type) => (
+                              {existingTypes.filter(t => !customType || t.toLowerCase().includes(customType.toLowerCase())).map((type) => (
                                 <CommandItem
                                   key={type}
                                   value={type}
                                   onSelect={() => {
                                     field.onChange(type);
                                     setIsTypePopoverOpen(false);
+                                    setCustomType("");
                                   }}
                                 >
                                   <Check className={cn("mr-2 h-4 w-4", field.value === type ? "opacity-100" : "opacity-0")} />
@@ -176,15 +186,14 @@ export function ProductForm({
                                 </CommandItem>
                               ))}
                             </CommandGroup>
-                          ) : (
-                            <CommandEmpty>No types found</CommandEmpty>
                           )}
 
-                          {customType.trim() && !existingTypes.includes(customType.trim()) && (
+                          {customType.trim() && !existingTypes.some(t => t.toLowerCase() === customType.trim().toLowerCase()) && (
                             <CommandGroup heading="Create New">
                               <CommandItem
                                 onSelect={() => handleAddCustomType(field)}
                                 className="text-primary"
+                                value={customType}
                               >
                                 <Plus className="mr-2 h-4 w-4" />
                                 Create "{customType.trim()}"
