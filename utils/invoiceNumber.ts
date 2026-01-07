@@ -8,18 +8,20 @@ import DeliveryNote from '@/models/DeliveryNote';
 import Purchase from '@/models/Purchase';
 import Expense from '@/models/Expense';
 import Journal from '@/models/Journal';
+import ReturnNote from '@/models/ReturnNote';
 
 // Define the supported document types
-type DocumentType = 
-  | 'invoice' 
-  | 'quotation' 
-  | 'receipt' 
+type DocumentType =
+  | 'invoice'
+  | 'quotation'
+  | 'receipt'
   | 'payment'
   | 'refund' // ✅ ADDED
-  | 'delivery' 
-  | 'journal' 
-  | 'purchase' 
-  | 'expense';
+  | 'delivery'
+  | 'journal'
+  | 'purchase'
+  | 'expense'
+  | 'return';
 
 // Define the prefixes for each document type
 const prefixes: Record<DocumentType, string> = {
@@ -32,6 +34,7 @@ const prefixes: Record<DocumentType, string> = {
   journal: 'JE',
   purchase: 'PUR',
   expense: 'EXP',
+  return: 'RTN',
 };
 
 /**
@@ -88,6 +91,10 @@ export default async function generateInvoiceNumber(
           Model = Journal;
           query = { journalNumber: { $regex: searchPattern } };
           break;
+        case 'return': // ✅ Return notes
+          Model = ReturnNote;
+          query = { returnNumber: { $regex: searchPattern } };
+          break;
         default:
           throw new Error(`Unknown document type: ${documentType}`);
       }
@@ -96,7 +103,7 @@ export default async function generateInvoiceNumber(
       count = await Model.countDocuments(query);
 
       // Generate next number
-      const nextNumber = count + 1 + attempt; 
+      const nextNumber = count + 1 + attempt;
       const formattedNumber = String(nextNumber).padStart(4, '0');
       const generatedNumber = `${prefix}-${datePart}-${formattedNumber}`;
 
@@ -106,6 +113,8 @@ export default async function generateInvoiceNumber(
         exists = await Model.findOne({ journalNumber: generatedNumber });
       } else if (documentType === 'purchase' || documentType === 'expense') {
         exists = await Model.findOne({ referenceNumber: generatedNumber });
+      } else if (documentType === 'return') {
+        exists = await Model.findOne({ returnNumber: generatedNumber });
       } else {
         exists = await Model.findOne({ invoiceNumber: generatedNumber });
       }
@@ -116,7 +125,7 @@ export default async function generateInvoiceNumber(
       }
 
       console.warn(`⚠️ Collision detected for ${generatedNumber}, retrying... (attempt ${attempt + 1})`);
-      
+
       await new Promise(resolve => setTimeout(resolve, Math.random() * 200));
 
     } catch (error) {

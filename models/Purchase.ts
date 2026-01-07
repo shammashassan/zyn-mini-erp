@@ -9,6 +9,7 @@ export interface IPurchaseItem {
   unitCost: number;
   total: number;
   receivedQuantity?: number;
+  returnedQuantity?: number;
 }
 
 export interface IPaymentAllocation {
@@ -87,6 +88,7 @@ const PurchaseItemSchema: Schema = new Schema({
   unitCost: { type: Number, required: true, min: 0 },
   total: { type: Number, required: true, min: 0 },
   receivedQuantity: { type: Number, default: 0, min: 0 },
+  returnedQuantity: { type: Number, default: 0, min: 0 },
 });
 
 const PaymentAllocationSchema: Schema = new Schema({

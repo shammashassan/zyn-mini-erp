@@ -58,6 +58,7 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   // Expenses
   "Purchases": { purchase: ["read"] },
   "Expenses": { expense: ["read"] },
+  "Return Notes": { returnNote: ["read"] },
   
   // Reports
   "Sales Report": { report: ["read"] },
@@ -125,6 +126,7 @@ const staticData = {
       items: [
         { title: "Purchases", url: "/expenses/purchases" },
         { title: "Expenses", url: "/expenses/expenses" },
+        { title: "Return Notes", url: "/expenses/return-notes" },
       ],
     },
     {

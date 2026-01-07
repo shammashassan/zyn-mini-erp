@@ -251,6 +251,20 @@ export function usePurchasePermissions() {
   });
 }
 
+// Specific hook for return note permissions
+export function useReturnNotePermissions() {
+  return usePermissions({
+    canRead: { returnNote: ["read"] },
+    canCreate: { returnNote: ["create"] },
+    canUpdate: { returnNote: ["update"] },
+    canUpdateStatus: { returnNote: ["update_status"] },
+    canDelete: { returnNote: ["soft_delete"] },
+    canViewTrash: { returnNote: ["view_trash"] },
+    canRestore: { returnNote: ["restore"] },
+    canPermanentDelete: { returnNote: ["permanent_delete"] },
+  });
+}
+
 // Report permissions hook (for all reports)
 export function useReportPermissions() {
   return usePermissions({

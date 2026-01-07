@@ -61,6 +61,7 @@ const routeGroups: Record<string, { label: string; path: string }[]> = {
   expenses: [
     { label: "Purchases", path: "/expenses/purchases" },
     { label: "Expenses", path: "/expenses/expenses" },
+    { label: "Return Notes", path: "/expenses/return-notes" },
   ],
   reports: [
     { label: "Expense Report", path: "/reports/expense-report" },

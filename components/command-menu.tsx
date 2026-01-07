@@ -35,7 +35,8 @@ import {
   CircleUser,
   CircleQuestionMark,
   Factory,
-  Bell
+  Bell,
+  Undo2
 } from "lucide-react";
 
 import {
@@ -67,6 +68,7 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Delivery notes": { deliveryNote: ["read"] },
   "Purchases": { purchase: ["read"] },
   "Expenses": { expense: ["read"] },
+  "Return Notes": { returnNote: ["read"] },
   "Sales Report": { report: ["read"] },
   "Purchase Report": { report: ["read"] },
   "Expense Report": { report: ["read"] },
@@ -112,6 +114,7 @@ const navigationData = [
   // Expenses
   { title: "Purchases", url: "/purchases", icon: ShoppingCart, group: "Expenses" },
   { title: "Expenses", url: "/expenses", icon: Banknote, group: "Expenses" },
+  { title: "Return Notes", url: "/expenses/return-notes", icon: Undo2, group: "Expenses" },
 
   // Reports
   { title: "Sales Report", url: "/reports/sales-report", icon: TrendingUp, group: "Reports" },

@@ -36,6 +36,7 @@ export const statement = {
   // Financial Resources
   purchase: ["read", "create", "update", "update_purchase_status", "update_inventory_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
   expense: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
+  returnNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Reports Resources
   report: ["read", "export"],
@@ -90,6 +91,7 @@ export const user = ac.newRole({
   // Financial - View, create, update only
   purchase: ["read", "create", "update", "update_inventory_status", "update_purchase_status"],
   expense: ["read", "create", "update"],
+  returnNote: ["read", "create", "update"],
 
   // No report access
 
@@ -134,6 +136,8 @@ export const manager = ac.newRole({
   // Financial - Add soft delete and payment creation
   purchase: ["read", "create", "update", "update_inventory_status", "update_purchase_status", "soft_delete", "create_payment"],
   expense: ["read", "create", "update", "soft_delete"],
+  returnNote: ["read", "create", "update", "update_status", "soft_delete"],
+
 
   // Reports - Full report access
   report: ["read", "export"],
@@ -185,6 +189,7 @@ export const admin = ac.newRole({
   // Financial - Full access
   purchase: ["read", "create", "update", "update_inventory_status", "update_purchase_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
   expense: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
+  returnNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Reports - Full access
   report: ["read", "export"],
@@ -241,6 +246,7 @@ export const owner = ac.newRole({
   // Financial - Full access
   purchase: ["read", "create", "update", "update_inventory_status", "update_purchase_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
   expense: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
+  returnNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Reports - Full access
   report: ["read", "export"],
