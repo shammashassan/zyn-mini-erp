@@ -58,11 +58,13 @@ export function ChartAreaInteractive({ chartData = [] }: ChartAreaInteractivePro
   // Default to 30d instead of 90d for better performance, but 7d on mobile
   const [timeRange, setTimeRange] = React.useState(() => isMobile ? "7d" : "90d")
 
+  // FIX: Only reset to 7d when the device capability (isMobile) actually changes.
+  // We removed 'timeRange' from the dependency array so it doesn't trigger when the user selects a new range.
   React.useEffect(() => {
-    if (isMobile && timeRange !== "7d") {
+    if (isMobile) {
       setTimeRange("7d")
     }
-  }, [isMobile, timeRange])
+  }, [isMobile])
 
   // Memoize filtered data for performance
   const filteredData = React.useMemo(() => {

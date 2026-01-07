@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatCompactCurrency, formatCurrency } from "@/utils/formatters/currency";
-import { formatDisplayDate, formatMonthDay, formatMonth, formatMonthKey } from "@/utils/formatters/date";
+import { formatMonthDay, formatMonth, formatMonthKey } from "@/utils/formatters/date";
 
 interface SalesChartProps {
   data: Array<{
@@ -129,6 +129,7 @@ export function SalesChart({ data, totalSales, totalOrders, dateRange }: SalesCh
           {/* Chart Section */}
           <div className="flex-1">
             <ChartContainer
+              key={viewType}
               config={chartConfig}
               className="aspect-auto h-[250px] w-full"
             >
@@ -185,6 +186,7 @@ export function SalesChart({ data, totalSales, totalOrders, dateRange }: SalesCh
                   type="monotone"
                   fill={viewType === "sales" ? "url(#fillSales)" : "url(#fillOrders)"}
                   stroke={viewType === "sales" ? "var(--color-sales)" : "var(--color-orders)"}
+                  isAnimationActive={true}
                 />
                 <ChartLegend content={<ChartLegendContent />} />
               </AreaChart>

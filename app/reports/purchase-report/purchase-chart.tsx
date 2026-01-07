@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatCompactCurrency, formatCurrency } from "@/utils/formatters/currency";
-import { formatDisplayDate, formatMonthDay, formatMonth, formatMonthKey } from "@/utils/formatters/date";
+import { formatMonthDay, formatMonth, formatMonthKey } from "@/utils/formatters/date";
 
 interface PurchaseChartProps {
   data: Array<{
@@ -132,6 +132,7 @@ export function PurchaseChart({ data, totalPurchases, totalOrders, dateRange }: 
           {/* Chart Section */}
           <div className="flex-1">
             <ChartContainer
+              key={viewType}
               config={chartConfig}
               className="aspect-auto h-[250px] w-full"
             >
@@ -188,6 +189,7 @@ export function PurchaseChart({ data, totalPurchases, totalOrders, dateRange }: 
                   type="monotone"
                   fill={viewType === "purchases" ? "url(#fillPurchases)" : "url(#fillOrders)"}
                   stroke={viewType === "purchases" ? "var(--color-purchases)" : "var(--color-orders)"}
+                  isAnimationActive={true}
                 />
                 <ChartLegend content={<ChartLegendContent />} />
               </AreaChart>

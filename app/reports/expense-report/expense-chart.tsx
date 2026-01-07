@@ -5,7 +5,6 @@ import { TrendingUp, TrendingDown } from "lucide-react";
 import { Label, Pie, PieChart, Bar, BarChart, XAxis, CartesianGrid, LabelList } from "recharts";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -29,8 +28,8 @@ import {
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
-import { formatCompactCurrency, formatCurrency } from "@/utils/formatters/currency";
-import { formatDisplayDate, formatMonth, formatMonthDay, formatMonthKey } from "@/utils/formatters/date";
+import { formatCompactCurrency } from "@/utils/formatters/currency";
+import { formatMonth, formatMonthKey } from "@/utils/formatters/date";
 
 interface ExpenseChartProps {
   categoryData: {
@@ -90,8 +89,6 @@ export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRang
     fill: "var(--chart-1)",
   }));
 
-  const currentChartData = chartView === "category" ? pieChartData : barChartData;
-  const topCategory = categoryData[0];
   const totalExpenses = categoryData.reduce((sum, cat) => sum + cat.count, 0);
 
   // Calculate trend for monthly view
@@ -168,6 +165,7 @@ export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRang
           {/* Chart Section */}
           <div className="flex-1">
             <ChartContainer
+              key={chartView}
               config={chartConfig}
               className={cn(
                 "mx-auto",
@@ -187,6 +185,7 @@ export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRang
                     innerRadius={70}
                     outerRadius={120}
                     strokeWidth={8}
+                    isAnimationActive={true}
                   >
                     <Label
                       content={({ viewBox }) => {
@@ -239,7 +238,12 @@ export function ExpenseChart({ categoryData, monthlyTrend, totalAmount, dateRang
                     cursor={false}
                     content={<ChartTooltipContent indicator="dot" />}
                   />
-                  <Bar dataKey="amount" fill="var(--chart-1)" radius={8}>
+                  <Bar 
+                    dataKey="amount" 
+                    fill="var(--chart-1)" 
+                    radius={8}
+                    isAnimationActive={true}
+                  >
                     <LabelList
                       position="top"
                       offset={12}

@@ -1,4 +1,4 @@
-// app/profit-loss/profit-loss-chart.tsx - UPDATED: Uniform UI with other charts
+// app/profit-loss/profit-loss-chart.tsx - UPDATED: Fix Net Loss Tooltip Label
 
 "use client";
 
@@ -71,6 +71,8 @@ const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0];
     const categoryName = data.payload.category;
+    // Check if a custom label is passed in the data (e.g. "Net Loss")
+    const customLabel = data.payload.label;
     const amount = data.value;
     const color = data.payload.fill;
     
@@ -82,7 +84,8 @@ const CustomTooltip = ({ active, payload }: any) => {
       costs: "Total Costs"
     };
     
-    const displayName = displayNames[categoryName] || categoryName.charAt(0).toUpperCase() + categoryName.slice(1);
+    // Use custom label if available, otherwise fallback to map
+    const displayName = customLabel || displayNames[categoryName] || categoryName.charAt(0).toUpperCase() + categoryName.slice(1);
     
     return (
       <div className="bg-background border border-border rounded-lg shadow-lg p-3 min-w-[120px]">
@@ -112,7 +115,12 @@ export function ProfitLossChart({ profit, expenses, purchases, netTax, dateRange
   
   // Breakdown view: Show profit and cost components
   const breakdownData = [
-    { category: "profit", amount: Math.abs(profit), fill: profit >= 0 ? "var(--color-profit)" : "var(--chart-5)" },
+    { 
+      category: "profit", 
+      amount: Math.abs(profit), 
+      fill: profit >= 0 ? "var(--color-profit)" : "var(--chart-5)",
+      label: profit >= 0 ? "Net Profit" : "Net Loss" 
+    },
     { category: "expenses", amount: expenses, fill: "var(--color-expenses)" },
     { category: "purchases", amount: purchases, fill: "var(--color-purchases)" },
     ...(netTax !== 0 ? [{ category: "netTax", amount: Math.abs(netTax), fill: "var(--color-netTax)" }] : []),
@@ -120,7 +128,12 @@ export function ProfitLossChart({ profit, expenses, purchases, netTax, dateRange
 
   // Summary view: Profit vs Total Costs
   const summaryData = [
-    { category: "profit", amount: Math.abs(profit), fill: profit >= 0 ? "var(--chart-2)" : "var(--chart-5)" },
+    { 
+      category: "profit", 
+      amount: Math.abs(profit), 
+      fill: profit >= 0 ? "var(--chart-2)" : "var(--chart-5)",
+      label: profit >= 0 ? "Net Profit" : "Net Loss"
+    },
     { category: "costs", amount: totalCosts, fill: "var(--color-costs)" },
   ].filter(item => item.amount > 0);
 
