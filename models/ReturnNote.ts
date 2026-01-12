@@ -1,4 +1,4 @@
-// models/ReturnNote.ts - Return Note Model (Quantity-Only)
+// models/ReturnNote.ts - UPDATED: Uniform Connected Documents Pattern
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -26,7 +26,6 @@ export interface IAuditEntry {
 export interface IReturnNote extends Document {
   _id: string;
   returnNumber: string;
-  purchaseId: mongoose.Types.ObjectId;
   purchaseReference: string;
   supplierName: string;
   items: IReturnItem[];
@@ -35,7 +34,9 @@ export interface IReturnNote extends Document {
   notes?: string;
   status: 'pending' | 'approved' | 'cancelled';
   
+  // ✅ UPDATED: Moved purchaseId inside connectedDocuments
   connectedDocuments: {
+    purchaseId: mongoose.Types.ObjectId;
     debitNoteId?: mongoose.Types.ObjectId;
   };
   
@@ -81,11 +82,6 @@ const AuditEntrySchema: Schema = new Schema({
 
 const ReturnNoteSchema: Schema<IReturnNote> = new Schema({
   returnNumber: { type: String, required: true, unique: true },
-  purchaseId: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'Purchase', 
-    required: true 
-  },
   purchaseReference: { type: String, required: true },
   supplierName: { type: String, required: true },
   items: [ReturnItemSchema],
@@ -98,11 +94,20 @@ const ReturnNoteSchema: Schema<IReturnNote> = new Schema({
     default: 'pending'
   },
   
+  // ✅ UPDATED: Uniform connected documents structure
   connectedDocuments: {
     type: {
-      debitNoteId: { type: Schema.Types.ObjectId, ref: 'DebitNote' }
+      purchaseId: { 
+        type: Schema.Types.ObjectId, 
+        ref: 'Purchase', 
+        required: true 
+      },
+      debitNoteId: { 
+        type: Schema.Types.ObjectId, 
+        ref: 'DebitNote' 
+      }
     },
-    default: {}
+    required: true
   },
   
   isDeleted: { type: Boolean, default: false, index: true },
@@ -117,7 +122,7 @@ const ReturnNoteSchema: Schema<IReturnNote> = new Schema({
 // Indexes
 ReturnNoteSchema.index({ isDeleted: 1, createdAt: -1 });
 ReturnNoteSchema.index({ status: 1 });
-ReturnNoteSchema.index({ purchaseId: 1 });
+ReturnNoteSchema.index({ 'connectedDocuments.purchaseId': 1 });
 ReturnNoteSchema.index({ supplierName: 1 });
 ReturnNoteSchema.index({ 'connectedDocuments.debitNoteId': 1 });
 

@@ -1,10 +1,11 @@
-// app/api/vouchers/[id]/route.ts - COMPLETE: Added Refund Support
+// app/api/vouchers/[id]/route.ts - FIXED: Added Purchase Payment Deallocation (Invoice-Receipt Pattern)
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Voucher from "@/models/Voucher";
 import Purchase from "@/models/Purchase";
 import Invoice from "@/models/Invoice";
+import DebitNote from "@/models/DebitNote";
 import { softDelete } from "@/utils/softDelete";
 import { voidJournalsForReference } from '@/utils/journalManager';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
@@ -241,7 +242,7 @@ export async function DELETE(request: Request, context: RequestContext) {
               console.log(`✅ Invoice ${invoice.invoiceNumber} restored to approved`);
 
               if (oldStatus === 'cancelled' && invoice.status === 'approved') {
-                console.log(`📄 Restoring invoice journal due to refund deletion (${oldStatus} → approved)`);
+                console.log(`🔄 Restoring invoice journal due to refund deletion (${oldStatus} → approved)`);
                 const { handleInvoiceStatusChange } = await import('@/utils/journalAutoCreate');
                 await handleInvoiceStatusChange(
                   invoice.toObject(),
@@ -259,6 +260,7 @@ export async function DELETE(request: Request, context: RequestContext) {
           if (purchase && !purchase.isDeleted) {
             console.log(`💰 Deallocating ${formatCurrency(allocation.amount)} from purchase ${purchase.referenceNumber}`);
             
+            // ✅ USE SAME PATTERN AS INVOICE-RECEIPT
             if (typeof purchase.deallocatePayment === 'function') {
               const removedAmount = purchase.deallocatePayment(voucher._id);
               
@@ -285,6 +287,7 @@ export async function DELETE(request: Request, context: RequestContext) {
                 }
               }
               
+              // Recalculate paidAmount from remaining allocations
               if (purchase.paymentAllocations && purchase.paymentAllocations.length > 0) {
                 purchase.paidAmount = purchase.paymentAllocations.reduce(
                   (sum: number, alloc: any) => sum + alloc.allocatedAmount,
@@ -313,7 +316,6 @@ export async function DELETE(request: Request, context: RequestContext) {
             console.log(`✅ Purchase ${purchase.referenceNumber} updated`);
           }
         } else if (allocation.documentType === 'expense') {
-          // ✅ NEW: Handle expense deallocation
           const Expense = (await import('@/models/Expense')).default;
           const expense = await Expense.findById(allocation.documentId);
           
@@ -374,6 +376,66 @@ export async function DELETE(request: Request, context: RequestContext) {
             console.log(`✅ Expense ${expense.referenceNumber} updated`);
           }
         }
+        else if (allocation.documentType === 'debitNote') {
+          const debitNote = await DebitNote.findById(allocation.documentId);
+          
+          if (debitNote && !debitNote.isDeleted) {
+            console.log(`💰 Deallocating ${formatCurrency(allocation.amount)} from debit note ${debitNote.debitNoteNumber}`);
+            
+            if (typeof debitNote.deallocateReceipt === 'function') {
+              const removedAmount = debitNote.deallocateReceipt(voucher._id);
+              
+              debitNote.addAuditEntry(
+                'Receipt Voucher Deleted',
+                user.id,
+                user.username || user.name,
+                [{
+                  field: 'Deallocated Amount',
+                  oldValue: formatCurrency(removedAmount),
+                  newValue: formatCurrency(0)
+                }]
+              );
+            } else {
+              console.log('⚠️ Using fallback deallocation (old model)');
+              
+              if (debitNote.receiptAllocations) {
+                const index = debitNote.receiptAllocations.findIndex(
+                  (alloc: any) => alloc.voucherId.toString() === voucher._id.toString()
+                );
+                
+                if (index !== -1) {
+                  debitNote.receiptAllocations.splice(index, 1);
+                }
+              }
+              
+              if (debitNote.receiptAllocations && debitNote.receiptAllocations.length > 0) {
+                debitNote.receivedAmount = debitNote.receiptAllocations.reduce(
+                  (sum: number, alloc: any) => sum + alloc.allocatedAmount,
+                  0
+                );
+              } else {
+                debitNote.receivedAmount = 0;
+              }
+              
+              debitNote.addAuditEntry(
+                'Receipt Voucher Deleted',
+                user.id,
+                user.username || user.name
+              );
+            }
+            
+            const updatedReceiptIds = (debitNote.connectedDocuments?.receiptIds || [])
+              .filter((rid: any) => rid.toString() !== id);
+            
+            debitNote.connectedDocuments = {
+              ...debitNote.connectedDocuments,
+              receiptIds: updatedReceiptIds
+            };
+            
+            await debitNote.save();
+            console.log(`✅ Debit Note ${debitNote.debitNoteNumber} updated`);
+          }
+        }
       }
     } else {
       // ===== OLD SYSTEM: Use connectedDocuments =====
@@ -426,6 +488,7 @@ export async function DELETE(request: Request, context: RequestContext) {
         }
       }
       
+      // ✅ PAYMENT VOUCHER - OLD SYSTEM (SAME AS RECEIPT)
       if (voucher.voucherType === 'payment' && voucher.connectedDocuments?.purchaseIds) {
         for (const purchaseId of voucher.connectedDocuments.purchaseIds) {
           const purchase = await Purchase.findById(purchaseId);
@@ -436,6 +499,7 @@ export async function DELETE(request: Request, context: RequestContext) {
             const updatedPaymentIds = (purchase.connectedDocuments?.paymentIds || [])
               .filter((pid: any) => pid.toString() !== id);
             
+            // Recalculate from remaining payments
             let newPaidAmount = 0;
             for (const paymentId of updatedPaymentIds) {
               try {
@@ -447,6 +511,8 @@ export async function DELETE(request: Request, context: RequestContext) {
                 console.error(`Failed to fetch payment ${paymentId}:`, err);
               }
             }
+            
+            const oldPaidAmount = purchase.paidAmount;
             
             purchase.paidAmount = newPaidAmount;
             purchase.connectedDocuments = {
@@ -460,7 +526,7 @@ export async function DELETE(request: Request, context: RequestContext) {
               user.username || user.name,
               [{
                 field: 'paidAmount',
-                oldValue: purchase.paidAmount + voucher.grandTotal,
+                oldValue: oldPaidAmount,
                 newValue: newPaidAmount
               }]
             );
@@ -471,7 +537,6 @@ export async function DELETE(request: Request, context: RequestContext) {
         }
       }
       
-      // ✅ NEW: Handle old system expenses
       if (voucher.voucherType === 'payment' && voucher.connectedDocuments?.expenseIds) {
         const Expense = (await import('@/models/Expense')).default;
         
@@ -515,6 +580,51 @@ export async function DELETE(request: Request, context: RequestContext) {
             
             await expense.save();
             console.log(`✅ Expense ${expense.referenceNumber} updated - paidAmount: ${formatCurrency(newPaidAmount)}`);
+          }
+        }
+      }
+
+      if (voucher.voucherType === 'receipt' && voucher.connectedDocuments?.debitNoteIds) {
+        for (const debitNoteId of voucher.connectedDocuments.debitNoteIds) {
+          const debitNote = await DebitNote.findById(debitNoteId);
+          
+          if (debitNote && !debitNote.isDeleted) {
+            console.log(`💰 Removing receipt from debit note ${debitNote.debitNoteNumber}`);
+            
+            const updatedReceiptIds = (debitNote.connectedDocuments?.receiptIds || [])
+              .filter((rid: any) => rid.toString() !== id);
+            
+            let newReceivedAmount = 0;
+            for (const receiptId of updatedReceiptIds) {
+              try {
+                const receipt = await Voucher.findById(receiptId);
+                if (receipt && !receipt.isDeleted) {
+                  newReceivedAmount += receipt.grandTotal;
+                }
+              } catch (err) {
+                console.error(`Failed to fetch receipt ${receiptId}:`, err);
+              }
+            }
+            
+            debitNote.receivedAmount = newReceivedAmount;
+            debitNote.connectedDocuments = {
+              ...debitNote.connectedDocuments,
+              receiptIds: updatedReceiptIds
+            };
+            
+            debitNote.addAuditEntry(
+              'Receipt Voucher Deleted',
+              user.id,
+              user.username || user.name,
+              [{
+                field: 'receivedAmount',
+                oldValue: debitNote.receivedAmount + voucher.grandTotal,
+                newValue: newReceivedAmount
+              }]
+            );
+            
+            await debitNote.save();
+            console.log(`✅ Debit Note ${debitNote.debitNoteNumber} updated - receivedAmount: ${formatCurrency(newReceivedAmount)}`);
           }
         }
       }

@@ -1,4 +1,4 @@
-// app/api/vouchers/route.ts - UPDATED: Support all party types for all voucher types
+// app/api/vouchers/route.ts - UPDATED: Added Debit Note Allocation Support
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -8,6 +8,7 @@ import Supplier from "@/models/Supplier";
 import Payee from "@/models/Payee";
 import Purchase from "@/models/Purchase";
 import Invoice from "@/models/Invoice";
+import DebitNote from "@/models/DebitNote"; // ✅ NEW
 import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { createJournalForVoucher, createJournalForRefund } from '@/utils/journalAutoCreate';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
@@ -87,6 +88,12 @@ export async function GET(request: Request) {
           select: 'referenceNumber amount status paymentStatus isDeleted',
           match: { isDeleted: false }
         },
+        // ✅ NEW: Debit Note population
+        {
+          path: 'connectedDocuments.debitNoteIds',
+          select: 'debitNoteNumber grandTotal status isDeleted',
+          match: { isDeleted: false }
+        },
         { path: 'payeeId', select: 'name type', match: { isDeleted: false } },
         { path: 'customerId', select: 'name email phone', match: { isDeleted: false } },
         { path: 'supplierId', select: 'name email', match: { isDeleted: false } }
@@ -152,6 +159,12 @@ export async function GET(request: Request) {
             select: 'referenceNumber amount status paymentStatus isDeleted',
             match: { isDeleted: false }
           })
+          // ✅ NEW: Debit Note population
+          .populate({
+            path: 'connectedDocuments.debitNoteIds',
+            select: 'debitNoteNumber grandTotal status isDeleted',
+            match: { isDeleted: false }
+          })
           .populate('payeeId', 'name type')
           .populate('customerId', 'name email phone')
           .populate('supplierId', 'name email');
@@ -206,7 +219,7 @@ export async function POST(request: Request) {
       skipAutoCreation
     } = body;
 
-    // ✅ UPDATED: Validation - Any voucher type can have any party type
+    // Validation
     if (!voucherType || !['receipt', 'payment', 'refund'].includes(voucherType)) {
       return NextResponse.json({
         error: 'Valid voucherType (receipt, payment, or refund) is required'
@@ -231,7 +244,7 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // ✅ UPDATED: Upsert/lookup for all party types
+    // Upsert/lookup for all party types
     let resolvedCustomerId = null;
     let resolvedSupplierId = null;
     let resolvedPayeeId = null;
@@ -296,7 +309,7 @@ export async function POST(request: Request) {
     const allocations: any[] = [];
     let connectedIds: any = {};
     
-    // ✅ Logic for Receipt, Payment, Refund allocations (unchanged)
+    // ✅ RECEIPT: Handle Invoice allocations
     if (voucherType === 'receipt' && connectedDocuments?.invoiceIds) {
       const invoiceIds = connectedDocuments.invoiceIds;
       if (invoiceIds.length > 0) {
@@ -327,6 +340,55 @@ export async function POST(request: Request) {
       connectedIds = { invoiceIds };
     }
     
+    // ✅ NEW: RECEIPT - Handle Debit Note allocations
+    if (voucherType === 'receipt' && connectedDocuments?.debitNoteIds) {
+      const debitNoteIds = connectedDocuments.debitNoteIds;
+      if (debitNoteIds.length > 0) {
+        const debitNotes = await DebitNote.find({ _id: { $in: debitNoteIds }, isDeleted: false });
+        if (debitNotes.length === debitNoteIds.length) {
+          if (debitNoteIds.length === 1) {
+            const debitNote = debitNotes[0];
+            const remaining = debitNote.grandTotal - debitNote.getTotalAllocated();
+            if (remaining >= finalGrandTotal) {
+              allocations.push({ 
+                documentId: debitNote._id, 
+                documentType: 'debitNote', 
+                amount: finalGrandTotal, 
+                createdAt: new Date() 
+              });
+            }
+          } else {
+            const totalRemaining = debitNotes.reduce((sum, dn) => sum + (dn.grandTotal - dn.getTotalAllocated()), 0);
+            if (totalRemaining >= finalGrandTotal) {
+              let remaining = finalGrandTotal;
+              for (let i = 0; i < debitNotes.length; i++) {
+                const debitNote = debitNotes[i];
+                const debitNoteRemaining = debitNote.grandTotal - debitNote.getTotalAllocated();
+                let allocationAmount = (i === debitNotes.length - 1) 
+                  ? remaining 
+                  : Math.min(
+                      Math.round(finalGrandTotal * (debitNoteRemaining / totalRemaining) * 100) / 100, 
+                      debitNoteRemaining, 
+                      remaining
+                    );
+                if (allocationAmount > 0) {
+                  allocations.push({ 
+                    documentId: debitNote._id, 
+                    documentType: 'debitNote', 
+                    amount: allocationAmount, 
+                    createdAt: new Date() 
+                  });
+                  remaining -= allocationAmount;
+                }
+              }
+            }
+          }
+        }
+      }
+      connectedIds = { ...connectedIds, debitNoteIds };
+    }
+    
+    // PAYMENT: Handle Purchase allocations
     if (voucherType === 'payment' && connectedDocuments?.purchaseIds) {
        const purchaseIds = connectedDocuments.purchaseIds;
        if (purchaseIds.length > 0) {
@@ -357,6 +419,7 @@ export async function POST(request: Request) {
        connectedIds = { purchaseIds };
     }
 
+    // PAYMENT: Handle Expense allocations
     if (voucherType === 'payment' && connectedDocuments?.expenseIds) {
         const expenseIds = connectedDocuments.expenseIds;
         if(expenseIds.length > 0) {
@@ -388,6 +451,7 @@ export async function POST(request: Request) {
         connectedIds = { expenseIds };
     }
 
+    // REFUND: Handle Invoice allocations
     if (voucherType === 'refund' && connectedDocuments?.invoiceIds) {
         const invoiceIds = connectedDocuments.invoiceIds;
         if (invoiceIds.length > 0) {
@@ -465,23 +529,40 @@ export async function POST(request: Request) {
         await newVoucher.save();
       }
 
-      // Apply Allocations to Documents
+      // ✅ Apply Allocations to Invoices
        if (voucherType === 'receipt' && allocations.length > 0) {
         for (const allocation of allocations) {
-          const invoice = await Invoice.findById(allocation.documentId);
-          if (invoice && !invoice.isDeleted) {
-            invoice.allocateReceipt(newVoucher._id, allocation.amount);
-            const currentReceiptIds = invoice.connectedDocuments?.receiptIds || [];
-            if (!currentReceiptIds.some((rid: any) => rid.toString() === newVoucher._id.toString())) {
-              currentReceiptIds.push(newVoucher._id);
-              invoice.connectedDocuments = invoice.connectedDocuments || { receiptIds: [] };
-              invoice.connectedDocuments.receiptIds = currentReceiptIds;
+          if (allocation.documentType === 'invoice') {
+            const invoice = await Invoice.findById(allocation.documentId);
+            if (invoice && !invoice.isDeleted) {
+              invoice.allocateReceipt(newVoucher._id, allocation.amount);
+              const currentReceiptIds = invoice.connectedDocuments?.receiptIds || [];
+              if (!currentReceiptIds.some((rid: any) => rid.toString() === newVoucher._id.toString())) {
+                currentReceiptIds.push(newVoucher._id);
+                invoice.connectedDocuments = invoice.connectedDocuments || { receiptIds: [] };
+                invoice.connectedDocuments.receiptIds = currentReceiptIds;
+              }
+              await invoice.save();
             }
-            await invoice.save();
+          }
+          // ✅ NEW: Apply allocations to Debit Notes
+          else if (allocation.documentType === 'debitNote') {
+            const debitNote = await DebitNote.findById(allocation.documentId);
+            if (debitNote && !debitNote.isDeleted) {
+              debitNote.allocateReceipt(newVoucher._id, allocation.amount);
+              const currentReceiptIds = debitNote.connectedDocuments?.receiptIds || [];
+              if (!currentReceiptIds.some((rid: any) => rid.toString() === newVoucher._id.toString())) {
+                currentReceiptIds.push(newVoucher._id);
+                debitNote.connectedDocuments = debitNote.connectedDocuments || { receiptIds: [] };
+                debitNote.connectedDocuments.receiptIds = currentReceiptIds;
+              }
+              await debitNote.save();
+            }
           }
         }
       }
 
+      // Apply allocations to Purchases
       if (voucherType === 'payment' && allocations.length > 0) {
         for (const allocation of allocations) {
           if (allocation.documentType === 'purchase') {
@@ -513,6 +594,7 @@ export async function POST(request: Request) {
         }
       }
 
+      // Apply allocations for Refunds
       if (voucherType === 'refund' && allocations.length > 0) {
          for (const allocation of allocations) {
             const invoice = await Invoice.findById(allocation.documentId);
@@ -539,6 +621,7 @@ export async function POST(request: Request) {
          }
       }
 
+      // Create journal entries
       try {
         if (voucherType === 'refund') {
           await createJournalForRefund(newVoucher.toObject(), user.id, user.username || user.name);

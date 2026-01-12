@@ -4,6 +4,7 @@ import dbConnect from '@/lib/dbConnect';
 import Invoice from '@/models/Invoice';
 import Quotation from '@/models/Quotation';
 import Voucher from '@/models/Voucher';
+import DebitNote from '@/models/DebitNote';
 import DeliveryNote from '@/models/DeliveryNote';
 import Purchase from '@/models/Purchase';
 import Expense from '@/models/Expense';
@@ -17,6 +18,7 @@ type DocumentType =
   | 'receipt'
   | 'payment'
   | 'refund' // ✅ ADDED
+  | 'debitNote'
   | 'delivery'
   | 'journal'
   | 'purchase'
@@ -30,6 +32,7 @@ const prefixes: Record<DocumentType, string> = {
   receipt: 'RCP',
   payment: 'PAY',
   refund: 'RFN', // ✅ ADDED
+  debitNote: 'DBN',
   delivery: 'DLV',
   journal: 'JE',
   purchase: 'PUR',
@@ -75,6 +78,10 @@ export default async function generateInvoiceNumber(
           Model = Voucher;
           query = { invoiceNumber: { $regex: searchPattern } };
           break;
+        case 'debitNote':
+          Model = (await import('@/models/DebitNote')).default;
+          query = { debitNoteNumber: { $regex: searchPattern } };
+          break;
         case 'delivery':
           Model = DeliveryNote;
           query = { invoiceNumber: { $regex: searchPattern } };
@@ -115,6 +122,8 @@ export default async function generateInvoiceNumber(
         exists = await Model.findOne({ referenceNumber: generatedNumber });
       } else if (documentType === 'return') {
         exists = await Model.findOne({ returnNumber: generatedNumber });
+      } else if (documentType === 'debitNote') {
+        exists = await Model.findOne({ debitNoteNumber: generatedNumber });
       } else {
         exists = await Model.findOne({ invoiceNumber: generatedNumber });
       }

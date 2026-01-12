@@ -1,4 +1,4 @@
-// app/purchases/page.tsx - UPDATED: Fixed opacity flash on window focus
+// app/expenses/purchases/page.tsx - UPDATED: Added handleViewReturnNotePdf
 
 "use client";
 
@@ -86,12 +86,10 @@ function PurchasesPageContent() {
     setIsMounted(true);
   }, []);
 
-  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
   const fetchPurchases = useCallback(async (background = false) => {
     if (!canRead) return;
 
     try {
-      // Only show loading spinner/skeleton if it's NOT a background fetch
       if (!background) {
         setIsLoading(true);
       }
@@ -102,7 +100,6 @@ function PurchasesPageContent() {
         populate: 'true',
       });
 
-      // Add Date Range to params
       if (dateRange?.from) {
         params.append('startDate', dateRange.from.toISOString());
       }
@@ -121,7 +118,6 @@ function PurchasesPageContent() {
       const res = await fetch(`/api/purchases?${params.toString()}`);
 
       if (res.status === 403) {
-        // Only show toast error if it's a user interaction, not a background poll
         if (!background) toast.error("You don't have permission to view purchases");
         return;
       }
@@ -150,8 +146,6 @@ function PurchasesPageContent() {
     }
   }, [canRead, urlState.page, urlState.pageSize, urlState.sort, urlState.filters, dateRange]);
 
-  // Standard fetch on dependency change (loading state visible)
-  // ✅ FIXED: Removed 'session' from dependencies to prevent auto-fetch on window focus (which refreshes session)
   useEffect(() => {
     if (session && canRead) {
       fetchPurchases();
@@ -165,12 +159,9 @@ function PurchasesPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canRead, fetchPurchases]);
 
-  // ✅ NEW: Window Focus Listener - SILENT MODE
-  // This triggers a silent "background" fetch when you tab back to this page.
   useEffect(() => {
     const onFocus = () => {
       if (session && canRead) {
-        // Pass true to indicate this is a background fetch (no loading UI/opacity change)
         fetchPurchases(true);
       }
     };
@@ -262,7 +253,7 @@ function PurchasesPageContent() {
       }
 
       toast.success(`Purchase ${id ? "updated" : "added"} successfully.`);
-      fetchPurchases(); // Trigger fresh fetch
+      fetchPurchases();
       setIsFormOpen(false);
       setSelectedPurchase(null);
 
@@ -327,15 +318,30 @@ function PurchasesPageContent() {
       url = `/api/quotations/${bill._id}/pdf`;
     } else if (type === 'delivery' || number.startsWith('DEL')) {
       url = `/api/delivery-notes/${bill._id}/pdf`;
+    } else if (number.startsWith('RTN')) {
+      url = `/api/return-notes/${bill._id}/pdf`;
     } else {
       toast.error("Unknown document type. Cannot generate PDF.");
       return;
     }
 
     setSelectedPdfUrl(url);
-    setSelectedPdfTitle(bill.invoiceNumber || "Document");
+    setSelectedPdfTitle(bill.invoiceNumber || bill.returnNumber || "Document");
     setIsModalOpen(true);
   };
+
+  // ✅ NEW: Handler for viewing return note PDFs
+  const handleViewReturnNotePdf = useCallback((returnNote: any) => {
+    if (!returnNote || !returnNote._id) {
+      toast.error("Cannot view PDF. Return note data is missing.");
+      return;
+    }
+
+    const pdfUrl = `/api/return-notes/${returnNote._id}/pdf`;
+    setSelectedPdfUrl(pdfUrl);
+    setSelectedPdfTitle(returnNote.returnNumber || "Return Note");
+    setIsModalOpen(true);
+  }, []);
 
   const handleViewPurchase = (purchase: IPurchase) => {
     setPurchaseToView(purchase);
@@ -392,8 +398,9 @@ function PurchasesPageContent() {
     canUpdate,
     canCreate,
     canUpdateStatus,
-    canCreatePayment
-  ), [purchases, canDelete, canCreate, canUpdate, canUpdateStatus, canCreatePayment]);
+    canCreatePayment,
+    handleViewReturnNotePdf // ✅ Pass the new handler
+  ), [purchases, canDelete, canCreate, canUpdate, canUpdateStatus, canCreatePayment, handleViewReturnNotePdf]);
 
   const { table } = useDataTable<IPurchase>({
     data: purchases,
@@ -444,7 +451,6 @@ function PurchasesPageContent() {
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <div className="flex flex-col lg:flex-row lg:justify-between px-4 lg:px-6 gap-4">
 
-              {/* Left: Title */}
               <div className="flex items-center gap-3 self-start lg:self-center">
                 <div className="p-3 bg-primary/10 rounded-full">
                   <ShoppingCart className="h-8 w-8 text-primary" />
@@ -464,10 +470,7 @@ function PurchasesPageContent() {
                 </div>
               </div>
 
-              {/* Right: Actions & Filters Group */}
               <div className="flex flex-col gap-3 w-full lg:w-auto lg:items-end">
-
-                {/* Row 1: Actions */}
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                   {canViewTrash && (
                     <Link href="./purchases/trash" className="w-full sm:w-auto">
@@ -491,9 +494,7 @@ function PurchasesPageContent() {
                   )}
                 </div>
 
-                {/* Row 2: Date Filters */}
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-                  {/* Date Range Picker */}
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -528,7 +529,6 @@ function PurchasesPageContent() {
                     </PopoverContent>
                   </Popover>
 
-                  {/* Quick Select Dropdown */}
                   <Select onValueChange={handleQuickSelect} defaultValue="last6Months">
                     <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue placeholder="Quick select" />
@@ -563,7 +563,6 @@ function PurchasesPageContent() {
                 </CardContent>
               </Card>
 
-              {/* Empty State */}
               {purchases.length === 0 && !isInitialLoad && !isLoading && canCreate && (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">
@@ -610,6 +609,7 @@ function PurchasesPageContent() {
         }}
         purchase={purchaseToView}
         onViewPdf={handleViewPdf}
+        onViewReturnNotePdf={handleViewReturnNotePdf}
       />
     </>
   );

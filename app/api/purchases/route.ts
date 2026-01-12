@@ -1,4 +1,4 @@
-// app/api/purchases/route.ts - UPDATED: Three Separate Statuses
+// app/api/purchases/route.ts - GET handler ONLY - UPDATED: Populate returnNoteIds
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     await dbConnect();
 
     const { searchParams } = new URL(request.url);
-    
+
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
 
     const startDateParam = searchParams.get('startDate') || searchParams.get('from');
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 
     if (isServerSide) {
       const { page, pageSize, sorting, filters } = extractTableParams(searchParams);
-      
+
       const baseFilter: any = { isDeleted: false };
 
       if (startDateParam || endDateParam) {
@@ -51,11 +51,18 @@ export async function GET(request: Request) {
 
       const populate = searchParams.get('populate') === 'true';
 
-      const populateOptions = populate ? {
-        path: 'connectedDocuments.paymentIds',
-        select: 'invoiceNumber grandTotal documentType isDeleted',
-        match: { isDeleted: false }
-      } : undefined;
+      const populateOptions = populate ? [
+        {
+          path: 'connectedDocuments.paymentIds',
+          select: 'invoiceNumber grandTotal voucherType',
+          match: { isDeleted: false }
+        },
+        {
+          path: 'connectedDocuments.returnNoteIds',
+          select: 'returnNumber status',
+          match: { isDeleted: false }
+        }
+      ] : undefined;
 
       const result = await executePaginatedQuery(Purchase, {
         baseFilter,
@@ -91,11 +98,17 @@ export async function GET(request: Request) {
       let query = Purchase.find(filter).sort({ createdAt: -1 });
 
       if (populate) {
-        query = query.populate({
-          path: 'connectedDocuments.paymentIds',
-          select: 'invoiceNumber grandTotal documentType isDeleted',
-          match: { isDeleted: false }
-        });
+        query = query
+          .populate({
+            path: 'connectedDocuments.paymentIds',
+            select: 'invoiceNumber grandTotal documentType isDeleted',
+            match: { isDeleted: false }
+          })
+          .populate({
+            path: 'connectedDocuments.returnNoteIds',
+            select: 'returnNumber status',
+            match: { isDeleted: false }
+          });
       }
 
       const purchases = await query.exec();
@@ -139,13 +152,13 @@ export async function POST(request: Request) {
 
     // Validate discount
     const discount = Number(body.discount) || 0;
-    
+
     if (discount < 0) {
       return NextResponse.json({ error: "Discount cannot be negative" }, { status: 400 });
     }
 
     if (discount > body.totalAmount) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: "Discount cannot exceed gross total",
         details: `Discount: ${discount}, Gross Total: ${body.totalAmount}`
       }, { status: 400 });
@@ -222,12 +235,12 @@ export async function POST(request: Request) {
     });
 
     const savedPurchase = await newPurchase.save();
-    
+
     // ✅ BACKWARD COMPATIBILITY: Handle direct creation with received/partially received status
     // This allows users to create purchases that are already received (legacy workflow)
     if (savedPurchase.inventoryStatus === 'received' || savedPurchase.inventoryStatus === 'partially received') {
       console.log(`📦 Processing stock for directly created ${savedPurchase.inventoryStatus} purchase`);
-      
+
       for (const item of savedPurchase.items) {
         const material = await Material.findById(item.materialId);
         if (material) {

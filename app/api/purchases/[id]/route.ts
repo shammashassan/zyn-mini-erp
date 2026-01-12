@@ -37,6 +37,12 @@ export async function GET(request: Request, context: RequestContext) {
         model: 'Voucher',
         select: 'invoiceNumber grandTotal voucherType',
         match: { isDeleted: false }
+      })
+      .populate({
+        path: 'connectedDocuments.returnNoteIds',
+        model: 'ReturnNote',
+        select: 'returnNumber status',
+        match: { isDeleted: false }
       });
 
     if (!purchase) {
@@ -59,11 +65,11 @@ function detectChanges(oldPurchase: any, newData: any) {
   const fieldsToTrack = [
     'purchaseStatus',
     'inventoryStatus',
-    'paymentStatus', 
-    'totalAmount', 
+    'paymentStatus',
+    'totalAmount',
     'discount',
-    'supplierName', 
-    'paidAmount', 
+    'supplierName',
+    'paidAmount',
     'date'
   ];
 
@@ -281,10 +287,10 @@ export async function PUT(request: Request, context: RequestContext) {
 
     const oldPurchaseStatus = currentPurchase.purchaseStatus;
     const oldInventoryStatus = currentPurchase.inventoryStatus;
-    
+
     const newPurchaseStatus = body.purchaseStatus || oldPurchaseStatus;
     const newInventoryStatus = body.inventoryStatus || oldInventoryStatus;
-    
+
     const itemsChanged = body.items && haveItemsChanged(currentPurchase.items, body.items);
 
     console.log(`\n📝 Purchase Update: ${currentPurchase.referenceNumber}`);
@@ -336,7 +342,7 @@ export async function PUT(request: Request, context: RequestContext) {
               const oldStock = material.stock;
               const newStock = oldStock + remainingToAdd;
               await Material.findByIdAndUpdate(item.materialId, { stock: newStock });
-              
+
               const adjustmentReason = previouslyReceived > 0
                 ? `Purchase fully received (${item.quantity} of ${item.quantity} total)`
                 : `Purchase fully received`;
@@ -379,7 +385,7 @@ export async function PUT(request: Request, context: RequestContext) {
 
               const adjustmentType = qtyDifference > 0 ? 'increment' : 'decrement';
               const adjustmentValue = Math.abs(qtyDifference);
-              
+
               const newAdjustment = new StockAdjustment({
                 materialId: item.materialId,
                 materialName: item.materialName,
@@ -439,7 +445,7 @@ export async function PUT(request: Request, context: RequestContext) {
     );
 
     const updateData = { ...body };
-    
+
     // Recalculate amounts if items or discount changed
     if (body.items || body.discount !== undefined) {
       const itemsToUse = body.items || currentPurchase.items;
@@ -541,31 +547,31 @@ export async function DELETE(request: Request, context: RequestContext) {
 
     // Revert stock based on inventory status
     if (purchaseToDelete.inventoryStatus === 'received' || purchaseToDelete.inventoryStatus === 'partially received') {
-       for (const item of purchaseToDelete.items) {
-          const qtyToRemove = getReceivedQuantity(item, purchaseToDelete.inventoryStatus);
-          if (qtyToRemove > 0) {
-            const material = await Material.findById(item.materialId);
-            if (material) {
-              const oldStock = material.stock;
-              const newStock = oldStock - qtyToRemove;
-              
-              await Material.findByIdAndUpdate(item.materialId, { stock: newStock });
-              
-              await new StockAdjustment({
-                materialId: item.materialId,
-                materialName: item.materialName,
-                adjustmentType: 'decrement',
-                value: qtyToRemove,
-                oldStock,
-                newStock,
-                oldUnitCost: material.unitCost,
-                newUnitCost: material.unitCost,
-                adjustmentReason: `Purchase soft deleted`,
-                createdAt: new Date(),
-              }).save();
-            }
+      for (const item of purchaseToDelete.items) {
+        const qtyToRemove = getReceivedQuantity(item, purchaseToDelete.inventoryStatus);
+        if (qtyToRemove > 0) {
+          const material = await Material.findById(item.materialId);
+          if (material) {
+            const oldStock = material.stock;
+            const newStock = oldStock - qtyToRemove;
+
+            await Material.findByIdAndUpdate(item.materialId, { stock: newStock });
+
+            await new StockAdjustment({
+              materialId: item.materialId,
+              materialName: item.materialName,
+              adjustmentType: 'decrement',
+              value: qtyToRemove,
+              oldStock,
+              newStock,
+              oldUnitCost: material.unitCost,
+              newUnitCost: material.unitCost,
+              adjustmentReason: `Purchase soft deleted`,
+              createdAt: new Date(),
+            }).save();
           }
-       }
+        }
+      }
     }
 
     const deletedPurchase = await softDelete(Purchase, id, user.id, user.username);

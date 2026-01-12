@@ -1,4 +1,4 @@
-// models/Purchase.ts - UPDATED: Separate Purchase and Inventory Status
+// models/Purchase.ts - FIXED: Added paidAmount reset logic (same as Invoice model)
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -43,7 +43,6 @@ export interface IPurchase extends Document {
   grandTotal: number;
   date: Date;
   
-  // ✅ NEW: Three separate statuses
   purchaseStatus: 'pending' | 'approved' | 'cancelled';
   inventoryStatus: 'pending' | 'received' | 'partially received';
   paymentStatus: 'pending' | 'paid' | 'partially paid';
@@ -55,6 +54,7 @@ export interface IPurchase extends Document {
   
   connectedDocuments: {
     paymentIds: mongoose.Types.ObjectId[];
+    returnNoteIds: mongoose.Types.ObjectId[];
   };
   
   isDeleted: boolean;
@@ -129,7 +129,6 @@ const PurchaseSchema: Schema<IPurchase> = new Schema({
   grandTotal: { type: Number, min: 0 },
   date: { type: Date, required: true },
   
-  // ✅ NEW: Three separate statuses
   purchaseStatus: { 
     type: String, 
     enum: ['pending', 'approved', 'cancelled'],
@@ -151,8 +150,9 @@ const PurchaseSchema: Schema<IPurchase> = new Schema({
   connectedDocuments: {
     type: {
       paymentIds: [{ type: Schema.Types.ObjectId, ref: 'Voucher' }],
+      returnNoteIds: [{ type: Schema.Types.ObjectId, ref: 'ReturnNote' }],
     },
-    default: { paymentIds: [] }
+    default: { paymentIds: [], returnNoteIds: [] }
   },
   
   paidAmount: { type: Number, default: 0, min: 0 },
@@ -175,10 +175,11 @@ PurchaseSchema.index({ isDeleted: 1, date: -1 });
 PurchaseSchema.index({ purchaseStatus: 1, inventoryStatus: 1, paymentStatus: 1 });
 PurchaseSchema.index({ supplierName: 1 });
 PurchaseSchema.index({ 'connectedDocuments.paymentIds': 1 });
+PurchaseSchema.index({ 'connectedDocuments.returnNoteIds': 1 });
 PurchaseSchema.index({ date: 1 });
 PurchaseSchema.index({ 'paymentAllocations.voucherId': 1 });
 
-// Pre-save middleware
+// ✅ FIXED: Pre-save middleware - same logic as Invoice model
 PurchaseSchema.pre('save', function(next) {
   const grossTotal = this.totalAmount;
   const discount = this.discount || 0;
@@ -188,11 +189,15 @@ PurchaseSchema.pre('save', function(next) {
   this.vatAmount = vatAmount;
   this.grandTotal = subtotal + vatAmount;
   
+  // ✅ FIXED: Calculate paid amount from payment allocations
   if (this.paymentAllocations && this.paymentAllocations.length > 0) {
     this.paidAmount = this.paymentAllocations.reduce(
       (sum: number, alloc: IPaymentAllocation) => sum + alloc.allocatedAmount, 
       0
     );
+  } else if (!this.isModified('paidAmount')) {
+    // ✅ ADDED: Reset paidAmount to 0 if no allocations (same as Invoice)
+    this.paidAmount = 0;
   }
   
   this.totalPaid = this.paidAmount;

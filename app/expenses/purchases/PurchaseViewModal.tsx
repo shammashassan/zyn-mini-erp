@@ -28,7 +28,7 @@ import {
   XCircle
 } from "lucide-react";
 import type { IPurchase } from "@/models/Purchase";
-import { ConnectedPaymentsBadges } from "./ConnectedPaymentsBadges";
+import { ConnectedDocumentsBadges } from "./ConnectedDocumentsBadges";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { formatDateTime, formatLongDate } from "@/utils/formatters/date";
 import { toast } from "sonner";
@@ -39,6 +39,7 @@ interface PurchaseViewModalProps {
   onClose: () => void;
   purchase: IPurchase | any | null;
   onViewPdf?: (bill: any) => void;
+  onViewReturnNotePdf?: (returnNote: any) => void;
 }
 
 // ✅ Purchase Status helpers
@@ -104,7 +105,7 @@ const getCreatorUsername = (purchase: any): string | null => {
   return createAction?.username || null;
 };
 
-export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, onViewPdf }: PurchaseViewModalProps) {
+export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, onViewPdf, onViewReturnNotePdf }: PurchaseViewModalProps) {
   const [purchase, setPurchase] = useState<any>(initialPurchase);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -544,20 +545,21 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
               </CardContent>
             </Card>
 
-            {/* Connected Payment Vouchers */}
-            {currentData.connectedDocuments?.paymentIds && currentData.connectedDocuments.paymentIds.length > 0 && (
+            {/* Connected Documents - Payment Vouchers & Return Notes */}
+            {(currentData.connectedDocuments?.paymentIds?.length > 0 || currentData.connectedDocuments?.returnNoteIds?.length > 0) && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm sm:text-base flex items-center gap-2">
                     <Wallet className="h-3 w-3 sm:h-4 sm:w-4" />
-                    Connected Payment Vouchers
+                    Connected Documents
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {onViewPdf ? (
-                    <ConnectedPaymentsBadges
+                  {onViewPdf && onViewReturnNotePdf ? (
+                    <ConnectedDocumentsBadges
                       purchase={currentData as any}
                       onViewPdf={onViewPdf}
+                      onViewReturnNotePdf={onViewReturnNotePdf}
                     />
                   ) : (
                     <span className="text-xs sm:text-sm text-muted-foreground">—</span>

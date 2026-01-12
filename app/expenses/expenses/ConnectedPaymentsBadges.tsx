@@ -3,7 +3,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Wallet, ExternalLink } from "lucide-react";
+import { Wallet, ExternalLink, Ticket } from "lucide-react";
 
 interface ConnectedPayment {
   _id: string;
@@ -64,7 +64,7 @@ export function ConnectedPaymentsBadges({ expense, onViewPdf }: ConnectedPayment
             handleView(payment);
           }}
         >
-          <Wallet className="h-3 w-3" />
+          <Ticket className="h-3 w-3" />
           {payment.invoiceNumber}
           <ExternalLink className="h-3 w-3 ml-1" />
         </Badge>

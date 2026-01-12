@@ -1,4 +1,4 @@
-// app/api/return-notes/trash/restore/route.ts
+// app/api/return-notes/trash/restore/route.ts - UPDATED: Bidirectional restoration
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
     // If the return note was approved, restore the stock changes
     if (returnNoteToRestore.status === 'approved') {
-      const purchase = await Purchase.findById(returnNoteToRestore.purchaseId);
+      const purchase = await Purchase.findById(returnNoteToRestore.connectedDocuments.purchaseId);
       if (purchase && !purchase.isDeleted) {
         // Restore purchase item returned quantities
         for (const returnItem of returnNoteToRestore.items) {
@@ -53,6 +53,16 @@ export async function POST(request: Request) {
             const currentReturned = purchase.items[purchaseItemIndex].returnedQuantity || 0;
             purchase.items[purchaseItemIndex].returnedQuantity = currentReturned + returnItem.returnQuantity;
           }
+        }
+
+        // ✅ NEW: Re-add return note ID to purchase connectedDocuments
+        const currentReturnNoteIds = purchase.connectedDocuments?.returnNoteIds || [];
+        if (!currentReturnNoteIds.some((rid: any) => rid.toString() === id)) {
+          currentReturnNoteIds.push(id);
+          purchase.connectedDocuments = {
+            ...purchase.connectedDocuments,
+            returnNoteIds: currentReturnNoteIds
+          };
         }
 
         purchase.addAuditEntry(
@@ -88,6 +98,27 @@ export async function POST(request: Request) {
 
           await newAdjustment.save();
         }
+      }
+    } else {
+      // ✅ NEW: Even if not approved, re-add to purchase connectedDocuments
+      const purchase = await Purchase.findById(returnNoteToRestore.connectedDocuments.purchaseId);
+      if (purchase && !purchase.isDeleted) {
+        const currentReturnNoteIds = purchase.connectedDocuments?.returnNoteIds || [];
+        if (!currentReturnNoteIds.some((rid: any) => rid.toString() === id)) {
+          currentReturnNoteIds.push(id);
+          purchase.connectedDocuments = {
+            ...purchase.connectedDocuments,
+            returnNoteIds: currentReturnNoteIds
+          };
+        }
+
+        purchase.addAuditEntry(
+          `Return Note ${returnNoteToRestore.returnNumber} restored`,
+          user.id,
+          user.username || user.name
+        );
+
+        await purchase.save();
       }
     }
 

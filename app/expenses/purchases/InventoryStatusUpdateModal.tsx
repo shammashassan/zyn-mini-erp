@@ -1,4 +1,4 @@
-// app/expenses/purchases/InventoryStatusUpdateModal.tsx - NEW: Inventory Receiving Only
+// app/expenses/purchases/InventoryStatusUpdateModal.tsx - FIXED: Received status now updates receivedQuantity
 
 "use client";
 
@@ -148,7 +148,16 @@ export function InventoryStatusUpdateModal({
       if (allFullyReceived) {
         toast.info("All items fully received. Changing status to 'received'.");
         
-        const updateData: any = { inventoryStatus: 'received' };
+        // ✅ FIXED: Include items with receivedQuantity set to full quantity
+        const itemsWithFullReceived = purchase.items.map(item => ({
+          ...item,
+          receivedQuantity: item.quantity
+        }));
+
+        const updateData: any = { 
+          inventoryStatus: 'received',
+          items: itemsWithFullReceived
+        };
 
         setIsLoading(true);
         const res = await fetch(`/api/purchases/${purchase._id}`, {
@@ -173,6 +182,15 @@ export function InventoryStatusUpdateModal({
     setIsLoading(true);
     try {
       const updateData: any = { inventoryStatus: newStatus };
+
+      // ✅ FIXED: When changing to 'received', set receivedQuantity to full quantity for all items
+      if (newStatus === 'received' && purchase.inventoryStatus !== 'received') {
+        const itemsWithFullReceived = purchase.items.map(item => ({
+          ...item,
+          receivedQuantity: item.quantity
+        }));
+        updateData.items = itemsWithFullReceived;
+      }
 
       // Reset receivedQuantity when changing to pending
       if (newStatus === 'pending' &&
@@ -322,7 +340,7 @@ export function InventoryStatusUpdateModal({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Purchase Info - Kept minimal */}
+          {/* Purchase Info */}
           <div className="rounded-lg border p-3 bg-muted/50 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Supplier:</span>
@@ -334,7 +352,7 @@ export function InventoryStatusUpdateModal({
             </div>
           </div>
 
-          {/* Status Selection Buttons - Simplified */}
+          {/* Status Selection Buttons */}
           <div className="grid grid-cols-3 gap-2">
             {availableStatuses.map((status) => (
               <Button
@@ -478,7 +496,6 @@ export function InventoryStatusUpdateModal({
                 </div>
               </>
             )}
-            {/* If status hasn't changed, just show the current status on the right as well for symmetry or hide arrow/new - Invoice modal shows New even if same, let's follow that pattern */}
              {newStatus === initialStatus && (
               <div>
                 <span className="text-muted-foreground">New:</span>
@@ -493,7 +510,7 @@ export function InventoryStatusUpdateModal({
              )}
           </div>
 
-          {/* Stock Impact Warning - Kept for safety */}
+          {/* Stock Impact Warning */}
           {willAddStock && (
             <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-lg text-sm">
               <AlertCircle className="h-4 w-4 text-green-600 mt-0.5" />

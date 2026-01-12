@@ -71,7 +71,7 @@ export default function ReturnNotesTrashPage() {
         const deletedByUsername = deleteAction?.username || item.deletedBy || "Unknown";
         const displayTotal = item.grandTotal || 0;
         
-        return `${item.purchaseReference || "N/A"} • ${item.supplierName || "Unknown Supplier"} • ${totalQuantity.toFixed(2)} units • ${formatCurrency(displayTotal)} • ${item.reason || "No reason"} • Deleted by @${deletedByUsername}`;
+        return `${item.purchaseReference || "N/A"} • ${item.supplierName || "Unknown Supplier"} • ${totalQuantity.toFixed(2)} units • ${item.reason || "No reason"} • Deleted by @${deletedByUsername}`;
       }}
     />
   );

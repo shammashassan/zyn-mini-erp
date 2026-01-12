@@ -11,7 +11,7 @@ export interface IItem extends Document {
 
 export interface IAllocation {
   documentId: mongoose.Types.ObjectId;
-  documentType: 'invoice' | 'purchase' | 'expense';
+  documentType: 'invoice' | 'purchase' | 'expense' | 'debitNote';
   amount: number;
   createdAt: Date;
 }
@@ -60,6 +60,7 @@ export interface IVoucher extends Document {
     invoiceIds?: mongoose.Types.ObjectId[];
     purchaseIds?: mongoose.Types.ObjectId[];
     expenseIds?: mongoose.Types.ObjectId[];
+    debitNoteIds?: mongoose.Types.ObjectId[];
   };
   
   isDeleted: boolean;
@@ -95,7 +96,7 @@ const AllocationSchema: Schema = new Schema({
   documentId: { type: Schema.Types.ObjectId, required: true },
   documentType: { 
     type: String, 
-    enum: ['invoice', 'purchase', 'expense'], 
+    enum: ['invoice', 'purchase', 'expense', 'debitNote'], 
     required: true 
   },
   amount: { type: Number, required: true, min: 0 },
@@ -149,7 +150,8 @@ const VoucherSchema: Schema<IVoucher> = new Schema({
     type: {
       invoiceIds: [{ type: Schema.Types.ObjectId, ref: 'Invoice' }],
       purchaseIds: [{ type: Schema.Types.ObjectId, ref: 'Purchase' }],
-      expenseIds: [{ type: Schema.Types.ObjectId, ref: 'Expense' }]
+      expenseIds: [{ type: Schema.Types.ObjectId, ref: 'Expense' }],
+      debitNoteIds: [{ type: Schema.Types.ObjectId, ref: 'DebitNote' }]
     },
     default: {}
   },
@@ -176,6 +178,7 @@ VoucherSchema.index({ vendorName: 1 }); // ✅ ADDED
 VoucherSchema.index({ 'connectedDocuments.invoiceIds': 1 });
 VoucherSchema.index({ 'connectedDocuments.purchaseIds': 1 });
 VoucherSchema.index({ 'connectedDocuments.expenseIds': 1 });
+VoucherSchema.index({ 'connectedDocuments.debitNoteIds': 1 });
 VoucherSchema.index({ 'allocations.documentId': 1 });
 
 // Pre-save validation

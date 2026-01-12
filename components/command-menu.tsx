@@ -65,6 +65,8 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Quotations": { invoice: ["read"] },
   "Invoices": { invoice: ["read"] },
   "Vouchers": { voucher: ["read"] },
+  "Debit Notes": { debitNote: ["read"] },
+  "Credit Notes": { creditNote: ["read"] },
   "Delivery notes": { deliveryNote: ["read"] },
   "Purchases": { purchase: ["read"] },
   "Expenses": { expense: ["read"] },
@@ -109,11 +111,13 @@ const navigationData = [
   { title: "Quotations", url: "/documents/quotations", icon: FileClock, group: "Documents" },
   { title: "Invoices", url: "/documents/invoices", icon: FileText, group: "Documents" },
   { title: "Vouchers", url: "/documents/vouchers", icon: Ticket, group: "Documents" },
+  { title: "Debit Notes", url: "/documents/debit-notes", icon: ClipboardCheck, group: "Documents" },
+  { title: "Credit Notes", url: "/documents/credit-notes", icon: ClipboardCheck, group: "Documents" },
   { title: "Delivery notes", url: "/documents/delivery-notes", icon: Truck, group: "Documents" },
 
   // Expenses
-  { title: "Purchases", url: "/purchases", icon: ShoppingCart, group: "Expenses" },
-  { title: "Expenses", url: "/expenses", icon: Banknote, group: "Expenses" },
+  { title: "Purchases", url: "/expenses/purchases", icon: ShoppingCart, group: "Expenses" },
+  { title: "Expenses", url: "/expenses/expenses", icon: Banknote, group: "Expenses" },
   { title: "Return Notes", url: "/expenses/return-notes", icon: Undo2, group: "Expenses" },
 
   // Reports

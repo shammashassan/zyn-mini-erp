@@ -34,10 +34,12 @@ const routeGroups: Record<string, { label: string; path: string }[]> = {
     { label: "Trial Balance", path: "/accounting/trial-balance" },
   ],
   documents: [
-    { label: "Delivery Notes", path: "/documents/delivery-notes" },
     { label: "Invoices", path: "/documents/invoices" },
     { label: "Quotations", path: "/documents/quotations" },
     { label: "Vouchers", path: "/documents/vouchers" },
+    { label: "Debit Notes", path: "/documents/debit-notes" },
+    { label: "Credit Notes", path: "/documents/credit-notes" },
+    { label: "Delivery Notes", path: "/documents/delivery-notes" },
   ],
   hrm: [
     { label: "Employees", path: "/hrm/employees" },

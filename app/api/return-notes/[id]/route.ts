@@ -1,10 +1,11 @@
-// app/api/return-notes/[id]/route.ts - UPDATED: No Commercial Fields
+// app/api/return-notes/[id]/route.ts - GET & PUT handlers - UPDATED: Use connectedDocuments structure
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import ReturnNote from "@/models/ReturnNote";
 import Purchase from "@/models/Purchase";
 import Material from "@/models/Material";
+import DebitNote from "@/models/DebitNote";
 import StockAdjustment from "@/models/StockAdjustment";
 import { softDelete } from "@/utils/softDelete";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
@@ -25,15 +26,18 @@ export async function GET(request: Request, context: RequestContext) {
     });
     if (error) return error;
 
+    const _ensureModels = [DebitNote, Purchase, Material];
+
+    // ✅ UPDATED: Populate from connectedDocuments.purchaseId
     const returnNote = await ReturnNote.findById(id)
       .populate({
-        path: 'purchaseId',
+        path: 'connectedDocuments.purchaseId',
         select: 'referenceNumber supplierName items inventoryStatus',
         match: { isDeleted: false }
       })
       .populate({
         path: 'connectedDocuments.debitNoteId',
-        select: 'debitNoteNumber',
+        select: 'debitNoteNumber status',
         match: { isDeleted: false }
       });
 
@@ -105,7 +109,8 @@ export async function PUT(request: Request, context: RequestContext) {
     if (oldStatus !== 'approved' && newStatus === 'approved') {
       console.log(`📦 Approving return note ${currentReturnNote.returnNumber}...`);
 
-      const purchase = await Purchase.findById(currentReturnNote.purchaseId);
+      // ✅ UPDATED: Use connectedDocuments.purchaseId
+      const purchase = await Purchase.findById(currentReturnNote.connectedDocuments.purchaseId);
       if (!purchase || purchase.isDeleted) {
         return NextResponse.json({
           error: "Associated purchase not found"
@@ -165,7 +170,8 @@ export async function PUT(request: Request, context: RequestContext) {
     if (oldStatus === 'approved' && newStatus !== 'approved') {
       console.log(`🔄 Reversing return note ${currentReturnNote.returnNumber}...`);
 
-      const purchase = await Purchase.findById(currentReturnNote.purchaseId);
+      // ✅ UPDATED: Use connectedDocuments.purchaseId
+      const purchase = await Purchase.findById(currentReturnNote.connectedDocuments.purchaseId);
       if (purchase && !purchase.isDeleted) {
         // Reverse purchase item returned quantities
         for (const returnItem of currentReturnNote.items) {
@@ -269,7 +275,7 @@ export async function DELETE(request: Request, context: RequestContext) {
     if (returnNote.status === 'approved') {
       console.log(`🔄 Reversing approved return note ${returnNote.returnNumber}...`);
 
-      const purchase = await Purchase.findById(returnNote.purchaseId);
+      const purchase = await Purchase.findById(returnNote.connectedDocuments.purchaseId);
       if (purchase && !purchase.isDeleted) {
         // Reverse purchase item returned quantities
         for (const returnItem of returnNote.items) {
@@ -282,6 +288,15 @@ export async function DELETE(request: Request, context: RequestContext) {
             purchase.items[purchaseItemIndex].returnedQuantity = Math.max(0, currentReturned - returnItem.returnQuantity);
           }
         }
+
+        // ✅ NEW: Remove return note ID from purchase connectedDocuments
+        const updatedReturnNoteIds = (purchase.connectedDocuments?.returnNoteIds || [])
+          .filter((rid: any) => rid.toString() !== id);
+
+        purchase.connectedDocuments = {
+          ...purchase.connectedDocuments,
+          returnNoteIds: updatedReturnNoteIds
+        };
 
         purchase.addAuditEntry(
           `Return Note ${returnNote.returnNumber} deleted`,
@@ -316,6 +331,26 @@ export async function DELETE(request: Request, context: RequestContext) {
 
           await newAdjustment.save();
         }
+      }
+    } else {
+      // ✅ NEW: Even if not approved, remove from purchase connectedDocuments
+      const purchase = await Purchase.findById(returnNote.connectedDocuments.purchaseId);
+      if (purchase && !purchase.isDeleted) {
+        const updatedReturnNoteIds = (purchase.connectedDocuments?.returnNoteIds || [])
+          .filter((rid: any) => rid.toString() !== id);
+
+        purchase.connectedDocuments = {
+          ...purchase.connectedDocuments,
+          returnNoteIds: updatedReturnNoteIds
+        };
+
+        purchase.addAuditEntry(
+          `Return Note ${returnNote.returnNumber} deleted`,
+          user.id,
+          user.username || user.name
+        );
+
+        await purchase.save();
       }
     }
 

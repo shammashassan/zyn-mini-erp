@@ -468,6 +468,197 @@ async function extractPurchasePartyAndItemInfo(purchase: any) {
 }
 
 /**
+ * Helper: Extract party and item info from debit note
+ */
+async function extractDebitNotePartyAndItemInfo(debitNote: any) {
+  const result: {
+    partyType?: 'Supplier' | 'Vendor';
+    partyId?: string;
+    partyName?: string;
+    itemType?: 'Material';
+    itemName?: string;
+  } = {};
+
+  if (debitNote.supplierName) {
+    result.partyName = debitNote.supplierName;
+    
+    try {
+      const Supplier = (await import('@/models/Supplier')).default;
+      const supplier = await Supplier.findOne({ name: debitNote.supplierName, isDeleted: false });
+      if (supplier) {
+        result.partyType = 'Supplier';
+        result.partyId = supplier._id.toString();
+      } else {
+        result.partyType = 'Vendor';
+      }
+    } catch (error) {
+      result.partyType = 'Vendor';
+    }
+  }
+
+  if (debitNote.items && debitNote.items.length > 0) {
+    const firstItem = debitNote.items[0];
+    if (firstItem.materialName) {
+      result.itemType = 'Material';
+      result.itemName = firstItem.materialName;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Auto-create journal entry for Debit Note (Approved only)
+ */
+export async function createJournalForDebitNote(
+  debitNote: any,
+  userId: string | null = null,
+  username: string | null = null
+) {
+  try {
+    if (debitNote.status !== 'approved') {
+      console.log(`⭕ Skipping journal creation - debit note status is '${debitNote.status}', not 'approved'`);
+      return null;
+    }
+
+    const entries: JournalEntryData[] = [];
+    const { partyType, partyId, partyName, itemType, itemName } = await extractDebitNotePartyAndItemInfo(debitNote);
+
+    const grossTotal = Number(debitNote.totalAmount) || 0;
+    const discount = Number(debitNote.discount) || 0;
+    const subtotal = grossTotal - discount;
+    const vatAmount = debitNote.isTaxPayable ? (subtotal * 0.05) : 0;
+    const grandTotal = subtotal + vatAmount;
+
+    const narration = debitNote.debitType === 'return'
+      ? `Debit Note for Return ${debitNote.returnNumber || 'N/A'} - ${debitNote.items.length} item(s) returned`
+      : `Debit Note ${debitNote.debitNoteNumber} - ${debitNote.reason || 'Adjustment'}`;
+
+    // Dr. Accounts Payable = Grand Total
+    entries.push({
+      accountCode: 'L1001',
+      accountName: 'Accounts Payable',
+      debit: grandTotal,
+      credit: 0,
+    });
+
+    // Cr. Inventory = Subtotal (after discount)
+    if (debitNote.debitType === 'return' || debitNote.debitType === 'adjustment') {
+      entries.push({
+        accountCode: 'A1200',
+        accountName: 'Inventory',
+        debit: 0,
+        credit: subtotal,
+      });
+    } else {
+      // Standalone debit notes credit COGS
+      entries.push({
+        accountCode: 'X1001',
+        accountName: 'Cost of Goods Sold',
+        debit: 0,
+        credit: subtotal,
+      });
+    }
+
+    // Cr. VAT Receivable (if tax payable)
+    if (debitNote.isTaxPayable && vatAmount > 0) {
+      entries.push({
+        accountCode: 'A1300',
+        accountName: 'VAT Receivable',
+        debit: 0,
+        credit: vatAmount,
+      });
+    }
+
+    const totalDebit = entries.reduce((sum, e) => sum + e.debit, 0);
+    const totalCredit = entries.reduce((sum, e) => sum + e.credit, 0);
+    
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      throw new Error(
+        `Journal entry is not balanced! Debit: ${totalDebit.toFixed(2)}, Credit: ${totalCredit.toFixed(2)}`
+      );
+    }
+
+    const journalNumber = await generateInvoiceNumber('journal');
+
+    const journal = new Journal({
+      journalNumber,
+      entryDate: debitNote.debitDate || new Date(),
+      referenceType: 'DebitNote',
+      referenceId: debitNote._id,
+      referenceNumber: debitNote.debitNoteNumber,
+      
+      partyType,
+      partyId,
+      partyName,
+      itemType,
+      itemName,
+      
+      narration,
+      entries,
+      totalDebit,
+      totalCredit,
+      status: 'posted',
+      createdBy: userId,
+      postedBy: userId,
+      postedAt: new Date(),
+      actionHistory: [{
+        action: 'Auto-created from Debit Note (Approved)',
+        userId,
+        username,
+        timestamp: new Date(),
+      }],
+    });
+
+    await journal.save();
+    console.log(`✅ Journal entry ${journalNumber} created for debit note ${debitNote.debitNoteNumber}`);
+    if (discount > 0) {
+      console.log(`   💰 Discount of ${discount.toFixed(2)} applied`);
+    }
+    return journal;
+  } catch (error) {
+    console.error('❌ Error creating journal for debit note:', error);
+    return null;
+  }
+}
+
+/**
+ * Handle journal for debit note status change
+ */
+export async function handleDebitNoteStatusChange(
+  debitNote: any,
+  oldStatus: string,
+  newStatus: string,
+  userId: string | null = null,
+  username: string | null = null
+) {
+  try {
+    console.log(`📄 Handling debit note status change: ${oldStatus} → ${newStatus}`);
+
+    // Void journal when moving away from 'approved'
+    if (oldStatus === 'approved' && newStatus !== 'approved') {
+      console.log('🔴 Voiding journal - status changed from approved');
+      await voidJournalsForReference(
+        debitNote._id,
+        userId,
+        username,
+        `Debit note status changed from ${oldStatus} to ${newStatus}`
+      );
+      return;
+    }
+
+    // Create journal when moving to 'approved'
+    if (oldStatus !== 'approved' && newStatus === 'approved') {
+      console.log('✅ Creating journal - status changed to approved');
+      await createJournalForDebitNote(debitNote, userId, username);
+      return;
+    }
+  } catch (error) {
+    console.error('Error handling debit note status change:', error);
+  }
+}
+
+/**
  * ✅ UPDATED: Auto-create journal entry for Purchase when inventoryStatus is 'received'
  */
 export async function createJournalForPurchase(

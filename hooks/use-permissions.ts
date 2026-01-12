@@ -209,6 +209,21 @@ export function useVoucherPermissions() {
   });
 }
 
+// Specific hook for debit note permissions
+export function useDebitNotePermissions() {
+  return usePermissions({
+    canRead: { debitNote: ["read"] },
+    canCreate: { debitNote: ["create"] },
+    canUpdate: { debitNote: ["update"] },
+    canUpdateStatus: { debitNote: ["update_status"] },
+    canDelete: { debitNote: ["soft_delete"] },
+    canViewTrash: { debitNote: ["view_trash"] },
+    canRestore: { debitNote: ["restore"] },
+    canPermanentDelete: { debitNote: ["permanent_delete"] },
+    canCreateReceipt: { debitNote: ["create_receipt"] },
+  });
+}
+
 // Specific hook for delivery notes
 export function useDeliveryNotePermissions() {
   return usePermissions({

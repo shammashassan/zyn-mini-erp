@@ -1,4 +1,4 @@
-// app/expenses/purchases/columns.tsx - UPDATED: Merged Total Amount into Payment Status
+// app/expenses/purchases/columns.tsx - UPDATED: Conditional Inventory Status & Payment Button
 
 "use client";
 
@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { IPurchase } from "@/models/Purchase";
 import { CreatePaymentModal } from "./CreatePaymentModal";
-import { ConnectedPaymentsBadges } from "./ConnectedPaymentsBadges";
+import { ConnectedDocumentsBadges } from "./ConnectedDocumentsBadges";
 import { PurchaseStatusUpdateModal } from "./PurchaseStatusUpdateModal";
 import { InventoryStatusUpdateModal } from "./InventoryStatusUpdateModal";
 import { formatCurrency } from "@/utils/formatters/currency";
@@ -95,7 +95,7 @@ const getInventoryStatusIcon = (status: string) => {
   }
 };
 
-// Payment Status helpers (unchanged)
+// Payment Status helpers
 const getPaymentStatusVariant = (status: string) => {
   switch (status) {
     case 'paid': return 'success';
@@ -124,6 +124,11 @@ const CreatePaymentButton = ({
   canCreatePayment: boolean;
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
+
+  // ✅ NEW: Hide button if purchase status is not 'approved'
+  if (purchase.purchaseStatus !== 'approved') {
+    return null;
+  }
 
   if (purchase.paymentStatus === 'paid' || !canCreatePayment) {
     return null;
@@ -181,7 +186,6 @@ const RowActions = ({
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
   const hasPayments = purchase.connectedDocuments?.paymentIds && purchase.connectedDocuments.paymentIds.length > 0;
 
-  // ✅ UPDATED: Can only edit when purchaseStatus is 'pending'
   const canEdit = canUpdate && purchase.purchaseStatus === 'pending';
 
   return (
@@ -281,7 +285,8 @@ export const getColumns = (
   canUpdate: boolean = true,
   canCreate: boolean = true,
   canUpdateStatus: boolean = true,
-  canCreatePayment: boolean = true
+  canCreatePayment: boolean = true,
+  onViewReturnNotePdf?: (returnNote: any) => void
 ): ColumnDef<IPurchase>[] => [
     {
       id: "date",
@@ -366,8 +371,6 @@ export const getColumns = (
         );
       },
     },
-    // ✅ MOVED Total Amount into Payment Status column & Removed independent Total Column
-    // ✅ NEW: Purchase Status Column
     {
       id: "purchaseStatus",
       accessorKey: "purchaseStatus",
@@ -424,7 +427,6 @@ export const getColumns = (
       },
       enableColumnFilter: true,
     },
-    // ✅ UPDATED: Inventory Status Column (with modal)
     {
       id: "inventoryStatus",
       accessorKey: "inventoryStatus",
@@ -435,37 +437,32 @@ export const getColumns = (
         const refresh = onRefresh || (() => { });
         const InventoryIcon = getInventoryStatusIcon(purchase.inventoryStatus);
 
-        if (!canUpdateStatus) {
-          return (
-            <Badge
-              variant={getInventoryStatusVariant(purchase.inventoryStatus) as any}
-              appearance="outline"
-              className="gap-1 pr-2.5 capitalize"
-            >
-              <InventoryIcon className="h-3 w-3" />
-              {purchase.inventoryStatus}
-            </Badge>
-          );
-        }
+        // ✅ NEW: Make badge non-clickable if purchase status is not 'approved'
+        const isClickable = canUpdateStatus && purchase.purchaseStatus === 'approved';
 
         return (
           <>
             <Badge
               variant={getInventoryStatusVariant(purchase.inventoryStatus) as any}
               appearance="outline"
-              className="gap-1 pr-2.5 cursor-pointer hover:bg-accent transition-colors capitalize"
-              onClick={() => setIsOpen(true)}
+              className={cn(
+                "gap-1 pr-2.5 capitalize",
+                isClickable ? "cursor-pointer hover:bg-accent transition-colors" : "cursor-default"
+              )}
+              onClick={() => isClickable && setIsOpen(true)}
             >
               <InventoryIcon className="h-3 w-3" />
               {purchase.inventoryStatus}
             </Badge>
 
-            <InventoryStatusUpdateModal
-              isOpen={isOpen}
-              onClose={() => setIsOpen(false)}
-              purchase={purchase as any}
-              onRefresh={refresh}
-            />
+            {isClickable && (
+              <InventoryStatusUpdateModal
+                isOpen={isOpen}
+                onClose={() => setIsOpen(false)}
+                purchase={purchase as any}
+                onRefresh={refresh}
+              />
+            )}
           </>
         );
       },
@@ -481,7 +478,6 @@ export const getColumns = (
       },
       enableColumnFilter: true,
     },
-    // Payment Status (Updated to include total)
     {
       id: "paymentStatus",
       accessorKey: "paymentStatus",
@@ -523,14 +519,15 @@ export const getColumns = (
       enableColumnFilter: true,
     },
     {
-      id: "connectedPayments",
-      header: "Connected Payments",
+      id: "connectedDocuments",
+      header: "Connected",
       cell: ({ row }) => {
         const purchase = row.original;
-        return onViewPdf ? (
-          <ConnectedPaymentsBadges
+        return (onViewPdf && onViewReturnNotePdf) ? (
+          <ConnectedDocumentsBadges
             purchase={purchase as any}
             onViewPdf={onViewPdf}
+            onViewReturnNotePdf={onViewReturnNotePdf}
           />
         ) : (
           <span className="text-sm text-muted-foreground">—</span>

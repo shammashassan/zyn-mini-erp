@@ -1,10 +1,11 @@
-// app/api/vouchers/trash/restore/route.ts - FIXED: Added Expense Validation
+// app/api/vouchers/trash/restore/route.ts - FIXED: Added Purchase Payment Validation (Invoice-Receipt Pattern)
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Voucher from "@/models/Voucher";
 import Purchase from "@/models/Purchase";
 import Invoice from "@/models/Invoice";
+import DebitNote from "@/models/DebitNote";
 import { restore } from "@/utils/softDelete";
 import { getVoidedJournalsForReference, createJournalWithDate } from "@/utils/journalManager";
 import { formatCurrency } from "@/utils/formatters/currency";
@@ -111,6 +112,7 @@ export async function POST(request: Request) {
           }
         } 
         
+        // ✅ PAYMENT VOUCHER - SAME VALIDATION AS RECEIPT
         else if (allocation.documentType === 'purchase') {
           const purchase = await Purchase.findById(allocation.documentId);
 
@@ -144,7 +146,6 @@ export async function POST(request: Request) {
           }
         }
         
-        // ✅ NEW: EXPENSE VALIDATION
         else if (allocation.documentType === 'expense') {
           const Expense = (await import('@/models/Expense')).default;
           const expense = await Expense.findById(allocation.documentId);
@@ -176,6 +177,39 @@ export async function POST(request: Request) {
             );
           } else {
             console.log(`   ✅ Valid: Has room for ${formatCurrency(expense.amount - currentAllocated)}`);
+          }
+        }
+        
+        else if (allocation.documentType === 'debitNote') {
+          const debitNote = await DebitNote.findById(allocation.documentId);
+
+          if (!debitNote || debitNote.isDeleted) {
+            restorationWarnings.push(
+              `Debit Note ${allocation.documentId} no longer exists or is deleted. ` +
+              `Allocation of ${formatCurrency(allocation.amount)} will be skipped.`
+            );
+            continue;
+          }
+
+          const currentAllocated = debitNote.getTotalAllocated();
+          const wouldBeAllocated = currentAllocated + allocation.amount;
+
+          console.log(`📝 Debit Note ${debitNote.debitNoteNumber}:`);
+          console.log(`   Current Allocated: ${formatCurrency(currentAllocated)}`);
+          console.log(`   Would Allocate: ${formatCurrency(allocation.amount)}`);
+          console.log(`   Total Would Be: ${formatCurrency(wouldBeAllocated)}`);
+          console.log(`   Debit Note Total: ${formatCurrency(debitNote.grandTotal)}`);
+
+          if (wouldBeAllocated > debitNote.grandTotal) {
+            restorationBlocked.push(
+              `Cannot restore: Allocation of ${formatCurrency(allocation.amount)} ` +
+              `to debit note ${debitNote.debitNoteNumber} would exceed its total. ` +
+              `Currently allocated: ${formatCurrency(currentAllocated)}, ` +
+              `Debit note total: ${formatCurrency(debitNote.grandTotal)}, ` +
+              `Available: ${formatCurrency(debitNote.grandTotal - currentAllocated)}`
+            );
+          } else {
+            console.log(`   ✅ Valid: Has room for ${formatCurrency(debitNote.grandTotal - currentAllocated)}`);
           }
         }
       }
@@ -308,6 +342,7 @@ export async function POST(request: Request) {
             }
           } 
           
+          // ✅ PAYMENT VOUCHER - SAME AS RECEIPT
           else if (allocation.documentType === 'purchase') {
             const purchase = await Purchase.findById(allocation.documentId);
 
@@ -372,6 +407,38 @@ export async function POST(request: Request) {
 
             console.log(`✅ Reapplied allocation to expense ${expense.referenceNumber}`);
           }
+          
+          else if (allocation.documentType === 'debitNote') {
+            const debitNote = await DebitNote.findById(allocation.documentId);
+
+            if (!debitNote || debitNote.isDeleted) {
+              reconnectionResults.push(`Skipped debit note ${allocation.documentId} (deleted or not found)`);
+              continue;
+            }
+
+            debitNote.allocateReceipt(restoredVoucher._id, allocation.amount);
+
+            const currentReceiptIds = debitNote.connectedDocuments?.receiptIds || [];
+            if (!currentReceiptIds.some((rid: any) => rid.toString() === id)) {
+              currentReceiptIds.push(id);
+              debitNote.connectedDocuments = debitNote.connectedDocuments || { receiptIds: [] };
+              debitNote.connectedDocuments.receiptIds = currentReceiptIds;
+            }
+
+            debitNote.addAuditEntry(
+              `Receipt voucher ${restoredVoucher.invoiceNumber} restored - allocated: ${formatCurrency(allocation.amount)}`,
+              user?.id || null,
+              user?.username || 'System'
+            );
+
+            await debitNote.save();
+
+            reconnectionResults.push(
+              `Allocated ${formatCurrency(allocation.amount)} to debit note ${debitNote.debitNoteNumber}`
+            );
+
+            console.log(`✅ Reapplied allocation to debit note ${debitNote.debitNoteNumber}`);
+          }
         } catch (allocationError: any) {
           console.error(`Failed to reapply allocation:`, allocationError);
           reconnectionResults.push(
@@ -382,7 +449,7 @@ export async function POST(request: Request) {
     }
 
     if (journalsToRecreate.length > 0) {
-      console.log(`🔄 Recreating ${journalsToRecreate.length} journal(s)...`);
+      console.log(`📄 Recreating ${journalsToRecreate.length} journal(s)...`);
 
       for (const voidedJournal of journalsToRecreate) {
         const journalData = {

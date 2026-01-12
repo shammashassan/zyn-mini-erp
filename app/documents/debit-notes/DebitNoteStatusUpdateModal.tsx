@@ -1,0 +1,215 @@
+// app/documents/debit-notes/DebitNoteStatusUpdateModal.tsx
+
+"use client";
+
+import React, { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { formatCurrency } from "@/utils/formatters/currency";
+import { Spinner } from "@/components/ui/spinner";
+import { AlertCircle } from "lucide-react";
+
+interface DebitNote {
+  _id: string;
+  status: 'pending' | 'approved' | 'cancelled';
+  supplierName?: string;
+  customerName?: string;
+  payeeName?: string;
+  vendorName?: string;
+  totalAmount: number;
+  grandTotal?: number;
+  vatAmount?: number;
+}
+
+interface DebitNoteStatusUpdateModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  debitNote: DebitNote;
+  onRefresh: () => void;
+}
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'approved': return 'success';
+    case 'pending': return 'warning';
+    case 'cancelled': return 'destructive';
+    default: return 'neutral';
+  }
+};
+
+export function DebitNoteStatusUpdateModal({ 
+  isOpen, 
+  onClose, 
+  debitNote, 
+  onRefresh 
+}: DebitNoteStatusUpdateModalProps) {
+  const [initialStatus, setInitialStatus] = useState(debitNote.status);
+  const [newStatus, setNewStatus] = useState(debitNote.status);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const availableStatuses: DebitNote['status'][] = ['pending', 'approved', 'cancelled'];
+  const displayTotal = debitNote.grandTotal || (debitNote.totalAmount + (debitNote.vatAmount || 0));
+
+  useEffect(() => {
+    if (isOpen) {
+      setInitialStatus(debitNote.status);
+      setNewStatus(debitNote.status);
+    }
+  }, [isOpen, debitNote.status]);
+
+  const handleUpdateStatus = async () => {
+    setIsLoading(true);
+    
+    try {
+      const updateData = { 
+        status: newStatus
+      };
+
+      const res = await fetch(`/api/debit-notes/${debitNote._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+      });
+
+      if (res.ok) {
+        toast.success('Debit note status updated successfully');
+        onClose();
+        onRefresh();
+      } else {
+        const error = await res.json();
+        toast.error(error.error || 'Failed to update status');
+      }
+    } catch (error) {
+      console.error('Status update error:', error);
+      toast.error('An error occurred while updating status');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Update Debit Note Status</DialogTitle>
+          <DialogDescription>
+            Change the status for this debit note
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Debit Note Info */}
+          <div className="rounded-lg border p-3 bg-muted/50 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">{debitNote.supplierName ? 'Supplier' : debitNote.customerName ? 'Customer' : debitNote.payeeName ? 'Payee' : debitNote.vendorName ? 'Vendor' : ''}:</span>
+              <span className="font-medium">
+                {debitNote.supplierName || debitNote.customerName || debitNote.payeeName || debitNote.vendorName || 'N/A'}
+              </span>
+            </div>
+            <div className="flex justify-between mt-2">
+              <span className="text-muted-foreground">Total:</span>
+              <span className="font-medium">{formatCurrency(displayTotal)}</span>
+            </div>
+          </div>
+
+          {/* Status Warning */}
+          {newStatus === 'approved' && initialStatus !== 'approved' && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-blue-900 dark:text-blue-100">
+                    Approving this debit note
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This will create a journal entry crediting inventory/COGS and debiting accounts payable.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {initialStatus === 'approved' && newStatus !== 'approved' && (
+            <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-orange-900 dark:text-orange-100">
+                    ⚠️ Reversing approved status
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This will void the associated journal entry.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Status Selection */}
+          <div className="grid grid-cols-3 gap-2">
+            {availableStatuses.map((status) => (
+              <Button
+                key={status}
+                variant={newStatus === status ? 'default' : 'outline'}
+                onClick={() => setNewStatus(status)}
+                className="capitalize"
+              >
+                {status}
+              </Button>
+            ))}
+          </div>
+
+          {/* Status Comparison */}
+          <div className="flex items-center justify-between p-3 bg-muted rounded-lg text-sm">
+            <div>
+              <span className="text-muted-foreground">Current:</span>
+              <Badge
+                variant={getStatusColor(initialStatus) as any}
+                className="ml-2 capitalize"
+                appearance="outline"
+              >
+                {initialStatus}
+              </Badge>
+            </div>
+            <div>
+              <span className="text-muted-foreground">New:</span>
+              <Badge
+                variant={getStatusColor(newStatus) as any}
+                className="ml-2 capitalize"
+                appearance="outline"
+              >
+                {newStatus}
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleUpdateStatus}
+            disabled={isLoading || newStatus === initialStatus}
+          >
+            {isLoading ? (
+              <>
+                <Spinner />
+                Updating...
+              </>
+            ) : 'Update Status'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

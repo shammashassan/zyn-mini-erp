@@ -1,10 +1,11 @@
-// app/api/return-notes/route.ts - UPDATED: No Commercial Fields
+// app/api/return-notes/route.ts - UPDATED: Bidirectional Connected Documents
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import ReturnNote from "@/models/ReturnNote";
 import Purchase from "@/models/Purchase";
 import Material from "@/models/Material";
+import DebitNote from "@/models/DebitNote";
 import StockAdjustment from "@/models/StockAdjustment";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
@@ -18,6 +19,8 @@ export async function GET(request: Request) {
     if (error) return error;
 
     await dbConnect();
+
+    const _ensureModels = [DebitNote, Purchase, Material];
 
     const { searchParams } = new URL(request.url);
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
@@ -46,13 +49,13 @@ export async function GET(request: Request) {
 
       const populateOptions = populate ? [
         {
-          path: 'purchaseId',
+          path: 'connectedDocuments.purchaseId',
           select: 'referenceNumber supplierName items inventoryStatus',
           match: { isDeleted: false }
         },
         {
           path: 'connectedDocuments.debitNoteId',
-          select: 'debitNoteNumber',
+          select: 'debitNoteNumber status',
           match: { isDeleted: false }
         }
       ] : undefined;
@@ -93,13 +96,13 @@ export async function GET(request: Request) {
       if (populate) {
         query = query
           .populate({
-            path: 'purchaseId',
+            path: 'connectedDocuments.purchaseId',
             select: 'referenceNumber supplierName items inventoryStatus',
             match: { isDeleted: false }
           })
           .populate({
             path: 'connectedDocuments.debitNoteId',
-            select: 'debitNoteNumber',
+            select: 'debitNoteNumber status',
             match: { isDeleted: false }
           });
       }
@@ -197,10 +200,9 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    // Create return note (quantity-only, no commercial fields)
+    // ✅ UPDATED: Create return note with connectedDocuments structure
     const newReturnNote = new ReturnNote({
       returnNumber,
-      purchaseId: purchase._id,
       purchaseReference: purchase.referenceNumber,
       supplierName: purchase.supplierName,
       items,
@@ -208,6 +210,9 @@ export async function POST(request: Request) {
       reason,
       notes,
       status,
+      connectedDocuments: {
+        purchaseId: purchase._id
+      },
       isDeleted: false,
       deletedAt: null,
       deletedBy: null,
@@ -222,6 +227,16 @@ export async function POST(request: Request) {
     });
 
     const savedReturnNote = await newReturnNote.save();
+
+    // ✅ NEW: Add return note ID to purchase connectedDocuments
+    const currentReturnNoteIds = purchase.connectedDocuments?.returnNoteIds || [];
+    if (!currentReturnNoteIds.some((rid: any) => rid.toString() === savedReturnNote._id.toString())) {
+      currentReturnNoteIds.push(savedReturnNote._id);
+      purchase.connectedDocuments = {
+        ...purchase.connectedDocuments,
+        returnNoteIds: currentReturnNoteIds
+      };
+    }
 
     // If status is 'approved', process the return immediately
     if (status === 'approved') {
@@ -272,6 +287,9 @@ export async function POST(request: Request) {
       }
 
       console.log(`✅ Return Note ${returnNumber} approved - stock reduced`);
+    } else {
+      // Just save purchase with new return note reference
+      await purchase.save();
     }
 
     return NextResponse.json({

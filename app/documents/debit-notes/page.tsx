@@ -1,23 +1,23 @@
-// app/expenses/return-notes/page.tsx - UPDATED: Proper PDF handler naming
+// app/documents/debit-notes/page.tsx - UPDATED: Proper PDF handler naming
 
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import { toast } from "sonner";
-import { PackageX, Plus, Trash2, CalendarIcon } from "lucide-react";
+import { FileText, Plus, Trash2, CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useDataTable } from "@/hooks/use-data-table";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { DataTable } from "@/components/data-table/data-table";
-import { ReturnNoteForm } from "./return-note-form";
-import { getColumns, type ReturnNote } from "./columns";
-import { ReturnNoteViewModal } from "./ReturnNoteViewModal";
+import { DebitNoteForm } from "./debit-note-form";
+import { getColumns, type DebitNote } from "./columns";
+import { DebitNoteViewModal } from "./DebitNoteViewModal";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
-import { PurchaseViewModal } from "@/app/expenses/purchases/PurchaseViewModal";
+import { CreateReceiptModal } from "./CreateReceiptModal";
 import Link from "next/link";
-import { useReturnNotePermissions } from "@/hooks/use-permissions";
+import { useDebitNotePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { useQueryStates, parseAsInteger } from "nuqs";
@@ -37,22 +37,20 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
 
-function ReturnNotesPageContent() {
-  const [returnNotes, setReturnNotes] = useState<ReturnNote[]>([]);
+function DebitNotesPageContent() {
+  const [debitNotes, setDebitNotes] = useState<DebitNote[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedReturnNote, setSelectedReturnNote] = useState<ReturnNote | null>(null);
+  const [selectedDebitNote, setSelectedDebitNote] = useState<DebitNote | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [returnNoteToView, setReturnNoteToView] = useState<ReturnNote | null>(null);
+  const [debitNoteToView, setDebitNoteToView] = useState<DebitNote | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPdfUrl, setSelectedPdfUrl] = useState("");
   const [selectedPdfTitle, setSelectedPdfTitle] = useState("");
-
-  // Purchase View Modal States
-  const [purchaseViewModalOpen, setPurchaseViewModalOpen] = useState(false);
-  const [purchaseToView, setPurchaseToView] = useState<any | null>(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [debitNoteForReceipt, setDebitNoteForReceipt] = useState<DebitNote | null>(null);
 
   // Date Range State (Default 6 months)
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -69,8 +67,8 @@ function ReturnNotesPageContent() {
   const [urlState, setUrlState] = useQueryStates({
     page: parseAsInteger.withDefault(1),
     pageSize: parseAsInteger.withDefault(10),
-    sort: getSortingStateParser<ReturnNote>().withDefault([{ id: "returnDate", desc: true }]),
-    filters: getFiltersStateParser<ReturnNote>().withDefault([]),
+    sort: getSortingStateParser<DebitNote>().withDefault([{ id: "debitDate", desc: true }]),
+    filters: getFiltersStateParser<DebitNote>().withDefault([]),
   });
 
   const {
@@ -80,17 +78,19 @@ function ReturnNotesPageContent() {
       canUpdate,
       canDelete,
       canViewTrash,
+      canUpdateStatus,
+      canCreateReceipt,
     },
     session,
     isPending,
-  } = useReturnNotePermissions();
+  } = useDebitNotePermissions();
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Fetch return notes with optional background mode
-  const fetchReturnNotes = useCallback(
+  // Fetch debit notes with optional background mode
+  const fetchDebitNotes = useCallback(
     async (background = false) => {
       if (!canRead) return;
 
@@ -121,27 +121,27 @@ function ReturnNotesPageContent() {
           params.append("filters", JSON.stringify(urlState.filters));
         }
 
-        const res = await fetch(`/api/return-notes?${params.toString()}`);
+        const res = await fetch(`/api/debit-notes?${params.toString()}`);
 
         if (res.status === 403) {
-          if (!background) toast.error("You don't have permission to view return notes");
+          if (!background) toast.error("You don't have permission to view debit notes");
           return;
         }
 
-        if (!res.ok) throw new Error("Failed to fetch return notes");
+        if (!res.ok) throw new Error("Failed to fetch debit notes");
 
         const result = await res.json();
 
         if (result.data && result.pageCount !== undefined) {
-          setReturnNotes(result.data);
+          setDebitNotes(result.data);
           setPageCount(result.pageCount);
           setTotalCount(result.totalCount);
         } else {
-          setReturnNotes(result);
+          setDebitNotes(result);
         }
       } catch (error) {
         if (!background) {
-          toast.error("Could not load return notes.");
+          toast.error("Could not load debit notes.");
           console.error(error);
         }
       } finally {
@@ -157,22 +157,21 @@ function ReturnNotesPageContent() {
   // Standard fetch on dependency change
   useEffect(() => {
     if (session && canRead) {
-      fetchReturnNotes();
+      fetchDebitNotes();
     } else if (session && !canRead) {
-      toast.error("You don't have permission to view return notes", {
+      toast.error("You don't have permission to view debit notes", {
         description: "Only authorized users can access this page",
       });
       setIsLoading(false);
       setIsInitialLoad(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canRead, fetchReturnNotes]);
+  }, [canRead, fetchDebitNotes, session]);
 
   // Window Focus Listener - SILENT MODE
   useEffect(() => {
     const onFocus = () => {
       if (session && canRead) {
-        fetchReturnNotes(true);
+        fetchDebitNotes(true);
       }
     };
 
@@ -181,27 +180,27 @@ function ReturnNotesPageContent() {
     return () => {
       window.removeEventListener("focus", onFocus);
     };
-  }, [fetchReturnNotes, session, canRead]);
+  }, [fetchDebitNotes, session, canRead]);
 
-  const handleOpenForm = (returnNote: ReturnNote | null = null) => {
-    if (returnNote && !canUpdate) {
-      toast.error("You don't have permission to edit return notes");
+  const handleOpenForm = (debitNote: DebitNote | null = null) => {
+    if (debitNote && !canUpdate) {
+      toast.error("You don't have permission to edit debit notes");
       return;
     }
 
-    if (returnNote && returnNote.status !== "pending") {
-      toast.error("Cannot edit return note", {
-        description: "Only pending return notes can be edited.",
+    if (debitNote && debitNote.status !== "pending") {
+      toast.error("Cannot edit debit note", {
+        description: "Only pending debit notes can be edited.",
       });
       return;
     }
 
-    if (!returnNote && !canCreate) {
-      toast.error("You don't have permission to create return notes");
+    if (!debitNote && !canCreate) {
+      toast.error("You don't have permission to create debit notes");
       return;
     }
 
-    setSelectedReturnNote(returnNote);
+    setSelectedDebitNote(debitNote);
     setIsFormOpen(true);
   };
 
@@ -209,17 +208,17 @@ function ReturnNotesPageContent() {
     if (isSubmittingRef.current) return;
 
     if (id && !canUpdate) {
-      toast.error("You don't have permission to update return notes");
+      toast.error("You don't have permission to update debit notes");
       return;
     }
     if (!id && !canCreate) {
-      toast.error("You don't have permission to create return notes");
+      toast.error("You don't have permission to create debit notes");
       return;
     }
 
     isSubmittingRef.current = true;
 
-    const url = id ? `/api/return-notes/${id}` : "/api/return-notes";
+    const url = id ? `/api/debit-notes/${id}` : "/api/debit-notes";
     const method = id ? "PUT" : "POST";
 
     try {
@@ -239,40 +238,39 @@ function ReturnNotesPageContent() {
       const result = await res.json();
 
       if (!res.ok) {
-        throw new Error(result.error || result.message || "Failed to save return note");
+        throw new Error(result.error || result.message || "Failed to save debit note");
       }
 
-      toast.success(`Return note ${id ? "updated" : "created"} successfully.`);
-      fetchReturnNotes();
+      toast.success(`Debit note ${id ? "updated" : "created"} successfully.`);
+      fetchDebitNotes();
       setIsFormOpen(false);
-      setSelectedReturnNote(null);
+      setSelectedDebitNote(null);
 
-      const savedReturnNote = result.returnNote || result;
-      
+      const savedDebitNote = result.debitNote || result;
+
       // Automatically open PDF viewer
-      setSelectedPdfUrl(`/api/return-notes/${savedReturnNote._id}/pdf`);
-      setSelectedPdfTitle(savedReturnNote.returnNumber || "Return Note");
+      setSelectedPdfUrl(`/api/debit-notes/${savedDebitNote._id}/pdf`);
+      setSelectedPdfTitle(savedDebitNote.debitNoteNumber || "Debit Note");
       setIsModalOpen(true);
-
     } catch (error: any) {
-      toast.error(error.message || `Failed to ${id ? "update" : "create"} return note.`);
+      toast.error(error.message || `Failed to ${id ? "update" : "create"} debit note.`);
     } finally {
       isSubmittingRef.current = false;
     }
   };
 
-  const handleDelete = async (selectedReturnNotes: ReturnNote[]) => {
+  const handleDelete = async (selectedDebitNotes: DebitNote[]) => {
     if (!canDelete) {
-      toast.error("You don't have permission to delete return notes");
+      toast.error("You don't have permission to delete debit notes");
       return;
     }
 
     try {
-      const deletePromises = selectedReturnNotes.map((returnNote) =>
-        fetch(`/api/return-notes/${returnNote._id}`, { method: "DELETE" }).then(
+      const deletePromises = selectedDebitNotes.map((debitNote) =>
+        fetch(`/api/debit-notes/${debitNote._id}`, { method: "DELETE" }).then(
           async (res) => {
             if (res.status === 403) {
-              throw new Error("You don't have permission to delete return notes");
+              throw new Error("You don't have permission to delete debit notes");
             }
             if (!res.ok) throw new Error("Failed to delete");
             return res.json();
@@ -282,93 +280,75 @@ function ReturnNotesPageContent() {
 
       await Promise.all(deletePromises);
 
-      toast.success(`${selectedReturnNotes.length} return note(s) moved to trash.`);
-      fetchReturnNotes();
+      toast.success(`${selectedDebitNotes.length} debit note(s) moved to trash.`);
+      fetchDebitNotes();
     } catch (error: any) {
-      console.error("Failed to delete return notes:", error);
-      toast.error(error.message || "Failed to delete return notes.");
+      console.error("Failed to delete debit notes:", error);
+      toast.error(error.message || "Failed to delete debit notes.");
     }
   };
 
-  const handleViewReturnNote = (returnNote: ReturnNote) => {
-    setReturnNoteToView(returnNote);
+  const handleViewDebitNote = (debitNote: DebitNote) => {
+    setDebitNoteToView(debitNote);
     setViewModalOpen(true);
   };
 
-  const handleViewPdf = useCallback((returnNote: ReturnNote) => {
+  const handleViewPdf = useCallback((debitNote: DebitNote) => {
+    if (!debitNote || !debitNote._id) {
+      toast.error("Cannot view PDF. Debit note data is missing.");
+      return;
+    }
+
+    const pdfUrl = `/api/debit-notes/${debitNote._id}/pdf`;
+    setSelectedPdfUrl(pdfUrl);
+    setSelectedPdfTitle(debitNote.debitNoteNumber || "Debit Note");
+    setIsModalOpen(true);
+  }, []);
+
+  // Handler for viewing receipt PDFs from connected documents
+  const handleViewReceiptPdf = useCallback((receipt: any) => {
+    if (!receipt || !receipt._id) {
+      toast.error("Cannot view PDF. Receipt data is missing.");
+      return;
+    }
+
+    const pdfUrl = `/api/vouchers/${receipt._id}/pdf`;
+    setSelectedPdfUrl(pdfUrl);
+    setSelectedPdfTitle(receipt.invoiceNumber || "Receipt");
+    setIsModalOpen(true);
+  }, []);
+
+  // NEW: Handler for viewing return note PDFs
+  const handleViewReturnNotePdf = useCallback((returnNote: any) => {
     if (!returnNote || !returnNote._id) {
       toast.error("Cannot view PDF. Return note data is missing.");
       return;
     }
-
     const pdfUrl = `/api/return-notes/${returnNote._id}/pdf`;
     setSelectedPdfUrl(pdfUrl);
     setSelectedPdfTitle(returnNote.returnNumber || "Return Note");
     setIsModalOpen(true);
   }, []);
 
-  // Handler for viewing connected purchase
-  const handleViewPurchase = useCallback(async (purchase: any) => {
-    if (!purchase || !purchase._id) {
-      toast.error("Cannot view purchase. Purchase data is missing.");
+  const handleCreateReceipt = (debitNote: DebitNote) => {
+    if (!canCreateReceipt) {
+      toast.error("You don't have permission to create receipts");
       return;
     }
 
-    try {
-      // Fetch full purchase details
-      const res = await fetch(`/api/purchases/${purchase._id}`);
-      if (res.ok) {
-        const fullPurchase = await res.json();
-        setPurchaseToView(fullPurchase);
-        setPurchaseViewModalOpen(true);
-      } else {
-        toast.error("Failed to load purchase details");
-      }
-    } catch (error) {
-      console.error("Error fetching purchase:", error);
-      toast.error("Error loading purchase details");
-    }
-  }, []);
-
-  // Handler for viewing PDFs of documents connected to purchases (from inside PurchaseViewModal)
-  const handleViewPurchaseDocumentPdf = useCallback((bill: any) => {
-    if (!bill || !bill._id) {
-      toast.error("Cannot view PDF. Document data is missing.");
+    if (debitNote.status !== "approved") {
+      toast.error("Can only create receipts for approved debit notes");
       return;
     }
 
-    let url = "";
-
-    const type = bill.documentType || bill.voucherType;
-    const number = bill.invoiceNumber || "";
-
-    if (type === 'payment' || number.startsWith('PAY')) {
-      url = `/api/vouchers/${bill._id}/pdf?type=payment`;
-    } else if (type === 'receipt' || number.startsWith('RCT')) {
-      url = `/api/vouchers/${bill._id}/pdf?type=receipt`;
-    } else if (number.startsWith('RTN')) {
-      url = `/api/return-notes/${bill._id}/pdf`;
-    } else {
-      toast.error("Unknown document type. Cannot generate PDF.");
+    if (debitNote.paymentStatus === "paid") {
+      toast.error("This debit note has already been fully paid");
       return;
     }
 
-    setSelectedPdfUrl(url);
-    setSelectedPdfTitle(bill.invoiceNumber || bill.returnNumber || "Document");
-    setIsModalOpen(true);
-  }, []);
-
-  // NEW: Handler for viewing debit note PDFs
-  const handleViewDebitNotePdf = useCallback((debitNote: any) => {
-    if (!debitNote || !debitNote._id) {
-      toast.error("Cannot view PDF. Debit note data is missing.");
-      return;
-    }
-    const pdfUrl = `/api/debit-notes/${debitNote._id}/pdf`;
-    setSelectedPdfUrl(pdfUrl);
-    setSelectedPdfTitle(debitNote.debitNoteNumber || "Debit Note");
-    setIsModalOpen(true);
-  }, []);
+    setDebitNoteForReceipt(debitNote);
+    setIsReceiptModalOpen(true);
+  };
 
   const handleQuickSelect = (period: string) => {
     const now = new Date();
@@ -409,23 +389,23 @@ function ReturnNotesPageContent() {
       getColumns(
         handleOpenForm,
         (id: string) => {
-          const returnNoteToDelete = returnNotes.find((r) => String(r._id) === id);
-          if (returnNoteToDelete) {
-            handleDelete([returnNoteToDelete]);
+          const debitNoteToDelete = debitNotes.find((d) => String(d._id) === id);
+          if (debitNoteToDelete) {
+            handleDelete([debitNoteToDelete]);
           }
         },
-        { canUpdate, canDelete, canUpdateStatus: canUpdate },
-        handleViewReturnNote,
+        { canUpdate, canDelete, canUpdateStatus, canCreateReceipt },
+        handleViewDebitNote,
         handleViewPdf,
-        fetchReturnNotes,
-        handleViewPurchase,
-        handleViewDebitNotePdf // NEW: For debit notes
+        fetchDebitNotes,
+        handleViewReceiptPdf,
+        handleViewReturnNotePdf // NEW: For return notes
       ),
-    [returnNotes, canUpdate, canDelete, handleViewPdf, fetchReturnNotes, handleViewPurchase, handleViewDebitNotePdf]
+    [debitNotes, canUpdate, canDelete, canUpdateStatus, canCreateReceipt, handleViewPdf, fetchDebitNotes, handleViewReceiptPdf, handleViewReturnNotePdf]
   );
 
-  const { table } = useDataTable<ReturnNote>({
-    data: returnNotes,
+  const { table } = useDataTable<DebitNote>({
+    data: debitNotes,
     columns,
     pageCount,
     initialState: {
@@ -443,11 +423,11 @@ function ReturnNotesPageContent() {
       });
     },
     onSortingChange: (sorting) => {
-      setUrlState({ sort: sorting as ExtendedColumnSort<ReturnNote>[] });
+      setUrlState({ sort: sorting as ExtendedColumnSort<DebitNote>[] });
     },
     onColumnFiltersChange: (filters) => {
       setUrlState({
-        filters: filters as ExtendedColumnFilter<ReturnNote>[],
+        filters: filters as ExtendedColumnFilter<DebitNote>[],
         page: 1,
       });
     },
@@ -475,11 +455,11 @@ function ReturnNotesPageContent() {
               {/* Left: Title */}
               <div className="flex items-center gap-3 self-start lg:self-center">
                 <div className="p-3 bg-primary/10 rounded-full">
-                  <PackageX className="h-8 w-8 text-primary" />
+                  <FileText className="h-8 w-8 text-primary" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h1 className="text-3xl font-bold tracking-tight">Return Notes</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">Debit Notes</h1>
                     {totalCount > 0 && (
                       <Badge variant="primary" appearance="outline">
                         {totalCount}
@@ -487,7 +467,7 @@ function ReturnNotesPageContent() {
                     )}
                   </div>
                   <p className="text-muted-foreground">
-                    Track material returns to suppliers
+                    Track supplier debit notes and payment refunds
                   </p>
                 </div>
               </div>
@@ -497,7 +477,7 @@ function ReturnNotesPageContent() {
                 {/* Row 1: Actions */}
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                   {canViewTrash && (
-                    <Link href="./return-notes/trash" className="w-full sm:w-auto">
+                    <Link href="./debit-notes/trash" className="w-full sm:w-auto">
                       <Button variant="outline" className="gap-2 w-full sm:w-auto">
                         <Trash2 className="h-4 w-4" />
                         Trash
@@ -509,7 +489,7 @@ function ReturnNotesPageContent() {
                       onClick={() => handleOpenForm()}
                       className="gap-2 w-full sm:w-auto"
                     >
-                      <Plus className="h-4 w-4" /> Create Return Note
+                      <Plus className="h-4 w-4" /> Create Debit Note
                     </Button>
                   )}
                 </div>
@@ -595,16 +575,16 @@ function ReturnNotesPageContent() {
               </Card>
 
               {/* Empty State */}
-              {returnNotes.length === 0 && !isInitialLoad && !isLoading && canCreate && (
+              {debitNotes.length === 0 && !isInitialLoad && !isLoading && canCreate && (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">
-                    <PackageX className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No return notes yet</h3>
+                    <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No debit notes yet</h3>
                     <p className="text-muted-foreground text-center mb-4">
-                      Start tracking material returns by creating your first return note.
+                      Start tracking debit notes by creating your first one.
                     </p>
                     <Button onClick={() => handleOpenForm()} className="gap-2">
-                      <Plus className="h-4 w-4" /> Create Return Note
+                      <Plus className="h-4 w-4" /> Create Debit Note
                     </Button>
                   </CardContent>
                 </Card>
@@ -615,24 +595,26 @@ function ReturnNotesPageContent() {
       </div>
 
       {canCreate && (
-        <ReturnNoteForm
+        <DebitNoteForm
           isOpen={isFormOpen}
           onClose={() => {
             setIsFormOpen(false);
-            setSelectedReturnNote(null);
+            setSelectedDebitNote(null);
           }}
           onSubmit={handleFormSubmit}
-          defaultValues={selectedReturnNote}
+          defaultValues={selectedDebitNote}
         />
       )}
 
-      <ReturnNoteViewModal
+      <DebitNoteViewModal
         isOpen={viewModalOpen}
         onClose={() => {
           setViewModalOpen(false);
-          setReturnNoteToView(null);
+          setDebitNoteToView(null);
         }}
-        returnNote={returnNoteToView}
+        debitNote={debitNoteToView}
+        onCreateReceipt={handleCreateReceipt}
+        canCreateReceipt={canCreateReceipt}
       />
 
       <PDFViewerModal
@@ -642,16 +624,17 @@ function ReturnNotesPageContent() {
         title={selectedPdfTitle}
       />
 
-      <PurchaseViewModal
-        isOpen={purchaseViewModalOpen}
-        onClose={() => {
-          setPurchaseViewModalOpen(false);
-          setPurchaseToView(null);
-        }}
-        purchase={purchaseToView}
-        onViewPdf={handleViewPurchaseDocumentPdf}
-        onViewReturnNotePdf={handleViewPdf}
-      />
+      {canCreateReceipt && debitNoteForReceipt && (
+        <CreateReceiptModal
+          isOpen={isReceiptModalOpen}
+          onClose={() => {
+            setIsReceiptModalOpen(false);
+            setDebitNoteForReceipt(null);
+          }}
+          debitNote={debitNoteForReceipt}
+          onRefresh={fetchDebitNotes}
+        />
+      )}
     </>
   );
 }
@@ -665,7 +648,7 @@ export default function Component() {
         </div>
       }
     >
-      <ReturnNotesPageContent />
+      <DebitNotesPageContent />
     </Suspense>
   );
 }

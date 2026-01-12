@@ -1,4 +1,4 @@
-// app/expenses/return-notes/columns.tsx - UPDATED: Clickable Status Badge, No Commercial Fields
+// app/expenses/return-notes/columns.tsx - UPDATED: Use ReturnNoteConnectedDocumentsBadge
 
 "use client";
 
@@ -39,6 +39,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatDisplayDate, formatTime } from "@/utils/formatters/date";
 import { ReturnNoteStatusUpdateModal } from "./ReturnNoteStatusUpdateModal";
+import { ConnectedDocumentsBadges } from "./ConnectedDocumentsBadges";
 import { toast } from "sonner";
 
 export interface ReturnNote {
@@ -59,6 +60,7 @@ export interface ReturnNote {
   notes?: string;
   status: "pending" | "approved" | "cancelled";
   connectedDocuments?: {
+    purchaseId?: string | any;
     debitNoteId?: string | any;
   };
   isDeleted: boolean;
@@ -175,7 +177,6 @@ const RowActions = ({
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
   const { canUpdate, canDelete } = permissions;
 
-  // Can only edit pending return notes
   const canEdit = canUpdate && returnNote.status === "pending";
 
   return (
@@ -275,7 +276,9 @@ export const getColumns = (
   permissions: ReturnNotePermissions,
   onView?: (returnNote: ReturnNote) => void,
   onViewPdf?: (returnNote: ReturnNote) => void,
-  onRefresh?: () => void
+  onRefresh?: () => void,
+  onViewPurchase?: (purchase: any) => void,
+  onViewDebitNotePdf?: (debitNote: any) => void
 ): ColumnDef<ReturnNote>[] => [
   {
     id: "returnDate",
@@ -312,20 +315,6 @@ export const getColumns = (
     meta: {
       label: "Return No.",
       placeholder: "Search return no...",
-      variant: "text",
-    },
-    enableColumnFilter: true,
-  },
-  {
-    id: "purchaseReference",
-    accessorKey: "purchaseReference",
-    header: "Purchase",
-    cell: ({ row }) => (
-      <span className="font-mono text-sm">{row.getValue("purchaseReference")}</span>
-    ),
-    meta: {
-      label: "Purchase",
-      placeholder: "Search purchase...",
       variant: "text",
     },
     enableColumnFilter: true,
@@ -393,28 +382,18 @@ export const getColumns = (
     },
   },
   {
-    id: "reason",
-    accessorKey: "reason",
-    header: "Reason",
-    cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground max-w-[200px] truncate block">
-        {row.getValue("reason")}
-      </span>
-    ),
-  },
-  {
     id: "status",
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => {
       const returnNote = row.original;
       const refresh = onRefresh || (() => {});
-
+      
       return (
         <StatusBadgeButton
-          returnNote={returnNote}
-          onRefresh={refresh}
-          canUpdateStatus={permissions.canUpdateStatus}
+        returnNote={returnNote}
+        onRefresh={refresh}
+        canUpdateStatus={permissions.canUpdateStatus}
         />
       );
     },
@@ -428,6 +407,32 @@ export const getColumns = (
       ],
     },
     enableColumnFilter: true,
+  },
+  {
+    id: "reason",
+    accessorKey: "reason",
+    header: "Reason",
+    cell: ({ row }) => (
+      <span className="text-sm text-muted-foreground max-w-[200px] truncate block">
+        {row.getValue("reason")}
+      </span>
+    ),
+  },
+  {
+    id: "connectedDocuments",
+    header: "Connected",
+    cell: ({ row }) => {
+      const returnNote = row.original;
+      return (onViewPurchase && onViewDebitNotePdf) ? (
+        <ConnectedDocumentsBadges
+          returnNote={returnNote as any}
+          onViewPurchase={onViewPurchase}
+          onViewDebitNotePdf={onViewDebitNotePdf}
+        />
+      ) : (
+        <span className="text-sm text-muted-foreground">—</span>
+      );
+    },
   },
   {
     id: "actions",

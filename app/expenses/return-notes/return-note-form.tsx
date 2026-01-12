@@ -1,6 +1,8 @@
-// app/expenses/return-notes/return-note-form.tsx - UPDATED: Supplier → Purchase Flow, No Commercial Fields
+// app/expenses/return-notes/return-note-form.tsx - FIXED: All items showing + proper dirty detection
 
-import React, { useEffect, useState } from "react";
+"use client";
+
+import React, { useEffect, useState, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,18 +37,18 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
-import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ChevronsUpDown,
   Check,
   PackageX,
   AlertCircle,
   Calendar as CalendarIcon,
-  Loader2
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { Spinner } from "@/components/ui/spinner";
 
 type ReturnItem = {
   materialId: string;
@@ -96,7 +98,7 @@ export function ReturnNoteForm({
     setValue,
     control,
     reset,
-    formState: { isSubmitting, isDirty }
+    formState: { isSubmitting }
   } = useForm<ReturnNoteFormData>({
     defaultValues: {
       items: [],
@@ -117,8 +119,59 @@ export function ReturnNoteForm({
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [returnQuantities, setReturnQuantities] = useState<Record<string, number>>({});
   const [supplierSearchQuery, setSupplierSearchQuery] = useState("");
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  // ✅ NEW: Track initial state for dirty detection
+  const [initialState, setInitialState] = useState<{
+    selectedItems: Set<string>;
+    returnQuantities: Record<string, number>;
+    reason: string;
+    notes: string;
+    status: string;
+    returnDate: string;
+  } | null>(null);
 
   const isEditMode = !!defaultValues?._id;
+
+  // Watch form values for dirty detection
+  const currentReason = watch('reason');
+  const currentNotes = watch('notes');
+  const currentStatus = watch('status');
+  const currentReturnDate = watch('returnDate');
+
+  // ✅ Calculate if form is dirty
+  const isDirty = useMemo(() => {
+    if (!isEditMode || !initialState) return false;
+
+    // Check if selected items changed
+    if (selectedItems.size !== initialState.selectedItems.size) return true;
+    for (const item of selectedItems) {
+      if (!initialState.selectedItems.has(item)) return true;
+    }
+
+    // Check if return quantities changed
+    for (const [materialId, qty] of Object.entries(returnQuantities)) {
+      if (initialState.returnQuantities[materialId] !== qty) return true;
+    }
+
+    // Check if other fields changed
+    if (currentReason !== initialState.reason) return true;
+    if (currentNotes !== initialState.notes) return true;
+    if (currentStatus !== initialState.status) return true;
+
+    // Compare dates (normalize to same format)
+    const currentDateStr = currentReturnDate ? new Date(currentReturnDate).toISOString() : '';
+    if (currentDateStr !== initialState.returnDate) return true;
+
+    return false;
+  }, [isEditMode, initialState, selectedItems, returnQuantities, currentReason, currentNotes, currentStatus, currentReturnDate]);
+
+  useEffect(() => {
+    const checkIsDesktop = () => setIsDesktop(window.innerWidth >= 1024);
+    checkIsDesktop();
+    window.addEventListener("resize", checkIsDesktop);
+    return () => window.removeEventListener("resize", checkIsDesktop);
+  }, []);
 
   // Fetch suppliers
   useEffect(() => {
@@ -150,7 +203,6 @@ export function ReturnNoteForm({
         const res = await fetch('/api/purchases?populate=true');
         if (res.ok) {
           const allPurchases = await res.json();
-          // Filter to only show purchases with received/partially received status from selected supplier
           const eligiblePurchases = allPurchases.filter(
             (p: any) =>
               p.supplierName === selectedSupplier &&
@@ -167,6 +219,64 @@ export function ReturnNoteForm({
     fetchPurchases();
   }, [selectedSupplier]);
 
+  // ✅ FIXED: Handle edit mode - properly restore all state
+  useEffect(() => {
+    const loadEditData = async () => {
+      if (!isOpen || !isEditMode || !defaultValues) return;
+
+      // Extract purchaseId from connectedDocuments or direct field
+      const purchaseId =
+        defaultValues.connectedDocuments?.purchaseId?._id ||
+        defaultValues.connectedDocuments?.purchaseId ||
+        defaultValues.purchaseId;
+
+      if (!purchaseId) {
+        console.error("No purchase ID found in defaultValues");
+        return;
+      }
+
+      try {
+        // Fetch full purchase details
+        const res = await fetch(`/api/purchases/${purchaseId}`);
+        if (res.ok) {
+          const purchase = await res.json();
+          setSelectedPurchase(purchase);
+          setValue('purchaseId', purchase._id);
+
+          // ✅ Restore selected items from defaultValues
+          if (defaultValues.items && Array.isArray(defaultValues.items)) {
+            const itemIds = new Set<string>(
+              defaultValues.items.map((item: any) => String(item.materialId))
+            );
+            setSelectedItems(itemIds);
+
+            // ✅ Restore return quantities
+            const quantities: Record<string, number> = {};
+            defaultValues.items.forEach((item: any) => {
+              quantities[item.materialId] = item.returnQuantity;
+            });
+            setReturnQuantities(quantities);
+
+            // ✅ Set initial state for dirty detection
+            setInitialState({
+              selectedItems: new Set<string>(itemIds),
+              returnQuantities: { ...quantities },
+              reason: defaultValues.reason || '',
+              notes: defaultValues.notes || '',
+              status: defaultValues.status || 'pending',
+              returnDate: defaultValues.returnDate ? new Date(defaultValues.returnDate).toISOString() : new Date().toISOString()
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch purchase for edit:", error);
+        toast.error("Failed to load purchase details");
+      }
+    };
+
+    loadEditData();
+  }, [isOpen, isEditMode, defaultValues, setValue]);
+
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -175,13 +285,9 @@ export function ReturnNoteForm({
           ...defaultValues,
           returnDate: defaultValues.returnDate ? new Date(defaultValues.returnDate) : new Date()
         });
-        // Set supplier and purchase from default values
         if (defaultValues.supplierName) {
           setSelectedSupplier(defaultValues.supplierName);
           setSupplierSearchQuery(defaultValues.supplierName);
-        }
-        if (defaultValues.purchaseId) {
-          // Will be populated when purchases load
         }
       } else {
         reset({
@@ -196,6 +302,7 @@ export function ReturnNoteForm({
         setSelectedPurchase(null);
         setSelectedItems(new Set());
         setReturnQuantities({});
+        setInitialState(null);
       }
     }
   }, [isOpen, defaultValues, reset]);
@@ -205,11 +312,12 @@ export function ReturnNoteForm({
     setSupplierSearchQuery(supplier.name);
     setValue('supplierName', supplier.name);
     setSupplierPopoverOpen(false);
-    // Reset purchase selection when supplier changes
-    setSelectedPurchase(null);
-    setValue('purchaseId', '');
-    setSelectedItems(new Set());
-    setReturnQuantities({});
+    if (!isEditMode) {
+      setSelectedPurchase(null);
+      setValue('purchaseId', '');
+      setSelectedItems(new Set());
+      setReturnQuantities({});
+    }
   };
 
   const handlePurchaseSelect = (purchase: any) => {
@@ -264,6 +372,8 @@ export function ReturnNoteForm({
     return sum + (returnQuantities[materialId] || 0);
   }, 0);
 
+  const totalSelectedItems = selectedItems.size;
+
   const handleFormSubmit = async (data: ReturnNoteFormData) => {
     if (!selectedSupplier) {
       toast.error("Please select a supplier");
@@ -285,7 +395,6 @@ export function ReturnNoteForm({
       return;
     }
 
-    // Build items array
     const returnItems: ReturnItem[] = [];
     for (const materialId of selectedItems) {
       const item = selectedPurchase.items.find((i: any) => i.materialId === materialId);
@@ -323,358 +432,473 @@ export function ReturnNoteForm({
     await onSubmit(submitData, submissionId);
   };
 
+  // ✅ FIXED: Filter eligible items properly
+  const eligibleItems = useMemo(() => {
+    if (!selectedPurchase?.items) return [];
+
+    return selectedPurchase.items.filter((item: any) => {
+      const receivedQty = item.receivedQuantity || 0;
+      const returnedQty = item.returnedQuantity || 0;
+      return receivedQty > returnedQty;
+    });
+  }, [selectedPurchase]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] lg:max-w-3xl max-h-[90vh] overflow-y-auto sidebar-scroll">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PackageX className="h-5 w-5" />
-            {defaultValues ? "Edit Return Note" : "Create Return Note"}
+            {defaultValues ? "Edit Return Note" : "Create New Return Note"}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Selection</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Supplier Selection */}
-              <div className="space-y-2">
-                <Label>Supplier *</Label>
-                <Popover open={supplierPopoverOpen} onOpenChange={setSupplierPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-between"
-                      disabled={isEditMode}
-                    >
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+          {/* Top Row: Supplier, Purchase, Date */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Supplier Selection */}
+            <div className="space-y-2">
+              <Label>
+                Supplier Name <span className="text-destructive">*</span>
+              </Label>
+              <Popover open={supplierPopoverOpen} onOpenChange={setSupplierPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                    disabled={isEditMode}
+                  >
+                    <div className="truncate">
                       {selectedSupplier || "Select supplier..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <Command shouldFilter={false}>
-                      <CommandInput 
-                        placeholder="Search suppliers..." 
-                        value={supplierSearchQuery}
-                        onValueChange={setSupplierSearchQuery}
-                      />
-                      <CommandList
-                        className="max-h-[200px] overflow-y-auto"
-                        onWheel={(e) => e.stopPropagation()}
-                      >
-                        <CommandEmpty>No supplier found.</CommandEmpty>
-                        <CommandGroup>
-                          {suppliers
-                            .filter(supplier => 
-                              !supplierSearchQuery || 
-                              supplier.name.toLowerCase().includes(supplierSearchQuery.toLowerCase())
-                            )
-                            .map((supplier) => (
-                              <CommandItem
-                                key={supplier._id}
-                                value={supplier.name}
-                                onSelect={() => handleSupplierSelect(supplier)}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    selectedSupplier === supplier.name ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex-1">
-                                  <div className="font-medium">{supplier.name}</div>
-                                  {supplier.city && supplier.district && (
-                                    <div className="text-xs text-muted-foreground">
-                                      {supplier.city}, {supplier.district}
-                                    </div>
-                                  )}
-                                </div>
-                              </CommandItem>
-                            ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
+                    </div>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Search suppliers..."
+                      value={supplierSearchQuery}
+                      onValueChange={setSupplierSearchQuery}
+                    />
+                    <CommandList
+                      className="max-h-[200px] overflow-y-auto"
+                      onWheel={(e) => e.stopPropagation()}
+                    >
+                      <CommandEmpty>
+                        {supplierSearchQuery.trim() ? "No supplier found." : "Start typing to search..."}
+                      </CommandEmpty>
+                      <CommandGroup heading="Suppliers">
+                        {suppliers
+                          .filter(supplier =>
+                            !supplierSearchQuery ||
+                            supplier.name.toLowerCase().includes(supplierSearchQuery.toLowerCase())
+                          )
+                          .map((supplier) => (
+                            <CommandItem
+                              key={supplier._id}
+                              value={supplier.name}
+                              onSelect={() => handleSupplierSelect(supplier)}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedSupplier === supplier.name ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex-1">
+                                <span>{supplier.name}</span>
+                                {supplier.city && supplier.district && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {supplier.city}, {supplier.district}
+                                  </div>
+                                )}
+                              </div>
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
 
-              {/* Purchase Selection (only shows if supplier is selected) */}
-              {selectedSupplier && (
-                <div className="space-y-2">
-                  <Label>Purchase *</Label>
-                  <Popover open={purchasePopoverOpen} onOpenChange={setPurchasePopoverOpen}>
+            {/* Purchase Selection */}
+            <div className="space-y-2">
+              <Label>
+                Purchase <span className="text-destructive">*</span>
+              </Label>
+              <Popover open={purchasePopoverOpen} onOpenChange={setPurchasePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                    disabled={isEditMode || !selectedSupplier || purchases.length === 0}
+                  >
+                    <div className="truncate">
+                      {selectedPurchase
+                        ? selectedPurchase.referenceNumber
+                        : !selectedSupplier
+                          ? "Select supplier first..."
+                          : purchases.length === 0
+                            ? "No eligible purchases"
+                            : "Select purchase..."}
+                    </div>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search purchases..." />
+                    <CommandList
+                      className="max-h-[200px] overflow-y-auto"
+                      onWheel={(e) => e.stopPropagation()}
+                    >
+                      <CommandEmpty>No purchases found.</CommandEmpty>
+                      <CommandGroup>
+                        {purchases.map((purchase) => (
+                          <CommandItem
+                            key={purchase._id}
+                            value={purchase.referenceNumber}
+                            onSelect={() => handlePurchaseSelect(purchase)}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedPurchase?._id === purchase._id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium">{purchase.referenceNumber}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {purchase.inventoryStatus} • {purchase.items?.length || 0} items
+                              </div>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Return Date */}
+            <div className="space-y-2">
+              <Label>Return Date</Label>
+              <Controller
+                name="returnDate"
+                control={control}
+                render={({ field }) => (
+                  <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button
+                        ref={field.ref}
                         type="button"
                         variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                        disabled={isEditMode || purchases.length === 0}
-                      >
-                        {selectedPurchase
-                          ? `${selectedPurchase.referenceNumber}`
-                          : purchases.length === 0
-                          ? "No eligible purchases"
-                          : "Select purchase..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search purchases..." />
-                        <CommandList
-                          className="max-h-[200px] overflow-y-auto"
-                          onWheel={(e) => e.stopPropagation()}
-                        >
-                          <CommandEmpty>No purchases found.</CommandEmpty>
-                          <CommandGroup>
-                            {purchases.map((purchase) => (
-                              <CommandItem
-                                key={purchase._id}
-                                value={purchase.referenceNumber}
-                                onSelect={() => handlePurchaseSelect(purchase)}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    selectedPurchase?._id === purchase._id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex-1">
-                                  <div className="font-medium">{purchase.referenceNumber}</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {purchase.inventoryStatus} • {purchase.items?.length || 0} items
-                                  </div>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Return Date</Label>
-                  <Controller
-                    name="returnDate"
-                    control={control}
-                    render={({ field }) => (
-                      <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            ref={field.ref}
-                            type="button"
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={(date) => {
-                              field.onChange(date);
-                              setDatePopoverOpen(false);
-                            }}
-                            captionLayout="dropdown"
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    )}
-                  />
-                </div>
-
-                {isEditMode && (
-                  <div className="space-y-2">
-                    <Label>Status</Label>
-                    <Controller
-                      name="status"
-                      control={control}
-                      render={({ field }) => (
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="approved">Approved</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {selectedPurchase && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Select Items to Return</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {selectedPurchase.items
-                  .filter((item: any) => {
-                    const receivedQty = item.receivedQuantity || 0;
-                    const returnedQty = item.returnedQuantity || 0;
-                    return receivedQty > returnedQty;
-                  })
-                  .map((item: any) => {
-                    const receivedQty = item.receivedQuantity || 0;
-                    const returnedQty = item.returnedQuantity || 0;
-                    const availableToReturn = receivedQty - returnedQty;
-                    const isSelected = selectedItems.has(item.materialId);
-
-                    return (
-                      <Label
-                        key={item.materialId}
-                        htmlFor={`item-${item.materialId}`}
                         className={cn(
-                          "flex items-start gap-3 rounded-lg border p-4 cursor-pointer transition-colors",
-                          isSelected && "border-red-600 bg-red-50 dark:border-red-900 dark:bg-red-950"
+                          "w-full justify-start text-left font-normal",
+                          !field.value && "text-muted-foreground"
                         )}
                       >
-                        <input
-                          type="checkbox"
-                          id={`item-${item.materialId}`}
-                          checked={isSelected}
-                          onChange={() => toggleItemSelection(item.materialId)}
-                          className="mt-1"
-                        />
-                        <div className="flex-1 space-y-2">
-                          <div className="font-medium">{item.materialName}</div>
-                          <div className="grid grid-cols-4 gap-2 text-xs text-muted-foreground">
-                            <div>Ordered: {item.quantity}</div>
-                            <div>Received: {receivedQty}</div>
-                            <div className="text-orange-600">Returned: {returnedQty}</div>
-                            <div className="text-green-600">
-                              Available: {availableToReturn.toFixed(2)}
-                            </div>
-                          </div>
-                          {isSelected && (
-                            <div className="space-y-1">
-                              <Label className="text-xs">Return Quantity</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                max={availableToReturn}
-                                placeholder={`Max: ${availableToReturn.toFixed(2)}`}
-                                value={returnQuantities[item.materialId] || ''}
-                                onChange={(e) =>
-                                  handleReturnQuantityChange(item.materialId, e.target.value)
-                                }
-                                className="h-8"
-                                disabled={availableToReturn === 0}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </Label>
-                    );
-                  })}
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {field.value ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={(date) => {
+                          field.onChange(date);
+                          setDatePopoverOpen(false);
+                        }}
+                        captionLayout="dropdown"
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+              />
+            </div>
+          </div>
 
-                {selectedPurchase.items.every((item: any) => {
-                  const receivedQty = item.receivedQuantity || 0;
-                  const returnedQty = item.returnedQuantity || 0;
-                  return receivedQty <= returnedQty;
-                }) && (
-                    <div className="flex items-center gap-2 p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
-                      <AlertCircle className="h-5 w-5 text-yellow-600" />
-                      <p className="text-sm text-yellow-900 dark:text-yellow-100">
-                        All received items have been returned
-                      </p>
-                    </div>
-                  )}
-              </CardContent>
-            </Card>
-          )}
+          {/* Reason and Status (Status only in edit mode) */}
+          <div className={cn("grid gap-4", isEditMode ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
+            <div className="space-y-2">
+              <Label htmlFor="reason">
+                Reason <span className="text-destructive">*</span>
+              </Label>
+              <Controller
+                name="reason"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select reason for return" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RETURN_REASONS.map((reason) => (
+                        <SelectItem key={reason} value={reason}>
+                          {reason}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Return Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+            {isEditMode && (
               <div className="space-y-2">
-                <Label htmlFor="reason">Reason *</Label>
+                <Label>Status</Label>
                 <Controller
-                  name="reason"
+                  name="status"
                   control={control}
                   render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select reason" />
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>
-                        {RETURN_REASONS.map((reason) => (
-                          <SelectItem key={reason} value={reason}>
-                            {reason}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
                     </Select>
                   )}
                 />
               </div>
+            )}
+          </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="notes">Additional Notes</Label>
-                <Textarea
-                  id="notes"
-                  {...register("notes")}
-                  placeholder="Add any additional details..."
-                  rows={3}
-                />
-              </div>
+          {/* Items Selection Card */}
+          {selectedPurchase && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <CardTitle className="text-base">Select Items to Return</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {eligibleItems.length === 0 ? (
+                  <div className="flex items-center gap-2 p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                    <AlertCircle className="h-5 w-5 text-yellow-600" />
+                    <p className="text-sm text-yellow-900 dark:text-yellow-100">
+                      All received items have been returned
+                    </p>
+                  </div>
+                ) : isDesktop ? (
+                  /* Desktop Table View */
+                  <div className="w-full overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-center p-3 font-medium text-sm w-[60px]">Select</th>
+                          <th className="text-left p-3 font-medium text-sm min-w-[200px]">Material</th>
+                          <th className="text-center p-3 font-medium text-sm w-[100px]">Ordered</th>
+                          <th className="text-center p-3 font-medium text-sm w-[100px]">Received</th>
+                          <th className="text-center p-3 font-medium text-sm w-[100px]">Returned</th>
+                          <th className="text-center p-3 font-medium text-sm w-[100px]">Available</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {eligibleItems.map((item: any) => {
+                          const receivedQty = item.receivedQuantity || 0;
+                          const returnedQty = item.returnedQuantity || 0;
+                          const availableToReturn = receivedQty - returnedQty;
+                          const isSelected = selectedItems.has(item.materialId);
 
-              {selectedItems.size > 0 && (
-                <div className="p-4 bg-muted rounded-lg">
-                  <div className="flex justify-between items-center">
+                          return (
+                            <React.Fragment key={item.materialId}>
+                              <tr
+                                className={cn(
+                                  "border-b hover:bg-muted/50",
+                                  isSelected && "bg-red-50 dark:bg-red-950/20"
+                                )}
+                              >
+                                <td className="p-3 text-center">
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={() => toggleItemSelection(item.materialId)}
+                                    className="mx-auto"
+                                  />
+                                </td>
+                                <td className="p-3 font-medium">{item.materialName}</td>
+                                <td className="p-3 text-center tabular-nums">{item.quantity}</td>
+                                <td className="p-3 text-center tabular-nums">{receivedQty.toFixed(2)}</td>
+                                <td className="p-3 text-center tabular-nums text-orange-600">
+                                  {returnedQty.toFixed(2)}
+                                </td>
+                                <td className="p-3 text-center tabular-nums text-green-600 font-semibold">
+                                  {availableToReturn.toFixed(2)}
+                                </td>
+                              </tr>
+                              {isSelected && (
+                                <tr className={cn("border-b", isSelected && "bg-red-50 dark:bg-red-950/20")}>
+                                  <td colSpan={6} className="p-3">
+                                    <div className="flex items-center gap-3 max-w-sm">
+                                      <Label className="text-sm text-muted-foreground whitespace-nowrap">
+                                        Return Quantity:
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        max={availableToReturn}
+                                        placeholder="0.00"
+                                        value={returnQuantities[item.materialId] || ''}
+                                        onChange={(e) =>
+                                          handleReturnQuantityChange(item.materialId, e.target.value)
+                                        }
+                                        className="h-9"
+                                        disabled={availableToReturn === 0}
+                                      />
+                                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                        Max: {availableToReturn.toFixed(2)}
+                                      </span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  /* Mobile Card View */
+                  <div className="space-y-3">
+                    {eligibleItems.map((item: any) => {
+                      const receivedQty = item.receivedQuantity || 0;
+                      const returnedQty = item.returnedQuantity || 0;
+                      const availableToReturn = receivedQty - returnedQty;
+                      const isSelected = selectedItems.has(item.materialId);
+
+                      return (
+                        <Card
+                          key={item.materialId}
+                          className={cn(
+                            "border-2 transition-colors",
+                            isSelected && "border-red-600 bg-red-50 dark:border-red-900 dark:bg-red-950/20"
+                          )}
+                        >
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start gap-3">
+                              <Checkbox
+                                id={`item-${item.materialId}`}
+                                checked={isSelected}
+                                onCheckedChange={() => toggleItemSelection(item.materialId)}
+                                className="mt-1"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <Label
+                                  htmlFor={`item-${item.materialId}`}
+                                  className="font-medium cursor-pointer"
+                                >
+                                  {item.materialName}
+                                </Label>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-3 pt-0">
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              <div className="space-y-1">
+                                <div className="text-xs text-muted-foreground">Ordered</div>
+                                <div className="font-medium">{item.quantity}</div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="text-xs text-muted-foreground">Received</div>
+                                <div className="font-medium">{receivedQty.toFixed(2)}</div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="text-xs text-muted-foreground">Returned</div>
+                                <div className="font-medium text-orange-600">{returnedQty.toFixed(2)}</div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="text-xs text-muted-foreground">Available</div>
+                                <div className="font-semibold text-green-600">{availableToReturn.toFixed(2)}</div>
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <div className="space-y-2 pt-2 border-t">
+                                <Label className="text-xs text-muted-foreground">Return Quantity</Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  max={availableToReturn}
+                                  placeholder={`Max: ${availableToReturn.toFixed(2)}`}
+                                  value={returnQuantities[item.materialId] || ''}
+                                  onChange={(e) =>
+                                    handleReturnQuantityChange(item.materialId, e.target.value)
+                                  }
+                                  className="h-9"
+                                  disabled={availableToReturn === 0}
+                                />
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Additional Notes */}
+          <div className="space-y-2">
+            <Label htmlFor="notes">Additional Notes (Optional)</Label>
+            <Textarea
+              id="notes"
+              placeholder="Add any additional details..."
+              {...register("notes")}
+              rows={3}
+            />
+          </div>
+
+          {/* Summary Card */}
+          {selectedItems.size > 0 && (
+            <Card className="bg-muted/50">
+              <CardContent className="p-6">
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Items Selected:</span>
+                    <span className="font-medium">{totalSelectedItems}</span>
+                  </div>
+                  <div className="flex justify-between pt-3 border-t">
                     <span className="font-semibold">Total Quantity to Return:</span>
                     <span className="text-xl font-bold text-red-600">
                       {totalReturnedQty.toFixed(2)}
                     </span>
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button 
-              type="button" 
-              onClick={handleSubmit(handleFormSubmit)} 
+            <Button
+              type="submit"
               disabled={isSubmitting || (isEditMode && !isDirty)}
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner />
                   Saving...
                 </>
-              ) : defaultValues ? "Update Return Note" : "Create Return Note"}
+              ) : (defaultValues ? "Update Return Note" : "Create Return Note")}
             </Button>
           </DialogFooter>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
