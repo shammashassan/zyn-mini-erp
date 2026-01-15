@@ -289,26 +289,32 @@ export const getColumns = (
   onViewReturnNotePdf?: (returnNote: any) => void
 ): ColumnDef<IPurchase>[] => [
     {
-      id: "date",
-      accessorKey: "date",
+      accessorKey: "expenseDate", // Changed from "date"
       header: ({ column }) => (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-8 px-2"
         >
           Date
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => (
-        <div className="text-left font-medium min-w-[100px]">
-          <div>{formatDisplayDate(row.original.date)}</div>
-          <div className="text-xs text-muted-foreground">
-            {formatTime(row.original.date)}
+      cell: ({ row }) => {
+        const date = new Date(row.original.purchaseDate); // Changed
+        return (
+          <div className="text-left font-medium min-w-[100px]">
+            <div>{formatDisplayDate(date)}</div>
+            <div className="text-xs text-muted-foreground">
+              {formatTime(date)}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
+      sortingFn: (rowA, rowB) => {
+        const dateA = new Date(rowA.original.purchaseDate); // Changed
+        const dateB = new Date(rowB.original.purchaseDate); // Changed
+        return dateB.getTime() - dateA.getTime();
+      },
     },
     {
       id: "referenceNumber",

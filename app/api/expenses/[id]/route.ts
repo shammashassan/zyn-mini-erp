@@ -1,4 +1,4 @@
-// app/api/expenses/[id]/route.ts - UPDATED: Handle payeeName/supplierName
+// app/api/expenses/[id]/route.ts - UPDATED: Handle expenseDate in PUT
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -20,7 +20,7 @@ interface RequestContext {
 
 function detectChanges(oldExpense: any, newData: any) {
   const changes: Array<{ field: string; oldValue: any; newValue: any }> = [];
-  const fieldsToTrack = ['amount', 'category', 'paymentMethod', 'vendor', 'notes', 'description', 'date', 'status'];
+  const fieldsToTrack = ['amount', 'category', 'paymentMethod', 'vendor', 'notes', 'description', 'expenseDate', 'status']; // ✅ UPDATED: Changed from 'date' to 'expenseDate'
   
   for (const field of fieldsToTrack) {
     if (newData[field] !== undefined && oldExpense[field] !== newData[field]) {
@@ -164,6 +164,11 @@ export async function PUT(request: Request, context: RequestContext) {
       delete body.payeeName;
       delete body.supplierId;
       delete body.supplierName;
+    }
+
+    // ✅ UPDATED: Sync expenseDate with legacy date field
+    if (body.expenseDate) {
+      body.date = body.expenseDate;
     }
 
     const oldStatus = currentExpense.status;

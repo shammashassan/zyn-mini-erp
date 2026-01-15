@@ -1,4 +1,4 @@
-// models/Expense.ts - UPDATED with Payee and Supplier References
+// models/Expense.ts - UPDATED: Added expenseDate field
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -27,12 +27,13 @@ export interface IExpense extends Document {
   amount: number;
   category: string;
   type: 'single' | 'period';
-  date: Date;
+  date: Date; // Legacy field - kept for backward compatibility
+  expenseDate: Date; // ✅ NEW: Expense date field (separate from createdAt)
   
-  // ✅ UPDATED: Enhanced vendor tracking with references
-  vendor?: string; // Kept for backward compatibility and manual entry
-  payeeId?: mongoose.Types.ObjectId; // Reference to Payee
-  supplierId?: mongoose.Types.ObjectId; // Reference to Supplier
+  // Enhanced vendor tracking with references
+  vendor?: string;
+  payeeId?: mongoose.Types.ObjectId;
+  supplierId?: mongoose.Types.ObjectId;
   
   notes?: string;
   
@@ -130,10 +131,14 @@ const ExpenseSchema: Schema<IExpense> = new Schema({
   },
   date: { 
     type: Date, 
-    required: true
+    required: true // Legacy field
+  },
+  expenseDate: { 
+    type: Date, 
+    required: true // ✅ NEW: Expense date field
   },
   
-  // ✅ UPDATED: Enhanced vendor tracking
+  // Enhanced vendor tracking
   vendor: { 
     type: String, 
     trim: true, 
@@ -190,16 +195,14 @@ const ExpenseSchema: Schema<IExpense> = new Schema({
 });
 
 // Compound indexes
-ExpenseSchema.index({ isDeleted: 1, date: -1 });
+ExpenseSchema.index({ isDeleted: 1, expenseDate: -1 }); // ✅ UPDATED: Index on expenseDate
 ExpenseSchema.index({ category: 1 });
-ExpenseSchema.index({ type: 1, date: -1 });
+ExpenseSchema.index({ type: 1, expenseDate: -1 }); // ✅ UPDATED
 ExpenseSchema.index({ status: 1, paymentStatus: 1 });
 ExpenseSchema.index({ createdAt: -1 });
-ExpenseSchema.index({ date: 1 });
+ExpenseSchema.index({ expenseDate: 1 }); // ✅ NEW: Dedicated index
 ExpenseSchema.index({ 'connectedDocuments.paymentIds': 1 });
 ExpenseSchema.index({ 'paymentAllocations.voucherId': 1 });
-
-// ✅ NEW: Add indexes for payee and supplier references
 ExpenseSchema.index({ payeeId: 1 });
 ExpenseSchema.index({ supplierId: 1 });
 
@@ -211,6 +214,14 @@ ExpenseSchema.pre('save', function(next) {
   
   if (this.amount < 0) {
     return next(new Error('Amount cannot be negative'));
+  }
+  
+  // ✅ NEW: Sync date and expenseDate for backward compatibility
+  if (this.isNew && !this.expenseDate && this.date) {
+    this.expenseDate = this.date;
+  }
+  if (this.isNew && !this.date && this.expenseDate) {
+    this.date = this.expenseDate;
   }
   
   // Calculate paid amount from allocations
@@ -243,6 +254,11 @@ ExpenseSchema.pre(/^find/, function(this: Query<any, any>, next) {
   
   if (!options.includeDeleted) {
     this.find({ isDeleted: false });
+  }
+  
+  // ✅ UPDATED: Default sort by expenseDate instead of createdAt
+  if (!this.getOptions().sort) {
+    this.sort({ expenseDate: -1 });
   }
   
   next();

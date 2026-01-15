@@ -1,14 +1,15 @@
-// app/api/invoices/[id]/route.ts - Updated with receivedAmount
+// app/api/invoices/[id]/route.ts - UPDATED: Store previous quotation status and revert on delete
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Invoice from "@/models/Invoice";
+import Quotation from "@/models/Quotation";
 import Voucher from "@/models/Voucher";
 import { softDelete } from "@/utils/softDelete";
 import { handleInvoiceStatusChange } from '@/utils/journalAutoCreate';
 import { voidJournalsForReference } from '@/utils/journalManager';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
-import { UAE_VAT_PERCENTAGE } from "@/utils/constants"; // ✅ ADDED
+import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 
 interface RequestContext {
   params: Promise<{
@@ -24,7 +25,6 @@ export async function GET(request: Request, context: RequestContext) {
     await dbConnect();
     const { id } = await context.params;
 
-    // Check permission
     const { error } = await requireAuthAndPermission({
       invoice: ["read"],
     });
@@ -66,7 +66,8 @@ function detectChanges(oldInvoice: any, newData: any) {
     'discount',
     'notes',
     'paidAmount',
-    'receivedAmount'
+    'receivedAmount',
+    'invoiceDate'
   ];
 
   for (const field of fieldsToTrack) {
@@ -91,7 +92,6 @@ export async function PUT(request: Request, context: RequestContext) {
     const { id } = await context.params;
     const body = await request.json();
 
-    // Check permission
     const { error, session } = await requireAuthAndPermission({
       invoice: ["update"],
     });
@@ -112,31 +112,21 @@ export async function PUT(request: Request, context: RequestContext) {
 
     const oldStatus = currentInvoice.status;
 
-    // ✅ FIXED: Recalculate with VAT on Gross Total
-    // Use values from body if present, otherwise fallback to existing invoice values
     const items = body.items || currentInvoice.items;
     const discount = body.discount !== undefined ? body.discount : currentInvoice.discount;
 
-    // 1. Gross Total = Sum of all items
     const grossTotal = items.reduce((sum: number, item: { total: number }) => sum + (item.total || 0), 0);
-
-    // 3. Subtotal = Gross Total - Discount
     const subtotal = Math.max(grossTotal - discount, 0);
-
-    // 2. VAT = Subtotal × 5%
     const vatAmount = subtotal * (UAE_VAT_PERCENTAGE / 100);
-
-    // 4. Grand Total = Subtotal + VAT
     const grandTotal = subtotal + vatAmount;
 
-    // Prepare the final update object
     const updateData = {
       ...body,
-      items,         // Ensure consistent items
-      discount,      // Ensure consistent discount
-      totalAmount: grossTotal,  // ✅ Gross Total
-      vatAmount,                // ✅ VAT on Gross Total
-      grandTotal,               // ✅ Grand Total
+      items,
+      discount,
+      totalAmount: grossTotal,
+      vatAmount,
+      grandTotal,
       updatedBy: user.id,
     };
 
@@ -180,14 +170,13 @@ export async function PUT(request: Request, context: RequestContext) {
 }
 
 /**
- * DELETE - Soft delete with journal voiding
+ * DELETE - Soft delete with journal voiding and quotation status reversion
  */
 export async function DELETE(request: Request, context: RequestContext) {
   try {
     await dbConnect();
     const { id } = await context.params;
 
-    // Check permission
     const { error, session } = await requireAuthAndPermission({
       invoice: ["soft_delete"],
     });
@@ -202,6 +191,48 @@ export async function DELETE(request: Request, context: RequestContext) {
     }
 
     console.log(`🔴 DELETE /api/invoices/${id}`);
+
+    // ✅ NEW: Handle quotation status reversion
+    if (invoice.connectedDocuments?.quotationId) {
+      try {
+        const quotation = await Quotation.findById(invoice.connectedDocuments.quotationId);
+        
+        if (quotation && quotation.status === 'converted') {
+          // Store the previous status in the invoice for restoration later
+          if (!invoice.metadata) {
+            invoice.metadata = {};
+          }
+          invoice.metadata.previousQuotationStatus = 'approved'; // Default to approved
+          
+          // Revert quotation status to approved
+          quotation.status = 'approved';
+          
+          // Remove invoice from quotation's connected documents
+          if (quotation.connectedDocuments?.invoiceIds) {
+            quotation.connectedDocuments.invoiceIds = quotation.connectedDocuments.invoiceIds.filter(
+              (invId: any) => invId.toString() !== id
+            );
+          }
+          
+          quotation.addAuditEntry(
+            'Status reverted (connected invoice deleted)',
+            user.id,
+            user.username || user.name,
+            [{
+              field: 'status',
+              oldValue: 'converted',
+              newValue: 'approved'
+            }]
+          );
+          
+          await quotation.save();
+          console.log(`✅ Reverted quotation ${quotation.invoiceNumber} status to 'approved'`);
+        }
+      } catch (quotationError) {
+        console.error('Error reverting quotation status:', quotationError);
+        // Don't fail the delete if quotation update fails
+      }
+    }
 
     // Void all related journals when soft deleting
     await voidJournalsForReference(

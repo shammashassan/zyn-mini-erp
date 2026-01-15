@@ -1,4 +1,4 @@
-// app/api/quotations/route.ts - FIXED: Backend calculates totals
+// app/api/quotations/route.ts - UPDATED: Added quotationDate field and date range filtering
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -22,6 +22,7 @@ export async function GET(request: Request) {
     
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
     
+    // Extract date params (support both naming conventions)
     const startDateParam = searchParams.get('startDate') || searchParams.get('from');
     const endDateParam = searchParams.get('endDate') || searchParams.get('to');
 
@@ -32,15 +33,16 @@ export async function GET(request: Request) {
 
       const baseFilter: any = { isDeleted: false };
 
+      // ✅ UPDATED: Apply Date Range Filter using quotationDate
       if (startDateParam || endDateParam) {
-        baseFilter.createdAt = {};
+        baseFilter.quotationDate = {}; // Changed from createdAt to quotationDate
         if (startDateParam) {
-          baseFilter.createdAt.$gte = new Date(startDateParam);
+          baseFilter.quotationDate.$gte = new Date(startDateParam);
         }
         if (endDateParam) {
           const end = new Date(endDateParam);
           end.setHours(23, 59, 59, 999);
-          baseFilter.createdAt.$lte = end;
+          baseFilter.quotationDate.$lte = end;
         }
       }
 
@@ -59,13 +61,14 @@ export async function GET(request: Request) {
         }
       ] : undefined;
 
+      // ✅ UPDATED: Default sort by quotationDate
       const result = await executePaginatedQuery(Quotation, {
         baseFilter,
         columnFilters: filters,
         sorting,
         page,
         pageSize,
-        defaultSort: { createdAt: -1 },
+        defaultSort: { quotationDate: -1 }, // Changed from createdAt to quotationDate
         populate: populateOptions,
       });
 
@@ -77,6 +80,7 @@ export async function GET(request: Request) {
         pageSize: result.pageSize,
       });
     } else {
+      // Client-side mode
       const status = searchParams.get('status');
       const limit = searchParams.get('limit');
       const customerName = searchParams.get('customerName');
@@ -86,17 +90,18 @@ export async function GET(request: Request) {
       if (status) filter.status = status;
       if (customerName) filter.customerName = customerName;
 
+      // ✅ UPDATED: Apply Date Range using quotationDate
       if (startDateParam || endDateParam) {
-        filter.createdAt = {};
-        if (startDateParam) filter.createdAt.$gte = new Date(startDateParam);
+        filter.quotationDate = {}; // Changed from createdAt to quotationDate
+        if (startDateParam) filter.quotationDate.$gte = new Date(startDateParam);
         if (endDateParam) {
           const toDate = new Date(endDateParam);
           toDate.setHours(23, 59, 59, 999);
-          filter.createdAt.$lte = toDate;
+          filter.quotationDate.$lte = toDate;
         }
       }
 
-      let query = Quotation.find(filter).sort({ createdAt: -1 });
+      let query = Quotation.find(filter).sort({ quotationDate: -1 }); // ✅ UPDATED
 
       if (populate) {
         query = query
@@ -149,6 +154,7 @@ export async function POST(request: Request) {
       discount = 0,
       notes,
       status,
+      quotationDate, // ✅ NEW: Quotation date field
       createdAt,
       updatedAt,
       connectedDocuments,
@@ -167,6 +173,13 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
+    // ✅ NEW: Validate quotation date
+    if (!quotationDate) {
+      return NextResponse.json({
+        error: 'Quotation date is required'
+      }, { status: 400 });
+    }
+
     // Upsert customer
     await Customer.findOneAndUpdate(
       { name: customerName },
@@ -179,17 +192,10 @@ export async function POST(request: Request) {
       { upsert: true, new: true }
     );
 
-    // ✅ FIXED: Correct VAT Calculation
-    // 1. Gross Total = Sum of all items
+    // Calculate totals
     const grossTotal = items.reduce((sum: number, item: { total: number }) => sum + item.total, 0);
-    
-    // 2. Subtotal = Gross Total - Discount
     const subtotal = (Math.max(grossTotal - discount, 0));
-
-    // 3. VAT = Subtotal × 5%
     const vatAmount = subtotal * (UAE_VAT_PERCENTAGE / 100);
-
-    // 4. Grand Total = Subtotal + VAT
     const grandTotal = subtotal + vatAmount;
 
     // Generate quotation number
@@ -218,9 +224,10 @@ export async function POST(request: Request) {
       items,
       discount,
       notes,
-      totalAmount: grossTotal,    // Gross Total (before VAT)
-      vatAmount: vatAmount,        // VAT (5% of gross total)
-      grandTotal: grandTotal,      // Final Total (gross + VAT - discount)
+      quotationDate: new Date(quotationDate), // ✅ NEW: Set quotation date
+      totalAmount: grossTotal,
+      vatAmount: vatAmount,
+      grandTotal: grandTotal,
       status: status || 'pending',
       isDeleted: false,
       deletedAt: null,

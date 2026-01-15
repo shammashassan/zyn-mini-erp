@@ -1,4 +1,4 @@
-// app/expenses/return-notes/return-note-form.tsx - FIXED: All items showing + proper dirty detection
+// app/expenses/return-notes/return-note-form.tsx - FIXED: Right-aligned return input
 
 "use client";
 
@@ -739,7 +739,7 @@ export function ReturnNoteForm({
                               {isSelected && (
                                 <tr className={cn("border-b", isSelected && "bg-red-50 dark:bg-red-950/20")}>
                                   <td colSpan={6} className="p-3">
-                                    <div className="flex items-center gap-3 max-w-sm">
+                                    <div className="flex items-center justify-end gap-3">
                                       <Label className="text-sm text-muted-foreground whitespace-nowrap">
                                         Return Quantity:
                                       </Label>
@@ -753,7 +753,7 @@ export function ReturnNoteForm({
                                         onChange={(e) =>
                                           handleReturnQuantityChange(item.materialId, e.target.value)
                                         }
-                                        className="h-9"
+                                        className="h-9 w-32"
                                         disabled={availableToReturn === 0}
                                       />
                                       <span className="text-xs text-muted-foreground whitespace-nowrap">

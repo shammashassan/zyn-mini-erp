@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     
-    // ✅ Check if this is a server-side request (has page/pageSize params)
+    // Check if this is a server-side request (has page/pageSize params)
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
     
     // Extract date params (support both naming conventions)
@@ -41,16 +41,16 @@ export async function GET(request: Request) {
       // Base filter (always exclude deleted items)
       const baseFilter: any = { isDeleted: false };
 
-      // Apply Date Range Filter
+      // ✅ UPDATED: Apply Date Range Filter using invoiceDate
       if (startDateParam || endDateParam) {
-        baseFilter.createdAt = {};
+        baseFilter.invoiceDate = {}; // Changed from createdAt to invoiceDate
         if (startDateParam) {
-          baseFilter.createdAt.$gte = new Date(startDateParam);
+          baseFilter.invoiceDate.$gte = new Date(startDateParam);
         }
         if (endDateParam) {
           const end = new Date(endDateParam);
           end.setHours(23, 59, 59, 999);
-          baseFilter.createdAt.$lte = end;
+          baseFilter.invoiceDate.$lte = end;
         }
       }
 
@@ -80,14 +80,14 @@ export async function GET(request: Request) {
         }
       ] : undefined;
 
-      // Execute paginated query
+      // Execute paginated query - ✅ UPDATED: Default sort by invoiceDate
       const result = await executePaginatedQuery(Invoice, {
         baseFilter,
         columnFilters: filters,
         sorting,
         page,
         pageSize,
-        defaultSort: { createdAt: -1 },
+        defaultSort: { invoiceDate: -1 }, // Changed from createdAt to invoiceDate
         populate: populateOptions,
       });
 
@@ -120,18 +120,18 @@ export async function GET(request: Request) {
         filter.status = 'overdue';
       }
 
-      // Apply Date Range (Supports both 'startDate/endDate' and 'from/to')
+      // ✅ UPDATED: Apply Date Range using invoiceDate (Supports both 'startDate/endDate' and 'from/to')
       if (startDateParam || endDateParam) {
-        filter.createdAt = {};
-        if (startDateParam) filter.createdAt.$gte = new Date(startDateParam);
+        filter.invoiceDate = {}; // Changed from createdAt to invoiceDate
+        if (startDateParam) filter.invoiceDate.$gte = new Date(startDateParam);
         if (endDateParam) {
           const toDate = new Date(endDateParam);
           toDate.setHours(23, 59, 59, 999);
-          filter.createdAt.$lte = toDate;
+          filter.invoiceDate.$lte = toDate;
         }
       }
 
-      let query = Invoice.find(filter).sort({ createdAt: -1 });
+      let query = Invoice.find(filter).sort({ invoiceDate: -1 }); // ✅ UPDATED: Sort by invoiceDate
 
       if (populate) {
         query = query
@@ -180,7 +180,7 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST - Create new invoice (unchanged)
+ * POST - Create new invoice
  */
 export async function POST(request: Request) {
   try {
@@ -203,8 +203,7 @@ export async function POST(request: Request) {
       discount = 0,
       notes,
       status,
-      createdAt,
-      updatedAt,
+      invoiceDate, // ✅ NEW: Invoice date field
       connectedDocuments,
       vatAmount: customVatAmount,
       totalAmount: customTotalAmount,
@@ -224,6 +223,13 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
+    // ✅ NEW: Validate invoice date
+    if (!invoiceDate) {
+      return NextResponse.json({
+        error: 'Invoice date is required'
+      }, { status: 400 });
+    }
+
     // Upsert customer
     await Customer.findOneAndUpdate(
       { name: customerName },
@@ -236,17 +242,10 @@ export async function POST(request: Request) {
       { upsert: true, new: true }
     );
 
-    // ✅ FIXED: Correct VAT Calculation
-    // 1. Gross Total = Sum of all items
+    // Calculate totals
     const grossTotal = items.reduce((sum: number, item: { total: number }) => sum + item.total, 0);
-    
-    // 2. Subtotal = Gross Total - Discount
     const subtotal = Math.max(grossTotal - discount, 0);
-
-    // 3. VAT = Subtotal × 5%
     const calculatedVatAmount = subtotal * (UAE_VAT_PERCENTAGE / 100);
-
-    // 4. Grand Total = Subtotal + VAT
     const calculatedGrandTotal = subtotal + calculatedVatAmount;
 
     // Allow custom values if provided, otherwise use calculated
@@ -280,9 +279,10 @@ export async function POST(request: Request) {
       items,
       discount,
       notes,
-      totalAmount: finalTotalAmount,  // Gross Total
-      vatAmount: finalVatAmount,       // VAT (5% of gross total)
-      grandTotal: finalGrandTotal,     // Final Total (gross + VAT - discount)
+      invoiceDate: new Date(invoiceDate), // ✅ NEW: Set invoice date
+      totalAmount: finalTotalAmount,
+      vatAmount: finalVatAmount,
+      grandTotal: finalGrandTotal,
       status: status || 'pending',
       paidAmount: 0,
       receivedAmount: 0,
@@ -301,33 +301,18 @@ export async function POST(request: Request) {
       }],
     };
 
-    // Handle custom timestamps
-    if (createdAt) {
-      invoiceData.createdAt = new Date(createdAt);
-    }
-    if (updatedAt) {
-      invoiceData.updatedAt = new Date(updatedAt);
-    }
-
     // Create and save invoice
     const newInvoice = new Invoice(invoiceData);
 
     try {
-      if (createdAt || updatedAt) {
-        await newInvoice.save({ timestamps: false });
-        if (createdAt) newInvoice.createdAt = new Date(createdAt);
-        if (updatedAt) newInvoice.updatedAt = new Date(updatedAt);
-        await newInvoice.save({ timestamps: false });
-      } else {
-        await newInvoice.save();
-      }
+      await newInvoice.save();
 
       console.log(`✅ Successfully created invoice: ${newInvoice.invoiceNumber}`);
       console.log(`   Gross Total: ${grossTotal}, VAT: ${finalVatAmount}, Subtotal: ${subtotal}, Discount: ${discount}, Grand Total: ${finalGrandTotal}`);
 
       // Conditional journal entry creation - only for APPROVED invoices
       if (newInvoice.status === 'approved') {
-        console.log('🔐 Creating journal for APPROVED invoice');
+        console.log('📝 Creating journal for APPROVED invoice');
         try {
           await createJournalForInvoice(
             newInvoice.toObject(),

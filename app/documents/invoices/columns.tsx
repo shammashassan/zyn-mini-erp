@@ -1,4 +1,4 @@
-// app/invoices/columns.tsx - COMPLETE: Added icons to status badges
+// app/invoices/columns.tsx - UPDATED: Added View Details option
 
 "use client";
 
@@ -18,7 +18,8 @@ import {
   DollarSign,
   CreditCard,
   AlertCircle,
-  Edit
+  Edit,
+  Eye
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +85,7 @@ export interface Invoice {
   remainingAmount?: number;
   discount?: number;
   notes?: string;
+  invoiceDate: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -105,7 +107,6 @@ const getStatusVariant = (status: string) => {
   }
 };
 
-// ✅ ADDED: Helper for Status Icons
 const getStatusIcon = (status: string) => {
   switch (status) {
     case 'approved': return CheckCircle;
@@ -125,7 +126,6 @@ const getPaymentStatusVariant = (status: string) => {
   }
 };
 
-// ✅ ADDED: Helper for Payment Icons
 const getPaymentStatusIcon = (status: string) => {
   switch (status) {
     case 'Paid': return CheckCircle;
@@ -212,7 +212,7 @@ const CreateDeliveryButton = ({ invoice, onRefresh, canCreateDelivery }: { invoi
 
 const StatusBadgeButton = ({ invoice, onRefresh, canUpdateStatus }: { invoice: Invoice; onRefresh: () => void; canUpdateStatus: boolean }) => {
   const [isOpen, setIsOpen] = React.useState(false);
-  const Icon = getStatusIcon(invoice.status); // ✅ ADDED: Get icon
+  const Icon = getStatusIcon(invoice.status);
 
   const handleClick = () => {
     if (canUpdateStatus) {
@@ -226,12 +226,11 @@ const StatusBadgeButton = ({ invoice, onRefresh, canUpdateStatus }: { invoice: I
     <>
       <Badge
         variant={getStatusVariant(invoice.status) as any}
-        // ✅ UPDATED: Added gap and padding for icon
         className={cn("gap-1 pr-2.5", canUpdateStatus ? "cursor-pointer hover:opacity-80" : "cursor-default")}
         appearance="outline"
         onClick={handleClick}
       >
-        <Icon className="h-3 w-3" /> {/* ✅ ADDED: Icon */}
+        <Icon className="h-3 w-3" />
         {invoice.status}
       </Badge>
 
@@ -248,12 +247,13 @@ const StatusBadgeButton = ({ invoice, onRefresh, canUpdateStatus }: { invoice: I
 interface RowActionsProps {
   invoice: Invoice;
   onViewPdf: (invoice: Invoice) => void;
+  onView?: (invoice: Invoice) => void; // ✅ NEW: View details option
   onEdit: (invoice: Invoice) => void;
   onDelete: (id: string) => void;
   permissions: InvoicePermissions;
 }
 
-const RowActions = ({ invoice, onViewPdf, onEdit, onDelete, permissions }: RowActionsProps) => {
+const RowActions = ({ invoice, onViewPdf, onView, onEdit, onDelete, permissions }: RowActionsProps) => {
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
   const { canDelete, canUpdate } = permissions;
 
@@ -270,6 +270,17 @@ const RowActions = ({ invoice, onViewPdf, onEdit, onDelete, permissions }: RowAc
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
+
+          {/* ✅ NEW: View Details option */}
+          {onView && (
+            <DropdownMenuItem
+              onClick={() => onView(invoice)}
+              className="cursor-pointer"
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              View Details
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuItem
             onClick={() => onViewPdf(invoice)}
@@ -332,15 +343,17 @@ const RowActions = ({ invoice, onViewPdf, onEdit, onDelete, permissions }: RowAc
   );
 };
 
+// ✅ UPDATED: Added onView parameter
 export const getColumns = (
   onViewPdf: (invoice: Invoice) => void,
   onEdit: (invoice: Invoice) => void,
   onDelete: (id: string) => void,
   permissions: InvoicePermissions,
-  onRefresh?: () => void
+  onRefresh?: () => void,
+  onView?: (invoice: Invoice) => void // ✅ NEW
 ): ColumnDef<Invoice>[] => [
     {
-      accessorKey: "createdAt",
+      accessorKey: "invoiceDate",
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -352,7 +365,7 @@ export const getColumns = (
         </Button>
       ),
       cell: ({ row }) => {
-        const date = new Date(row.original.createdAt);
+        const date = new Date(row.original.invoiceDate);
         return (
           <div className="text-left font-medium">
             <div>{formatDisplayDate(date)}</div>
@@ -363,8 +376,8 @@ export const getColumns = (
         );
       },
       sortingFn: (rowA, rowB) => {
-        const dateA = new Date(rowA.original.createdAt);
-        const dateB = new Date(rowB.original.createdAt);
+        const dateA = new Date(rowA.original.invoiceDate);
+        const dateB = new Date(rowB.original.invoiceDate);
         return dateB.getTime() - dateA.getTime();
       },
     },
@@ -404,24 +417,6 @@ export const getColumns = (
       },
       enableColumnFilter: true,
     },
-    // {
-    //   accessorKey: "grandTotal",
-    //   header: ({ column }) => (
-    //     <Button
-    //       variant="ghost"
-    //       onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-    //       className="h-8 px-2 justify-end w-full"
-    //     >
-    //       Total Amount
-    //       <ArrowUpDown className="ml-2 h-4 w-4" />
-    //     </Button>
-    //   ),
-    //   cell: ({ row }) => (
-    //     <div className="text-right text-green-600 min-w-[120px] font-medium">
-    //       {formatCurrency(row.original.grandTotal)}
-    //     </div>
-    //   ),
-    // },
     {
       id: "status",
       accessorKey: "status",
@@ -523,6 +518,7 @@ export const getColumns = (
           <RowActions
             invoice={row.original}
             onViewPdf={onViewPdf}
+            onView={onView} // ✅ NEW: Pass onView
             onEdit={onEdit}
             onDelete={onDelete}
             permissions={permissions}

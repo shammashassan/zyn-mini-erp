@@ -1,4 +1,4 @@
-// app/purchases/CreatePaymentModal.tsx - UPDATED: Uses /api/vouchers
+// app/purchases/CreatePaymentModal.tsx - FIXED: Preserve returnNoteIds when updating
 
 "use client";
 
@@ -42,6 +42,7 @@ interface Purchase {
   }>;
   connectedDocuments?: {
     paymentIds?: string[];
+    returnNoteIds?: string[]; // ✅ Include returnNoteIds
   };
 }
 
@@ -108,21 +109,21 @@ export function CreatePaymentModal({
 
       console.log(`Creating NEW payment voucher for ${formatCurrency(amount)} via ${paymentMethod}`);
 
-      // ✅ UPDATED: Create new payment voucher using /api/vouchers
+      // Create new payment voucher using /api/vouchers
       const paymentRes = await fetch("/api/vouchers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           supplierName: purchase.supplierName,
           paymentMethod: paymentMethod,
-          voucherType: "payment", // ✅ Correct field for new model
+          voucherType: "payment",
           items: [],
           discount: 0,
           notes: notes || `Payment for purchase ${purchase.referenceNumber || ''} - ${formatCurrency(amount)} via ${paymentMethod}`,
           connectedDocuments: {
-            purchaseIds: [purchase._id], // ✅ Use array format
+            purchaseIds: [purchase._id],
           },
-          totalAmount: amount, // ✅ Use totalAmount/grandTotal
+          totalAmount: amount,
           grandTotal: amount,
         }),
       });
@@ -138,24 +139,22 @@ export function CreatePaymentModal({
 
       console.log(`✅ Payment voucher created: ${newPaymentData.voucher.invoiceNumber}`);
 
-      // Update purchase with new payment (Frontend side update, though backend route handles it too, explicit double check doesn't hurt or can simply refresh)
-      // Note: The /api/vouchers POST route logic (from previous turns) automatically updates the purchase. 
-      // So we might just need to refresh. But to be safe and ensure UI updates immediately:
-
+      // ✅ FIXED: Preserve existing returnNoteIds when updating
       const currentPaymentIds = purchase.connectedDocuments?.paymentIds || [];
+      const currentReturnNoteIds = purchase.connectedDocuments?.returnNoteIds || []; // ✅ Get existing return notes
       const newPaidAmount = alreadyPaid + amount;
 
-      // We manually update purchase status to be sure, although backend hook in voucher creation likely did it.
+      // Update purchase with new payment, preserving return notes
       const updateRes = await fetch(`/api/purchases/${purchase._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           connectedDocuments: {
             paymentIds: [...currentPaymentIds, newPaymentData.voucher._id],
+            returnNoteIds: currentReturnNoteIds, // ✅ Preserve existing return notes
           },
           paidAmount: newPaidAmount,
           remainingAmount: displayTotal - newPaidAmount,
-          // Calculate status based on amounts
           paymentStatus: (newPaidAmount >= displayTotal) ? 'paid' : 'partially paid'
         }),
       });

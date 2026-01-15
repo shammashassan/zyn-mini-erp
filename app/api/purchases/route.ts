@@ -1,4 +1,4 @@
-// app/api/purchases/route.ts - GET handler ONLY - UPDATED: Populate returnNoteIds
+// app/api/purchases/route.ts - UPDATED: Using purchaseDate field
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -37,15 +37,16 @@ export async function GET(request: Request) {
 
       const baseFilter: any = { isDeleted: false };
 
+      // ✅ UPDATED: Apply Date Range Filter using purchaseDate
       if (startDateParam || endDateParam) {
-        baseFilter.createdAt = {};
+        baseFilter.purchaseDate = {};
         if (startDateParam) {
-          baseFilter.createdAt.$gte = new Date(startDateParam);
+          baseFilter.purchaseDate.$gte = new Date(startDateParam);
         }
         if (endDateParam) {
           const end = new Date(endDateParam);
           end.setHours(23, 59, 59, 999);
-          baseFilter.createdAt.$lte = end;
+          baseFilter.purchaseDate.$lte = end;
         }
       }
 
@@ -64,13 +65,14 @@ export async function GET(request: Request) {
         }
       ] : undefined;
 
+      // ✅ UPDATED: Default sort by purchaseDate
       const result = await executePaginatedQuery(Purchase, {
         baseFilter,
         columnFilters: filters,
         sorting,
         page,
         pageSize,
-        defaultSort: { createdAt: -1 },
+        defaultSort: { purchaseDate: -1 },
         populate: populateOptions,
       });
 
@@ -85,17 +87,18 @@ export async function GET(request: Request) {
       const populate = searchParams.get('populate') === 'true';
       const filter: any = { isDeleted: false };
 
+      // ✅ UPDATED: Apply Date Range using purchaseDate
       if (startDateParam || endDateParam) {
-        filter.createdAt = {};
-        if (startDateParam) filter.createdAt.$gte = new Date(startDateParam);
+        filter.purchaseDate = {};
+        if (startDateParam) filter.purchaseDate.$gte = new Date(startDateParam);
         if (endDateParam) {
           const toDate = new Date(endDateParam);
           toDate.setHours(23, 59, 59, 999);
-          filter.createdAt.$lte = toDate;
+          filter.purchaseDate.$lte = toDate;
         }
       }
 
-      let query = Purchase.find(filter).sort({ createdAt: -1 });
+      let query = Purchase.find(filter).sort({ purchaseDate: -1 }); // ✅ UPDATED: Sort by purchaseDate
 
       if (populate) {
         query = query
@@ -146,8 +149,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Supplier name is required" }, { status: 400 });
     }
 
-    if (body.totalAmount === undefined || body.date === undefined) {
+    if (body.totalAmount === undefined) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    // ✅ NEW: Validate purchase date
+    if (!body.purchaseDate && !body.date) {
+      return NextResponse.json({
+        error: 'Purchase date is required'
+      }, { status: 400 });
     }
 
     // Validate discount
@@ -210,6 +220,9 @@ export async function POST(request: Request) {
     const purchaseStatus = 'pending';
     const inventoryStatus = 'pending';
 
+    // ✅ UPDATED: Use purchaseDate, fallback to date for backward compatibility
+    const purchaseDate = body.purchaseDate ? new Date(body.purchaseDate) : new Date(body.date);
+
     // Create purchase
     const newPurchase = new Purchase({
       ...body,
@@ -218,8 +231,10 @@ export async function POST(request: Request) {
       totalAmount: grossTotal,
       vatAmount,
       grandTotal,
-      purchaseStatus,     // ✅ NEW
-      inventoryStatus,    // ✅ NEW
+      purchaseDate,        // ✅ NEW: Primary purchase date field
+      date: purchaseDate,  // Keep date synced for backward compatibility
+      purchaseStatus,     
+      inventoryStatus,    
       paymentStatus: 'pending',
       isDeleted: false,
       deletedAt: null,
@@ -237,7 +252,6 @@ export async function POST(request: Request) {
     const savedPurchase = await newPurchase.save();
 
     // ✅ BACKWARD COMPATIBILITY: Handle direct creation with received/partially received status
-    // This allows users to create purchases that are already received (legacy workflow)
     if (savedPurchase.inventoryStatus === 'received' || savedPurchase.inventoryStatus === 'partially received') {
       console.log(`📦 Processing stock for directly created ${savedPurchase.inventoryStatus} purchase`);
 

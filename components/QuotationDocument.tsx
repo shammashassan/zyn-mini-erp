@@ -1,4 +1,4 @@
-// components/QuotationDocument.tsx - Modern Blue Theme (Updated)
+// components/QuotationDocument.tsx - UPDATED: Using quotationDate
 
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Font, Image, Svg, Path } from '@react-pdf/renderer';
@@ -23,7 +23,7 @@ try {
   console.error("Failed to register fonts.", error);
 }
 
-// Icon Components
+// Icon Components (same as before)
 const MapPinIcon = () => (
   <Svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#90caf9" strokeWidth="2">
     <Path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
@@ -62,8 +62,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     position: 'relative',
   },
-
-  // Watermark
   watermark: {
     position: 'absolute',
     top: '35%',
@@ -74,8 +72,6 @@ const styles = StyleSheet.create({
     transform: 'rotate(-45deg)',
     fontWeight: 'bold',
   },
-
-  // Header Section
   header: {
     backgroundColor: '#1a237e',
     padding: '15 25',
@@ -99,8 +95,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
   },
-
-  // Title Section
   titleSection: {
     backgroundColor: '#283593',
     padding: '10 25',
@@ -122,8 +116,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffeb3b',
   },
-
-  // Info Bar
   infoBar: {
     backgroundColor: '#e8eaf6',
     padding: '12 25',
@@ -166,14 +158,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1a237e',
   },
-
-  // Main Content
   content: {
     padding: '15 25 25 25',
     flexGrow: 1,
   },
-
-  // Table
   table: {
     marginTop: 10,
     marginBottom: 15,
@@ -205,8 +193,6 @@ const styles = StyleSheet.create({
   qtyCol: { width: '15%', textAlign: 'center' },
   rateCol: { width: '20%', textAlign: 'right' },
   totalCol: { width: '25%', textAlign: 'right', fontWeight: 'bold' },
-
-  // Summary Section
   summaryContainer: {
     marginTop: 20,
   },
@@ -216,8 +202,6 @@ const styles = StyleSheet.create({
     gap: 15,
     marginBottom: 15,
   },
-
-  // Notes Box
   notesBox: {
     width: '55%',
     backgroundColor: '#fff3e0',
@@ -237,8 +221,6 @@ const styles = StyleSheet.create({
     color: '#424242',
     lineHeight: 1.4,
   },
-
-  // Totals Box
   totalsBox: {
     width: '40%',
     backgroundColor: '#ffffff',
@@ -277,8 +259,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffeb3b',
   },
-
-  // Amount in Words Box (Voucher Style)
   amountInWordsBox: {
     backgroundColor: '#e8eaf6',
     border: '1.5 solid #1a237e',
@@ -307,15 +287,11 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     border: '0.5 solid #c5cae9',
   },
-
-  // Bottom Sections
   bottomSection: {
     flexDirection: 'row',
     gap: 15,
     marginBottom: 10,
   },
-
-  // Validity Box
   validityBox: {
     flex: 1,
     backgroundColor: '#e3f2fd',
@@ -334,8 +310,6 @@ const styles = StyleSheet.create({
     marginRight: 5,
     fontWeight: 'bold',
   },
-
-  // Terms Box
   termsBox: {
     flex: 1,
     backgroundColor: '#f5f5f5',
@@ -343,8 +317,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     padding: 10,
   },
-
-  // Footer
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -379,11 +351,9 @@ export const QuotationDocument: React.FC<QuotationDocumentProps> = ({ bill, comp
   const discount = bill.discount || 0;
   const grandTotal = bill.grandTotal || 0;
 
-
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Watermark */}
         <Text style={styles.watermark}>QUOTATION</Text>
 
         {/* Header */}
@@ -430,7 +400,7 @@ export const QuotationDocument: React.FC<QuotationDocumentProps> = ({ bill, comp
           <Text style={styles.documentNumber}>{bill.invoiceNumber}</Text>
         </View>
 
-        {/* Info Bar */}
+        {/* Info Bar - ✅ UPDATED: Using quotationDate */}
         <View style={styles.infoBar}>
           <View style={styles.customerSection}>
             <Text style={styles.sectionLabel}>Quoted For:</Text>
@@ -444,7 +414,7 @@ export const QuotationDocument: React.FC<QuotationDocumentProps> = ({ bill, comp
           </View>
           <View style={styles.dateInfo}>
             <Text style={styles.dateLabel}>Quotation Date</Text>
-            <Text style={styles.dateValue}>{formatDisplayDate(bill.createdAt)}</Text>
+            <Text style={styles.dateValue}>{formatDisplayDate(bill.quotationDate)}</Text>
           </View>
         </View>
 
@@ -507,7 +477,7 @@ export const QuotationDocument: React.FC<QuotationDocumentProps> = ({ bill, comp
               </View>
             </View>
 
-            {/* Amount in Words (Voucher Style) */}
+            {/* Amount in Words */}
             <View style={styles.amountInWordsBox}>
               <View style={styles.amountWordsRow}>
                 <View style={{ flex: 1 }}>
@@ -519,7 +489,7 @@ export const QuotationDocument: React.FC<QuotationDocumentProps> = ({ bill, comp
               </View>
             </View>
 
-            {/* Bottom Section: Validity & Terms */}
+            {/* Bottom Section */}
             <View style={styles.bottomSection}>
               <View style={styles.validityBox}>
                 <Text style={styles.boxTitle}>Validity & Terms</Text>
@@ -543,31 +513,27 @@ export const QuotationDocument: React.FC<QuotationDocumentProps> = ({ bill, comp
                 </View>
               </View>
 
-              {/* Terms Box - Conditional check removed so hardcoded text always shows */}
-                <View style={styles.termsBox}>
-                  <Text style={styles.boxTitle}>Important Considerations</Text>
-
-                  <View style={styles.validityItem}>
-                    <Text style={styles.bulletPoint}>•</Text>
-                    <Text style={styles.boxContent}>
-                      These examples are for illustrative purposes only and do not constitute legal advice.
-                    </Text>
-                  </View>
-
-                  <View style={styles.validityItem}>
-                    <Text style={styles.bulletPoint}>•</Text>
-                    <Text style={styles.boxContent}>
-                      Consulting a legal professional is recommended to ensure compliance with local laws.
-                    </Text>
-                  </View>
-
-                  <View style={styles.validityItem}>
-                    <Text style={styles.bulletPoint}>•</Text>
-                    <Text style={styles.boxContent}>
-                      Terms should remain clear, concise, and transparent for all users.
-                    </Text>
-                  </View>
+              <View style={styles.termsBox}>
+                <Text style={styles.boxTitle}>Important Considerations</Text>
+                <View style={styles.validityItem}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.boxContent}>
+                    These examples are for illustrative purposes only and do not constitute legal advice.
+                  </Text>
                 </View>
+                <View style={styles.validityItem}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.boxContent}>
+                    Consulting a legal professional is recommended to ensure compliance with local laws.
+                  </Text>
+                </View>
+                <View style={styles.validityItem}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.boxContent}>
+                    Terms should remain clear, concise, and transparent for all users.
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
         </View>

@@ -1,11 +1,12 @@
-// app/documents/delivery-notes/delivery-note-form.tsx - UPDATED: Populated combobox input
+// app/documents/delivery-notes/delivery-note-form.tsx - UPDATED: Responsive Items View
 
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -26,11 +27,21 @@ import {
   CommandItem,
   CommandList
 } from "@/components/ui/command";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronsUpDown, Check, FileText, AlertCircle } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
+import { ChevronsUpDown, Check, AlertCircle, Truck, CalendarIcon, Package } from "lucide-react";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { ICustomer } from "@/models/Customer";
+import type { DeliveryNote } from "./columns";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -38,6 +49,8 @@ interface ConnectedInvoice {
   _id: string;
   invoiceNumber: string;
   customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
   grandTotal: number;
   items: Array<{
     description: string;
@@ -48,20 +61,40 @@ interface ConnectedInvoice {
 }
 
 interface DeliveryNoteFormData {
+  customerName: string;
   invoiceId: string;
+  deliveryDate: Date;
+  status: 'pending' | 'dispatched' | 'delivered' | 'cancelled';
+  notes: string;
 }
 
 interface DeliveryNoteFormProps {
   isOpen: boolean;
   onClose: () => void;
-  // Updated type to Promise so we can await it
   onSubmit: (data: any) => Promise<void>;
+  defaultValues?: DeliveryNote | null;
 }
 
-export function DeliveryNoteForm({ isOpen, onClose, onSubmit }: DeliveryNoteFormProps) {
-  const { watch, setValue, handleSubmit, formState: { isSubmitting } } = useForm<DeliveryNoteFormData>({
+export function DeliveryNoteForm({
+  isOpen,
+  onClose,
+  onSubmit,
+  defaultValues
+}: DeliveryNoteFormProps) {
+  const {
+    control,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { isSubmitting, isDirty }
+  } = useForm<DeliveryNoteFormData>({
     defaultValues: {
+      customerName: "",
       invoiceId: "",
+      deliveryDate: new Date(),
+      status: 'pending',
+      notes: "",
     }
   });
 
@@ -69,12 +102,26 @@ export function DeliveryNoteForm({ isOpen, onClose, onSubmit }: DeliveryNoteForm
   const [invoices, setInvoices] = useState<ConnectedInvoice[]>([]);
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [invoicePopoverOpen, setInvoicePopoverOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState("");
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<ConnectedInvoice | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
 
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  const customerName = watch("customerName");
   const invoiceId = watch("invoiceId");
+  const deliveryDate = watch("deliveryDate");
+  const notes = watch("notes");
+
+  const isEditMode = !!defaultValues?._id;
+
+  useEffect(() => {
+    const checkIsDesktop = () => setIsDesktop(window.innerWidth >= 1024);
+    checkIsDesktop();
+    window.addEventListener("resize", checkIsDesktop);
+    return () => window.removeEventListener("resize", checkIsDesktop);
+  }, []);
 
   // Fetch customers
   useEffect(() => {
@@ -91,20 +138,19 @@ export function DeliveryNoteForm({ isOpen, onClose, onSubmit }: DeliveryNoteForm
 
   // Fetch invoices when customer changes
   useEffect(() => {
-    if (!selectedCustomer || !isOpen) return;
+    if (!customerName || !isOpen) return;
 
     const fetchInvoices = async () => {
       setLoadingInvoices(true);
       try {
-        // ✅ UPDATED: Use /api/invoices specifically
         const res = await fetch(
-          `/api/invoices?status=approved&customerName=${encodeURIComponent(selectedCustomer)}&populate=true`
+          `/api/invoices?status=approved&customerName=${encodeURIComponent(customerName)}&populate=true`
         );
         if (res.ok) {
           const fetchedInvoices = await res.json();
-          // Filter invoices that don't have a delivery note yet
           const availableInvoices = fetchedInvoices.filter(
-            (inv: any) => !inv.connectedDocuments?.deliveryId
+            (inv: any) => !inv.connectedDocuments?.deliveryId ||
+              (defaultValues && inv.connectedDocuments?.deliveryId === defaultValues._id)
           );
           setInvoices(availableInvoices);
         }
@@ -116,59 +162,106 @@ export function DeliveryNoteForm({ isOpen, onClose, onSubmit }: DeliveryNoteForm
     };
 
     fetchInvoices();
-  }, [selectedCustomer, isOpen]);
+  }, [customerName, isOpen, defaultValues]);
 
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setValue("invoiceId", "");
-      setSelectedCustomer("");
-      setSearchQuery("");
-      setSelectedInvoice(null);
-      setInvoices([]);
-    }
-  }, [isOpen, setValue]);
+      if (defaultValues) {
+        // Edit mode
+        reset({
+          customerName: defaultValues.customerName || "",
+          invoiceId: (defaultValues.connectedDocuments?.invoiceIds?.[0] as any)?._id || "",
+          deliveryDate: defaultValues.deliveryDate ? new Date(defaultValues.deliveryDate) : new Date(),
+          status: defaultValues.status || 'pending',
+          notes: defaultValues.notes || "",
+        });
+        setCustomerSearchQuery(defaultValues.customerName || "");
 
-  // Handle customer selection
+        const invoiceData = defaultValues.connectedDocuments?.invoiceIds?.[0];
+        if (invoiceData && typeof invoiceData === 'object') {
+          setSelectedInvoice({
+            _id: invoiceData._id,
+            invoiceNumber: invoiceData.invoiceNumber,
+            customerName: defaultValues.customerName,
+            grandTotal: defaultValues.grandTotal,
+            items: defaultValues.items || []
+          });
+        }
+      } else {
+        // Create mode
+        reset({
+          customerName: "",
+          invoiceId: "",
+          deliveryDate: new Date(),
+          status: 'pending',
+          notes: "",
+        });
+        setCustomerSearchQuery("");
+        setSelectedInvoice(null);
+        setInvoices([]);
+      }
+    }
+  }, [isOpen, defaultValues, reset]);
+
   const handleCustomerSelect = (customer: ICustomer) => {
-    setSelectedCustomer(customer.name);
-    setSearchQuery(customer.name);
+    setValue("customerName", customer.name, { shouldDirty: true });
+    setCustomerSearchQuery(customer.name);
     setCustomerPopoverOpen(false);
     setInvoices([]);
     setValue("invoiceId", "");
+    setValue("notes", "");
     setSelectedInvoice(null);
   };
 
-  // Handle invoice selection
   const handleInvoiceSelect = (invoice: ConnectedInvoice) => {
-    setValue("invoiceId", invoice._id);
+    setValue("invoiceId", invoice._id, { shouldDirty: true });
     setSelectedInvoice(invoice);
     setInvoicePopoverOpen(false);
+    
+    // Don't auto-generate notes - let user add them manually
   };
 
-  // ✅ Updated to be async to ensure button stays disabled
-  const handleFormSubmit = async () => {
-    if (!invoiceId) {
+  const handleFormSubmit = async (data: DeliveryNoteFormData) => {
+    if (!data.customerName || !data.customerName.trim()) {
+      toast.error("Please select a customer");
+      return;
+    }
+
+    if (!data.invoiceId) {
       toast.error("Please select an invoice");
       return;
     }
 
-    if (!selectedInvoice) {
+    if (!selectedInvoice && !isEditMode) {
       toast.error("Invoice data is missing");
       return;
     }
 
-    const submitData = {
-      customerName: selectedInvoice.customerName,
-      items: selectedInvoice.items,
-      // documentType: "delivery", // Not strictly needed as endpoint defines it
-      status: "pending",
-      connectedDocuments: {
-        invoiceId: invoiceId, // Passed to page.tsx, which will convert to array
-      },
+    if (!data.deliveryDate) {
+      toast.error("Please select a delivery date");
+      return;
+    }
+
+    const submitData: any = {
+      status: isEditMode ? data.status : 'pending',
+      deliveryDate: data.deliveryDate,
+      notes: data.notes.trim() || (selectedInvoice ? `Delivery note for invoice ${selectedInvoice.invoiceNumber}` : ""),
     };
 
-    // Await the submission to keep isSubmitting true
+    // Only include items and customer data if creating (not editing)
+    if (!isEditMode && selectedInvoice) {
+      submitData.customerName = selectedInvoice.customerName;
+      submitData.customerPhone = selectedInvoice.customerPhone;
+      submitData.customerEmail = selectedInvoice.customerEmail;
+      submitData.items = selectedInvoice.items;
+      submitData.discount = 0;
+
+      submitData.connectedDocuments = {
+        invoiceId: data.invoiceId,
+      };
+    }
+
     await onSubmit(submitData);
   };
 
@@ -177,175 +270,367 @@ export function DeliveryNoteForm({ isOpen, onClose, onSubmit }: DeliveryNoteForm
       <DialogContent className="max-w-[95vw] lg:max-w-3xl max-h-[90vh] overflow-y-auto sidebar-scroll">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Create Delivery Note
+            <Truck className="h-5 w-5" />
+            {defaultValues ? "Edit Delivery Note" : "Create Delivery Note"}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-          {/* Step 1: Select Customer */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Step 1: Select Customer</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="customer">Customer *</Label>
-                <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" className="w-full justify-between">
-                      {selectedCustomer || "Select customer..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <Command shouldFilter={false}>
-                      <CommandInput 
-                        placeholder="Search customer..." 
-                        value={searchQuery}
-                        onValueChange={setSearchQuery}
-                      />
-                      <CommandList
-                        className="max-h-[200px] overflow-y-auto"
-                        onWheel={(e) => e.stopPropagation()}
+          <div className={cn(
+            "grid grid-cols-1 gap-4",
+            isEditMode ? "lg:grid-cols-4" : "lg:grid-cols-3"
+          )}>
+            {/* Customer */}
+            <div className="space-y-2">
+              <Label>Customer <span className="text-destructive">*</span></Label>
+              <Controller
+                name="customerName"
+                control={control}
+                render={({ field }) => (
+                  <Popover
+                    open={customerPopoverOpen}
+                    onOpenChange={(isOpen) => {
+                      setCustomerPopoverOpen(isOpen);
+                      if (isOpen) setCustomerSearchQuery(field.value);
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        ref={field.ref}
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between h-9 px-3"
+                        disabled={isEditMode}
                       >
-                        <CommandEmpty>No customer found.</CommandEmpty>
-                        <CommandGroup>
-                          {customers
-                            .filter(customer => 
-                              !searchQuery || customer.name.toLowerCase().includes(searchQuery.toLowerCase())
-                            )
-                            .map((customer) => (
-                              <CommandItem
-                                key={String(customer._id)}
-                                value={customer.name}
-                                onSelect={() => handleCustomerSelect(customer)}
-                              >
-                                <Check className={cn("mr-2 h-4 w-4", selectedCustomer === customer.name ? "opacity-100" : "opacity-0")} />
-                                <div>
-                                  <div>{customer.name}</div>
-                                  {customer.email && (
-                                    <div className="text-xs text-muted-foreground">{customer.email}</div>
-                                  )}
-                                </div>
-                              </CommandItem>
-                            ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Step 2: Select Invoice */}
-          {selectedCustomer && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Step 2: Select Approved Invoice</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {invoices.length === 0 && !loadingInvoices && (
-                  <div className="flex items-center gap-2 p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
-                    <AlertCircle className="h-5 w-5 text-yellow-600" />
-                    <p className="text-sm text-yellow-900 dark:text-yellow-100">
-                      No approved invoices without delivery notes found for this customer.
-                    </p>
-                  </div>
-                )}
-
-                {invoices.length > 0 && (
-                  <div className="space-y-2">
-                    <Label htmlFor="invoice">Invoice *</Label>
-                    <Popover open={invoicePopoverOpen} onOpenChange={setInvoicePopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" role="combobox" className="w-full justify-between">
-                          {invoiceId
-                            ? invoices.find(inv => inv._id === invoiceId)?.invoiceNumber
-                            : loadingInvoices
-                              ? "Loading invoices..."
-                              : "Select invoice..."}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                        <Command>
-                          <CommandList
-                            className="max-h-[200px] overflow-y-auto"
-                            onWheel={(e) => e.stopPropagation()}
-                          >
-                            <CommandEmpty>No invoices found.</CommandEmpty>
-                            <CommandGroup>
-                              {invoices.map((invoice) => (
+                        {field.value || "Select customer..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Search customer..."
+                          value={customerSearchQuery}
+                          onValueChange={setCustomerSearchQuery}
+                        />
+                        <CommandList
+                          className="max-h-[200px] overflow-y-auto"
+                          onWheel={(e) => e.stopPropagation()}
+                        >
+                          <CommandEmpty>No customer found.</CommandEmpty>
+                          <CommandGroup>
+                            {customers
+                              .filter(customer =>
+                                !customerSearchQuery ||
+                                customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase())
+                              )
+                              .map((customer) => (
                                 <CommandItem
-                                  key={invoice._id}
-                                  value={invoice._id}
-                                  onSelect={() => handleInvoiceSelect(invoice)}
+                                  key={String(customer._id)}
+                                  value={customer.name}
+                                  onSelect={() => handleCustomerSelect(customer)}
                                 >
-                                  <Check className={cn("mr-2 h-4 w-4", invoiceId === invoice._id ? "opacity-100" : "opacity-0")} />
+                                  <Check className={cn(
+                                    "mr-2 h-4 w-4",
+                                    field.value === customer.name ? "opacity-100" : "opacity-0"
+                                  )} />
                                   <div>
-                                    <div className="font-medium">{invoice.invoiceNumber}</div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {invoice.items.length} items • {formatCurrency(invoice.grandTotal)}
-                                    </div>
+                                    <div>{customer.name}</div>
+                                    {customer.email && (
+                                      <div className="text-xs text-muted-foreground">
+                                        {customer.email}
+                                      </div>
+                                    )}
                                   </div>
                                 </CommandItem>
                               ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 )}
-              </CardContent>
-            </Card>
+              />
+            </div>
+
+            {/* Invoice */}
+            <div className="space-y-2">
+              <Label>Invoice <span className="text-destructive">*</span></Label>
+              <Controller
+                name="invoiceId"
+                control={control}
+                render={({ field }) => (
+                  <Popover
+                    open={invoicePopoverOpen}
+                    onOpenChange={setInvoicePopoverOpen}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        ref={field.ref}
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between h-9 px-3"
+                        disabled={!customerName || loadingInvoices || isEditMode}
+                      >
+                        {field.value
+                          ? (invoices.find(inv => inv._id === field.value)?.invoiceNumber ||
+                            (selectedInvoice?._id === field.value ? selectedInvoice.invoiceNumber : "Select invoice..."))
+                          : loadingInvoices
+                            ? "Loading invoices..."
+                            : "Select invoice..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
+                      <Command>
+                        <CommandList
+                          className="max-h-[200px] overflow-y-auto"
+                          onWheel={(e) => e.stopPropagation()}
+                        >
+                          <CommandEmpty>No invoices found.</CommandEmpty>
+                          <CommandGroup>
+                            {invoices.map((invoice) => (
+                              <CommandItem
+                                key={invoice._id}
+                                value={invoice._id}
+                                onSelect={() => handleInvoiceSelect(invoice)}
+                              >
+                                <Check className={cn(
+                                  "mr-2 h-4 w-4",
+                                  field.value === invoice._id ? "opacity-100" : "opacity-0"
+                                )} />
+                                <div>
+                                  <div className="font-medium">{invoice.invoiceNumber}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {invoice.items.length} items • {formatCurrency(invoice.grandTotal)}
+                                  </div>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              />
+            </div>
+
+            {/* Delivery Date */}
+            <div className="space-y-2">
+              <Label>Delivery Date</Label>
+              <Controller
+                name="deliveryDate"
+                control={control}
+                render={({ field }) => (
+                  <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        ref={field.ref}
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal h-9 px-3",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {field.value ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={(date) => {
+                          field.onChange(date);
+                          setDatePopoverOpen(false);
+                        }}
+                        captionLayout="dropdown"
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+              />
+            </div>
+
+            {/* Status (only in edit mode) */}
+            {isEditMode && (
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Controller
+                  name="status"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-full h-9 px-3">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="dispatched">Dispatched</SelectItem>
+                        <SelectItem value="delivered">Delivered</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Warning if no invoices available */}
+          {customerName && invoices.length === 0 && !loadingInvoices && (
+            <div className="flex items-center gap-2 p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
+              <p className="text-sm text-yellow-900 dark:text-yellow-100">
+                No approved invoices without delivery notes found for this customer.
+              </p>
+            </div>
           )}
 
-          {/* Invoice Summary */}
+          {/* Invoice Summary & Items */}
           {selectedInvoice && (
-            <Card className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900">
-              <CardHeader>
-                <CardTitle className="text-base">Invoice Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Invoice No.:</span>
-                  <span className="font-mono font-medium">{selectedInvoice.invoiceNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Customer:</span>
-                  <span className="font-medium">{selectedInvoice.customerName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Items:</span>
-                  <span className="font-medium">{selectedInvoice.items.length} item(s)</span>
-                </div>
-                <div className="flex justify-between pt-3 border-t border-blue-200 dark:border-blue-900">
-                  <span className="font-semibold">Total Amount:</span>
-                  <span className="text-lg font-bold text-blue-900 dark:text-blue-100">
-                    {formatCurrency(selectedInvoice.grandTotal)}
-                  </span>
+            <>
+              {/* Invoice Summary Card */}
+              <Card className="bg-muted/50">
+                <CardContent className="p-4 sm:p-6 space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Invoice No.:</span>
+                      <span className="font-medium font-mono">{selectedInvoice.invoiceNumber}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Customer:</span>
+                      <span className="font-medium">{selectedInvoice.customerName}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total Items:</span>
+                      <span className="font-medium">{selectedInvoice.items.length} item(s)</span>
+                    </div>
+
+                    {/* Total Amount with muted note */}
+                    <div className="pt-3 border-t">
+                      <div className="flex justify-between">
+                        <span className="text-lg font-semibold">Total Amount:</span>
+                        <span className="text-xl font-bold text-green-600">
+                          {formatCurrency(selectedInvoice.grandTotal)}
+                        </span>
+                      </div>
+                      <div className="text-right text-xs text-muted-foreground mt-1">
+                        (includes discounts + vat)
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Items List - Responsive View */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Items to Ship
+                </Label>
+                
+                {/* Desktop View (Table) */}
+                <div className="hidden md:block overflow-x-auto rounded-md border bg-background">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="text-left p-3 font-medium text-sm">#</th>
+                        <th className="text-left p-3 font-medium text-sm">Description</th>
+                        <th className="text-right p-3 font-medium text-sm">Quantity</th>
+                        <th className="text-right p-3 font-medium text-sm">Rate</th>
+                        <th className="text-right p-3 font-medium text-sm">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedInvoice.items.map((item, index) => (
+                        <tr key={index} className="border-b hover:bg-muted/50 last:border-0">
+                          <td className="p-3 text-sm text-muted-foreground">{index + 1}</td>
+                          <td className="p-3">
+                            <div className="font-medium text-sm">{item.description}</div>
+                          </td>
+                          <td className="p-3 text-right font-medium text-sm">
+                            {item.quantity.toFixed(2)}
+                          </td>
+                          <td className="p-3 text-right text-muted-foreground text-sm">
+                            {formatCurrency(item.rate)}
+                          </td>
+                          <td className="p-3 text-right font-semibold text-sm">
+                            {formatCurrency(item.total)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
 
-                {/* Items List */}
-                <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-900">
-                  <p className="text-sm font-medium mb-2">Items to Ship:</p>
-                  <div className="space-y-2">
-                    {selectedInvoice.items.map((item, idx) => (
-                      <div key={idx} className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          {item.description} (x{item.quantity})
-                        </span>
-                        <span className="font-medium">{formatCurrency(item.total)}</span>
-                      </div>
-                    ))}
-                  </div>
+                {/* Mobile View (Cards) */}
+                <div className="md:hidden space-y-2 max-h-[300px] overflow-y-auto sidebar-scroll">
+                  {selectedInvoice.items.map((item, idx) => (
+                    <Card key={idx} className="border">
+                      <CardContent className="p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs text-muted-foreground mb-1">Item #{idx + 1}</div>
+                            <div className="font-medium text-sm break-words">{item.description}</div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 pt-2 border-t text-sm">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-0.5">Quantity</div>
+                            <div className="font-medium">{item.quantity.toFixed(2)}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs text-muted-foreground mb-0.5">Rate</div>
+                            <div className="font-medium">{formatCurrency(item.rate)}</div>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">Total</span>
+                            <span className="font-bold text-sm">
+                              {formatCurrency(item.total)}
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </>
           )}
+
+          {/* Notes Field */}
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes (Optional)</Label>
+            <Controller
+              name="notes"
+              control={control}
+              render={({ field }) => (
+                <Textarea
+                  {...field}
+                  id="notes"
+                  placeholder={
+                    selectedInvoice 
+                      ? `Add delivery notes... (Default: "Delivery note for invoice ${selectedInvoice.invoiceNumber}")`
+                      : "Add delivery notes..."
+                  }
+                  rows={3}
+                />
+              )}
+            />
+            <p className="text-xs text-muted-foreground">
+              💡 If left empty, a default note will be generated automatically
+            </p>
+          </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
@@ -353,14 +638,16 @@ export function DeliveryNoteForm({ isOpen, onClose, onSubmit }: DeliveryNoteForm
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || !invoiceId}
+              disabled={isSubmitting || !invoiceId || (isEditMode && !isDirty)}
             >
               {isSubmitting ? (
                 <>
                   <Spinner />
-                  Creating...
+                  {defaultValues ? "Updating..." : "Creating..."}
                 </>
-              ) : "Create Delivery Note"}
+              ) : (
+                defaultValues ? "Update Delivery Note" : "Create Delivery Note"
+              )}
             </Button>
           </DialogFooter>
         </form>

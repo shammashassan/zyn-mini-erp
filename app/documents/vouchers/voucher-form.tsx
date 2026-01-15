@@ -1,15 +1,15 @@
-// app/documents/vouchers/voucher-form.tsx - UPDATED: Added automatic creation for Customer, Supplier, and Payee
+// app/documents/vouchers/voucher-form.tsx - UPDATED: Added voucherDate, improved UI layout
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -38,32 +38,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { 
-  ChevronsUpDown, 
-  Check, 
-  Wallet, 
-  AlertCircle, 
-  Users, 
-  Building2, 
-  User, 
+import {
+  ChevronsUpDown,
+  Check,
+  Wallet,
+  AlertCircle,
+  Users,
+  Building2,
+  User,
   Store,
-  Loader2,
-  Plus
+  Plus,
+  Calendar as CalendarIcon,
+  DollarSign,
+  CreditCard,
+  Landmark,
+  FileText
 } from "lucide-react";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { Spinner } from "@/components/ui/spinner";
 import type { ICustomer } from "@/models/Customer";
 import type { ISupplier } from "@/models/Supplier";
 import type { IPayee } from "@/models/Payee";
-
-// Local utility for currency formatting to avoid import errors
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount);
-};
+import { formatCurrency } from "@/utils/formatters/currency";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 interface ConnectedInvoice {
   _id: string;
@@ -103,6 +104,7 @@ type VoucherFormData = {
   voucherAmount: number;
   discount: number;
   notes: string;
+  voucherDate: Date; // ✅ UPDATED: Changed from 'date' to 'voucherDate'
   selectedInvoiceIds?: string[];
   selectedPurchaseIds?: string[];
 };
@@ -114,12 +116,12 @@ interface VoucherFormProps {
 }
 
 const PAYMENT_METHODS = [
-  'Cash',
-  'Credit Card',
-  'Debit Card',
-  'UPI',
-  'Bank Transfer',
-  'Cheque',
+  { value: 'Cash', label: 'Cash', icon: DollarSign },
+  { value: 'Credit Card', label: 'Credit Card', icon: CreditCard },
+  { value: 'Debit Card', label: 'Debit Card', icon: CreditCard },
+  { value: 'UPI', label: 'UPI', icon: Wallet },
+  { value: 'Bank Transfer', label: 'Bank Transfer', icon: Landmark },
+  { value: 'Cheque', label: 'Cheque', icon: FileText },
 ];
 
 export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
@@ -131,6 +133,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
       voucherAmount: 0,
       discount: 0,
       notes: "",
+      voucherDate: new Date(), // ✅ UPDATED
     }
   });
 
@@ -141,12 +144,14 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
   const [purchases, setPurchases] = useState<ConnectedPurchase[]>([]);
   const [partyPopoverOpen, setPartyPopoverOpen] = useState(false);
   const [selectedParty, setSelectedParty] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [partySearchQuery, setPartySearchQuery] = useState("");
   const [vendorName, setVendorName] = useState("");
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [loadingPurchases, setLoadingPurchases] = useState(false);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(new Set());
   const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<Set<string>>(new Set());
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(true);
 
   const voucherType = watch("voucherType");
   const partyType = watch("partyType");
@@ -157,6 +162,13 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
     (voucherType === 'receipt' && selectedInvoiceIds.size > 0) ||
     (voucherType === 'payment' && selectedPurchaseIds.size > 0) ||
     (voucherType === 'refund' && selectedInvoiceIds.size > 0);
+
+  useEffect(() => {
+    const checkIsDesktop = () => setIsDesktop(window.innerWidth >= 1024);
+    checkIsDesktop();
+    window.addEventListener("resize", checkIsDesktop);
+    return () => window.removeEventListener("resize", checkIsDesktop);
+  }, []);
 
   // Fetch customers, suppliers, and payees
   useEffect(() => {
@@ -292,8 +304,9 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
       setValue("voucherAmount", 0);
       setValue("discount", 0);
       setValue("notes", "");
+      setValue("voucherDate", new Date()); // ✅ UPDATED
       setSelectedParty("");
-      setSearchQuery("");
+      setPartySearchQuery("");
       setVendorName("");
       setSelectedInvoiceIds(new Set());
       setSelectedPurchaseIds(new Set());
@@ -315,15 +328,15 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
 
   const handlePartySelect = (party: ICustomer | ISupplier | IPayee) => {
     setSelectedParty(party.name);
-    setSearchQuery(party.name);
+    setPartySearchQuery(party.name);
     setPartyPopoverOpen(false);
     setSelectedInvoiceIds(new Set());
     setSelectedPurchaseIds(new Set());
   };
 
   const handleCreateNew = () => {
-    if (searchQuery.trim()) {
-      setSelectedParty(searchQuery.trim());
+    if (partySearchQuery.trim()) {
+      setSelectedParty(partySearchQuery.trim());
       setPartyPopoverOpen(false);
       setSelectedInvoiceIds(new Set());
       setSelectedPurchaseIds(new Set());
@@ -376,7 +389,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
   const doesPartyExist = () => {
     const partyList = getPartyList();
     return partyList.some(
-      (p) => p.name.toLowerCase() === searchQuery.trim().toLowerCase()
+      (p) => p.name.toLowerCase() === partySearchQuery.trim().toLowerCase()
     );
   };
 
@@ -388,6 +401,11 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
 
     if (data.voucherAmount <= 0) {
       toast.error("Please enter a valid amount");
+      return;
+    }
+
+    if (!data.voucherDate) { // ✅ UPDATED
+      toast.error("Please select a voucher date");
       return;
     }
 
@@ -426,7 +444,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
               break;
             case 'payee':
               endpoint = '/api/payees';
-              partyPayload.type = 'individual'; // Default type for payee
+              partyPayload.type = 'individual';
               entityName = 'Payee';
               break;
           }
@@ -439,8 +457,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
 
           if (createRes.ok) {
             toast.success(`${entityName} "${selectedParty}" created successfully`);
-            
-            // Refresh the party list
+
             const refreshRes = await fetch(endpoint);
             if (refreshRes.ok) {
               const updatedList = await refreshRes.json();
@@ -495,6 +512,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
       notes: data.notes,
       totalAmount: data.voucherAmount,
       grandTotal: data.voucherAmount,
+      voucherDate: data.voucherDate, // ✅ UPDATED: Use voucherDate
       connectedDocuments: selectedDocuments,
     };
 
@@ -526,11 +544,11 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
     }
   };
 
-  const handleVoucherTypeChange = (value: 'receipt' | 'payment' | 'refund') => {
-    if (value) {
-      setValue("voucherType", value);
+  const handleVoucherTypeChange = (value: string) => {
+    if (value && (value === 'receipt' || value === 'payment' || value === 'refund')) {
+      setValue("voucherType", value as 'receipt' | 'payment' | 'refund');
       setSelectedParty("");
-      setSearchQuery("");
+      setPartySearchQuery("");
       setVendorName("");
       setSelectedInvoiceIds(new Set());
       setSelectedPurchaseIds(new Set());
@@ -542,7 +560,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
     if (value) {
       setValue('partyType', value);
       setSelectedParty("");
-      setSearchQuery("");
+      setPartySearchQuery("");
       setVendorName("");
       setSelectedInvoiceIds(new Set());
       setSelectedPurchaseIds(new Set());
@@ -552,6 +570,15 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
   const partyList = getPartyList();
   const showInvoices = (voucherType === 'receipt' || voucherType === 'refund') && partyType === 'customer';
   const showPurchases = voucherType === 'payment' && partyType === 'supplier';
+
+  const totalSelectedItems = selectedInvoiceIds.size + selectedPurchaseIds.size;
+
+  const showSummarySeparator =
+    (voucherType === 'receipt' || voucherType === 'refund') &&
+    selectedInvoiceIds.size > 0 &&
+    hasLinkedDocuments &&
+    discount > 0;
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -564,354 +591,606 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+          {/* Voucher Type Tabs - ✅ UPDATED: Takes only needed width */}
+          <div className="space-y-2">
+            {/* Desktop Toggle Group */}
+            <ToggleGroup
+              type="single"
+              value={voucherType}
+              onValueChange={handleVoucherTypeChange}
+              variant="outline"
+              className="w-full hidden md:grid grid-cols-3"
+            >
+              <ToggleGroupItem value="receipt" className="flex-1">Receipt</ToggleGroupItem>
+              <ToggleGroupItem value="payment" className="flex-1">Payment</ToggleGroupItem>
+              <ToggleGroupItem value="refund" className="flex-1">Refund</ToggleGroupItem>
+            </ToggleGroup>
+            {/* Mobile Select */}
+            <div className="md:hidden">
+              <Select
+                value={voucherType}
+                onValueChange={handleVoucherTypeChange}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select voucher type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="receipt">Receipt</SelectItem>
+                  <SelectItem value="payment">Payment</SelectItem>
+                  <SelectItem value="refund">Refund</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Voucher Type</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                {/* Desktop Toggle Group */}
-                <ToggleGroup
-                  type="single"
-                  value={voucherType}
-                  onValueChange={handleVoucherTypeChange}
-                  variant="outline"
-                  className="w-full hidden md:grid grid-cols-3"
-                >
-                  <ToggleGroupItem value="receipt" className="flex-1">Receipt</ToggleGroupItem>
-                  <ToggleGroupItem value="payment" className="flex-1">Payment</ToggleGroupItem>
-                  <ToggleGroupItem value="refund" className="flex-1">Refund</ToggleGroupItem>
-                </ToggleGroup>
-
-                {/* Mobile Select */}
-                <div className="md:hidden">
-                  <Select
-                    value={voucherType}
-                    onValueChange={handleVoucherTypeChange}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select voucher type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="receipt">Receipt</SelectItem>
-                      <SelectItem value="payment">Payment</SelectItem>
-                      <SelectItem value="refund">Refund</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Party Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Party Type Selection */}
-              <div className="space-y-2">
-                <Label>Party Type</Label>
-                
-                {/* Desktop Toggle Group */}
-                <ToggleGroup
-                  type="single"
-                  value={partyType}
-                  onValueChange={handlePartyTypeChange}
-                  variant="outline"
-                  className="w-full hidden md:grid grid-cols-4"
-                >
+          {/* Top Row: Party Type, Party Selection, Date */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Party Type Selection */}
+            <div className="space-y-2">
+              <Label>Party Type <span className="text-destructive">*</span></Label>
+              <Select value={partyType} onValueChange={handlePartyTypeChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select party type" />
+                </SelectTrigger>
+                <SelectContent>
                   {(['customer', 'supplier', 'payee', 'vendor'] as PartyType[]).map((type) => {
                     const Icon = getPartyTypeIcon(type);
                     return (
-                      <ToggleGroupItem key={type} value={type} className="flex items-center gap-2 capitalize flex-1">
-                         <Icon className="h-4 w-4" />
-                         {type}
-                      </ToggleGroupItem>
+                      <SelectItem key={type} value={type}>
+                        <div className="flex items-center gap-2 capitalize">
+                          <Icon className="h-4 w-4" />
+                          {type}
+                        </div>
+                      </SelectItem>
                     );
                   })}
-                </ToggleGroup>
+                </SelectContent>
+              </Select>
+            </div>
 
-                {/* Mobile Select */}
-                <div className="md:hidden">
-                  <Select
-                    value={partyType}
-                    onValueChange={handlePartyTypeChange}
-                  >
-                     <SelectTrigger className="w-full capitalize">
-                      <SelectValue placeholder="Select party type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(['customer', 'supplier', 'payee', 'vendor'] as PartyType[]).map((type) => {
-                        const Icon = getPartyTypeIcon(type);
-                         return (
-                          <SelectItem key={type} value={type} className="capitalize">
-                            <div className="flex items-center gap-2">
-                               <Icon className="h-4 w-4" />
-                               {type}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-
+            {/* Party Selection */}
+            {partyType === 'vendor' ? (
+              <div className="space-y-2">
+                <Label htmlFor="vendorName">Vendor Name <span className="text-destructive">*</span></Label>
+                <Input
+                  id="vendorName"
+                  placeholder="Enter vendor name..."
+                  value={vendorName}
+                  onChange={(e) => setVendorName(e.target.value)}
+                />
               </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>
+                  {partyType.charAt(0).toUpperCase() + partyType.slice(1)} <span className="text-destructive">*</span>
+                </Label>
+                <Popover
+                  open={partyPopoverOpen}
+                  onOpenChange={(isOpen) => {
+                    setPartyPopoverOpen(isOpen);
+                    if (isOpen) setPartySearchQuery(selectedParty);
+                  }}
+                >
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between">
+                      <span className="truncate">{selectedParty || `Select ${partyType}...`}</span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder={`Search ${partyType}...`}
+                        value={partySearchQuery}
+                        onValueChange={setPartySearchQuery}
+                      />
+                      <CommandList
+                        className="max-h-[200px] overflow-y-auto"
+                        onWheel={(e) => e.stopPropagation()}
+                      >
+                        <CommandEmpty>
+                          {partySearchQuery.trim() ? `No ${partyType} found.` : "Start typing to search..."}
+                        </CommandEmpty>
 
-              {/* Party Selection */}
-              {partyType === 'vendor' ? (
-                <div className="space-y-2">
-                  <Label htmlFor="vendorName">Vendor Name *</Label>
-                  <Input
-                    id="vendorName"
-                    placeholder="Enter vendor name..."
-                    value={vendorName}
-                    onChange={(e) => setVendorName(e.target.value)}
-                  />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="party">
-                    {partyType.charAt(0).toUpperCase() + partyType.slice(1)} *
-                  </Label>
-                  <Popover open={partyPopoverOpen} onOpenChange={setPartyPopoverOpen}>
+                        {partyList.length > 0 && (
+                          <CommandGroup heading={`Existing ${partyType.charAt(0).toUpperCase() + partyType.slice(1)}s`}>
+                            {partyList
+                              .filter(party =>
+                                !partySearchQuery || party.name.toLowerCase().includes(partySearchQuery.toLowerCase())
+                              )
+                              .map((party) => (
+                                <CommandItem
+                                  key={String(party._id)}
+                                  value={party.name}
+                                  onSelect={() => handlePartySelect(party)}
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", selectedParty === party.name ? "opacity-100" : "opacity-0")} />
+                                  <div className="flex-1">
+                                    <span>{party.name}</span>
+                                    {partyType === 'customer' && (party as any).email && (
+                                      <div className="text-xs text-muted-foreground">
+                                        {(party as any).email}
+                                      </div>
+                                    )}
+                                    {partyType === 'supplier' && (party as any).city && (party as any).district && (
+                                      <div className="text-xs text-muted-foreground">
+                                        {(party as any).city}, {(party as any).district}
+                                      </div>
+                                    )}
+                                    {partyType === 'payee' && (party as any).type && (
+                                      <div className="text-xs text-muted-foreground capitalize">
+                                        {(party as any).type}
+                                      </div>
+                                    )}
+                                  </div>
+                                </CommandItem>
+                              ))}
+                          </CommandGroup>
+                        )}
+
+                        {partySearchQuery.trim() && !doesPartyExist() && (
+                          <CommandGroup heading="Create New">
+                            <CommandItem
+                              onSelect={handleCreateNew}
+                              className="text-primary"
+                              value={partySearchQuery}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Create "{partySearchQuery}"
+                            </CommandItem>
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
+            {/* Voucher Date - ✅ UPDATED */}
+            <div className="space-y-2">
+              <Label>Voucher Date <span className="text-destructive">*</span></Label>
+              <Controller
+                name="voucherDate"
+                control={control}
+                render={({ field }) => (
+                  <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" role="combobox" className="w-full justify-between">
-                        {selectedParty || `Select or type ${partyType}...`}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      <Button
+                        ref={field.ref}
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {field.value ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                      <Command shouldFilter={false}>
-                        <CommandInput 
-                          placeholder={`Search ${partyType}...`}
-                          value={searchQuery}
-                          onValueChange={setSearchQuery}
-                        />
-                        <CommandList
-                          className="max-h-[200px] overflow-y-auto"
-                          onWheel={(e) => e.stopPropagation()}
-                        >
-                          <CommandEmpty>
-                            {searchQuery.trim() ? `No ${partyType} found.` : "Start typing to search..."}
-                          </CommandEmpty>
-                          
-                          {partyList.length > 0 && (
-                            <CommandGroup heading={`Existing ${partyType.charAt(0).toUpperCase() + partyType.slice(1)}s`}>
-                              {partyList
-                                .filter(party => 
-                                  !searchQuery || party.name.toLowerCase().includes(searchQuery.toLowerCase())
-                                )
-                                .map((party) => (
-                                  <CommandItem
-                                    key={String(party._id)}
-                                    value={party.name}
-                                    onSelect={() => handlePartySelect(party)}
-                                  >
-                                    <Check className={cn("mr-2 h-4 w-4", selectedParty === party.name ? "opacity-100" : "opacity-0")} />
-                                    <div>
-                                      <div>{party.name}</div>
-                                    </div>
-                                  </CommandItem>
-                                ))}
-                            </CommandGroup>
-                          )}
-
-                          {searchQuery.trim() && !doesPartyExist() && (
-                            <CommandGroup heading="Create New">
-                              <CommandItem
-                                onSelect={handleCreateNew}
-                                className="text-primary"
-                                value={searchQuery}
-                              >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Create "{searchQuery}"
-                              </CommandItem>
-                            </CommandGroup>
-                          )}
-                        </CommandList>
-                      </Command>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={(date) => {
+                          field.onChange(date);
+                          setDatePopoverOpen(false);
+                        }}
+                        captionLayout="dropdown"
+                        initialFocus
+                      />
                     </PopoverContent>
                   </Popover>
-                </div>
-              )}
+                )}
+              />
+            </div>
+          </div>
 
-              {/* Show Invoices for Customers */}
-              {showInvoices && selectedParty && (
-                <div className="space-y-2">
-                  <Label>
-                    {voucherType === 'receipt' ? 'Invoices (Optional)' : 'Paid Invoices (Required for Refund)'}
-                  </Label>
-                  {invoices.length === 0 && !loadingInvoices && (
-                    <div className="flex items-center gap-2 p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
-                      <AlertCircle className="h-5 w-5 text-yellow-600" />
-                      <p className="text-sm text-yellow-900 dark:text-yellow-100">
-                        {voucherType === 'receipt'
-                          ? 'No approved pending invoices found.'
-                          : 'No approved paid invoices available for refund.'}
-                      </p>
-                    </div>
-                  )}
-                  {invoices.length > 0 && (
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                      {invoices.map((invoice) => {
-                        const isSelected = selectedInvoiceIds.has(invoice._id);
-                        const displayAmount = voucherType === 'refund'
-                          ? (invoice as any).remainingRefundable
-                          : invoice.remainingAmount;
+          {/* Payment Method - ✅ UPDATED: With icons */}
+          <div className="space-y-2">
+            <Label htmlFor="paymentMethod">Payment Method <span className="text-destructive">*</span></Label>
+            <Select value={paymentMethod} onValueChange={(value) => setValue("paymentMethod", value)}>
+              <SelectTrigger id="paymentMethod">
+                <SelectValue placeholder="Select payment method" />
+              </SelectTrigger>
+              <SelectContent>
+                {PAYMENT_METHODS.map((method) => {
+                  const Icon = method.icon;
+                  return (
+                    <SelectItem key={method.value} value={method.value}>
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4" />
+                        {method.label}
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
 
-                        return (
-                          <Label
-                            key={invoice._id}
-                            htmlFor={`invoice-${invoice._id}`}
-                            className={cn(
-                              "hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-4 cursor-pointer transition-colors",
-                              isSelected && (voucherType === 'refund'
-                                ? "border-red-600 bg-red-50 dark:border-red-900 dark:bg-red-950"
-                                : "border-blue-600 bg-blue-50 dark:border-blue-900 dark:bg-blue-950")
-                            )}
-                          >
-                            <div className="grid gap-1.5 font-normal flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">{invoice.invoiceNumber}</span>
-                                <Badge variant="primary" appearance="outline">{invoice.paymentStatus}</Badge>
-                              </div>
-                              <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-                                <div>Total: {formatCurrency(invoice.grandTotal)}</div>
-                                <div className="text-green-600">Paid: {formatCurrency(invoice.paidAmount)}</div>
-                                {voucherType === 'refund' ? (
-                                  <div className="text-red-600">Refundable: {formatCurrency(displayAmount)}</div>
-                                ) : (
-                                  <div className="text-orange-600">Rem: {formatCurrency(displayAmount)}</div>
-                                )}
+          {/* Show Invoices for Customers */}
+          {showInvoices && selectedParty && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  {voucherType === 'receipt' ? 'Invoices (Optional)' : 'Paid Invoices (Required for Refund)'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {invoices.length === 0 && !loadingInvoices ? (
+                  <div className="flex items-center gap-2 p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                    <AlertCircle className="h-5 w-5 text-yellow-600" />
+                    <p className="text-sm text-yellow-900 dark:text-yellow-100">
+                      {voucherType === 'receipt'
+                        ? 'No approved pending invoices found.'
+                        : 'No approved paid invoices available for refund.'}
+                    </p>
+                  </div>
+                ) : isDesktop && invoices.length > 0 ? (
+                  /* Desktop Table View */
+                  <div className="w-full overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-center p-3 font-medium text-sm w-[60px]">Select</th>
+                          <th className="text-left p-3 font-medium text-sm min-w-[150px]">Invoice #</th>
+                          <th className="text-center p-3 font-medium text-sm w-[100px]">Status</th>
+                          <th className="text-right p-3 font-medium text-sm w-[100px]">Total</th>
+                          <th className="text-right p-3 font-medium text-sm w-[100px]">Paid</th>
+                          <th className="text-right p-3 font-medium text-sm w-[100px]">
+                            {voucherType === 'refund' ? 'Refundable' : 'Remaining'}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoices.map((invoice) => {
+                          const isSelected = selectedInvoiceIds.has(invoice._id);
+                          const displayAmount = voucherType === 'refund'
+                            ? (invoice as any).remainingRefundable
+                            : invoice.remainingAmount;
+
+                          return (
+                            <tr
+                              key={invoice._id}
+                              className={cn(
+                                "border-b hover:bg-muted/50",
+                                isSelected && (voucherType === 'refund'
+                                  ? "bg-red-50 dark:bg-red-950/20"
+                                  : "bg-blue-50 dark:bg-blue-950/20")
+                              )}
+                            >
+                              <td className="p-3 text-center">
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => toggleInvoiceSelection(invoice._id)}
+                                  className="mx-auto"
+                                />
+                              </td>
+                              <td className="p-3 font-medium">{invoice.invoiceNumber}</td>
+                              <td className="p-3 text-center">
+                                <Badge variant="primary" appearance="outline">
+                                  {invoice.paymentStatus}
+                                </Badge>
+                              </td>
+                              <td className="p-3 text-right tabular-nums">
+                                {formatCurrency(invoice.grandTotal)}
+                              </td>
+                              <td className="p-3 text-right tabular-nums text-green-600">
+                                {formatCurrency(invoice.paidAmount)}
+                              </td>
+                              <td className={cn(
+                                "p-3 text-right tabular-nums font-semibold",
+                                voucherType === 'refund' ? "text-red-600" : "text-orange-600"
+                              )}>
+                                {formatCurrency(displayAmount)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : invoices.length > 0 ? (
+                  /* Mobile Card View */
+                  <div className="space-y-3">
+                    {invoices.map((invoice) => {
+                      const isSelected = selectedInvoiceIds.has(invoice._id);
+                      const displayAmount = voucherType === 'refund'
+                        ? (invoice as any).remainingRefundable
+                        : invoice.remainingAmount;
+
+                      return (
+                        <Card
+                          key={invoice._id}
+                          className={cn(
+                            "border-2 transition-colors",
+                            isSelected && (voucherType === 'refund'
+                              ? "border-red-600 bg-red-50 dark:border-red-900 dark:bg-red-950/20"
+                              : "border-blue-600 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20")
+                          )}
+                        >
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start gap-3">
+                              <Checkbox
+                                id={`invoice-${invoice._id}`}
+                                checked={isSelected}
+                                onCheckedChange={() => toggleInvoiceSelection(invoice._id)}
+                                className="mt-1"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <Label
+                                  htmlFor={`invoice-${invoice._id}`}
+                                  className="font-medium cursor-pointer"
+                                >
+                                  {invoice.invoiceNumber}
+                                </Label>
+                                <Badge variant="primary" appearance="outline" className="mt-1">
+                                  {invoice.paymentStatus}
+                                </Badge>
                               </div>
                             </div>
-                            <Checkbox
-                              id={`invoice-${invoice._id}`}
-                              checked={isSelected}
-                              onCheckedChange={() => toggleInvoiceSelection(invoice._id)}
-                            />
-                          </Label>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Show Purchases for Suppliers */}
-              {showPurchases && selectedParty && (
-                <div className="space-y-2">
-                  <Label>Purchases (Optional)</Label>
-                  {purchases.length === 0 && !loadingPurchases && (
-                    <div className="flex items-center gap-2 p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
-                      <AlertCircle className="h-5 w-5 text-yellow-600" />
-                      <p className="text-sm text-yellow-900 dark:text-yellow-100">No pending purchases found.</p>
-                    </div>
-                  )}
-                  {purchases.length > 0 && (
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                      {purchases.map((purchase) => {
-                        const displayTotal = purchase.grandTotal ?? purchase.totalAmount ?? 0;
-                        const isSelected = selectedPurchaseIds.has(purchase._id);
-                        return (
-                          <Label
-                            key={purchase._id}
-                            htmlFor={`purchase-${purchase._id}`}
-                            className={cn(
-                              "hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-4 cursor-pointer transition-colors",
-                              isSelected && "border-yellow-600 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950"
-                            )}
-                          >
-                            <div className="grid gap-1.5 font-normal flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono font-medium">{purchase.referenceNumber}</span>
-                                <Badge variant="warning" appearance="outline">{purchase.paymentStatus}</Badge>
+                          </CardHeader>
+                          <CardContent className="space-y-2 pt-0">
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground">Total</div>
+                                <div className="font-medium">{formatCurrency(invoice.grandTotal)}</div>
                               </div>
-                              <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-                                <div>Total: {formatCurrency(displayTotal)}</div>
-                                <div className="text-green-600">Paid: {formatCurrency(purchase.paidAmount)}</div>
-                                <div className="text-orange-600">Rem: {formatCurrency(purchase.remainingAmount)}</div>
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground">Paid</div>
+                                <div className="font-medium text-green-600">
+                                  {formatCurrency(invoice.paidAmount)}
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground">
+                                  {voucherType === 'refund' ? 'Refundable' : 'Remaining'}
+                                </div>
+                                <div className={cn(
+                                  "font-semibold",
+                                  voucherType === 'refund' ? "text-red-600" : "text-orange-600"
+                                )}>
+                                  {formatCurrency(displayAmount)}
+                                </div>
                               </div>
                             </div>
-                            <Checkbox
-                              id={`purchase-${purchase._id}`}
-                              checked={isSelected}
-                              onCheckedChange={() => togglePurchaseSelection(purchase._id)}
-                            />
-                          </Label>
-                        );
-                      })}
-                    </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Show Purchases for Suppliers */}
+          {showPurchases && selectedParty && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Purchases (Optional)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {purchases.length === 0 && !loadingPurchases ? (
+                  <div className="flex items-center gap-2 p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                    <AlertCircle className="h-5 w-5 text-yellow-600" />
+                    <p className="text-sm text-yellow-900 dark:text-yellow-100">No pending purchases found.</p>
+                  </div>
+                ) : isDesktop && purchases.length > 0 ? (
+                  /* Desktop Table View */
+                  <div className="w-full overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-center p-3 font-medium text-sm w-[60px]">Select</th>
+                          <th className="text-left p-3 font-medium text-sm min-w-[150px]">Reference #</th>
+                          <th className="text-center p-3 font-medium text-sm w-[100px]">Status</th>
+                          <th className="text-right p-3 font-medium text-sm w-[100px]">Total</th>
+                          <th className="text-right p-3 font-medium text-sm w-[100px]">Paid</th>
+                          <th className="text-right p-3 font-medium text-sm w-[100px]">Remaining</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {purchases.map((purchase) => {
+                          const displayTotal = purchase.grandTotal ?? purchase.totalAmount ?? 0;
+                          const isSelected = selectedPurchaseIds.has(purchase._id);
+
+                          return (
+                            <tr
+                              key={purchase._id}
+                              className={cn(
+                                "border-b hover:bg-muted/50",
+                                isSelected && "bg-yellow-50 dark:bg-yellow-950/20"
+                              )}
+                            >
+                              <td className="p-3 text-center">
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => togglePurchaseSelection(purchase._id)}
+                                  className="mx-auto"
+                                />
+                              </td>
+                              <td className="p-3 font-mono font-medium">{purchase.referenceNumber}</td>
+                              <td className="p-3 text-center">
+                                <Badge variant="warning" appearance="outline">
+                                  {purchase.paymentStatus}
+                                </Badge>
+                              </td>
+                              <td className="p-3 text-right tabular-nums">
+                                {formatCurrency(displayTotal)}
+                              </td>
+                              <td className="p-3 text-right tabular-nums text-green-600">
+                                {formatCurrency(purchase.paidAmount)}
+                              </td>
+                              <td className="p-3 text-right tabular-nums font-semibold text-orange-600">
+                                {formatCurrency(purchase.remainingAmount)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : purchases.length > 0 ? (
+                  /* Mobile Card View */
+                  <div className="space-y-3">
+                    {purchases.map((purchase) => {
+                      const displayTotal = purchase.grandTotal ?? purchase.totalAmount ?? 0;
+                      const isSelected = selectedPurchaseIds.has(purchase._id);
+
+                      return (
+                        <Card
+                          key={purchase._id}
+                          className={cn(
+                            "border-2 transition-colors",
+                            isSelected && "border-yellow-600 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950/20"
+                          )}
+                        >
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start gap-3">
+                              <Checkbox
+                                id={`purchase-${purchase._id}`}
+                                checked={isSelected}
+                                onCheckedChange={() => togglePurchaseSelection(purchase._id)}
+                                className="mt-1"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <Label
+                                  htmlFor={`purchase-${purchase._id}`}
+                                  className="font-mono font-medium cursor-pointer"
+                                >
+                                  {purchase.referenceNumber}
+                                </Label>
+                                <Badge variant="warning" appearance="outline" className="mt-1">
+                                  {purchase.paymentStatus}
+                                </Badge>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-2 pt-0">
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground">Total</div>
+                                <div className="font-medium">{formatCurrency(displayTotal)}</div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground">Paid</div>
+                                <div className="font-medium text-green-600">
+                                  {formatCurrency(purchase.paidAmount)}
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground">Remaining</div>
+                                <div className="font-semibold text-orange-600">
+                                  {formatCurrency(purchase.remainingAmount)}
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Discount */}
+          {hasLinkedDocuments && (
+            <div className="space-y-2">
+              <Label htmlFor="discount">Discount (Optional)</Label>
+              <Input
+                id="discount"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                {...register("discount", { valueAsNumber: true })}
+              />
+            </div>
+          )}
+
+          {/* Amount */}
+          <div className="space-y-2">
+            <Label htmlFor="voucherAmount">Amount (incl. VAT) <span className="text-destructive">*</span></Label>
+            <Input
+              id="voucherAmount"
+              type="number"
+              step="0.01"
+              disabled={hasLinkedDocuments}
+              className={hasLinkedDocuments ? "bg-muted" : ""}
+              placeholder="0.00"
+              {...register("voucherAmount", { valueAsNumber: true })}
+            />
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes (Optional)</Label>
+            <Textarea
+              id="notes"
+              placeholder="Add any relevant notes..."
+              {...register("notes")}
+              rows={3}
+            />
+          </div>
+
+          {/* Summary Card */}
+          {(hasLinkedDocuments || watch("voucherAmount") > 0) && (
+            <Card className="bg-muted/50">
+              <CardContent className="p-6">
+                <div className="space-y-3">
+                  {hasLinkedDocuments && (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Selected Documents:</span>
+                        <span className="font-medium">{totalSelectedItems}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Base Amount:</span>
+                        <span className="font-medium">
+                          {formatCurrency(
+                            voucherType === 'receipt' || voucherType === 'refund'
+                              ? selectedInvoicesTotalAmount
+                              : selectedPurchasesTotalAmount
+                          )}
+                        </span>
+                      </div>
+                      {discount > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Discount:</span>
+                          <span className="font-medium text-destructive">
+                            -{formatCurrency(discount)}
+                          </span>
+                        </div>
+                      )}
+                    </>
                   )}
+                  <div
+                    className={cn(
+                      "flex justify-between pt-3",
+                      showSummarySeparator && "border-t"
+                    )}
+                  >
+                    <span className="font-semibold">Total Amount:</span>
+                    <span className="text-xl font-bold text-green-600">
+                      {formatCurrency(watch("voucherAmount") || 0)}
+                    </span>
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Payment Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="paymentMethod">Payment Method *</Label>
-                <Select value={paymentMethod} onValueChange={(value) => setValue("paymentMethod", value)}>
-                  <SelectTrigger id="paymentMethod"><SelectValue placeholder="Select payment method" /></SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_METHODS.map((method) => (
-                      <SelectItem key={method} value={method}>{method}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {hasLinkedDocuments && (
-                <div className="space-y-2">
-                  <Label htmlFor="discount">Discount (Optional)</Label>
-                  <Input
-                    id="discount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    {...register("discount", { valueAsNumber: true })}
-                  />
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="voucherAmount">Amount (incl. VAT) *</Label>
-                <Input
-                  id="voucherAmount"
-                  type="number"
-                  step="0.01"
-                  disabled={hasLinkedDocuments}
-                  className={hasLinkedDocuments ? "bg-muted" : ""}
-                  placeholder="0.00"
-                  {...register("voucherAmount", { valueAsNumber: true })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  placeholder="Add any relevant notes..."
-                  {...register("notes")}
-                  rows={3}
-                />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner />
                   Creating...
                 </>
               ) : "Create Voucher"}

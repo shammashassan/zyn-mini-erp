@@ -1,4 +1,4 @@
-// models/DeliveryNote.ts
+// models/DeliveryNote.ts - UPDATED: Added deliveryDate field
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -33,6 +33,7 @@ export interface IDeliveryNote extends Document {
   vatAmount: number;
   grandTotal: number;
   notes?: string;
+  deliveryDate: Date; // ✅ NEW: Delivery date field
   status: 'pending' | 'dispatched' | 'delivered' | 'cancelled';
   
   // Connected documents
@@ -92,6 +93,7 @@ const DeliveryNoteSchema: Schema<IDeliveryNote> = new Schema({
   vatAmount: { type: Number, default: 0 },
   grandTotal: { type: Number, required: true },
   notes: { type: String },
+  deliveryDate: { type: Date, required: true }, // ✅ NEW: Delivery date field
   status: { 
     type: String, 
     enum: ['pending', 'dispatched', 'delivered', 'cancelled'],
@@ -119,7 +121,7 @@ const DeliveryNoteSchema: Schema<IDeliveryNote> = new Schema({
 }, { timestamps: true });
 
 // Indexes
-DeliveryNoteSchema.index({ isDeleted: 1, createdAt: -1 });
+DeliveryNoteSchema.index({ isDeleted: 1, deliveryDate: -1 }); // ✅ UPDATED: Index on deliveryDate
 DeliveryNoteSchema.index({ status: 1 });
 DeliveryNoteSchema.index({ customerName: 1 });
 DeliveryNoteSchema.index({ 'connectedDocuments.invoiceIds': 1 });
@@ -131,6 +133,11 @@ DeliveryNoteSchema.pre(/^find/, function(this: Query<any, any>, next) {
   
   if (options.includeDeleted !== true) {
     this.find({ isDeleted: false });
+  }
+  
+  // ✅ UPDATED: Default sort by deliveryDate instead of createdAt
+  if (!this.getOptions().sort) {
+    this.sort({ deliveryDate: -1 });
   }
   
   next();

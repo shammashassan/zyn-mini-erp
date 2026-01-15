@@ -10,9 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import type { BillPayload } from "@/lib/types";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Calendar as CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
 
 const documentTypes = [
   { value: "quotation", label: "Quotation" },
@@ -38,10 +40,25 @@ interface DocumentDetailsProps {
 export function DocumentDetailsCard({ payload, onFieldChange }: DocumentDetailsProps) {
   const [docTypePopoverOpen, setDocTypePopoverOpen] = useState(false);
   const [paymentPopoverOpen, setPaymentPopoverOpen] = useState(false);
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const inputStyles = "bg-background placeholder:text-muted-foreground/70";
 
   // Payment method is required only for receipt/payment vouchers
   const requiresPaymentMethod = payload.documentType === 'receipt' || payload.documentType === 'payment';
+
+  // Get the appropriate date field based on document type
+  const getDateFieldName = (): keyof BillPayload | null => {
+    switch (payload.documentType) {
+      case 'invoice': return 'invoiceDate';
+      case 'quotation': return 'quotationDate';
+      case 'receipt':
+      case 'payment': return 'voucherDate';
+      default: return null;
+    }
+  };
+
+  const dateFieldName = getDateFieldName();
+  const currentDate = dateFieldName ? (payload[dateFieldName] as Date | undefined) || null : null;
 
   return (
     <Card>
@@ -125,6 +142,46 @@ export function DocumentDetailsCard({ payload, onFieldChange }: DocumentDetailsP
                       </CommandGroup>
                     </CommandList>
                   </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+
+          {/* Date Field - For all document types */}
+          {dateFieldName && (
+            <div className="grid w-full items-center gap-1.5">
+              <Label>
+                {payload.documentType === 'invoice' && 'Invoice Date'}
+                {payload.documentType === 'quotation' && 'Quotation Date'}
+                {(payload.documentType === 'receipt' || payload.documentType === 'payment') && 'Voucher Date'}
+                {' '}*
+              </Label>
+              <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !currentDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {currentDate ? format(new Date(currentDate), "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={currentDate ? new Date(currentDate) : undefined}
+                    onSelect={(date) => {
+                      if (dateFieldName) {
+                        onFieldChange(dateFieldName, date || null);
+                      }
+                      setDatePopoverOpen(false);
+                    }}
+                    captionLayout="dropdown"
+                    initialFocus
+                  />
                 </PopoverContent>
               </Popover>
             </div>

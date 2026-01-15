@@ -39,14 +39,14 @@ export async function GET(request: Request) {
       const baseFilter: any = { isDeleted: false };
       
       if (startDateParam || endDateParam) {
-        baseFilter.createdAt = {};
+        baseFilter.voucherDate = {};
         if (startDateParam) {
-          baseFilter.createdAt.$gte = new Date(startDateParam);
+          baseFilter.voucherDate.$gte = new Date(startDateParam);
         }
         if (endDateParam) {
           const end = new Date(endDateParam);
           end.setHours(23, 59, 59, 999);
-          baseFilter.createdAt.$lte = end;
+          baseFilter.voucherDate.$lte = end;
         }
       }
 
@@ -131,16 +131,16 @@ export async function GET(request: Request) {
       if (payeeName) filter.payeeName = payeeName;
 
       if (startDateParam || endDateParam) {
-        filter.createdAt = {};
-        if (startDateParam) filter.createdAt.$gte = new Date(startDateParam);
+        filter.voucherDate = {};
+        if (startDateParam) filter.voucherDate.$gte = new Date(startDateParam);
         if (endDateParam) {
           const toDate = new Date(endDateParam);
           toDate.setHours(23, 59, 59, 999);
-          filter.createdAt.$lte = toDate;
+          filter.voucherDate.$lte = toDate;
         }
       }
 
-      let query = Voucher.find(filter).sort({ createdAt: -1 });
+      let query = Voucher.find(filter).sort({ voucherDate: -1 });
 
       if (populate) {
         query = query
@@ -485,6 +485,7 @@ export async function POST(request: Request) {
     const voucherData: any = {
       invoiceNumber,
       voucherType,
+      voucherDate: body.voucherDate ? new Date(body.voucherDate) : new Date(),
       customerName: customerName || undefined,
       customerId: resolvedCustomerId || undefined,
       supplierName: supplierName || undefined,

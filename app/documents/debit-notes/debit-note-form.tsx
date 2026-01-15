@@ -250,7 +250,7 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
       } else if (defaultValues) {
         let detectedPartyType: PartyType = 'supplier';
         let partyNameValue = '';
-        
+
         if (defaultValues.customerName) {
           detectedPartyType = 'customer';
           partyNameValue = defaultValues.customerName;
@@ -264,7 +264,11 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
           detectedPartyType = 'supplier';
           partyNameValue = defaultValues.supplierName;
         }
-        
+
+        // ✅ NEW: Detect if it's a manual entry or items-based debit note
+        const isManualEntry = defaultValues.items?.length === 1 && !(defaultValues.items[0] as any).materialId;
+        const detectedMode: DebitNoteMode = isManualEntry ? 'manual' : 'items';
+
         reset({
           partyType: detectedPartyType,
           partyName: partyNameValue,
@@ -276,7 +280,9 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
           discount: defaultValues.discount || 0,
           isTaxPayable: defaultValues.isTaxPayable !== undefined ? defaultValues.isTaxPayable : true,
           debitType: defaultValues.debitType || 'standalone',
-          debitMode: 'items',
+          debitMode: detectedMode, // ✅ NEW: Set detected mode
+          manualAmount: isManualEntry ? defaultValues.items[0].total : 0, // ✅ NEW: Set manual amount if applicable
+          manualDescription: isManualEntry ? defaultValues.items[0].materialName : '', // ✅ NEW: Set description if applicable
         });
         setPartySearchQuery(partyNameValue);
       } else {
@@ -651,6 +657,21 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                                         <Check className={cn("mr-2 h-4 w-4", field.value === party.name ? "opacity-100" : "opacity-0")} />
                                         <div className="flex-1">
                                           <span>{party.name}</span>
+                                          {partyType === 'customer' && (party as any).email && (
+                                            <div className="text-xs text-muted-foreground">
+                                              {(party as any).email}
+                                            </div>
+                                          )}
+                                          {partyType === 'supplier' && (party as any).city && (party as any).district && (
+                                            <div className="text-xs text-muted-foreground">
+                                              {(party as any).city}, {(party as any).district}
+                                            </div>
+                                          )}
+                                          {partyType === 'payee' && (party as any).type && (
+                                            <div className="text-xs text-muted-foreground capitalize">
+                                              {(party as any).type}
+                                            </div>
+                                          )}
                                         </div>
                                       </CommandItem>
                                     ))}
@@ -778,7 +799,7 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
           {/* Status Field (only in edit mode) */}
           {isEditMode && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-               <div className="space-y-2">
+              <div className="space-y-2">
                 <Label>Status</Label>
                 <Controller
                   name="status"

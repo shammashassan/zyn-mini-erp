@@ -1,4 +1,4 @@
-// models/Voucher.ts - UPDATED: Fixed Duplicate Key Error
+// models/Voucher.ts - UPDATED: Added voucherDate field
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -43,7 +43,6 @@ export interface IVoucher extends Document {
   payeeName?: string;
   payeeId?: mongoose.Types.ObjectId;
 
-  // ✅ ADDED: Manual Vendor Name
   vendorName?: string;
   
   customerPhone?: string;
@@ -53,6 +52,8 @@ export interface IVoucher extends Document {
   grandTotal: number;
   paymentMethod: string;
   notes?: string;
+  
+  voucherDate: Date; // ✅ NEW: Voucher date field
   
   allocations: IAllocation[];
   
@@ -133,7 +134,6 @@ const VoucherSchema: Schema<IVoucher> = new Schema({
   payeeName: { type: String, required: false },
   payeeId: { type: Schema.Types.ObjectId, ref: 'Payee', required: false },
 
-  // ✅ ADDED: Vendor Name for manual entries
   vendorName: { type: String, required: false },
   
   customerPhone: { type: String },
@@ -143,6 +143,8 @@ const VoucherSchema: Schema<IVoucher> = new Schema({
   grandTotal: { type: Number, required: true },
   paymentMethod: { type: String, required: true },
   notes: { type: String },
+  
+  voucherDate: { type: Date, required: true }, // ✅ NEW: Voucher date field
   
   allocations: [AllocationSchema],
   
@@ -166,7 +168,7 @@ const VoucherSchema: Schema<IVoucher> = new Schema({
 }, { timestamps: true });
 
 // Indexes
-VoucherSchema.index({ isDeleted: 1, createdAt: -1 });
+VoucherSchema.index({ isDeleted: 1, voucherDate: -1 }); // ✅ UPDATED: Index on voucherDate
 VoucherSchema.index({ voucherType: 1 });
 VoucherSchema.index({ customerName: 1 });
 VoucherSchema.index({ customerId: 1 });
@@ -174,7 +176,7 @@ VoucherSchema.index({ supplierName: 1 });
 VoucherSchema.index({ supplierId: 1 });
 VoucherSchema.index({ payeeName: 1 });
 VoucherSchema.index({ payeeId: 1 });
-VoucherSchema.index({ vendorName: 1 }); // ✅ ADDED
+VoucherSchema.index({ vendorName: 1 });
 VoucherSchema.index({ 'connectedDocuments.invoiceIds': 1 });
 VoucherSchema.index({ 'connectedDocuments.purchaseIds': 1 });
 VoucherSchema.index({ 'connectedDocuments.expenseIds': 1 });
@@ -209,6 +211,11 @@ VoucherSchema.pre(/^find/, function(this: Query<any, any>, next) {
   
   if (!options.includeDeleted) {
     this.find({ isDeleted: false });
+  }
+  
+  // ✅ UPDATED: Default sort by voucherDate instead of createdAt
+  if (!this.getOptions().sort) {
+    this.sort({ voucherDate: -1 });
   }
   
   next();

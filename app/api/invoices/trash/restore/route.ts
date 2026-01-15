@@ -1,8 +1,9 @@
-// app/api/invoices/trash/restore/route.ts
+// app/api/invoices/trash/restore/route.ts - UPDATED: Restore quotation status to "converted"
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Invoice from "@/models/Invoice";
+import Quotation from "@/models/Quotation";
 import { restore } from "@/utils/softDelete";
 import { getVoidedJournalsForReference, createJournalWithDate } from "@/utils/journalManager";
 import { requireAuthAndPermission, validateRequiredFields } from "@/lib/auth-utils";
@@ -80,6 +81,53 @@ export async function POST(request: Request) {
       journalsToRecreate = [mostRecentJournal];
     }
     console.log(`📋 Invoice: Found ${voidedJournals.length} voided journal(s), ${journalsToRecreate.length} to recreate`);
+    
+    // ✅ NEW: Handle quotation status restoration
+    if (invoiceToRestore.connectedDocuments?.quotationId) {
+      try {
+        const quotation = await Quotation.findById(invoiceToRestore.connectedDocuments.quotationId);
+        
+        if (quotation) {
+          // Restore quotation status to "converted"
+          const oldStatus = quotation.status;
+          quotation.status = 'converted';
+          
+          // Add invoice back to quotation's connected documents if not already there
+          if (!quotation.connectedDocuments) {
+            quotation.connectedDocuments = {};
+          }
+          if (!quotation.connectedDocuments.invoiceIds) {
+            quotation.connectedDocuments.invoiceIds = [];
+          }
+          
+          // Check if invoice is not already in the array
+          const invoiceExists = quotation.connectedDocuments.invoiceIds.some(
+            (invId: any) => invId.toString() === id
+          );
+          
+          if (!invoiceExists) {
+            quotation.connectedDocuments.invoiceIds.push(id);
+          }
+          
+          quotation.addAuditEntry(
+            'Status restored (connected invoice restored)',
+            user?.id || null,
+            user?.username || user?.name || null,
+            oldStatus !== 'converted' ? [{
+              field: 'status',
+              oldValue: oldStatus,
+              newValue: 'converted'
+            }] : undefined
+          );
+          
+          await quotation.save();
+          console.log(`✅ Restored quotation ${quotation.invoiceNumber} status to 'converted'`);
+        }
+      } catch (quotationError) {
+        console.error('Error restoring quotation status:', quotationError);
+        // Don't fail the restore if quotation update fails
+      }
+    }
     
     // Restore the invoice
     console.log(`♻️ Restoring invoice ${invoiceToRestore.invoiceNumber}...`);

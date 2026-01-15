@@ -30,6 +30,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import type { DebitNote } from "./columns";
+import { ConnectedDocumentsBadges } from "./ConnectedDocumentsBadges";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { formatDateTime, formatLongDate } from "@/utils/formatters/date";
 import { toast } from "sonner";
@@ -41,6 +42,8 @@ interface DebitNoteViewModalProps {
   debitNote: DebitNote | any | null;
   onCreateReceipt?: (debitNote: DebitNote) => void;
   canCreateReceipt?: boolean;
+  onViewReceiptPdf?: (receipt: any) => void;
+  onViewReturnNotePdf?: (returnNote: any) => void;
 }
 
 const getStatusVariant = (status: string) => {
@@ -92,6 +95,8 @@ export function DebitNoteViewModal({
   debitNote: initialDebitNote,
   onCreateReceipt,
   canCreateReceipt,
+  onViewReceiptPdf,
+  onViewReturnNotePdf,
 }: DebitNoteViewModalProps) {
   const [debitNote, setDebitNote] = useState<any>(initialDebitNote);
   const [isLoading, setIsLoading] = useState(false);
@@ -164,7 +169,7 @@ export function DebitNoteViewModal({
       <DialogContent className="max-w-[98vw] sm:max-w-[95vw] lg:max-w-4xl max-h-[95vh] overflow-y-auto sidebar-scroll p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
+            <FileText className="h-4 w-4 sm:h-5 sm:w-5"/>
             Debit Note Details
           </DialogTitle>
         </DialogHeader>
@@ -497,22 +502,10 @@ export function DebitNoteViewModal({
             {/* Payment Information */}
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-                    <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
-                    Payment Information
-                  </CardTitle>
-                  {canShowReceiptButton && (
-                    <Button
-                      size="sm"
-                      onClick={() => onCreateReceipt!(currentData)}
-                      className="gap-2"
-                    >
-                      <Receipt className="h-4 w-4" />
-                      Create Receipt
-                    </Button>
-                  )}
-                </div>
+                <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                  <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
+                  Payment Information
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
@@ -561,6 +554,29 @@ export function DebitNoteViewModal({
                 )}
               </CardContent>
             </Card>
+
+            {/* Connected Documents - Receipt Vouchers & Return Notes */}
+            {(currentData.connectedDocuments?.receiptIds?.length > 0 || currentData.returnNoteId) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                    <Wallet className="h-3 w-3 sm:h-4 sm:w-4" />
+                    Connected Documents
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {onViewReceiptPdf && onViewReturnNotePdf ? (
+                    <ConnectedDocumentsBadges
+                      debitNote={currentData}
+                      onViewReceiptPdf={onViewReceiptPdf}
+                      onViewReturnNotePdf={onViewReturnNotePdf}
+                    />
+                  ) : (
+                    <span className="text-xs sm:text-sm text-muted-foreground">—</span>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Additional Notes */}
             {currentData.notes && (

@@ -13,6 +13,7 @@ import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { DataTable } from "@/components/data-table/data-table";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { VoucherForm } from "./voucher-form";
+import { VoucherViewModal } from "./VoucherViewModal";
 import { toast } from "sonner";
 import { Ticket, Trash2, BarChart3, Plus, CalendarIcon } from "lucide-react";
 import Link from "next/link";
@@ -48,6 +49,10 @@ function VouchersPageContent() {
   const [activeTab, setActiveTab] = useState("receipt");
   const [isVoucherFormOpen, setIsVoucherFormOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+
+  // ✅ NEW: View Modal State
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [voucherToView, setVoucherToView] = useState<Voucher | null>(null);
 
   // Date Range State (Default 6 months)
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -295,6 +300,12 @@ function VouchersPageContent() {
     setUrlState({ page: 1 });
   };
 
+  // ✅ NEW: Handle View Voucher
+  const handleViewVoucher = (voucher: Voucher) => {
+    setVoucherToView(voucher);
+    setViewModalOpen(true);
+  };
+
   const columns = useMemo(() => getColumns(
     handleViewPdf,
     (voucherOrId: Voucher | string) => {
@@ -306,7 +317,8 @@ function VouchersPageContent() {
     },
     { canDelete },
     fetchVouchers,
-  ), [vouchers, canDelete]);
+    handleViewVoucher, // ✅ NEW: Pass view handler
+  ), [vouchers, canDelete, fetchVouchers]);
 
   const { table } = useDataTable<Voucher>({
     data: vouchers,
@@ -531,6 +543,17 @@ function VouchersPageContent() {
         onClose={() => setIsModalOpen(false)}
         pdfUrl={selectedPdfUrl}
         title={selectedPdfTitle}
+      />
+
+      {/* ✅ NEW: Voucher View Modal */}
+      <VoucherViewModal
+        isOpen={viewModalOpen}
+        onClose={() => {
+          setViewModalOpen(false);
+          setVoucherToView(null);
+        }}
+        voucher={voucherToView}
+        onViewPdf={handleViewPdf}
       />
     </>
   );

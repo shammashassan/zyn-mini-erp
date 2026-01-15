@@ -1,4 +1,4 @@
-// app/api/quotations/[id]/route.ts - FIXED: Recalculates totals on edit
+// app/api/quotations/[id]/route.ts - UPDATED: Added quotationDate to changes tracking
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -56,7 +56,7 @@ export async function GET(request: Request, context: RequestContext) {
  */
 function detectChanges(oldQuotation: any, newData: any) {
   const changes: Array<{ field: string; oldValue: any; newValue: any }> = [];
-  const fieldsToTrack = ['status', 'grandTotal', 'discount', 'notes'];
+  const fieldsToTrack = ['status', 'grandTotal', 'discount', 'notes', 'quotationDate']; // ✅ UPDATED: Added quotationDate
   
   for (const field of fieldsToTrack) {
     if (newData[field] !== undefined && oldQuotation[field] !== newData[field]) {

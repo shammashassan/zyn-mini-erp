@@ -1,4 +1,4 @@
-// app/api/delivery-notes/[id]/route.ts
+// app/api/delivery-notes/[id]/route.ts - FIXED: Populate invoice data
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -13,24 +13,44 @@ interface RequestContext {
 }
 
 /**
- * GET - Fetch a single delivery note by ID
+ * GET - Fetch a single delivery note by ID with populated invoice data
  */
 export async function GET(request: Request, context: RequestContext) {
   try {
     await dbConnect();
     const { id } = await context.params;
     
-    // Check permission
     const { error } = await requireAuthAndPermission({
       deliveryNote: ["read"],
     });
     if (error) return error;
     
-    const deliveryNoteQuery = DeliveryNote.findById(id);
+    // ✅ FIXED: Check for populate query param
+    const { searchParams } = new URL(request.url);
+    const shouldPopulate = searchParams.get('populate') === 'true';
+    
+    let deliveryNoteQuery = DeliveryNote.findById(id);
+    
     const includeDeleted = request.headers.get('X-Include-Deleted') === 'true';
     if (includeDeleted) {
       deliveryNoteQuery.setOptions({ includeDeleted: true });
     }
+    
+    // ✅ NEW: Populate invoice data if requested
+    if (shouldPopulate) {
+      deliveryNoteQuery = deliveryNoteQuery
+        .populate({
+          path: 'connectedDocuments.invoiceIds',
+          select: 'invoiceNumber grandTotal status isDeleted customerName',
+          match: { isDeleted: false }
+        })
+        .populate({
+          path: 'connectedDocuments.quotationId',
+          select: 'invoiceNumber status isDeleted',
+          match: { isDeleted: false }
+        });
+    }
+    
     const deliveryNote = await deliveryNoteQuery;
     
     if (!deliveryNote) {
@@ -56,7 +76,7 @@ export async function GET(request: Request, context: RequestContext) {
  */
 function detectChanges(oldDeliveryNote: any, newData: any) {
   const changes: Array<{ field: string; oldValue: any; newValue: any }> = [];
-  const fieldsToTrack = ['status', 'grandTotal', 'discount', 'notes'];
+  const fieldsToTrack = ['status', 'grandTotal', 'discount', 'notes', 'deliveryDate'];
   
   for (const field of fieldsToTrack) {
     if (newData[field] !== undefined && oldDeliveryNote[field] !== newData[field]) {
@@ -80,7 +100,6 @@ export async function PUT(request: Request, context: RequestContext) {
     const { id } = await context.params;
     const body = await request.json();
     
-    // Check permission - for delivery notes, status update is a specific permission
     const { error, session } = await requireAuthAndPermission({
       deliveryNote: ["update_status"],
     });
@@ -108,6 +127,10 @@ export async function PUT(request: Request, context: RequestContext) {
       changes.length > 0 ? changes : undefined
     );
 
+    if (body.deliveryDate) {
+      body.deliveryDate = new Date(body.deliveryDate);
+    }
+
     currentDeliveryNote.set({
       ...body,
       updatedBy: user.id,
@@ -133,7 +156,6 @@ export async function DELETE(request: Request, context: RequestContext) {
     await dbConnect();
     const { id } = await context.params;
 
-    // Check permission
     const { error, session } = await requireAuthAndPermission({
       deliveryNote: ["soft_delete"],
     });

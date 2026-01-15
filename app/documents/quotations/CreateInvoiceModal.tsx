@@ -12,6 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { FileText } from "lucide-react";
 import type { Quotation } from "./columns";
@@ -31,6 +33,7 @@ export function CreateInvoiceModal({
   onRefresh,
 }: CreateInvoiceModalProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [notes, setNotes] = useState("");
 
   const handleCreateInvoice = async () => {
     setIsLoading(true);
@@ -123,6 +126,11 @@ export function CreateInvoiceModal({
       // Step 3: Create new invoice from quotation
       console.log("Creating new invoice from quotation");
 
+      // Generate notes - use custom notes if provided, otherwise auto-generate
+      const invoiceNotes = notes.trim() 
+        ? notes 
+        : `Created from quotation ${quotation.invoiceNumber}`;
+
       const invoiceRes = await fetch("/api/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -133,7 +141,8 @@ export function CreateInvoiceModal({
           status: "pending", // ✅ FIXED: Set to pending instead of approved
           items: quotation.items,
           discount: quotation.discount || 0, // ✅ FIXED: Pass discount from quotation
-          notes: `Created from quotation ${quotation.invoiceNumber}`,
+          invoiceDate: new Date(),
+          notes: invoiceNotes,
           connectedDocuments: {
             quotationId: quotation._id,
           },
@@ -177,6 +186,7 @@ export function CreateInvoiceModal({
         );
         onClose();
         onRefresh();
+        setNotes("");
       } else {
         const updateError = await updateQuotationRes.json();
         console.error("Failed to update quotation:", updateError);
@@ -232,6 +242,21 @@ export function CreateInvoiceModal({
           </div>
           <p className="text-sm text-muted-foreground">
             This will create a new invoice with the same items and discount from this quotation. The invoice will be automatically linked to this quotation and set to "pending" status.
+          </p>
+        </div>
+
+        {/* Notes */}
+        <div className="space-y-2">
+          <Label htmlFor="notes">Notes (Optional)</Label>
+          <Textarea
+            id="notes"
+            placeholder={`Add invoice notes...`}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+          />
+          <p className="text-xs text-muted-foreground">
+            💡 If left empty, a default note will be generated automatically
           </p>
         </div>
 

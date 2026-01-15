@@ -1,8 +1,9 @@
-// app/api/delivery-notes/route.ts - Enhanced with Date Range Filtering
+// app/api/delivery-notes/route.ts - FIXED: Update invoice.connectedDocuments.deliveryId
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import DeliveryNote from "@/models/DeliveryNote";
+import Invoice from "@/models/Invoice"; // ✅ ADDED
 import Customer from "@/models/Customer";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { UAE_VAT_PERCENTAGE } from '@/utils/constants';
@@ -20,10 +21,8 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     
-    // ✅ Check if this is a server-side request
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
     
-    // Extract date params (support both naming conventions)
     const startDateParam = searchParams.get('startDate') || searchParams.get('from');
     const endDateParam = searchParams.get('endDate') || searchParams.get('to');
 
@@ -35,16 +34,15 @@ export async function GET(request: Request) {
 
       const baseFilter: any = { isDeleted: false };
 
-      // Apply Date Range Filter
       if (startDateParam || endDateParam) {
-        baseFilter.createdAt = {};
+        baseFilter.deliveryDate = {};
         if (startDateParam) {
-          baseFilter.createdAt.$gte = new Date(startDateParam);
+          baseFilter.deliveryDate.$gte = new Date(startDateParam);
         }
         if (endDateParam) {
           const end = new Date(endDateParam);
           end.setHours(23, 59, 59, 999);
-          baseFilter.createdAt.$lte = end;
+          baseFilter.deliveryDate.$lte = end;
         }
       }
 
@@ -69,7 +67,7 @@ export async function GET(request: Request) {
         sorting,
         page,
         pageSize,
-        defaultSort: { createdAt: -1 },
+        defaultSort: { deliveryDate: -1 },
         populate: populateOptions,
       });
 
@@ -91,18 +89,17 @@ export async function GET(request: Request) {
       if (status) filter.status = status;
       if (customerName) filter.customerName = customerName;
 
-      // Apply Date Range
       if (startDateParam || endDateParam) {
-        filter.createdAt = {};
-        if (startDateParam) filter.createdAt.$gte = new Date(startDateParam);
+        filter.deliveryDate = {};
+        if (startDateParam) filter.deliveryDate.$gte = new Date(startDateParam);
         if (endDateParam) {
           const toDate = new Date(endDateParam);
           toDate.setHours(23, 59, 59, 999);
-          filter.createdAt.$lte = toDate;
+          filter.deliveryDate.$lte = toDate;
         }
       }
 
-      let query = DeliveryNote.find(filter).sort({ createdAt: -1 });
+      let query = DeliveryNote.find(filter).sort({ deliveryDate: -1 });
 
       if (populate) {
         query = query
@@ -139,7 +136,6 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     
-    // Check permission
     const { error, session } = await requireAuthAndPermission({
       deliveryNote: ["create"],
     });
@@ -156,8 +152,7 @@ export async function POST(request: Request) {
       discount = 0,
       notes,
       status,
-      createdAt,
-      updatedAt,
+      deliveryDate,
       connectedDocuments,
       vatAmount: customVatAmount,
       totalAmount: customTotalAmount,
@@ -176,6 +171,15 @@ export async function POST(request: Request) {
         error: 'Items are required for delivery notes' 
       }, { status: 400 });
     }
+
+    if (!deliveryDate) {
+      return NextResponse.json({
+        error: 'Delivery date is required'
+      }, { status: 400 });
+    }
+
+    // ✅ CRITICAL: Extract invoiceId from connectedDocuments
+    const invoiceId = connectedDocuments?.invoiceId;
 
     // Upsert customer
     await Customer.findOneAndUpdate(
@@ -223,6 +227,7 @@ export async function POST(request: Request) {
       items,
       discount,
       notes,
+      deliveryDate: new Date(deliveryDate),
       totalAmount: finalTotalAmount,
       vatAmount: finalVatAmount,
       grandTotal: finalGrandTotal,
@@ -232,7 +237,11 @@ export async function POST(request: Request) {
       deletedBy: null,
       createdBy: user.id,
       updatedBy: user.id,
-      connectedDocuments: connectedDocuments || {},
+      connectedDocuments: {
+        // ✅ FIXED: Store as invoiceIds array
+        invoiceIds: invoiceId ? [invoiceId] : [],
+        ...connectedDocuments
+      },
       actionHistory: [{
         action: 'Created',
         userId: user.id,
@@ -241,29 +250,48 @@ export async function POST(request: Request) {
       }],
     };
 
-    // Handle custom timestamps
-    if (createdAt) {
-      deliveryNoteData.createdAt = new Date(createdAt);
-    }
-    if (updatedAt) {
-      deliveryNoteData.updatedAt = new Date(updatedAt);
-    }
-
     // Create and save delivery note
     const newDeliveryNote = new DeliveryNote(deliveryNoteData);
 
     try {
-      if (createdAt || updatedAt) {
-        await newDeliveryNote.save({ timestamps: false });
-        if (createdAt) newDeliveryNote.createdAt = new Date(createdAt);
-        if (updatedAt) newDeliveryNote.updatedAt = new Date(updatedAt);
-        await newDeliveryNote.save({ timestamps: false });
-      } else {
-        await newDeliveryNote.save();
-      }
+      await newDeliveryNote.save();
 
-      console.log(`✅ Successfully created delivery note: ${newDeliveryNote.invoiceNumber}`);
-      console.log(`   Total: ${finalTotalAmount}, VAT: ${finalVatAmount}, Grand Total: ${finalGrandTotal}`);
+      // ✅ NEW: Update the linked invoice's connectedDocuments.deliveryId
+      if (invoiceId) {
+        try {
+          
+          const invoice = await Invoice.findById(invoiceId);
+          
+          if (!invoice) {
+            console.error(`❌ Invoice ${invoiceId} not found in database`);
+          } else if (invoice.isDeleted) {
+            console.warn(`⚠️ Invoice ${invoiceId} is deleted, skipping link`);
+          } else {
+            // Update the invoice
+            invoice.set({
+              'connectedDocuments.deliveryId': newDeliveryNote._id
+            });
+            
+            invoice.addAuditEntry(
+              'Delivery Note Linked',
+              user.id,
+              user.username || user.name,
+              [{
+                field: 'connectedDocuments.deliveryId',
+                oldValue: invoice.connectedDocuments?.deliveryId || null,
+                newValue: newDeliveryNote._id
+              }]
+            );
+            
+            await invoice.save();
+          }
+        } catch (linkError) {
+          console.error('❌ Failed to link invoice:', linkError);
+          // Don't fail the whole request if linking fails
+        }
+      } else {
+        console.warn('⚠️ No invoiceId provided, skipping invoice linking');
+      }
 
       return NextResponse.json({
         message: 'Delivery note saved',

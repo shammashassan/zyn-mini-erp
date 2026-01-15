@@ -615,6 +615,8 @@ function DebitNotesPageContent() {
         debitNote={debitNoteToView}
         onCreateReceipt={handleCreateReceipt}
         canCreateReceipt={canCreateReceipt}
+        onViewReceiptPdf={handleViewReceiptPdf}
+        onViewReturnNotePdf={handleViewReturnNotePdf}
       />
 
       <PDFViewerModal

@@ -1,4 +1,4 @@
-// app/api/expenses/route.ts - CORRECTED: Auto-create Payees/Suppliers based on party type
+// app/api/expenses/route.ts - UPDATED: Using expenseDate for filtering and sorting
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -46,16 +46,16 @@ export async function GET(request: Request) {
       query.type = type;
     }
 
-    // 2. Handle Date Range Filter
+    // 2. ✅ UPDATED: Handle Date Range Filter using expenseDate
     if (startDateParam || endDateParam) {
-      query.createdAt = {};
+      query.expenseDate = {}; // Changed from createdAt to expenseDate
       if (startDateParam) {
-        query.createdAt.$gte = new Date(startDateParam);
+        query.expenseDate.$gte = new Date(startDateParam);
       }
       if (endDateParam) {
         const end = new Date(endDateParam);
         end.setHours(23, 59, 59, 999);
-        query.createdAt.$lte = end;
+        query.expenseDate.$lte = end;
       }
     }
 
@@ -82,8 +82,8 @@ export async function GET(request: Request) {
       }
     }
 
-    // 4. Handle Sorting (safe parsing)
-    let sortQuery: any = { createdAt: -1 }; // Default sort
+    // 4. ✅ UPDATED: Handle Sorting (default to expenseDate)
+    let sortQuery: any = { expenseDate: -1 }; // Changed from createdAt to expenseDate
     if (sortParam) {
       try {
         const sorting = JSON.parse(sortParam);
@@ -243,6 +243,13 @@ export async function POST(request: Request) {
       delete body.supplierName;
     }
 
+    // ✅ UPDATED: Validate expenseDate
+    if (!body.expenseDate) {
+      return NextResponse.json({
+        error: 'Expense date is required'
+      }, { status: 400 });
+    }
+
     const referenceNumber = await generateInvoiceNumber('expense');
 
     const existingExpense = await Expense.findOne({
@@ -257,9 +264,12 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
+    // ✅ UPDATED: Set both date and expenseDate for backward compatibility
     const newExpense = new Expense({
       ...body,
       referenceNumber,
+      expenseDate: new Date(body.expenseDate),
+      date: new Date(body.expenseDate), // Sync legacy field
       isDeleted: false,
       deletedAt: null,
       deletedBy: null,

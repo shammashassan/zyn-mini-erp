@@ -1,8 +1,8 @@
-// app/documents/delivery-notes/page.tsx - UPDATED: Enabled Silent Background Fetch on Focus
+// app/documents/delivery-notes/page.tsx - FIXED: Proper invoice linking in form submission
 
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, Suspense } from "react";
+import { useEffect, useState, useMemo, useCallback, Suspense, useRef } from "react";
 import { useQueryStates, parseAsInteger } from "nuqs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { DataTable } from "@/components/data-table/data-table";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { DeliveryNoteForm } from "./delivery-note-form";
+import { DeliveryNoteViewModal } from "./DeliveryNoteViewModal";
 import { toast } from "sonner";
 import { Truck, Trash2, Plus, CalendarIcon } from "lucide-react";
 import Link from "next/link";
@@ -42,17 +43,20 @@ function DeliveryNotesPageContent() {
   const [pageCount, setPageCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
-  // PDF Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPdfUrl, setSelectedPdfUrl] = useState("");
   const [selectedPdfTitle, setSelectedPdfTitle] = useState("");
 
-  // Form Modal State
   const [isDeliveryFormOpen, setIsDeliveryFormOpen] = useState(false);
+  const [selectedDeliveryNote, setSelectedDeliveryNote] = useState<DeliveryNote | null>(null);
+
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [deliveryNoteToView, setDeliveryNoteToView] = useState<DeliveryNote | null>(null);
 
   const [isMounted, setIsMounted] = useState(false);
 
-  // Date Range State (Default 6 months)
+  const isSubmittingRef = useRef(false);
+
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(subMonths(new Date(), 5)),
     to: endOfMonth(new Date()),
@@ -80,11 +84,9 @@ function DeliveryNotesPageContent() {
     setIsMounted(true);
   }, []);
 
-  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
   const fetchDeliveryNotes = useCallback(async (background = false) => {
     if (!canRead) return;
     try {
-      // Only show loading spinner/skeleton if it's NOT a background fetch
       if (!background) {
         setIsLoading(true);
       }
@@ -95,7 +97,6 @@ function DeliveryNotesPageContent() {
         populate: 'true',
       });
 
-      // Add Date Range to params
       if (dateRange?.from) {
         params.append('startDate', dateRange.from.toISOString());
       }
@@ -136,20 +137,16 @@ function DeliveryNotesPageContent() {
     }
   }, [canRead, urlState.page, urlState.pageSize, urlState.sort, urlState.filters, dateRange]);
 
-  // Standard fetch on dependency change (loading state visible)
   useEffect(() => {
     if (isMounted && canRead) {
       fetchDeliveryNotes();
     }
   }, [isMounted, canRead, fetchDeliveryNotes]);
 
-  // ✅ NEW: Window Focus Listener - SILENT MODE
-  // This triggers a background fetch (true) when you tab back to this page.
-  // The table will NOT fade out or show a spinner.
   useEffect(() => {
     const onFocus = () => {
       if (isMounted && canRead) {
-        fetchDeliveryNotes(true); // Pass true for silent background fetch
+        fetchDeliveryNotes(true);
       }
     };
 
@@ -159,6 +156,21 @@ function DeliveryNotesPageContent() {
       window.removeEventListener("focus", onFocus);
     };
   }, [fetchDeliveryNotes, isMounted, canRead]);
+
+  const handleOpenForm = (deliveryNote: DeliveryNote | null = null) => {
+    if (deliveryNote && !canUpdate) {
+      toast.error("You don't have permission to edit delivery notes");
+      return;
+    }
+
+    if (!deliveryNote && !canCreate) {
+      toast.error("You don't have permission to create delivery notes");
+      return;
+    }
+
+    setSelectedDeliveryNote(deliveryNote);
+    setIsDeliveryFormOpen(true);
+  };
 
   const handleDelete = async (selectedDeliveryNotes: DeliveryNote[]) => {
     if (!canDelete) {
@@ -190,7 +202,6 @@ function DeliveryNotesPageContent() {
       return;
     }
 
-    // ✅ Route to correct endpoint based on document type
     let pdfUrl = '';
 
     if (doc.voucherType) {
@@ -200,7 +211,6 @@ function DeliveryNotesPageContent() {
     } else if (doc.documentType === 'invoice' || (!doc.documentType && doc.invoiceNumber?.startsWith('INV'))) {
       pdfUrl = `/api/invoices/${doc._id}/pdf`;
     } else {
-      // Default to delivery notes
       pdfUrl = `/api/delivery-notes/${doc._id}/pdf`;
     }
 
@@ -209,22 +219,50 @@ function DeliveryNotesPageContent() {
     setIsModalOpen(true);
   };
 
-  const handleDeliveryNoteFormSubmit = async (data: any) => {
-    if (!canCreate) {
+  const handleViewDeliveryNote = (deliveryNote: DeliveryNote) => {
+    setDeliveryNoteToView(deliveryNote);
+    setViewModalOpen(true);
+  };
+
+  const handleDeliveryNoteFormSubmit = async (data: any, id?: string) => {
+    if (isSubmittingRef.current) return;
+
+    if (id && !canUpdate) {
+      toast.error("You don't have permission to update delivery notes");
+      return;
+    }
+    if (!id && !canCreate) {
       toast.error("You don't have permission to create delivery notes");
       return;
     }
 
-    try {
-      const payload = {
-        ...data,
-        connectedDocuments: {
-          invoiceIds: data.connectedDocuments?.invoiceId ? [data.connectedDocuments.invoiceId] : []
-        }
-      };
+    isSubmittingRef.current = true;
 
-      const res = await fetch("/api/delivery-notes", {
-        method: "POST",
+    try {
+      const url = id ? `/api/delivery-notes/${id}` : "/api/delivery-notes";
+      const method = id ? "PUT" : "POST";
+
+      // ✅ FIXED: Properly format the payload
+      let payload;
+      
+      if (id) {
+        // Edit mode - just send the updates
+        payload = data;
+      } else {
+        // Create mode - ensure proper structure
+        payload = {
+          ...data,
+          connectedDocuments: {
+            // ✅ CRITICAL: Send invoiceId (singular) for the API to process
+            invoiceId: data.connectedDocuments?.invoiceId || null
+          }
+        };
+        
+        console.log('📤 Submitting delivery note with payload:', JSON.stringify(payload, null, 2));
+      }
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -232,45 +270,38 @@ function DeliveryNotesPageContent() {
       const result = await res.json();
 
       if (!res.ok) {
-        toast.error(result.error || "Failed to create delivery note.");
+        toast.error(result.error || `Failed to ${id ? 'update' : 'create'} delivery note.`);
         return;
       }
 
-      const newDeliveryNoteId = result.deliveryNote._id;
-      const deliveryNoteNumber = result.deliveryNote.invoiceNumber;
-      const invoiceId = data.connectedDocuments?.invoiceId;
+      const savedDeliveryNote = result.deliveryNote || result;
+      const deliveryNoteNumber = savedDeliveryNote.invoiceNumber;
 
-      if (invoiceId) {
-        try {
-          await fetch(`/api/invoices/${invoiceId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              "connectedDocuments.deliveryId": newDeliveryNoteId,
-            }),
-          });
-        } catch (error) {
-          console.error("Failed to update invoice:", error);
-        }
-      }
+      console.log('✅ Delivery note saved:', savedDeliveryNote);
 
-      // Close Form Modal
       setIsDeliveryFormOpen(false);
+      setSelectedDeliveryNote(null);
 
-      // Refresh Data
       fetchDeliveryNotes();
 
-      // Show Success Toast
-      toast.success(`Delivery Note ${deliveryNoteNumber} created successfully!`);
+      toast.success(`Delivery Note ${deliveryNoteNumber} ${id ? 'updated' : 'created'} successfully!`);
 
-      // ✅ AUTOMATICALLY OPEN PDF VIEWER
-      setSelectedPdfUrl(`/api/delivery-notes/${newDeliveryNoteId}/pdf`);
-      setSelectedPdfTitle(deliveryNoteNumber || "Delivery Note");
-      setIsModalOpen(true);
+      // Show view modal
+      setDeliveryNoteToView(savedDeliveryNote);
+      setViewModalOpen(true);
+
+      // Auto-open PDF viewer if it's a new delivery note
+      if (!id) {
+        setSelectedPdfUrl(`/api/delivery-notes/${savedDeliveryNote._id}/pdf`);
+        setSelectedPdfTitle(deliveryNoteNumber || "Delivery Note");
+        setIsModalOpen(true);
+      }
 
     } catch (error) {
-      console.error("Error creating delivery note:", error);
-      toast.error("An error occurred while creating delivery note.");
+      console.error("Error saving delivery note:", error);
+      toast.error("An error occurred while saving delivery note.");
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -318,7 +349,9 @@ function DeliveryNotesPageContent() {
       }
     },
     { canDelete, canUpdate },
-    fetchDeliveryNotes
+    fetchDeliveryNotes,
+    handleOpenForm,
+    handleViewDeliveryNote
   ), [deliveryNotes, canDelete, canUpdate]);
 
   const { table } = useDataTable<DeliveryNote>({
@@ -370,7 +403,6 @@ function DeliveryNotesPageContent() {
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <div className="flex flex-col lg:flex-row lg:justify-between px-4 lg:px-6 gap-4">
               
-              {/* Left: Title */}
               <div className="flex items-center gap-3 self-start lg:self-center">
                 <div className="p-3 bg-primary/10 rounded-full">
                   <Truck className="h-8 w-8 text-primary" />
@@ -390,10 +422,8 @@ function DeliveryNotesPageContent() {
                 </div>
               </div>
 
-              {/* Right: Actions & Filters Group */}
               <div className="flex flex-col gap-3 w-full lg:w-auto lg:items-end">
                 
-                {/* Row 1: Actions */}
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                   {canViewTrash && (
                     <Link href="./delivery-notes/trash" className="w-full sm:w-auto">
@@ -405,7 +435,7 @@ function DeliveryNotesPageContent() {
                   )}
                   {canCreate && (
                     <Button
-                      onClick={() => setIsDeliveryFormOpen(true)}
+                      onClick={() => handleOpenForm()}
                       className="gap-2 w-full sm:w-auto"
                     >
                       <Plus className="h-4 w-4" />
@@ -414,9 +444,7 @@ function DeliveryNotesPageContent() {
                   )}
                 </div>
 
-                {/* Row 2: Date Filters */}
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-                  {/* Date Range Picker */}
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -451,7 +479,6 @@ function DeliveryNotesPageContent() {
                     </PopoverContent>
                   </Popover>
 
-                  {/* Quick Select Dropdown */}
                   <Select onValueChange={handleQuickSelect} defaultValue="last6Months">
                     <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue placeholder="Quick select" />
@@ -495,7 +522,7 @@ function DeliveryNotesPageContent() {
                       Delivery notes will appear here once created
                     </p>
                     {canCreate && (
-                      <Button onClick={() => setIsDeliveryFormOpen(true)} className="gap-2">
+                      <Button onClick={() => handleOpenForm()} className="gap-2">
                         <Plus className="h-4 w-4" />
                         Create Delivery Note
                       </Button>
@@ -510,8 +537,12 @@ function DeliveryNotesPageContent() {
 
       <DeliveryNoteForm
         isOpen={isDeliveryFormOpen}
-        onClose={() => setIsDeliveryFormOpen(false)}
-        onSubmit={handleDeliveryNoteFormSubmit}
+        onClose={() => {
+          setIsDeliveryFormOpen(false);
+          setSelectedDeliveryNote(null);
+        }}
+        onSubmit={(data) => handleDeliveryNoteFormSubmit(data, selectedDeliveryNote?._id)}
+        defaultValues={selectedDeliveryNote}
       />
 
       <PDFViewerModal
@@ -520,9 +551,20 @@ function DeliveryNotesPageContent() {
         pdfUrl={selectedPdfUrl}
         title={selectedPdfTitle}
       />
+
+      <DeliveryNoteViewModal
+        isOpen={viewModalOpen}
+        onClose={() => {
+          setViewModalOpen(false);
+          setDeliveryNoteToView(null);
+        }}
+        deliveryNote={deliveryNoteToView}
+        onViewPdf={handleViewPdf}
+      />
     </>
   );
 }
+
 export default function Component() {
   return (
     <Suspense fallback={

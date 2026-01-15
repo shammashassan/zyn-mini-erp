@@ -59,7 +59,7 @@ type PurchaseItem = {
 type PurchaseFormData = {
   supplierName: string;
   items: PurchaseItem[];
-  date: Date;
+  purchaseDate: Date;
   purchaseStatus: 'pending' | 'approved' | 'cancelled';
   inventoryStatus: 'pending' | 'received' | 'partially received';
   discount: number;
@@ -85,6 +85,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
   } = useForm<PurchaseFormData>({
     defaultValues: {
       items: [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
+      purchaseDate: new Date(),
       discount: 0,
       isTaxPayable: true,
       purchaseStatus: 'pending',
@@ -149,7 +150,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
         reset({
           supplierName: defaultValues.supplierName || "",
           items: defaultValues.items || [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
-          date: defaultValues.date ? new Date(defaultValues.date) : new Date(),
+          purchaseDate: defaultValues.date ? new Date(defaultValues.date) : new Date(),
           purchaseStatus: defaultValues.purchaseStatus || 'pending',
           inventoryStatus: defaultValues.inventoryStatus || 'pending',
           discount: defaultValues.discount || 0,
@@ -160,7 +161,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
         reset({
           supplierName: "",
           items: [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
-          date: new Date(),
+          purchaseDate: new Date(),
           purchaseStatus: 'pending',
           inventoryStatus: 'pending',
           discount: 0,
@@ -201,7 +202,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
       return;
     }
 
-    if (!data.date) {
+    if (!data.purchaseDate) {
       toast.error("Please select a purchase date");
       return;
     }
@@ -249,7 +250,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
       isTaxPayable: data.isTaxPayable,
       vatAmount: calculatedVatAmount,
       grandTotal: calculatedGrandTotal,
-      date: data.date,
+      date: data.purchaseDate,
       purchaseStatus: isEditMode ? data.purchaseStatus : 'pending',
       inventoryStatus: isEditMode ? (defaultValues?.inventoryStatus || 'pending') : 'pending',
       paymentStatus: 'pending',
@@ -365,7 +366,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
             <div className="space-y-2">
               <Label>Purchase Date</Label>
               <Controller
-                name="date"
+                name="purchaseDate"
                 control={control}
                 render={({ field }) => (
                   <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>

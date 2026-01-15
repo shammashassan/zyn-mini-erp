@@ -1,4 +1,4 @@
-// app/expenses/columns.tsx - UPDATED: Added Icons to Category and Payment Status
+// app/expenses/columns.tsx - UPDATED: Using expenseDate instead of date
 
 "use client";
 
@@ -155,7 +155,6 @@ const StatusBadge = ({
     }
   };
 
-
   const Icon = getStatusIcon(expense.status);
 
   return (
@@ -199,7 +198,7 @@ export const getColumns = (
   onDuplicate?: (expense: IExpense) => void
 ): ColumnDef<IExpense>[] => [
     {
-      accessorKey: "date",
+      accessorKey: "expenseDate", // ✅ UPDATED: Changed from date to expenseDate
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -209,14 +208,22 @@ export const getColumns = (
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => (
-        <div className="text-left font-medium min-w-[100px]">
-          <div>{formatDisplayDate(row.original.date)}</div>
-          <div className="text-xs text-muted-foreground">
-            {formatTime(row.original.date)}
+      cell: ({ row }) => {
+        const date = new Date(row.original.expenseDate); // ✅ UPDATED
+        return (
+          <div className="text-left font-medium min-w-[100px]">
+            <div>{formatDisplayDate(date)}</div>
+            <div className="text-xs text-muted-foreground">
+              {formatTime(date)}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
+      sortingFn: (rowA, rowB) => {
+        const dateA = new Date(rowA.original.expenseDate); // ✅ UPDATED
+        const dateB = new Date(rowB.original.expenseDate); // ✅ UPDATED
+        return dateB.getTime() - dateA.getTime();
+      },
     },
     {
       accessorKey: "referenceNumber",
@@ -301,15 +308,6 @@ export const getColumns = (
       },
       enableColumnFilter: true,
     },
-    // {
-    //   accessorKey: "amount",
-    //   header: () => <div className="text-right">Amount</div>,
-    //   cell: ({ row }) => (
-    //     <div className="text-right font-medium">
-    //       {formatCurrency(row.getValue("amount"))}
-    //     </div>
-    //   ),
-    // },
     {
       accessorKey: "status",
       header: "Status",

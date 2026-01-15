@@ -1,4 +1,4 @@
-// app/api/purchases/[id]/route.ts - UPDATED: Three Separate Statuses
+// app/api/purchases/[id]/route.ts - FIXED: Enhanced audit tracking with username
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -70,7 +70,8 @@ function detectChanges(oldPurchase: any, newData: any) {
     'discount',
     'supplierName',
     'paidAmount',
-    'date'
+    'date',
+    'purchaseDate'
   ];
 
   for (const field of fieldsToTrack) {
@@ -260,6 +261,7 @@ function determineInventoryStatusAfterEdit(items: any[], oldInventoryStatus: str
 
 /**
  * PUT - Update a purchase
+ * ✅ FIXED: Enhanced audit tracking with proper username for automatic changes
  */
 export async function PUT(request: Request, context: RequestContext) {
   try {
@@ -287,6 +289,7 @@ export async function PUT(request: Request, context: RequestContext) {
 
     const oldPurchaseStatus = currentPurchase.purchaseStatus;
     const oldInventoryStatus = currentPurchase.inventoryStatus;
+    const oldPaymentStatus = currentPurchase.paymentStatus;
 
     const newPurchaseStatus = body.purchaseStatus || oldPurchaseStatus;
     const newInventoryStatus = body.inventoryStatus || oldInventoryStatus;
@@ -296,6 +299,7 @@ export async function PUT(request: Request, context: RequestContext) {
     console.log(`\n📝 Purchase Update: ${currentPurchase.referenceNumber}`);
     console.log(`   Old Purchase Status: ${oldPurchaseStatus}, New: ${newPurchaseStatus}`);
     console.log(`   Old Inventory Status: ${oldInventoryStatus}, New: ${newInventoryStatus}`);
+    console.log(`   Old Payment Status: ${oldPaymentStatus}`);
     console.log(`   Items Changed: ${itemsChanged}`);
 
     // SCENARIO 1: Editing items while inventory status is received or partially received
@@ -435,14 +439,18 @@ export async function PUT(request: Request, context: RequestContext) {
       }
     }
 
+    // Detect changes for manual audit entry
     const changes = detectChanges(currentPurchase.toObject(), body);
 
-    currentPurchase.addAuditEntry(
-      'Updated',
-      user.id,
-      user.username,
-      changes.length > 0 ? changes : undefined
-    );
+    // ✅ Only add manual "Updated" entry if there are explicit changes
+    if (changes.length > 0) {
+      currentPurchase.addAuditEntry(
+        'Updated',
+        user.id,
+        user.username,
+        changes
+      );
+    }
 
     const updateData = { ...body };
 
@@ -474,26 +482,43 @@ export async function PUT(request: Request, context: RequestContext) {
       updateData.items = body.items;
     }
 
+    // Handle purchaseDate update
+    if (body.purchaseDate) {
+      updateData.purchaseDate = new Date(body.purchaseDate);
+      updateData.date = updateData.purchaseDate;
+    } else if (body.date) {
+      updateData.date = new Date(body.date);
+      updateData.purchaseDate = updateData.date;
+    }
+
     currentPurchase.set({
       ...updateData,
       updatedBy: user.id,
     });
 
+    // ✅ FIXED: Update the last audit entry with username if payment status auto-changed
     await currentPurchase.save();
+    
+    // After save, check if the last audit entry is "Payment Status Auto-Updated" and add username
+    if (currentPurchase.actionHistory.length > 0) {
+      const lastEntry = currentPurchase.actionHistory[currentPurchase.actionHistory.length - 1];
+      if (lastEntry.action === 'Payment Status Auto-Updated' && !lastEntry.username) {
+        lastEntry.username = user.username;
+        await currentPurchase.save();
+      }
+    }
 
     const finalInventoryStatus = currentPurchase.inventoryStatus;
 
-    // ✅ Handle journal for inventory status changes
+    // Handle journal for inventory status changes
     if (oldInventoryStatus !== newInventoryStatus) {
       if (newInventoryStatus === 'received') {
-        // Create new journal for Received state
         await createJournalForPurchase(
           currentPurchase.toObject(),
           user.id,
           user.username || user.name
         );
       } else if (oldInventoryStatus === 'received') {
-        // Void old journal if moving away from Received
         await voidJournalsForReference(
           currentPurchase._id,
           user.id,

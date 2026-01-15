@@ -273,17 +273,17 @@ const RowActions = ({
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
 
-          {onViewPdf && (
-            <DropdownMenuItem onClick={() => onViewPdf(debitNote)}>
-              <FileText className="mr-2 h-4 w-4" />
-              View PDF
-            </DropdownMenuItem>
-          )}
-
           {onView && (
             <DropdownMenuItem onClick={() => onView(debitNote)}>
               <Eye className="mr-2 h-4 w-4" />
               View Details
+            </DropdownMenuItem>
+          )}
+
+          {onViewPdf && (
+            <DropdownMenuItem onClick={() => onViewPdf(debitNote)}>
+              <FileText className="mr-2 h-4 w-4" />
+              View PDF
             </DropdownMenuItem>
           )}
 

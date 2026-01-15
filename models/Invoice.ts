@@ -1,4 +1,4 @@
-// models/Invoice.ts - FIXED: Added "Partially Refunded" status
+// models/Invoice.ts - UPDATED: Added invoiceDate field
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -45,6 +45,7 @@ export interface IInvoice extends Document {
   vatAmount: number;
   grandTotal: number;
   notes?: string;
+  invoiceDate: Date; // ✅ NEW: Invoice date field
   status: 'paid' | 'pending' | 'partial' | 'overdue' | 'approved' | 'cancelled';
   
   receiptAllocations: IReceiptAllocation[];
@@ -53,7 +54,7 @@ export interface IInvoice extends Document {
   receivedAmount: number;
   refundedAmount: number;
   remainingAmount: number;
-  paymentStatus: 'Paid' | 'Pending' | 'Partially Paid' | 'Refunded' | 'Partially Refunded'; // ✅ ADDED: Partially Refunded
+  paymentStatus: 'Paid' | 'Pending' | 'Partially Paid' | 'Refunded' | 'Partially Refunded';
   
   connectedDocuments: {
     receiptIds?: mongoose.Types.ObjectId[];
@@ -140,6 +141,7 @@ const InvoiceSchema: Schema<IInvoice> = new Schema({
   vatAmount: { type: Number, default: 0 },
   grandTotal: { type: Number, required: true },
   notes: { type: String },
+  invoiceDate: { type: Date, required: true }, // ✅ NEW: Invoice date field
   status: { 
     type: String, 
     enum: ['paid', 'pending', 'partial', 'overdue', 'approved', 'cancelled'],
@@ -155,7 +157,7 @@ const InvoiceSchema: Schema<IInvoice> = new Schema({
   remainingAmount: { type: Number, default: 0, min: 0 },
   paymentStatus: {
     type: String,
-    enum: ['Paid', 'Pending', 'Partially Paid', 'Refunded', 'Partially Refunded'], // ✅ ADDED: Partially Refunded
+    enum: ['Paid', 'Pending', 'Partially Paid', 'Refunded', 'Partially Refunded'],
     default: 'Pending'
   },
   
@@ -179,7 +181,7 @@ const InvoiceSchema: Schema<IInvoice> = new Schema({
 }, { timestamps: true });
 
 // Indexes
-InvoiceSchema.index({ isDeleted: 1, createdAt: -1 });
+InvoiceSchema.index({ isDeleted: 1, invoiceDate: -1 }); // ✅ UPDATED: Index on invoiceDate
 InvoiceSchema.index({ status: 1 });
 InvoiceSchema.index({ customerName: 1 });
 InvoiceSchema.index({ paymentStatus: 1 });
@@ -189,7 +191,7 @@ InvoiceSchema.index({ 'connectedDocuments.quotationId': 1 });
 InvoiceSchema.index({ 'receiptAllocations.voucherId': 1 });
 InvoiceSchema.index({ 'refundAllocations.voucherId': 1 });
 
-// ✅ FIXED: Pre-save middleware with partial refund status
+// Pre-save middleware
 InvoiceSchema.pre('save', function(next) {
   // Calculate paid amount from receipt allocations
   if (this.receiptAllocations && this.receiptAllocations.length > 0) {
@@ -217,29 +219,22 @@ InvoiceSchema.pre('save', function(next) {
   // Recalculate remainingAmount
   this.remainingAmount = Math.max(0, this.grandTotal - effectiveAmount);
   
-  // ✅ IMPROVED: Auto-calculate payment status with partial refund support
-  // Use epsilon for floating-point comparison (0.01 = 1 fils tolerance)
+  // Auto-calculate payment status with partial refund support
   const EPSILON = 0.01;
   
   if (this.refundedAmount > 0) {
-    // Has refunds - determine if full or partial
     const refundDifference = this.paidAmount - this.refundedAmount;
     
     if (refundDifference <= EPSILON) {
-      // Fully refunded (within 1 fils tolerance)
       this.paymentStatus = 'Refunded';
     } else {
-      // Partially refunded
       this.paymentStatus = 'Partially Refunded';
     }
   } else if (effectiveAmount >= this.grandTotal - EPSILON) {
-    // Fully paid (no refunds, within 1 fils tolerance)
     this.paymentStatus = 'Paid';
   } else if (effectiveAmount > 0) {
-    // Partially paid (no refunds)
     this.paymentStatus = 'Partially Paid';
   } else {
-    // Nothing paid yet
     this.paymentStatus = 'Pending';
   }
   
@@ -252,6 +247,11 @@ InvoiceSchema.pre(/^find/, function(this: Query<any, any>, next) {
   
   if (options.includeDeleted !== true) {
     this.find({ isDeleted: false });
+  }
+  
+  // ✅ UPDATED: Default sort by invoiceDate instead of createdAt
+  if (!this.getOptions().sort) {
+    this.sort({ invoiceDate: -1 });
   }
   
   next();

@@ -291,7 +291,44 @@ const styles = StyleSheet.create({
     border: '0.5 solid #c5cae9',
   },
 
-  // Notes Box (Styled like Invoice Terms Box - Orange/Yellow)
+  // Bottom Section
+  bottomSection: {
+    flexDirection: 'row',
+    gap: 15,
+    marginBottom: 10,
+  },
+
+  // Bank Details Box
+  bankBox: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    border: '1 solid #e0e0e0',
+    borderRadius: 4,
+    padding: 10,
+  },
+  boxTitle: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#1a237e',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  boxContent: {
+    fontSize: 8,
+    color: '#424242',
+    lineHeight: 1.4,
+  },
+
+  // Terms Box
+  termsBox: {
+    flex: 1,
+    backgroundColor: '#fff3e0',
+    border: '1 solid #ffe0b2',
+    borderRadius: 4,
+    padding: 10,
+  },
+
+  // Notes Box (Additional Notes - if needed separately)
   notesBox: {
     backgroundColor: '#fff3e0',
     border: '1 solid #ffe0b2',
@@ -310,6 +347,18 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: '#424242',
     lineHeight: 1.4,
+  },
+
+  validityItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 3,
+  },
+  bulletPoint: {
+    fontSize: 8,
+    color: '#1a237e',
+    marginRight: 5,
+    fontWeight: 'bold',
   },
 
   // Footer
@@ -490,6 +539,41 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({ debitNote,
               )}
             </View>
 
+            {/* Bottom Section: Bank Details & Terms */}
+            <View style={styles.bottomSection}>
+              {companyDetails?.bankDetails && (
+                <View style={styles.bankBox}>
+                  <Text style={styles.boxTitle}>Bank Details</Text>
+                  <Text style={styles.boxContent}>{companyDetails.bankDetails}</Text>
+                </View>
+              )}
+              <View style={styles.termsBox}>
+                <Text style={styles.boxTitle}>Terms & Conditions</Text>
+                
+                <View style={styles.validityItem}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.boxContent}>
+                    These examples are for illustrative purposes only and do not constitute legal advice.
+                  </Text>
+                </View>
+
+                <View style={styles.validityItem}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.boxContent}>
+                    Consulting a legal professional is recommended to ensure compliance with local laws.
+                  </Text>
+                </View>
+
+                <View style={styles.validityItem}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.boxContent}>
+                    Terms should remain clear, concise, and transparent for all users.
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Additional Notes (if separate from terms) */}
             {debitNote.notes && (
               <View style={styles.notesBox}>
                 <Text style={styles.notesTitle}>Additional Notes</Text>

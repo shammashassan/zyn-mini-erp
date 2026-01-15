@@ -53,7 +53,7 @@ export function ConnectedDocumentsBadges({ invoice, onViewPdf }: ConnectedDocume
   }
 
   return (
-    <div className="flex flex-col gap-1 items-start">
+    <div className="flex flex-wrap gap-1">
       {/* Quotation Badge */}
       {quotation && (
         <Badge
@@ -83,42 +83,34 @@ export function ConnectedDocumentsBadges({ invoice, onViewPdf }: ConnectedDocume
       )}
 
       {/* Receipt Badges */}
-      {receipts.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {receipts.map((receipt) => (
-            <Badge
-              key={receipt._id}
-              variant="success"
-              appearance="outline"
-              className="font-mono cursor-pointer hover:opacity-70 transition-opacity gap-1 w-fit"
-              onClick={() => onViewPdf({ ...receipt, voucherType: 'receipt' })}
-            >
-              <Ticket className="h-3 w-3" />
-              {receipt.invoiceNumber}
-              <ExternalLink className="h-3 w-3 ml-1" />
-            </Badge>
-          ))}
-        </div>
-      )}
+      {receipts.map((receipt) => (
+        <Badge
+          key={receipt._id}
+          variant="success"
+          appearance="outline"
+          className="font-mono cursor-pointer hover:opacity-70 transition-opacity gap-1 w-fit"
+          onClick={() => onViewPdf({ ...receipt, voucherType: 'receipt' })}
+        >
+          <Ticket className="h-3 w-3" />
+          {receipt.invoiceNumber}
+          <ExternalLink className="h-3 w-3 ml-1" />
+        </Badge>
+      ))}
 
       {/* ✅ NEW: Refund Badges */}
-      {refunds.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {refunds.map((refund) => (
-            <Badge
-              key={refund._id}
-              variant="pink"
-              appearance="outline"
-              className="font-mono cursor-pointer hover:opacity-70 transition-opacity gap-1 w-fit"
-              onClick={() => onViewPdf({ ...refund, voucherType: 'refund' })}
-            >
-              <RotateCcw className="h-3 w-3" />
-              {refund.invoiceNumber}
-              <ExternalLink className="h-3 w-3 ml-1" />
-            </Badge>
-          ))}
-        </div>
-      )}
+      {refunds.map((refund) => (
+        <Badge
+          key={refund._id}
+          variant="pink"
+          appearance="outline"
+          className="font-mono cursor-pointer hover:opacity-70 transition-opacity gap-1 w-fit"
+          onClick={() => onViewPdf({ ...refund, voucherType: 'refund' })}
+        >
+          <RotateCcw className="h-3 w-3" />
+          {refund.invoiceNumber}
+          <ExternalLink className="h-3 w-3 ml-1" />
+        </Badge>
+      ))}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-// models/Quotation.ts - Complete Quotation Model
+// models/Quotation.ts - UPDATED: Added quotationDate field
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -33,6 +33,7 @@ export interface IQuotation extends Document {
   vatAmount: number;
   grandTotal: number;
   notes?: string;
+  quotationDate: Date; // ✅ NEW: Quotation date field
   status: 'sent' | 'pending' | 'approved' | 'cancelled' | 'converted';
   
   // Connected documents
@@ -92,6 +93,7 @@ const QuotationSchema: Schema<IQuotation> = new Schema({
   vatAmount: { type: Number, default: 0 },
   grandTotal: { type: Number, required: true },
   notes: { type: String },
+  quotationDate: { type: Date, required: true }, // ✅ NEW: Quotation date field
   status: { 
     type: String, 
     enum: ['sent', 'pending', 'approved', 'cancelled', 'converted'],
@@ -119,7 +121,7 @@ const QuotationSchema: Schema<IQuotation> = new Schema({
 }, { timestamps: true });
 
 // Indexes
-QuotationSchema.index({ isDeleted: 1, createdAt: -1 });
+QuotationSchema.index({ isDeleted: 1, quotationDate: -1 }); // ✅ UPDATED: Index on quotationDate
 QuotationSchema.index({ status: 1 });
 QuotationSchema.index({ customerName: 1 });
 QuotationSchema.index({ 'connectedDocuments.invoiceIds': 1 });
@@ -130,6 +132,11 @@ QuotationSchema.pre(/^find/, function(this: Query<any, any>, next) {
   
   if (options.includeDeleted !== true) {
     this.find({ isDeleted: false });
+  }
+  
+  // ✅ UPDATED: Default sort by quotationDate instead of createdAt
+  if (!this.getOptions().sort) {
+    this.sort({ quotationDate: -1 });
   }
   
   next();

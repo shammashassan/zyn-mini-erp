@@ -21,6 +21,9 @@ import { ca } from "date-fns/locale";
 interface BillPayload extends Omit<OriginalBillPayload, 'documentType'> {
   documentType: "invoice" | "receipt" | "payment" | "quotation";
   supplierName?: string;
+  invoiceDate?: Date;
+  quotationDate?: Date;
+  voucherDate?: Date;
 }
 
 export default function CreateBillPage() {
@@ -51,6 +54,9 @@ export default function CreateBillPage() {
     documentType: "invoice",
     status: "pending",
     items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
+    invoiceDate: new Date(),
+    quotationDate: new Date(),
+    voucherDate: new Date(),
   } as BillPayload);
 
   const { permissions: { canCreate } } = useBillPermissions();
@@ -264,6 +270,7 @@ export default function CreateBillPage() {
             quantity: Number(item.quantity) || 0,
             rate: Number(item.rate) || 0,
           }));
+          payloadToSend.invoiceDate = payload.invoiceDate;
           break;
 
         case "quotation":
@@ -275,6 +282,7 @@ export default function CreateBillPage() {
             quantity: Number(item.quantity) || 0,
             rate: Number(item.rate) || 0,
           }));
+          payloadToSend.quotationDate = payload.quotationDate;
           break;
 
         case "receipt":
@@ -295,6 +303,7 @@ export default function CreateBillPage() {
             totalAmount: payload.voucherAmount,
             grandTotal: payload.voucherAmount,
             discount: 0,
+            voucherDate: payload.voucherDate,
           };
           break;
       }

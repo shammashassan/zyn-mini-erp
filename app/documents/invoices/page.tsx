@@ -1,4 +1,4 @@
-// app/documents/invoices/page.tsx - UPDATED: Added Silent Background Fetch on Focus
+// app/documents/invoices/page.tsx - UPDATED: Added Invoice View Modal
 
 "use client";
 
@@ -15,6 +15,7 @@ import { DataTable } from "@/components/data-table/data-table";
 import { getColumns, type Invoice } from "./columns";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { InvoiceForm } from "./invoice-form";
+import { InvoiceViewModal } from "./InvoiceViewModal"; // ✅ NEW
 import Link from "next/link";
 import { useInvoicePermissions, useReportPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
@@ -40,7 +41,6 @@ function InvoicesPageContent() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Ref to prevent double submission
   const isSubmittingRef = useRef(false);
 
   const [pageCount, setPageCount] = useState(0);
@@ -52,7 +52,10 @@ function InvoicesPageContent() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
-  // Date Range State (Default 6 months)
+  // ✅ NEW: View Modal State
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [invoiceToView, setInvoiceToView] = useState<Invoice | null>(null);
+
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(subMonths(new Date(), 5)),
     to: endOfMonth(new Date()),
@@ -82,11 +85,9 @@ function InvoicesPageContent() {
     setIsMounted(true);
   }, []);
 
-  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
   const fetchInvoices = useCallback(async (background = false) => {
     if (!canRead) return;
     try {
-      // Only show loading spinner/skeleton if it's NOT a background fetch
       if (!background) {
         setIsLoading(true);
       }
@@ -97,7 +98,6 @@ function InvoicesPageContent() {
         populate: 'true',
       });
 
-      // Add Date Range to params
       if (dateRange?.from) {
         params.append('startDate', dateRange.from.toISOString());
       }
@@ -131,7 +131,6 @@ function InvoicesPageContent() {
         setInvoices(result);
       }
     } catch (error) {
-      // Only show toast error if it's a user interaction, not a background poll
       if (!background) {
         console.error("Error fetching invoices:", error);
         toast.error("Could not load invoices.");
@@ -144,19 +143,15 @@ function InvoicesPageContent() {
     }
   }, [canRead, urlState.page, urlState.pageSize, urlState.sort, urlState.filters, dateRange]);
 
-  // Standard fetch on dependency change
   useEffect(() => {
     if (isMounted && canRead) {
       fetchInvoices();
     }
   }, [isMounted, canRead, fetchInvoices]);
 
-  // ✅ NEW: Window Focus Listener - SILENT MODE
-  // This triggers a silent "background" fetch when you tab back to this page.
   useEffect(() => {
     const onFocus = () => {
       if (isMounted && canRead) {
-        // Pass true to indicate this is a background fetch (no loading UI/opacity change)
         fetchInvoices(true);
       }
     };
@@ -174,7 +169,6 @@ function InvoicesPageContent() {
       return;
     }
 
-    // Prevent editing if status is not "pending"
     if (invoice && invoice.status !== 'pending') {
       toast.error("Cannot edit invoice", {
         description: "Only invoices with 'pending' status can be edited. Approved/cancelled invoices affect accounting records."
@@ -234,8 +228,13 @@ function InvoicesPageContent() {
     setIsModalOpen(true);
   }, []);
 
+  // ✅ NEW: Handle View Invoice
+  const handleViewInvoice = (invoice: Invoice) => {
+    setInvoiceToView(invoice);
+    setViewModalOpen(true);
+  };
+
   const handleInvoiceFormSubmit = async (data: any, id?: string) => {
-    // 1. Immediate Lock
     if (isSubmittingRef.current) return;
 
     if (id && !canUpdate) {
@@ -248,7 +247,6 @@ function InvoicesPageContent() {
       return;
     }
 
-    // 2. Lock & Load
     isSubmittingRef.current = true;
 
     const url = id ? `/api/invoices/${id}` : "/api/invoices";
@@ -270,7 +268,6 @@ function InvoicesPageContent() {
 
       const invoice = id ? result : result.invoice;
 
-      // If creating and linked to quotation, update quotation status
       if (!id && data.connectedDocuments?.quotationId) {
         try {
           await fetch(`/api/quotations/${data.connectedDocuments.quotationId}`, {
@@ -286,17 +283,13 @@ function InvoicesPageContent() {
         }
       }
 
-      // Close Form Modal
       setIsInvoiceFormOpen(false);
       setSelectedInvoice(null);
 
-      // Refresh Data
       fetchInvoices();
 
-      // Show Success Toast
       toast.success(`Invoice ${invoice.invoiceNumber} ${id ? "updated" : "created"}!`);
 
-      // ✅ AUTOMATICALLY OPEN PDF VIEWER
       setSelectedPdfUrl(`/api/invoices/${invoice._id}/pdf`);
       setSelectedPdfTitle(invoice.invoiceNumber || "Invoice");
       setIsModalOpen(true);
@@ -305,7 +298,6 @@ function InvoicesPageContent() {
       console.error(`Error ${id ? "updating" : "creating"} invoice:`, error);
       toast.error(`An error occurred while ${id ? "updating" : "creating"} invoice.`);
     } finally {
-      // 3. Release Lock
       isSubmittingRef.current = false;
     }
   };
@@ -344,6 +336,7 @@ function InvoicesPageContent() {
     setUrlState({ page: 1 });
   };
 
+  // ✅ UPDATED: Pass onView to getColumns
   const columns = useMemo(() => getColumns(
     handleViewPdf,
     handleOpenForm,
@@ -354,7 +347,8 @@ function InvoicesPageContent() {
       }
     },
     { canDelete, canUpdate, canUpdateStatus, canCreateReceipt, canCreateDelivery },
-    fetchInvoices
+    fetchInvoices,
+    handleViewInvoice // ✅ NEW: Pass view handler
   ), [invoices, canDelete, canUpdate, canUpdateStatus, canCreateReceipt, canCreateDelivery, handleViewPdf, fetchInvoices]);
 
   const { table } = useDataTable<Invoice>({
@@ -406,7 +400,6 @@ function InvoicesPageContent() {
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <div className="flex flex-col lg:flex-row lg:justify-between px-4 lg:px-6 gap-4">
               
-              {/* Left: Title */}
               <div className="flex items-center gap-3 self-start lg:self-center">
                 <div className="p-3 bg-primary/10 rounded-full">
                   <FileText className="h-8 w-8 text-primary" />
@@ -426,10 +419,8 @@ function InvoicesPageContent() {
                 </div>
               </div>
 
-              {/* Right: Actions & Filters Group */}
               <div className="flex flex-col gap-3 w-full lg:w-auto lg:items-end">
                 
-                {/* Row 1: Actions */}
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                   {canViewTrash && (
                     <Link href="./invoices/trash" className="w-full sm:w-auto">
@@ -457,9 +448,7 @@ function InvoicesPageContent() {
                   )}
                 </div>
 
-                {/* Row 2: Date Filters */}
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-                  {/* Date Range Picker */}
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -494,7 +483,6 @@ function InvoicesPageContent() {
                     </PopoverContent>
                   </Popover>
 
-                  {/* Quick Select Dropdown */}
                   <Select onValueChange={handleQuickSelect} defaultValue="last6Months">
                     <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue placeholder="Quick select" />
@@ -569,9 +557,21 @@ function InvoicesPageContent() {
         pdfUrl={selectedPdfUrl}
         title={selectedPdfTitle}
       />
+
+      {/* ✅ NEW: Invoice View Modal */}
+      <InvoiceViewModal
+        isOpen={viewModalOpen}
+        onClose={() => {
+          setViewModalOpen(false);
+          setInvoiceToView(null);
+        }}
+        invoice={invoiceToView}
+        onViewPdf={handleViewPdf}
+      />
     </>
   );
 }
+
 export default function Component() {
   return (
     <Suspense fallback={

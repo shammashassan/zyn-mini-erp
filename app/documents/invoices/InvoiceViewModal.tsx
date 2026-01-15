@@ -1,4 +1,4 @@
-// app/expenses/purchases/PurchaseViewModal.tsx - FIXED: Correct Status Badges
+// app/documents/invoices/InvoiceViewModal.tsx - UPDATED: Payment Information Card with Progress Bar
 
 "use client";
 
@@ -12,47 +12,45 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  ShoppingCart,
+  FileText,
   Calendar,
   Package,
   User,
-  CreditCard,
-  Wallet,
-  TrendingUp,
-  FileText,
   CircleUserRound,
-  Percent,
   CheckCircle,
   Clock,
+  XCircle,
   AlertCircle,
-  XCircle
+  DollarSign,
+  CreditCard,
+  RotateCcw,
+  Percent,
+  Wallet
 } from "lucide-react";
-import type { IPurchase } from "@/models/Purchase";
+import type { Invoice } from "./columns";
 import { ConnectedDocumentsBadges } from "./ConnectedDocumentsBadges";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { formatDateTime, formatLongDate } from "@/utils/formatters/date";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
 
-interface PurchaseViewModalProps {
+interface InvoiceViewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  purchase: IPurchase | any | null;
-  onViewPdf?: (bill: any) => void;
-  onViewReturnNotePdf?: (returnNote: any) => void;
+  invoice: Invoice | any | null;
+  onViewPdf?: (doc: any) => void;
 }
 
-// ✅ Purchase Status helpers
-const getPurchaseStatusVariant = (status: string) => {
+const getStatusVariant = (status: string) => {
   switch (status) {
     case 'approved': return 'success';
-    case 'pending': return 'warning';
     case 'cancelled': return 'destructive';
-    default: return 'gray';
+    case 'pending': return 'warning';
+    default: return 'neutral';
   }
 };
 
-const getPurchaseStatusIcon = (status: string) => {
+const getStatusIcon = (status: string) => {
   switch (status) {
     case 'approved': return CheckCircle;
     case 'pending': return Clock;
@@ -61,76 +59,64 @@ const getPurchaseStatusIcon = (status: string) => {
   }
 };
 
-// ✅ Inventory Status helpers
-const getInventoryStatusVariant = (status: string) => {
-  switch (status) {
-    case 'received': return 'success';
-    case 'partially received': return 'primary';
-    case 'pending': return 'warning';
-    default: return 'gray';
-  }
-};
-
-const getInventoryStatusIcon = (status: string) => {
-  switch (status) {
-    case 'received': return CheckCircle;
-    case 'partially received': return Package;
-    case 'pending': return Clock;
-    default: return Clock;
-  }
-};
-
 const getPaymentStatusVariant = (status: string) => {
   switch (status) {
-    case 'paid': return 'success';
-    case 'partially paid': return 'primary';
-    case 'pending': return 'warning';
-    default: return 'gray';
+    case 'Paid': return 'success';
+    case 'Partially Paid': return 'primary';
+    case 'Pending': return 'warning';
+    case 'Refunded': return 'pink';
+    default: return 'neutral';
   }
 };
 
 const getPaymentStatusIcon = (status: string) => {
   switch (status) {
-    case 'paid': return CheckCircle;
-    case 'partially paid': return Wallet;
-    case 'pending': return Clock;
-    default: return Clock;
+    case 'Paid': return CheckCircle;
+    case 'Partially Paid': return CreditCard;
+    case 'Pending': return Clock;
+    case 'Refunded': return RotateCcw;
+    default: return DollarSign;
   }
 };
 
-const getCreatorUsername = (purchase: any): string | null => {
-  const createAction = purchase?.actionHistory?.find(
+const getCreatorUsername = (invoice: any): string | null => {
+  const createAction = invoice?.actionHistory?.find(
     (action: any) => action.action === 'Created'
   );
   return createAction?.username || null;
 };
 
-export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, onViewPdf, onViewReturnNotePdf }: PurchaseViewModalProps) {
-  const [purchase, setPurchase] = useState<any>(initialPurchase);
+export function InvoiceViewModal({ 
+  isOpen, 
+  onClose, 
+  invoice: initialInvoice, 
+  onViewPdf 
+}: InvoiceViewModalProps) {
+  const [invoice, setInvoice] = useState<any>(initialInvoice);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!isOpen || !initialPurchase) {
-      setPurchase(initialPurchase);
+    if (!isOpen || !initialInvoice) {
+      setInvoice(initialInvoice);
       return;
     }
 
-    const isPartialData = initialPurchase._id && (!initialPurchase.items || !Array.isArray(initialPurchase.items));
+    const isPartialData = initialInvoice._id && (!initialInvoice.items || !Array.isArray(initialInvoice.items));
 
     if (isPartialData) {
       const fetchFullDetails = async () => {
         setIsLoading(true);
         try {
-          const res = await fetch(`/api/purchases/${initialPurchase._id}`);
+          const res = await fetch(`/api/invoices/${initialInvoice._id}`);
           if (res.ok) {
             const fullData = await res.json();
-            setPurchase(fullData);
+            setInvoice(fullData);
           } else {
-            toast.error("Failed to load full purchase details");
+            toast.error("Failed to load full invoice details");
           }
         } catch (error) {
-          console.error("Error fetching purchase details:", error);
-          toast.error("Error loading purchase details");
+          console.error("Error fetching invoice details:", error);
+          toast.error("Error loading invoice details");
         } finally {
           setIsLoading(false);
         }
@@ -138,38 +124,28 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
 
       fetchFullDetails();
     } else {
-      setPurchase(initialPurchase);
+      setInvoice(initialInvoice);
     }
-  }, [isOpen, initialPurchase]);
+  }, [isOpen, initialInvoice]);
 
   if (!isOpen) return null;
 
-  const currentData = purchase || initialPurchase || {};
+  const currentData = invoice || initialInvoice || {};
 
   const creatorUsername = getCreatorUsername(currentData);
   const totalItems = currentData.items?.length || 0;
   const totalQuantity = currentData.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0;
-  const totalReceived = currentData.items?.reduce((sum: number, item: any) => sum + (item.receivedQuantity || 0), 0) || 0;
-  const hasPartialReceipt = currentData.inventoryStatus === 'partially received';
 
-  const grossTotal = currentData.totalAmount || 0;
-  const discount = currentData.discount || 0;
-  const subtotal = grossTotal - discount;
-  const vatAmount = currentData.vatAmount || 0;
-  const displayTotal = currentData.grandTotal || (subtotal + vatAmount);
-
-  // Status Icons
-  const PurchaseIcon = getPurchaseStatusIcon(currentData.purchaseStatus);
-  const InventoryIcon = getInventoryStatusIcon(currentData.inventoryStatus);
-  const PaymentIcon = getPaymentStatusIcon(currentData.paymentStatus);
+  const StatusIcon = getStatusIcon(currentData.status);
+  const PaymentStatusIcon = getPaymentStatusIcon(currentData.paymentStatus);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[98vw] sm:max-w-[95vw] lg:max-w-4xl max-h-[95vh] overflow-y-auto sidebar-scroll p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
-            Purchase Details
+            <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
+            Invoice Details
           </DialogTitle>
         </DialogHeader>
 
@@ -189,36 +165,23 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                 <CardTitle className="text-sm sm:text-base flex items-center justify-between flex-wrap gap-2">
                   <span className="flex items-center gap-2">
                     <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <span className="text-xs sm:text-sm">Purchase Order - {currentData.referenceNumber}</span>
+                    <span className="text-xs sm:text-sm">Invoice - {currentData.invoiceNumber}</span>
                   </span>
-                  <div className="flex gap-2 flex-wrap">
-                    {/* Purchase Status */}
+                  <div className="flex items-center gap-2">
                     <Badge
-                      variant={getPurchaseStatusVariant(currentData.purchaseStatus) as any}
+                      variant={getStatusVariant(currentData.status) as any}
                       appearance="outline"
                       className="capitalize text-xs gap-1"
                     >
-                      <PurchaseIcon className="h-3 w-3" />
-                      {currentData.purchaseStatus}
+                      <StatusIcon className="h-3 w-3" />
+                      {currentData.status}
                     </Badge>
-
-                    {/* Inventory Status */}
-                    <Badge
-                      variant={getInventoryStatusVariant(currentData.inventoryStatus) as any}
-                      appearance="outline"
-                      className="capitalize text-xs gap-1"
-                    >
-                      <InventoryIcon className="h-3 w-3" />
-                      {currentData.inventoryStatus}
-                    </Badge>
-
-                    {/* Payment Status */}
                     <Badge
                       variant={getPaymentStatusVariant(currentData.paymentStatus) as any}
                       appearance="outline"
-                      className="capitalize text-xs"
+                      className="capitalize text-xs gap-1"
                     >
-                      <PaymentIcon className="h-3 w-3" />
+                      <PaymentStatusIcon className="h-3 w-3" />
                       {currentData.paymentStatus}
                     </Badge>
                   </div>
@@ -229,17 +192,21 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                   <div className="flex items-start gap-3">
                     <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                     <div className="min-w-0">
-                      <div className="text-xs sm:text-sm text-muted-foreground">Purchase Date</div>
-                      <div className="font-medium text-xs sm:text-sm break-words">{formatLongDate(currentData.purchaseDate)}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground">Invoice Date</div>
+                      <div className="font-medium text-xs sm:text-sm break-words">
+                        {formatLongDate(currentData.invoiceDate)}
+                      </div>
                     </div>
                   </div>
 
-                  {currentData.supplierName && (
+                  {currentData.customerName && (
                     <div className="flex items-start gap-3">
                       <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                       <div className="min-w-0">
-                        <div className="text-xs sm:text-sm text-muted-foreground">Supplier</div>
-                        <div className="font-medium text-xs sm:text-sm break-words">{currentData.supplierName}</div>
+                        <div className="text-xs sm:text-sm text-muted-foreground">Customer</div>
+                        <div className="font-medium text-xs sm:text-sm break-words">
+                          {currentData.customerName}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -263,30 +230,20 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
+                    <Package className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                     <div>
                       <div className="text-xs sm:text-sm text-muted-foreground">Total Quantity</div>
                       <div className="font-medium text-xs sm:text-sm">{totalQuantity.toFixed(2)}</div>
                     </div>
                   </div>
-
-                  {hasPartialReceipt && (
-                    <div className="flex items-start gap-3">
-                      <Package className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 mt-0.5 shrink-0" />
-                      <div>
-                        <div className="text-xs sm:text-sm text-muted-foreground">Received Quantity</div>
-                        <div className="font-medium text-xs sm:text-sm text-green-600">{totalReceived.toFixed(2)}</div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Purchase Items */}
+            {/* Invoice Items */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm sm:text-base">Purchase Items</CardTitle>
+                <CardTitle className="text-sm sm:text-base">Items</CardTitle>
               </CardHeader>
               <CardContent>
                 {/* Desktop Table */}
@@ -295,12 +252,9 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                     <thead>
                       <tr className="border-b">
                         <th className="text-left p-3 font-medium text-sm">#</th>
-                        <th className="text-left p-3 font-medium text-sm">Material</th>
+                        <th className="text-left p-3 font-medium text-sm">Description</th>
                         <th className="text-right p-3 font-medium text-sm">Quantity</th>
-                        {hasPartialReceipt && (
-                          <th className="text-right p-3 font-medium text-sm text-green-600">Received</th>
-                        )}
-                        <th className="text-right p-3 font-medium text-sm">Unit Cost</th>
+                        <th className="text-right p-3 font-medium text-sm">Rate</th>
                         <th className="text-right p-3 font-medium text-sm">Total</th>
                       </tr>
                     </thead>
@@ -309,23 +263,13 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                         <tr key={index} className="border-b hover:bg-muted/50">
                           <td className="p-3 text-sm text-muted-foreground">{index + 1}</td>
                           <td className="p-3">
-                            <div className="font-medium">{item.materialName}</div>
+                            <div className="font-medium">{item.description}</div>
                           </td>
                           <td className="p-3 text-right font-medium">
                             {item.quantity?.toFixed(2)}
                           </td>
-                          {hasPartialReceipt && (
-                            <td className="p-3 text-right font-medium text-green-600">
-                              {(item.receivedQuantity || 0).toFixed(2)}
-                              {item.receivedQuantity && item.receivedQuantity < item.quantity && (
-                                <div className="text-xs text-orange-600">
-                                  Pending: {(item.quantity - item.receivedQuantity).toFixed(2)}
-                                </div>
-                              )}
-                            </td>
-                          )}
                           <td className="p-3 text-right text-muted-foreground">
-                            {formatCurrency(item.unitCost)}
+                            {formatCurrency(item.rate)}
                           </td>
                           <td className="p-3 text-right font-semibold">
                             {formatCurrency(item.total)}
@@ -335,53 +279,36 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                     </tbody>
                     <tfoot>
                       <tr className="border-t-2 font-bold bg-muted/50">
-                        <td colSpan={hasPartialReceipt ? 4 : 3} className="p-3 text-right">
-                          Gross Total:
-                        </td>
-                        <td className="p-3 text-right font-semibold" colSpan={2}>
-                          {formatCurrency(grossTotal)}
+                        <td colSpan={4} className="p-3 text-right">Total Amount:</td>
+                        <td className="p-3 text-right font-semibold">
+                          {formatCurrency(currentData.totalAmount)}
                         </td>
                       </tr>
-                      {discount > 0 && (
+                      {currentData.discount > 0 && (
                         <tr className="bg-muted/50">
-                          <td
-                            colSpan={hasPartialReceipt ? 4 : 3}
-                            className="p-3 text-right text-orange-600"
-                          >
+                          <td colSpan={4} className="p-3 text-right text-orange-600">
                             <div className="flex items-center justify-end gap-2">
                               <Percent className="h-3 w-3" />
                               Discount:
                             </div>
                           </td>
-                          <td className="p-3 text-right font-semibold text-orange-600" colSpan={2}>
-                            - {formatCurrency(discount)}
+                          <td className="p-3 text-right font-semibold text-orange-600">
+                            - {formatCurrency(currentData.discount)}
                           </td>
                         </tr>
                       )}
-                      <tr className="bg-muted/50">
-                        <td colSpan={hasPartialReceipt ? 4 : 3} className="p-3 text-right">
-                          Subtotal:
-                        </td>
-                        <td className="p-3 text-right font-semibold" colSpan={2}>
-                          {formatCurrency(subtotal)}
-                        </td>
-                      </tr>
-                      {currentData.isTaxPayable && vatAmount > 0 && (
+                      {currentData.vatAmount > 0 && (
                         <tr className="bg-muted/50">
-                          <td colSpan={hasPartialReceipt ? 4 : 3} className="p-3 text-right">
-                            VAT (5%):
-                          </td>
-                          <td className="p-3 text-right font-semibold" colSpan={2}>
-                            {formatCurrency(vatAmount)}
+                          <td colSpan={4} className="p-3 text-right">VAT (5%):</td>
+                          <td className="p-3 text-right font-semibold">
+                            {formatCurrency(currentData.vatAmount)}
                           </td>
                         </tr>
                       )}
                       <tr className="border-t-2 font-bold bg-muted/50">
-                        <td colSpan={hasPartialReceipt ? 4 : 3} className="p-3 text-right">
-                          Grand Total:
-                        </td>
-                        <td className="p-3 text-right text-green-600 text-lg" colSpan={2}>
-                          {formatCurrency(displayTotal)}
+                        <td colSpan={4} className="p-3 text-right">Grand Total:</td>
+                        <td className="p-3 text-right text-green-600 text-lg">
+                          {formatCurrency(currentData.grandTotal)}
                         </td>
                       </tr>
                     </tfoot>
@@ -396,7 +323,7 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="text-xs text-muted-foreground mb-1">Item #{index + 1}</div>
-                            <div className="font-medium text-sm break-words">{item.materialName}</div>
+                            <div className="font-medium text-sm break-words">{item.description}</div>
                           </div>
                         </div>
 
@@ -406,34 +333,17 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                             <div className="font-medium">{item.quantity?.toFixed(2)}</div>
                           </div>
                           <div className="text-right">
-                            <div className="text-xs text-muted-foreground mb-0.5">Unit Cost</div>
-                            <div className="font-medium">{formatCurrency(item.unitCost)}</div>
+                            <div className="text-xs text-muted-foreground mb-0.5">Rate</div>
+                            <div className="font-medium">{formatCurrency(item.rate)}</div>
                           </div>
                         </div>
-
-                        {hasPartialReceipt && (
-                          <div className="grid grid-cols-2 gap-3 text-sm">
-                            <div>
-                              <div className="text-xs text-muted-foreground mb-0.5">Received</div>
-                              <div className="font-medium text-green-600">
-                                {(item.receivedQuantity || 0).toFixed(2)}
-                              </div>
-                            </div>
-                            {item.receivedQuantity && item.receivedQuantity < item.quantity && (
-                              <div className="text-right">
-                                <div className="text-xs text-muted-foreground mb-0.5">Pending</div>
-                                <div className="font-medium text-orange-600">
-                                  {(item.quantity - item.receivedQuantity).toFixed(2)}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
 
                         <div className="pt-2 border-t">
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-muted-foreground">Total</span>
-                            <span className="font-bold text-sm sm:text-base">{formatCurrency(item.total)}</span>
+                            <span className="font-bold text-sm sm:text-base">
+                              {formatCurrency(item.total)}
+                            </span>
                           </div>
                         </div>
                       </CardContent>
@@ -444,32 +354,30 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                   <Card className="border-2 bg-muted/50">
                     <CardContent className="p-3 sm:p-4 space-y-2">
                       <div className="flex justify-between text-xs sm:text-sm">
-                        <span className="text-muted-foreground">Gross Total</span>
-                        <span className="font-semibold">{formatCurrency(grossTotal)}</span>
+                        <span className="text-muted-foreground">Total Amount</span>
+                        <span className="font-semibold">{formatCurrency(currentData.totalAmount)}</span>
                       </div>
-                      {discount > 0 && (
+                      {currentData.discount > 0 && (
                         <div className="flex justify-between text-xs sm:text-sm">
                           <span className="text-muted-foreground flex items-center gap-1">
                             <Percent className="h-3 w-3" />
                             Discount
                           </span>
-                          <span className="font-semibold text-orange-600">-{formatCurrency(discount)}</span>
+                          <span className="font-semibold text-orange-600">
+                            -{formatCurrency(currentData.discount)}
+                          </span>
                         </div>
                       )}
-                      <div className="flex justify-between text-xs sm:text-sm pt-2 border-t">
-                        <span className="text-muted-foreground">Subtotal</span>
-                        <span className="font-semibold">{formatCurrency(subtotal)}</span>
-                      </div>
-                      {currentData.isTaxPayable && vatAmount > 0 && (
-                        <div className="flex justify-between text-xs sm:text-sm">
+                      {currentData.vatAmount > 0 && (
+                        <div className="flex justify-between text-xs sm:text-sm pt-2 border-t">
                           <span className="text-muted-foreground">VAT (5%)</span>
-                          <span className="font-semibold">{formatCurrency(vatAmount)}</span>
+                          <span className="font-semibold">{formatCurrency(currentData.vatAmount)}</span>
                         </div>
                       )}
                       <div className="flex justify-between pt-2 border-t">
                         <span className="font-bold text-sm">Grand Total</span>
                         <span className="font-bold text-base sm:text-lg text-green-600">
-                          {formatCurrency(displayTotal)}
+                          {formatCurrency(currentData.grandTotal)}
                         </span>
                       </div>
                     </CardContent>
@@ -478,11 +386,11 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
               </CardContent>
             </Card>
 
-            {/* Payment Information */}
+            {/* ✅ NEW: Payment Information Card */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-                  <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <Wallet className="h-3 w-3 sm:h-4 sm:w-4" />
                   Payment Information
                 </CardTitle>
               </CardHeader>
@@ -491,16 +399,16 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                   <div className="p-3 sm:p-4 rounded-lg bg-muted/50">
                     <div className="text-xs sm:text-sm text-muted-foreground mb-1">Total Amount</div>
                     <div className="text-xl sm:text-2xl font-bold">
-                      {formatCurrency(displayTotal)}
+                      {formatCurrency(currentData.grandTotal)}
                     </div>
-                    {discount > 0 && (
+                    {currentData.discount > 0 && (
                       <div className="text-xs text-muted-foreground mt-1">
-                        Discount: {formatCurrency(discount)}
+                        Discount: {formatCurrency(currentData.discount)}
                       </div>
                     )}
-                    {currentData.isTaxPayable && vatAmount > 0 && (
+                    {currentData.vatAmount > 0 && (
                       <div className="text-xs text-muted-foreground mt-1">
-                        Includes VAT: {formatCurrency(vatAmount)}
+                        Includes VAT: {formatCurrency(currentData.vatAmount)}
                       </div>
                     )}
                   </div>
@@ -510,9 +418,9 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                     <div className="text-xl sm:text-2xl font-bold text-green-600">
                       {formatCurrency(currentData.paidAmount || 0)}
                     </div>
-                    {currentData.connectedDocuments?.paymentIds && currentData.connectedDocuments.paymentIds.length > 0 && (
+                    {currentData.connectedDocuments?.receiptIds && currentData.connectedDocuments.receiptIds.length > 0 && (
                       <div className="text-xs text-muted-foreground mt-1">
-                        {currentData.connectedDocuments.paymentIds.length} payment(s)
+                        {currentData.connectedDocuments.receiptIds.length} receipt(s)
                       </div>
                     )}
                   </div>
@@ -531,13 +439,13 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                     <div className="flex justify-between text-xs sm:text-sm">
                       <span className="text-muted-foreground">Payment Progress</span>
                       <span className="font-medium">
-                        {((currentData.paidAmount / displayTotal) * 100).toFixed(1)}%
+                        {((currentData.paidAmount / currentData.grandTotal) * 100).toFixed(1)}%
                       </span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full bg-green-600 transition-all"
-                        style={{ width: `${Math.min((currentData.paidAmount / displayTotal) * 100, 100)}%` }}
+                        style={{ width: `${Math.min((currentData.paidAmount / currentData.grandTotal) * 100, 100)}%` }}
                       />
                     </div>
                   </div>
@@ -545,25 +453,41 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
               </CardContent>
             </Card>
 
-            {/* Connected Documents - Payment Vouchers & Return Notes */}
-            {(currentData.connectedDocuments?.paymentIds?.length > 0 || currentData.connectedDocuments?.returnNoteIds?.length > 0) && (
+            {/* Connected Documents */}
+            {(currentData.connectedDocuments?.receiptIds?.length > 0 ||
+              currentData.connectedDocuments?.refundIds?.length > 0 ||
+              currentData.connectedDocuments?.deliveryId ||
+              currentData.connectedDocuments?.quotationId) && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-                    <Wallet className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
                     Connected Documents
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {onViewPdf && onViewReturnNotePdf ? (
+                  {onViewPdf ? (
                     <ConnectedDocumentsBadges
-                      purchase={currentData as any}
+                      invoice={currentData}
                       onViewPdf={onViewPdf}
-                      onViewReturnNotePdf={onViewReturnNotePdf}
                     />
                   ) : (
                     <span className="text-xs sm:text-sm text-muted-foreground">—</span>
                   )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Notes */}
+            {currentData.notes && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm sm:text-base">Notes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-wrap">
+                    {currentData.notes}
+                  </p>
                 </CardContent>
               </Card>
             )}
@@ -577,7 +501,10 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                 <CardContent>
                   <div className="space-y-2">
                     {currentData.actionHistory.map((action: any, index: number) => (
-                      <div key={index} className="flex items-start gap-3 text-xs sm:text-sm p-2 sm:p-3 rounded-lg bg-muted/50">
+                      <div 
+                        key={index} 
+                        className="flex items-start gap-3 text-xs sm:text-sm p-2 sm:p-3 rounded-lg bg-muted/50"
+                      >
                         <div className="flex-1 min-w-0">
                           <div className="font-medium break-words">{action.action}</div>
                           {(action.username || action.userId) && (

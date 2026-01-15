@@ -1,4 +1,4 @@
-// components/DeliveryNoteDocument.tsx - Modern Blue Theme (Updated)
+// components/DeliveryNoteDocument.tsx - FIXED: Show Against Invoice Reference
 
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Font, Image, Svg, Path } from '@react-pdf/renderer';
@@ -280,6 +280,13 @@ interface DeliveryNoteProps {
 }
 
 export const DeliveryNoteDocument: React.FC<DeliveryNoteProps> = ({ bill, companyDetails }) => {
+  // ✅ NEW: Extract invoice number from populated connectedDocuments
+  const invoiceIds = bill.connectedDocuments?.invoiceIds;
+  const firstInvoice = (Array.isArray(invoiceIds) && invoiceIds.length > 0) ? invoiceIds[0] : null;
+  const invoiceNumber = (typeof firstInvoice === 'object' && firstInvoice !== null && 'invoiceNumber' in firstInvoice)
+    ? (firstInvoice as any).invoiceNumber
+    : null;
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -344,7 +351,14 @@ export const DeliveryNoteDocument: React.FC<DeliveryNoteProps> = ({ bill, compan
           </View>
           <View style={styles.dateSection}>
             <Text style={styles.dateLabel}>Delivery Date</Text>
-            <Text style={styles.dateValue}>{formatDisplayDate(bill.createdAt)}</Text>
+            <Text style={styles.dateValue}>{formatDisplayDate(bill.deliveryDate)}</Text>
+            
+            {invoiceNumber && (
+              <>
+                <Text style={[styles.dateLabel, { marginTop: 8 }]}>Against Invoice</Text>
+                <Text style={styles.dateValue}>{invoiceNumber}</Text>
+              </>
+            )}
           </View>
         </View>
 

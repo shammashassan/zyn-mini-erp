@@ -1,3 +1,5 @@
+// app/documents/invoices/invoice-form.tsx - UPDATED: Using invoiceDate field
+
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -26,10 +28,19 @@ import {
   CommandItem,
   CommandList
 } from "@/components/ui/command";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronsUpDown, Check, Plus, X, FileText } from "lucide-react";
+import { ChevronsUpDown, Check, Plus, X, FileText, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { format } from "date-fns";
 import type { ICustomer } from "@/models/Customer";
 import type { IProduct } from "@/models/Product";
 import type { Invoice } from "./columns";
@@ -52,6 +63,8 @@ type InvoiceFormData = {
   discount: number;
   notes: string;
   quotationId?: string;
+  invoiceDate: Date; // ✅ UPDATED: Changed from 'date' to 'invoiceDate'
+  status: 'pending' | 'approved' | 'cancelled';
 };
 
 interface ConnectedQuotation {
@@ -83,6 +96,8 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
       items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
       discount: 0,
       notes: "",
+      invoiceDate: new Date(), // ✅ UPDATED: Changed from 'date' to 'invoiceDate'
+      status: 'pending',
     }
   });
 
@@ -96,6 +111,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
   const [quotations, setQuotations] = useState<ConnectedQuotation[]>([]);
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [quotationPopoverOpen, setQuotationPopoverOpen] = useState(false);
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [productPopovers, setProductPopovers] = useState<Record<number, boolean>>({});
   const [loadingQuotations, setLoadingQuotations] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -181,6 +197,8 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
           discount: defaultValues.discount || 0,
           notes: defaultValues.notes || "",
           quotationId: "",
+          invoiceDate: defaultValues.invoiceDate ? new Date(defaultValues.invoiceDate) : new Date(), // ✅ UPDATED
+          status: defaultValues.status || 'pending',
         });
         setSearchQuery(defaultValues.customerName || "");
       } else {
@@ -192,6 +210,8 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
           discount: 0,
           notes: "",
           quotationId: "",
+          invoiceDate: new Date(), // ✅ UPDATED
+          status: 'pending',
         });
         setSearchQuery("");
       }
@@ -254,6 +274,11 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
       return;
     }
 
+    if (!data.invoiceDate) { // ✅ UPDATED
+      toast.error("Please select an invoice date");
+      return;
+    }
+
     const validItems = data.items.filter(item => item.description);
     if (validItems.length === 0) {
       toast.error("Please add at least one item");
@@ -310,6 +335,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
       customerName: data.customerName.trim(),
       customerPhone: data.customerPhone.trim(),
       customerEmail: data.customerEmail.trim(),
+      invoiceDate: data.invoiceDate, // ✅ UPDATED: Use invoiceDate
       items: validItems.map(item => ({
         ...item,
         quantity: Number(item.quantity) || 0,
@@ -317,7 +343,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
       })),
       discount: Number(data.discount) || 0,
       notes: data.notes,
-      status: "pending",
+      status: isEditMode ? data.status : "pending",
       connectedDocuments: !isEditMode && data.quotationId ? { quotationId: data.quotationId } : {},
     };
 
@@ -335,44 +361,53 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Customer Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="customerName">Customer *</Label>
-                <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-between"
-                    >
-                      {customerName || "Select or type customer..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                    <Command shouldFilter={false}>
-                      <CommandInput
-                        placeholder="Search customer..."
-                        value={searchQuery}
-                        onValueChange={setSearchQuery}
-                      />
-                      <CommandList
-                        className="max-h-[200px] overflow-y-auto"
-                        onWheel={(e) => e.stopPropagation()}
+          
+          {/* Main Top Grid */}
+          <div className={cn("grid grid-cols-1 gap-4", isEditMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
+            {/* Customer Field */}
+            <div className="space-y-2">
+              <Label>Customer <span className="text-destructive">*</span></Label>
+              <Controller
+                name="customerName"
+                control={control}
+                render={({ field }) => (
+                  <Popover
+                    open={customerPopoverOpen}
+                    onOpenChange={(isOpen) => {
+                      setCustomerPopoverOpen(isOpen);
+                      if (isOpen) setSearchQuery(field.value);
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        ref={field.ref}
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between"
                       >
-                        <CommandEmpty>
-                          {searchQuery.trim() ? "No customer found." : "Start typing to search..."}
-                        </CommandEmpty>
-                        
-                        {customers.length > 0 && (
+                        {field.value || "Select or type customer..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Search customer..."
+                          value={searchQuery}
+                          onValueChange={setSearchQuery}
+                        />
+                        <CommandList
+                          className="max-h-[200px] overflow-y-auto"
+                          onWheel={(e) => e.stopPropagation()}
+                        >
+                          <CommandEmpty>
+                            {searchQuery.trim() ? "No customer found." : "Start typing to search..."}
+                          </CommandEmpty>
+
                           <CommandGroup heading="Existing Customers">
                             {customers
-                              .filter(customer => 
+                              .filter(customer =>
                                 !searchQuery || customer.name.toLowerCase().includes(searchQuery.toLowerCase())
                               )
                               .map((customer) => (
@@ -381,116 +416,158 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                                   value={customer.name}
                                   onSelect={() => handleCustomerSelect(customer)}
                                 >
-                                  <Check className={cn("mr-2 h-4 w-4", customerName === customer.name ? "opacity-100" : "opacity-0")} />
-                                  <div>
-                                    <div>{customer.name}</div>
+                                  <Check className={cn("mr-2 h-4 w-4", field.value === customer.name ? "opacity-100" : "opacity-0")} />
+                                  <div className="flex-1">
+                                    <span>{customer.name}</span>
                                     {customer.email && (
-                                      <div className="text-xs text-muted-foreground">{customer.email}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {customer.email}
+                                      </div>
                                     )}
                                   </div>
                                 </CommandItem>
                               ))}
                           </CommandGroup>
-                        )}
 
-                        {searchQuery.trim() && !doesCustomerExist && (
-                          <CommandGroup heading="Create New">
-                            <CommandItem
-                              onSelect={handleCreateNew}
-                              className="text-primary"
-                              value={searchQuery}
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              Create "{searchQuery}"
-                            </CommandItem>
-                          </CommandGroup>
-                        )}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="customerPhone">Phone</Label>
-                  <Input
-                    id="customerPhone"
-                    placeholder="Enter phone number"
-                    {...register("customerPhone")}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="customerEmail">Email</Label>
-                  <Input
-                    id="customerEmail"
-                    type="email"
-                    placeholder="Enter email address"
-                    {...register("customerEmail")}
-                  />
-                </div>
-              </div>
-
-              {!isEditMode && customerName && quotations.length > 0 && (
-                <div className="space-y-2 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-                  <Label className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
-                    <FileText className="h-4 w-4" />
-                    Link Approved Quotation (Optional)
-                  </Label>
-                  <Popover open={quotationPopoverOpen} onOpenChange={setQuotationPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <Button type="button" variant="outline" role="combobox" className="w-full justify-between">
-                        {quotationId
-                          ? quotations.find(q => q._id === quotationId)?.invoiceNumber
-                          : loadingQuotations
-                            ? "Loading quotations..."
-                            : "Select quotation..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                      <Command>
-                        <CommandList
-                          className="max-h-[200px] overflow-y-auto"
-                          onWheel={(e) => e.stopPropagation()}
-                        >
-                          <CommandEmpty>No approved quotations found.</CommandEmpty>
-                          <CommandGroup>
-                            {quotations.map((quotation) => (
+                          {searchQuery.trim() && !doesCustomerExist && (
+                            <CommandGroup heading="New Customer">
                               <CommandItem
-                                key={quotation._id}
-                                value={quotation._id}
-                                onSelect={() => handleQuotationSelect(quotation)}
+                                onSelect={handleCreateNew}
+                                className="text-primary"
+                                value={searchQuery}
                               >
-                                <Check className={cn("mr-2 h-4 w-4", quotationId === quotation._id ? "opacity-100" : "opacity-0")} />
-                                <div>
-                                  <div className="font-medium">{quotation.invoiceNumber}</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {formatCurrency(quotation.grandTotal)}
-                                  </div>
-                                </div>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Create "{searchQuery}"
                               </CommandItem>
-                            ))}
-                          </CommandGroup>
+                            </CommandGroup>
+                          )}
                         </CommandList>
                       </Command>
                     </PopoverContent>
                   </Popover>
-                  {quotationId && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setValue("quotationId", "", { shouldDirty: true })}
-                      className="text-xs"
-                    >
-                      Clear Selection
-                    </Button>
+                )}
+              />
+            </div>
+
+            {/* Date Field - ✅ UPDATED: Using invoiceDate */}
+            <div className="space-y-2">
+              <Label>Invoice Date</Label>
+              <Controller
+                name="invoiceDate"
+                control={control}
+                render={({ field }) => (
+                  <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        ref={field.ref}
+                        type="button"
+                        variant="outline"
+                        className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {field.value ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={(date) => {
+                          field.onChange(date);
+                          setDatePopoverOpen(false);
+                        }}
+                        captionLayout="dropdown"
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+              />
+            </div>
+
+            {/* Status Field (Edit Mode Only) */}
+            {isEditMode && (
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Controller
+                  name="status"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
                   )}
-                </div>
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Quotation Link Section (Conditional) */}
+          {!isEditMode && customerName && quotations.length > 0 && (
+            <div className="space-y-2 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+              <Label className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
+                <FileText className="h-4 w-4" />
+                Link Approved Quotation (Optional)
+              </Label>
+              <Popover open={quotationPopoverOpen} onOpenChange={setQuotationPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" role="combobox" className="w-full justify-between">
+                    {quotationId
+                      ? quotations.find(q => q._id === quotationId)?.invoiceNumber
+                      : loadingQuotations
+                        ? "Loading quotations..."
+                        : "Select quotation..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandList
+                      className="max-h-[200px] overflow-y-auto"
+                      onWheel={(e) => e.stopPropagation()}
+                    >
+                      <CommandEmpty>No approved quotations found.</CommandEmpty>
+                      <CommandGroup>
+                        {quotations.map((quotation) => (
+                          <CommandItem
+                            key={quotation._id}
+                            value={quotation._id}
+                            onSelect={() => handleQuotationSelect(quotation)}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", quotationId === quotation._id ? "opacity-100" : "opacity-0")} />
+                            <div>
+                              <div className="font-medium">{quotation.invoiceNumber}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {formatCurrency(quotation.grandTotal)}
+                              </div>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {quotationId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setValue("quotationId", "", { shouldDirty: true })}
+                  className="text-xs"
+                >
+                  Clear Selection
+                </Button>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          )}
 
           <Card>
             <CardHeader>

@@ -1,4 +1,4 @@
-// app/quotations/columns.tsx - Updated with Edit functionality
+// app/quotations/columns.tsx - UPDATED: Using quotationDate instead of createdAt
 
 "use client";
 
@@ -60,6 +60,7 @@ export interface Quotation {
   connectedDocuments?: {
     invoiceIds?: (string | ConnectedDocument)[];
   };
+  quotationDate: string; // ✅ UPDATED: Changed from createdAt to quotationDate
   createdAt: string;
   updatedAt: string;
 }
@@ -169,14 +170,17 @@ const StatusBadgeButton = ({ quotation, onRefresh, canUpdateStatus }: { quotatio
 interface RowActionsProps {
   quotation: Quotation;
   onViewPdf: (quotation: Quotation) => void;
+  onView?: (quotation: Quotation) => void; // ✅ NEW: View details option
   onEdit: (quotation: Quotation) => void;
   onDelete: (id: string) => void;
   permissions: QuotationPermissions;
 }
 
-const RowActions = ({ quotation, onViewPdf, onEdit, onDelete, permissions }: RowActionsProps) => {
+const RowActions = ({ quotation, onViewPdf, onView, onEdit, onDelete, permissions }: RowActionsProps) => {
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
   const { canDelete, canUpdate } = permissions;
+
+  const canEdit = canUpdate && quotation.status === 'pending';
 
   return (
     <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
@@ -190,15 +194,25 @@ const RowActions = ({ quotation, onViewPdf, onEdit, onDelete, permissions }: Row
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
 
+          {onView && (
+            <DropdownMenuItem
+              onClick={() => onView(quotation)}
+              className="cursor-pointer"
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              View Details
+            </DropdownMenuItem>
+          )}
+
           <DropdownMenuItem
             onClick={() => onViewPdf(quotation)}
             className="cursor-pointer"
           >
-            <Eye className="mr-2 h-4 w-4" />
+            <FileText className="mr-2 h-4 w-4" />
             View PDF
           </DropdownMenuItem>
 
-          {canUpdate && quotation.status === 'pending' && (
+          {canEdit && (
             <DropdownMenuItem
               onClick={() => onEdit(quotation)}
               className="cursor-pointer"
@@ -251,15 +265,17 @@ const RowActions = ({ quotation, onViewPdf, onEdit, onDelete, permissions }: Row
   );
 };
 
+// ✅ UPDATED: Added onView parameter
 export const getColumns = (
   onViewPdf: (quotation: Quotation) => void,
   onEdit: (quotation: Quotation) => void,
   onDelete: (id: string) => void,
   permissions: QuotationPermissions,
-  onRefresh?: () => void
+  onRefresh?: () => void,
+  onView?: (quotation: Quotation) => void // ✅ NEW
 ): ColumnDef<Quotation>[] => [
     {
-      accessorKey: "createdAt",
+      accessorKey: "quotationDate", // ✅ UPDATED: Changed from createdAt to quotationDate
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -271,7 +287,7 @@ export const getColumns = (
         </Button>
       ),
       cell: ({ row }) => {
-        const date = new Date(row.original.createdAt);
+        const date = new Date(row.original.quotationDate); // ✅ UPDATED
         return (
           <div className="text-left font-medium">
             <div>{formatDisplayDate(date)}</div>
@@ -282,8 +298,8 @@ export const getColumns = (
         );
       },
       sortingFn: (rowA, rowB) => {
-        const dateA = new Date(rowA.original.createdAt);
-        const dateB = new Date(rowB.original.createdAt);
+        const dateA = new Date(rowA.original.quotationDate); // ✅ UPDATED
+        const dateB = new Date(rowB.original.quotationDate); // ✅ UPDATED
         return dateB.getTime() - dateA.getTime();
       },
     },
@@ -401,6 +417,7 @@ export const getColumns = (
           <RowActions
             quotation={row.original}
             onViewPdf={onViewPdf}
+            onView={onView} // ✅ NEW: Pass onView
             onEdit={onEdit}
             onDelete={onDelete}
             permissions={permissions}

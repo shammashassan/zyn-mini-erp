@@ -407,7 +407,7 @@ export const VoucherDocument: React.FC<VoucherDocumentProps> = ({ bill, companyD
                     <View style={styles.infoItem}>
                         <Text style={styles.infoLabel}>DATE:</Text>
                         <Text style={styles.infoValue}>
-                            {formatDisplayDate(bill.createdAt)}
+                            {formatDisplayDate(bill.voucherDate)}
                         </Text>
                     </View>
                     <View style={styles.infoItem}>

@@ -1,4 +1,4 @@
-// app/expenses/expense-form.tsx - UPDATED: Populated combobox inputs
+// app/expenses/expense-form.tsx - UPDATED: Using expenseDate field
 
 "use client";
 
@@ -28,7 +28,7 @@ type ExpenseFormData = {
   amount: number | undefined;
   category: string;
   type: 'single' | 'period';
-  date: Date;
+  expenseDate: Date; // ✅ UPDATED: Changed from date to expenseDate
   vendor?: string;
   payeeName?: string;
   supplierName?: string;
@@ -123,11 +123,9 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
         initialPartyType = 'payee';
         const pVal = defaultValues.payeeId as any;
         
-        // Handle populated object (has .name) vs ID string
         if (pVal && typeof pVal === 'object' && pVal.name) {
           initialPartyName = pVal.name;
         } else {
-          // ID string - try to find in list
           const idToMatch = typeof pVal === 'object' ? pVal._id : pVal;
           const payee = payees.find(p => String(p._id) === String(idToMatch));
           initialPartyName = payee?.name || '';
@@ -137,11 +135,9 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
         initialPartyType = 'supplier';
         const sVal = defaultValues.supplierId as any;
 
-        // Handle populated object (has .name) vs ID string
         if (sVal && typeof sVal === 'object' && sVal.name) {
           initialPartyName = sVal.name;
         } else {
-          // ID string - try to find in list
           const idToMatch = typeof sVal === 'object' ? sVal._id : sVal;
           const supplier = suppliers.find(s => String(s._id) === String(idToMatch));
           initialPartyName = supplier?.name || '';
@@ -157,7 +153,7 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
         amount: defaultValues?.amount || undefined,
         category: defaultValues?.category || "",
         type: defaultValues?.type || 'single',
-        date: defaultValues?.date ? new Date(defaultValues.date) : new Date(),
+        expenseDate: defaultValues?.expenseDate ? new Date(defaultValues.expenseDate) : new Date(), // ✅ UPDATED
         vendor: initialPartyType === 'manual' ? initialPartyName : "",
         payeeName: initialPartyType === 'payee' ? initialPartyName : "",
         supplierName: initialPartyType === 'supplier' ? initialPartyName : "",
@@ -166,7 +162,6 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
         status: defaultValues?.status || 'pending',
       });
 
-      // Set initial search queries
       setPayeeSearchQuery(initialPartyType === 'payee' ? initialPartyName : "");
       setSupplierSearchQuery(initialPartyType === 'supplier' ? initialPartyName : "");
     }
@@ -199,7 +194,7 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
       return;
     }
 
-    if (!data.date) {
+    if (!data.expenseDate) { // ✅ UPDATED
       toast.error("Please select an expense date");
       return;
     }
@@ -233,7 +228,6 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
       delete submitData.payeeName;
       delete submitData.vendor;
     } else {
-      // Manual - keep vendor
       delete submitData.payeeId;
       delete submitData.payeeName;
       delete submitData.supplierId;
@@ -248,7 +242,7 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[98vw] sm:max-w-[95vw] lg:max-w-3xl max-h-[95vh] overflow-y-auto sidebar-scroll p-4 sm:p-6">
+      <DialogContent className="max-w-[95vw] lg:max-w-3xl max-h-[90vh] overflow-y-auto sidebar-scroll">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Banknote className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -451,7 +445,7 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
                                         <div className="truncate">{supplier.name}</div>
                                         {supplier.city && (
                                           <div className="text-xs text-muted-foreground truncate">
-                                            {supplier.city}
+                                            {supplier.city}, {supplier.district}
                                           </div>
                                         )}
                                       </div>
@@ -481,11 +475,11 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
               )}
             </div>
 
-            {/* Date Picker */}
+            {/* Date Picker - ✅ UPDATED: Using expenseDate */}
             <div className="space-y-2">
               <Label className="text-xs sm:text-sm">Expense Date *</Label>
               <Controller
-                name="date"
+                name="expenseDate"
                 control={control}
                 render={({ field }) => (
                   <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>

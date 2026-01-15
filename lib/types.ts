@@ -43,6 +43,11 @@ export interface BillPayload {
   connectedDocuments?: ConnectedDocuments;
   voucherAmount?: number;
   
+  // Date fields for documents
+  invoiceDate?: Date;
+  quotationDate?: Date;
+  voucherDate?: Date;
+  
   // Audit fields (readonly - managed by backend)
   createdBy?: string | null;
   updatedBy?: string | null;

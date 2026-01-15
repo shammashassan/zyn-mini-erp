@@ -1,10 +1,10 @@
-// app/documents/delivery-notes/columns.tsx
+// app/documents/delivery-notes/columns.tsx - UPDATED: Using deliveryDate instead of createdAt
 
 "use client"
 
 import * as React from "react"
 import { ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal, ArrowUpDown, Trash2, FileText, CheckCircle, Clock, XCircle, Truck, AlertCircle } from "lucide-react"
+import { MoreHorizontal, ArrowUpDown, Trash2, FileText, CheckCircle, Clock, XCircle, Truck, AlertCircle, Edit, Eye } from "lucide-react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -45,7 +45,9 @@ export interface DeliveryNote {
   customerEmail?: string;
   grandTotal: number;
   status: "pending" | "dispatched" | "delivered" | "cancelled";
+  notes: string;
   documentType: "delivery";
+  deliveryDate: string; // ✅ UPDATED: Changed from createdAt to deliveryDate
   items: Array<{
     description: string;
     quantity: number;
@@ -66,15 +68,17 @@ interface DeliveryNotePermissions {
 
 interface RowActionsProps {
   note: DeliveryNote
+  onEdit?: (note: DeliveryNote) => void
+  onView?: (note: DeliveryNote) => void
   onViewPdf: (note: DeliveryNote) => void
   onDelete?: (id: string) => void
   onRefresh: () => void
   permissions: DeliveryNotePermissions
 }
 
-const RowActions = ({ note, onDelete, onViewPdf, onRefresh, permissions }: RowActionsProps) => {
+const RowActions = ({ note, onEdit, onView, onDelete, onViewPdf, onRefresh, permissions }: RowActionsProps) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
-  const { canDelete } = permissions;
+  const { canDelete, canUpdate } = permissions;
 
   return (
     <>
@@ -87,10 +91,26 @@ const RowActions = ({ note, onDelete, onViewPdf, onRefresh, permissions }: RowAc
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
+          
+          {onView && (
+            <DropdownMenuItem onSelect={() => onView(note)}>
+              <Eye className="mr-2 w-4 h-4" />
+              View Details
+            </DropdownMenuItem>
+          )}
+          
           <DropdownMenuItem onSelect={() => onViewPdf(note)}>
             <FileText className="mr-2 w-4 h-4" />
             View PDF
           </DropdownMenuItem>
+
+          {canUpdate && onEdit && (
+            <DropdownMenuItem onSelect={() => onEdit(note)}>
+              <Edit className="mr-2 w-4 h-4" />
+              Edit
+            </DropdownMenuItem>
+          )}
+
           {canDelete && onDelete && (
             <>
               <DropdownMenuSeparator />
@@ -192,9 +212,11 @@ export const getColumns = (
   onDelete: (id: string) => void,
   permissions: DeliveryNotePermissions,
   onRefresh?: () => void,
+  onEdit?: (note: DeliveryNote) => void,
+  onView?: (note: DeliveryNote) => void,
 ): ColumnDef<DeliveryNote>[] => [
   {
-    accessorKey: "createdAt",
+    accessorKey: "deliveryDate", // ✅ UPDATED: Changed from createdAt to deliveryDate
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -206,7 +228,7 @@ export const getColumns = (
       </Button>
     ),
     cell: ({ row }) => {
-      const date = new Date(row.original.createdAt);
+      const date = new Date(row.original.deliveryDate); // ✅ UPDATED
       return (
         <div className="text-left font-medium">
           <div>{formatDisplayDate(date)}</div>
@@ -215,6 +237,11 @@ export const getColumns = (
           </div>
         </div>
       );
+    },
+    sortingFn: (rowA, rowB) => {
+      const dateA = new Date(rowA.original.deliveryDate); // ✅ UPDATED
+      const dateB = new Date(rowB.original.deliveryDate); // ✅ UPDATED
+      return dateB.getTime() - dateA.getTime();
     },
   },
   {
@@ -316,6 +343,8 @@ export const getColumns = (
     cell: ({ row }) => (
       <RowActions
         note={row.original}
+        onEdit={onEdit}
+        onView={onView}
         onDelete={onDelete}
         onViewPdf={onViewPdf}
         onRefresh={onRefresh || (() => { })}

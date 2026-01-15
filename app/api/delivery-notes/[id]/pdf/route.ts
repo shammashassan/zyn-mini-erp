@@ -1,3 +1,5 @@
+// app/api/delivery-notes/[id]/pdf/route.ts - FIXED: Populate invoice data for PDF
+
 import { NextRequest, NextResponse } from "next/server";
 import React from "react";
 import { renderToStream } from "@react-pdf/renderer";
@@ -35,8 +37,14 @@ export async function GET(
 
     await dbConnect();
 
-    // ✅ FIXED: Allow finding soft-deleted delivery notes for PDF generation
-    const deliveryNote = await DeliveryNote.findById(id).setOptions({ includeDeleted: true });
+    // ✅ FIXED: Populate invoice data for "Against Invoice" display
+    const deliveryNote = await DeliveryNote.findById(id)
+      .setOptions({ includeDeleted: true })
+      .populate({
+        path: 'connectedDocuments.invoiceIds',
+        select: 'invoiceNumber grandTotal status customerName',
+        match: { isDeleted: false }
+      });
 
     if (!deliveryNote) {
       return NextResponse.json({ message: "Delivery note not found" }, { status: 404 });

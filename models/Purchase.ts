@@ -1,4 +1,4 @@
-// models/Purchase.ts - FIXED: Added paidAmount reset logic (same as Invoice model)
+// models/Purchase.ts - FIXED: Track payment status changes in pre-save hook
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -42,6 +42,7 @@ export interface IPurchase extends Document {
   vatAmount: number;
   grandTotal: number;
   date: Date;
+  purchaseDate: Date;
   
   purchaseStatus: 'pending' | 'approved' | 'cancelled';
   inventoryStatus: 'pending' | 'received' | 'partially received';
@@ -128,6 +129,7 @@ const PurchaseSchema: Schema<IPurchase> = new Schema({
   vatAmount: { type: Number, default: 0, min: 0 },
   grandTotal: { type: Number, min: 0 },
   date: { type: Date, required: true },
+  purchaseDate: { type: Date, required: true },
   
   purchaseStatus: { 
     type: String, 
@@ -170,16 +172,16 @@ const PurchaseSchema: Schema<IPurchase> = new Schema({
   timestamps: true 
 });
 
-// Compound indexes
-PurchaseSchema.index({ isDeleted: 1, date: -1 });
+// Indexes
+PurchaseSchema.index({ isDeleted: 1, purchaseDate: -1 });
 PurchaseSchema.index({ purchaseStatus: 1, inventoryStatus: 1, paymentStatus: 1 });
 PurchaseSchema.index({ supplierName: 1 });
 PurchaseSchema.index({ 'connectedDocuments.paymentIds': 1 });
 PurchaseSchema.index({ 'connectedDocuments.returnNoteIds': 1 });
-PurchaseSchema.index({ date: 1 });
+PurchaseSchema.index({ purchaseDate: 1 });
 PurchaseSchema.index({ 'paymentAllocations.voucherId': 1 });
 
-// ✅ FIXED: Pre-save middleware - same logic as Invoice model
+// ✅ FIXED: Pre-save middleware with payment status change tracking
 PurchaseSchema.pre('save', function(next) {
   const grossTotal = this.totalAmount;
   const discount = this.discount || 0;
@@ -189,33 +191,63 @@ PurchaseSchema.pre('save', function(next) {
   this.vatAmount = vatAmount;
   this.grandTotal = subtotal + vatAmount;
   
-  // ✅ FIXED: Calculate paid amount from payment allocations
+  // Sync date with purchaseDate for backward compatibility
+  if (this.isModified('purchaseDate') && !this.isModified('date')) {
+    this.date = this.purchaseDate;
+  } else if (this.isModified('date') && !this.isModified('purchaseDate')) {
+    this.purchaseDate = this.date;
+  }
+  
+  // Calculate paid amount from payment allocations
   if (this.paymentAllocations && this.paymentAllocations.length > 0) {
     this.paidAmount = this.paymentAllocations.reduce(
       (sum: number, alloc: IPaymentAllocation) => sum + alloc.allocatedAmount, 
       0
     );
   } else if (!this.isModified('paidAmount')) {
-    // ✅ ADDED: Reset paidAmount to 0 if no allocations (same as Invoice)
     this.paidAmount = 0;
   }
   
   this.totalPaid = this.paidAmount;
   this.remainingAmount = Math.max(0, this.grandTotal - this.paidAmount);
   
+  // ✅ FIXED: Track payment status changes and auto-add audit entry
+  const oldPaymentStatus = (this as any)._doc?.paymentStatus;
+  let newPaymentStatus: 'pending' | 'paid' | 'partially paid';
+  
   // Auto-calculate payment status
   if (this.paidAmount >= this.grandTotal) {
-    this.paymentStatus = 'paid';
+    newPaymentStatus = 'paid';
   } else if (this.paidAmount > 0) {
-    this.paymentStatus = 'partially paid';
+    newPaymentStatus = 'partially paid';
   } else {
-    this.paymentStatus = 'pending';
+    newPaymentStatus = 'pending';
   }
+  
+  // ✅ Check if payment status changed and add audit entry
+  if (oldPaymentStatus && oldPaymentStatus !== newPaymentStatus && !this.isNew) {
+    console.log(`💰 Payment status changed: ${oldPaymentStatus} → ${newPaymentStatus}`);
+    
+    // Add audit entry for automatic payment status change
+    this.actionHistory.push({
+      action: 'Payment Status Auto-Updated',
+      userId: this.updatedBy,
+      username: null, // Will be set by the calling function if available
+      timestamp: new Date(),
+      changes: [{
+        field: 'paymentStatus',
+        oldValue: oldPaymentStatus,
+        newValue: newPaymentStatus,
+      }]
+    });
+  }
+  
+  this.paymentStatus = newPaymentStatus;
   
   next();
 });
 
-// Pre-find hook
+// Pre-find hook - default sort by purchaseDate
 PurchaseSchema.pre(/^find/, function(this: Query<any, any>, next) {
   const options = this.getOptions();
   
@@ -224,7 +256,7 @@ PurchaseSchema.pre(/^find/, function(this: Query<any, any>, next) {
   }
   
   if (!this.getOptions().sort) {
-    this.sort({ date: -1 });
+    this.sort({ purchaseDate: -1 });
   }
   
   next();

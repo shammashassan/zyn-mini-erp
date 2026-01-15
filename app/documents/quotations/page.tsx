@@ -1,4 +1,4 @@
-// app/documents/quotations/page.tsx - UPDATED: Added Silent Background Fetch on Focus
+// app/documents/quotations/page.tsx - UPDATED: Added Quotation View Modal
 
 "use client";
 
@@ -15,6 +15,7 @@ import { DataTable } from "@/components/data-table/data-table";
 import { getColumns, type Quotation } from "./columns";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { QuotationForm } from "./quotation-form";
+import { QuotationViewModal } from "./QuotationViewModal"; // ✅ NEW
 import Link from "next/link";
 import { useQuotationPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
@@ -48,13 +49,15 @@ function QuotationsPageContent() {
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
-  // Date Range State (Default 6 months)
+  // ✅ NEW: View Modal State
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [quotationToView, setQuotationToView] = useState<Quotation | null>(null);
+
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(subMonths(new Date(), 5)),
     to: endOfMonth(new Date()),
   });
 
-  // Ref to prevent double submission
   const isSubmittingRef = useRef(false);
 
   const {
@@ -81,11 +84,9 @@ function QuotationsPageContent() {
     setIsMounted(true);
   }, []);
 
-  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
   const fetchQuotations = useCallback(async (background = false) => {
     if (!canRead) return;
     try {
-      // Only show loading spinner/skeleton if it's NOT a background fetch
       if (!background) {
         setIsLoading(true);
       }
@@ -96,7 +97,6 @@ function QuotationsPageContent() {
         populate: 'true',
       });
 
-      // Add Date Range to params
       if (dateRange?.from) {
         params.append('startDate', dateRange.from.toISOString());
       }
@@ -126,7 +126,6 @@ function QuotationsPageContent() {
         setQuotations(result);
       }
     } catch (error) {
-      // Only show toast error if it's a user interaction, not a background poll
       if (!background) {
         toast.error("Could not load quotations.");
       }
@@ -138,19 +137,15 @@ function QuotationsPageContent() {
     }
   }, [canRead, urlState.page, urlState.pageSize, urlState.sort, urlState.filters, dateRange]);
 
-  // Standard fetch on dependency change
   useEffect(() => {
     if (isMounted && canRead) {
       fetchQuotations();
     }
   }, [isMounted, canRead, fetchQuotations]);
 
-  // ✅ NEW: Window Focus Listener - SILENT MODE
-  // This triggers a silent "background" fetch when you tab back to this page.
   useEffect(() => {
     const onFocus = () => {
       if (isMounted && canRead) {
-        // Pass true to indicate this is a background fetch (no loading UI/opacity change)
         fetchQuotations(true);
       }
     };
@@ -168,7 +163,6 @@ function QuotationsPageContent() {
       return;
     }
 
-    // Prevent editing if status is not "pending"
     if (quotation && quotation.status !== 'pending') {
       toast.error("Cannot edit quotation", {
         description: "Only quotations with 'pending' status can be edited. Approved/cancelled quotations affect business records."
@@ -223,6 +217,12 @@ function QuotationsPageContent() {
     setIsModalOpen(true);
   };
 
+  // ✅ NEW: Handle View Quotation
+  const handleViewQuotation = (quotation: Quotation) => {
+    setQuotationToView(quotation);
+    setViewModalOpen(true);
+  };
+
   const handleQuotationFormSubmit = async (data: any, id?: string) => {
     if (isSubmittingRef.current) return;
 
@@ -257,7 +257,6 @@ function QuotationsPageContent() {
         setSelectedQuotation(null);
         fetchQuotations();
         
-        // Automatically open PDF viewer
         setSelectedPdfUrl(`/api/quotations/${quotation._id}/pdf`);
         setSelectedPdfTitle(quotation.invoiceNumber || "Quotation");
         setIsModalOpen(true);
@@ -306,6 +305,7 @@ function QuotationsPageContent() {
     setUrlState({ page: 1 });
   };
 
+  // ✅ UPDATED: Pass onView to getColumns
   const columns = useMemo(() => getColumns(
     handleViewPdf,
     handleOpenForm,
@@ -316,8 +316,9 @@ function QuotationsPageContent() {
       }
     },
     { canDelete, canUpdate, canUpdateStatus, canCreateInvoice },
-    fetchQuotations
-  ), [quotations, canDelete, canUpdate, canUpdateStatus, canCreateInvoice]);
+    fetchQuotations,
+    handleViewQuotation // ✅ NEW
+  ), [quotations, canDelete, canUpdate, canUpdateStatus, canCreateInvoice, fetchQuotations, handleViewQuotation]);
 
   const { table } = useDataTable<Quotation>({
     data: quotations,
@@ -368,7 +369,6 @@ function QuotationsPageContent() {
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <div className="flex flex-col lg:flex-row lg:justify-between px-4 lg:px-6 gap-4">
               
-              {/* Left: Title */}
               <div className="flex items-center gap-3 self-start lg:self-center">
                 <div className="p-3 bg-primary/10 rounded-full">
                   <FileClock className="h-8 w-8 text-primary" />
@@ -388,10 +388,8 @@ function QuotationsPageContent() {
                 </div>
               </div>
 
-              {/* Right: Actions & Filters Group */}
               <div className="flex flex-col gap-3 w-full lg:w-auto lg:items-end">
                 
-                {/* Row 1: Actions */}
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                   {canViewTrash && (
                     <Link href="./quotations/trash" className="w-full sm:w-auto">
@@ -412,9 +410,7 @@ function QuotationsPageContent() {
                   )}
                 </div>
 
-                {/* Row 2: Date Filters */}
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-                  {/* Date Range Picker */}
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -449,7 +445,6 @@ function QuotationsPageContent() {
                     </PopoverContent>
                   </Popover>
 
-                  {/* Quick Select Dropdown */}
                   <Select onValueChange={handleQuickSelect} defaultValue="last6Months">
                     <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue placeholder="Quick select" />
@@ -522,9 +517,21 @@ function QuotationsPageContent() {
         pdfUrl={selectedPdfUrl}
         title={selectedPdfTitle}
       />
+
+      {/* ✅ NEW: Quotation View Modal */}
+      <QuotationViewModal
+        isOpen={viewModalOpen}
+        onClose={() => {
+          setViewModalOpen(false);
+          setQuotationToView(null);
+        }}
+        quotation={quotationToView}
+        onViewPdf={handleViewPdf}
+      />
     </>
   );
 }
+
 export default function Component() {
   return (
     <Suspense fallback={

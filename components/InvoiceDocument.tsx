@@ -419,7 +419,7 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, co
           </View>
           <View style={styles.dateInfo}>
             <Text style={styles.dateLabel}>Invoice Date</Text>
-            <Text style={styles.dateValue}>{formatDisplayDate(bill.createdAt)}</Text>
+            <Text style={styles.dateValue}>{formatDisplayDate(bill.invoiceDate)}</Text>
           </View>
         </View>
 

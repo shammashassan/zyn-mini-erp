@@ -138,7 +138,7 @@ export function ConnectedDocumentsBadges({ voucher, onViewPdf }: ConnectedDocume
 
   return (
     <>
-      <div className="flex flex-wrap gap-1 justify-center">
+      <div className="flex flex-wrap gap-1">
         {invoices.map((invoice) => (
           <Badge
             key={invoice._id}

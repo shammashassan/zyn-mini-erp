@@ -1,10 +1,10 @@
-// app/documents/vouchers/columns.tsx - FIXED: Reverted to partyName to handle multiple field types
+// app/documents/vouchers/columns.tsx - UPDATED: Using voucherDate, moved actions column to right
 
 "use client"
 
 import * as React from "react"
 import { ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal, ArrowUpDown, FileText, Trash2, DollarSign, CreditCard, Landmark, Wallet } from "lucide-react"
+import { MoreHorizontal, ArrowUpDown, FileText, Trash2, DollarSign, CreditCard, Landmark, Wallet, Eye } from "lucide-react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -81,6 +81,7 @@ export interface Voucher {
     purchaseIds?: (string | ConnectedPurchase)[];
     expenseIds?: any[];
   };
+  voucherDate: string; // ✅ NEW: Voucher date field
   createdAt: string;
   updatedAt: string;
 }
@@ -92,12 +93,13 @@ interface VoucherPermissions {
 interface RowActionsProps {
   voucher: Voucher;
   onViewPdf: (voucher: Voucher) => void;
+  onView?: (voucher: Voucher) => void; // ✅ NEW: View details option
   onDelete?: (id: string) => void;
   onRefresh: () => void;
   permissions: VoucherPermissions;
 }
 
-const RowActions = ({ voucher, onDelete, onViewPdf, permissions }: RowActionsProps) => {
+const RowActions = ({ voucher, onDelete, onViewPdf, onView, permissions }: RowActionsProps) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
   const { canDelete } = permissions;
 
@@ -112,6 +114,15 @@ const RowActions = ({ voucher, onDelete, onViewPdf, permissions }: RowActionsPro
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
+          {onView && (
+            <>
+              <DropdownMenuItem onSelect={() => onView(voucher)}>
+                <Eye className="mr-2 w-4 h-4" />
+                View Details
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuItem onSelect={() => onViewPdf(voucher)}>
             <FileText className="mr-2 w-4 h-4" />
             View PDF
@@ -172,9 +183,10 @@ export const getColumns = (
   onDelete: (id: string) => void,
   permissions: VoucherPermissions,
   onRefresh?: () => void,
+  onView?: (voucher: Voucher) => void, // ✅ NEW: View details option
 ): ColumnDef<Voucher>[] => [
   {
-    accessorKey: "createdAt",
+    accessorKey: "voucherDate", // ✅ UPDATED: Changed from createdAt to voucherDate
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -185,7 +197,7 @@ export const getColumns = (
       </Button>
     ),
     cell: ({ row }) => {
-      const date = new Date(row.original.createdAt);
+      const date = new Date(row.original.voucherDate); // ✅ UPDATED
       return (
         <div className="text-left font-medium">
           <div>{formatDisplayDate(date)}</div>
@@ -220,7 +232,7 @@ export const getColumns = (
     enableColumnFilter: true,
   },
   {
-    id: "partyName", // ✅ FIXED: Changed to partyName so we can filter all party types in backend
+    id: "partyName",
     accessorFn: (row) => row.customerName || row.supplierName || row.payeeName || row.vendorName || "",
     header: "Party",
     cell: ({ row }) => {
@@ -325,12 +337,13 @@ export const getColumns = (
     },
   },
   {
-    id: "actions",
+    id: "actions", // ✅ MOVED: Actions column is now last
     cell: ({ row }) => (
       <RowActions
         voucher={row.original}
         onDelete={onDelete}
         onViewPdf={onViewPdf}
+        onView={onView} // ✅ NEW: Pass view handler
         onRefresh={onRefresh || (() => { })}
         permissions={permissions}
       />
