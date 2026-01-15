@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { Spinner } from "@/components/ui/spinner";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Clock, CheckCircle, XCircle } from "lucide-react";
 
 interface DebitNote {
   _id: string;
@@ -43,6 +43,15 @@ const getStatusColor = (status: string) => {
     case 'pending': return 'warning';
     case 'cancelled': return 'destructive';
     default: return 'neutral';
+  }
+};
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case 'pending': return Clock;
+    case 'approved': return CheckCircle;
+    case 'cancelled': return XCircle;
+    default: return Clock;
   }
 };
 
@@ -156,16 +165,20 @@ export function DebitNoteStatusUpdateModal({
 
           {/* Status Selection */}
           <div className="grid grid-cols-3 gap-2">
-            {availableStatuses.map((status) => (
-              <Button
-                key={status}
-                variant={newStatus === status ? 'default' : 'outline'}
-                onClick={() => setNewStatus(status)}
-                className="capitalize"
-              >
-                {status}
-              </Button>
-            ))}
+            {availableStatuses.map((status) => {
+              const StatusIcon = getStatusIcon(status);
+              return (
+                <Button
+                  key={status}
+                  variant={newStatus === status ? 'default' : 'outline'}
+                  onClick={() => setNewStatus(status)}
+                  className="capitalize flex items-center gap-1"
+                >
+                  <StatusIcon className="h-3 w-3" />
+                  {status}
+                </Button>
+              );
+            })}
           </div>
 
           {/* Status Comparison */}

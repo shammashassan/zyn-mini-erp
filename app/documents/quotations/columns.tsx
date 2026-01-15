@@ -136,8 +136,12 @@ const CreateInvoiceButton = ({ quotation, onRefresh, canCreateInvoice }: { quota
 const StatusBadgeButton = ({ quotation, onRefresh, canUpdateStatus }: { quotation: Quotation; onRefresh: () => void; canUpdateStatus: boolean }) => {
   const [isOpen, setIsOpen] = React.useState(false);
   const Icon = getStatusIcon(quotation.status);
+  const isConverted = quotation.status === 'converted';
 
   const handleClick = () => {
+    if (isConverted) {
+      return;
+    }
     if (canUpdateStatus) {
       setIsOpen(true);
     } else {
@@ -149,7 +153,7 @@ const StatusBadgeButton = ({ quotation, onRefresh, canUpdateStatus }: { quotatio
     <>
       <Badge
         variant={getStatusVariant(quotation.status) as any}
-        className={cn("gap-1 pr-2.5", canUpdateStatus ? "cursor-pointer hover:opacity-80" : "cursor-default")}
+        className={cn("gap-1 pr-2.5", !isConverted && canUpdateStatus ? "cursor-pointer hover:opacity-80" : "cursor-default")}
         appearance="outline"
         onClick={handleClick}
       >

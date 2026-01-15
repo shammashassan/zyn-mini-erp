@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import type { Quotation } from "./columns";
 import { Spinner } from "@/components/ui/spinner";
+import { Clock, Send, CheckCircle, XCircle } from "lucide-react";
 
 interface StatusUpdateModalProps {
   isOpen: boolean;
@@ -32,6 +33,16 @@ const getStatusColor = (status: string) => {
     case 'cancelled': return 'destructive';
     case 'pending': return 'warning';
     default: return 'gray';
+  }
+};
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case 'pending': return Clock;
+    case 'sent': return Send;
+    case 'approved': return CheckCircle;
+    case 'cancelled': return XCircle;
+    default: return Clock;
   }
 };
 
@@ -99,16 +110,20 @@ export function StatusUpdateModal({ isOpen, onClose, quotation, onRefresh }: Sta
 
         <div className="space-y-4">
           <div className="grid gap-2 grid-cols-2">
-            {availableStatuses.map((status) => (
-              <Button
-                key={status}
-                variant={newStatus === status ? 'default' : 'outline'}
-                onClick={() => setNewStatus(status)}
-                className="capitalize"
-              >
-                {status}
-              </Button>
-            ))}
+            {availableStatuses.map((status) => {
+              const StatusIcon = getStatusIcon(status);
+              return (
+                <Button
+                  key={status}
+                  variant={newStatus === status ? 'default' : 'outline'}
+                  onClick={() => setNewStatus(status)}
+                  className="capitalize flex items-center gap-1"
+                >
+                  <StatusIcon className="h-3 w-3" />
+                  {status}
+                </Button>
+              );
+            })}
           </div>
 
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg text-sm">

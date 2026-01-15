@@ -22,12 +22,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { IJournal } from "@/models/Journal";
 import { useState } from "react";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { formatDisplayDate, formatTime } from "@/utils/formatters/date";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { JournalStatusUpdateModal } from "./JournalStatusUpdateModal";
 
 // ✅ Export the interface
 export type { IJournal } from "@/models/Journal";
@@ -61,6 +63,63 @@ const getReferenceTypeVariant = (type: string) => {
     case 'Manual': return 'secondary';
     default: return 'secondary';
   }
+};
+
+// ✅ NEW: Clickable Status Badge Component
+const StatusBadgeButton = ({ 
+  journal, 
+  onRefresh, 
+  canPost 
+}: { 
+  journal: IJournal; 
+  onRefresh: () => void; 
+  canPost: boolean;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const isDraft = journal.status === 'draft';
+
+  const handleClick = () => {
+    if (!isDraft) {
+      return; // Only draft entries can be clicked
+    }
+    if (canPost) {
+      setIsOpen(true);
+    } else {
+      toast.error("You don't have permission to post journal entries");
+    }
+  };
+
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge
+            variant={getStatusVariant(journal.status) as any}
+            className={cn(
+              "capitalize",
+              isDraft && canPost ? "cursor-pointer hover:opacity-80" : "cursor-default"
+            )}
+            appearance="outline"
+            onClick={handleClick}
+          >
+            {journal.status}
+          </Badge>
+        </TooltipTrigger>
+        {isDraft && canPost && (
+          <TooltipContent>
+            Click to post this entry
+          </TooltipContent>
+        )}
+      </Tooltip>
+
+      <JournalStatusUpdateModal
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        journal={journal}
+        onRefresh={onRefresh}
+      />
+    </>
+  );
 };
 
 // Delete Journal Dialog
@@ -159,6 +218,7 @@ const VoidJournalDialog = ({
 interface JournalPermissions {
   canUpdate: boolean;
   canDelete: boolean;
+  canPost: boolean;
   canVoid: boolean;
 }
 
@@ -167,7 +227,8 @@ export const getJournalColumns = (
   onEdit: (journal: IJournal) => void,
   onDelete: (journal: IJournal) => void,
   onVoid: (journal: IJournal) => void,
-  permissions: JournalPermissions
+  permissions: JournalPermissions,
+  onRefresh?: () => void
 ): ColumnDef<IJournal>[] => [
     {
       accessorKey: "entryDate",
@@ -259,7 +320,6 @@ export const getJournalColumns = (
           return <span className="text-xs text-muted-foreground">—</span>;
         }
 
-        // Determine badge variant based on party type
         const getPartyVariant = (type: string) => {
           switch (type) {
             case 'Customer': return 'success';
@@ -342,15 +402,18 @@ export const getJournalColumns = (
     {
       accessorKey: "status",
       header: "Status",
-      cell: ({ row }) => (
-        <Badge
-          variant={getStatusVariant(row.original.status) as any}
-          appearance="outline"
-          className="capitalize"
-        >
-          {row.original.status}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const journal = row.original;
+        const refresh = onRefresh || (() => { });
+
+        return (
+          <StatusBadgeButton 
+            journal={journal} 
+            onRefresh={refresh} 
+            canPost={permissions.canPost} 
+          />
+        );
+      },
     },
     {
       id: "actions",

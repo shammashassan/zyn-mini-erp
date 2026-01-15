@@ -1,4 +1,4 @@
-// app/accounting/journal/page.tsx - UPDATED: Uniform loading with Tax Report
+// app/accounting/journal/page.tsx - UPDATED: Added canPost permission for status updates
 
 "use client";
 
@@ -60,12 +60,14 @@ function JournalPageContent() {
   const [pageCount, setPageCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
+  // ✅ UPDATED: Added canPost permission
   const {
     permissions: {
       canRead,
       canCreate,
       canUpdate,
       canDelete,
+      canPost,
       canVoid,
       canViewTrash,
     },
@@ -349,13 +351,15 @@ function JournalPageContent() {
     setUrlState({ page: 1, filters: [] });
   };
 
+  // ✅ UPDATED: Pass canPost permission to getJournalColumns
   const columns = useMemo(() => getJournalColumns(
     handleViewJournal,
     (journal) => handleOpenForm(journal),
     (journal) => handleDelete([journal]),
     handleVoid,
-    { canUpdate, canDelete, canVoid }
-  ), [journals, canUpdate, canDelete, canVoid]);
+    { canUpdate, canDelete, canPost, canVoid },
+    fetchJournals
+  ), [journals, canUpdate, canDelete, canPost, canVoid, fetchJournals]);
 
   const { table } = useDataTable<IJournal>({
     data: journals,
@@ -669,7 +673,6 @@ function JournalPageContent() {
             <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
               <Card>
                 <CardContent className="p-6">
-                  {/* ✅ UPDATED: Matching Tax Report pattern */}
                   <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
                     {isInitialLoad ? (
                       <DataTableSkeleton
