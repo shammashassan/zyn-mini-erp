@@ -27,7 +27,7 @@ export async function GET(request: Request, context: RequestContext) {
 
     const debitNote = await DebitNote.findById(id)
       .populate({
-        path: 'returnNoteId',
+        path: 'connectedDocuments.returnNoteId',
         select: 'returnNumber purchaseReference supplierName',
         match: { isDeleted: false }
       })
@@ -189,8 +189,8 @@ export async function DELETE(request: Request, context: RequestContext) {
     }
 
     // Unlink from return note if connected
-    if (debitNote.returnNoteId && debitNote.debitType === 'return') {
-      await ReturnNote.findByIdAndUpdate(debitNote.returnNoteId, {
+    if (debitNote.connectedDocuments?.returnNoteId && debitNote.debitType === 'return') {
+      await ReturnNote.findByIdAndUpdate(debitNote.connectedDocuments.returnNoteId, {
         $unset: { 'connectedDocuments.debitNoteId': 1 }
       });
     }

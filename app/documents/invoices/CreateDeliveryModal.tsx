@@ -190,7 +190,7 @@ export function CreateDeliveryModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] lg:max-w-3xl max-h-[90vh] overflow-y-auto sidebar-scroll">
+      <DialogContent className="max-w-[95vw] lg:max-w-2xl max-h-[90vh] overflow-y-auto sidebar-scroll">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Truck className="h-5 w-5" />

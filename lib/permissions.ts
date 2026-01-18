@@ -32,6 +32,7 @@ export const statement = {
   invoice: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_receipt", "create_delivery"],
   voucher: ["read", "create", "soft_delete", "view_trash", "restore", "permanent_delete"],
   debitNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_receipt"],
+  creditNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
   deliveryNote: ["read", "create", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Financial Resources
@@ -88,6 +89,7 @@ export const user = ac.newRole({
   invoice: ["read", "create", "update", "update_status", "create_receipt", "create_delivery"],
   voucher: ["read", "create"],
   debitNote: ["read", "create", "update"],
+  creditNote: ["read", "create", "update"],
   deliveryNote: ["read", "create", "update_status"],
 
   // Financial - View, create, update only
@@ -134,6 +136,7 @@ export const manager = ac.newRole({
   invoice: ["read", "create", "update", "update_status", "soft_delete", "create_receipt", "create_delivery"],
   voucher: ["read", "create", "soft_delete"],
   debitNote: ["read", "create", "update", "update_status", "soft_delete", "create_receipt"],
+  creditNote: ["read", "create", "update", "update_status", "soft_delete", "create_payment"],
   deliveryNote: ["read", "create", "update_status", "soft_delete"],
 
   // Financial - Add soft delete and payment creation
@@ -188,6 +191,7 @@ export const admin = ac.newRole({
   invoice: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_receipt", "create_delivery"],
   voucher: ["read", "create", "soft_delete", "view_trash", "restore", "permanent_delete"],
   debitNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_receipt"],
+  creditNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
   deliveryNote: ["read", "create", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Financial - Full access
@@ -246,6 +250,7 @@ export const owner = ac.newRole({
   invoice: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_receipt", "create_delivery"],
   voucher: ["read", "create", "soft_delete", "view_trash", "restore", "permanent_delete"],
   debitNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_receipt"],
+  creditNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
   deliveryNote: ["read", "create", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Financial - Full access

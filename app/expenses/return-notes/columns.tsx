@@ -1,4 +1,4 @@
-// app/expenses/return-notes/columns.tsx - UPDATED: Use ReturnNoteConnectedDocumentsBadge
+// app/expenses/return-notes/columns.tsx - COMPLETE: Sales & Purchase Only - UPDATED: Invoice opens PDF
 
 "use client";
 
@@ -15,6 +15,8 @@ import {
   XCircle,
   AlertCircle,
   FileText,
+  Package,
+  ShoppingCart,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -45,14 +47,22 @@ import { toast } from "sonner";
 export interface ReturnNote {
   _id: string;
   returnNumber: string;
-  purchaseId: string | any;
-  purchaseReference: string;
-  supplierName: string;
+  returnType: 'salesReturn' | 'purchaseReturn';
+  
+  purchaseId?: string | any;
+  purchaseReference?: string;
+  supplierName?: string;
+  
+  invoiceId?: string | any;
+  invoiceReference?: string;
+  customerName?: string;
+  
   items: Array<{
-    materialName: string;
-    orderedQuantity: number;
-    receivedQuantity: number;
-    returnedQuantity: number;
+    materialName?: string;
+    productName?: string;
+    orderedQuantity?: number;
+    receivedQuantity?: number;
+    returnedQuantity?: number;
     returnQuantity: number;
   }>;
   returnDate: string;
@@ -61,7 +71,9 @@ export interface ReturnNote {
   status: "pending" | "approved" | "cancelled";
   connectedDocuments?: {
     purchaseId?: string | any;
+    invoiceId?: string | any;
     debitNoteId?: string | any;
+    creditNoteId?: string | any;
   };
   isDeleted: boolean;
   createdBy?: string | null;
@@ -118,6 +130,30 @@ const getStatusIcon = (status: string) => {
       return XCircle;
     default:
       return AlertCircle;
+  }
+};
+
+const getReturnTypeVariant = (type: string) => {
+  switch (type) {
+    case 'purchaseReturn': return 'warning';
+    case 'salesReturn': return 'primary';
+    default: return 'secondary';
+  }
+};
+
+const getReturnTypeIcon = (type: string) => {
+  switch (type) {
+    case 'purchaseReturn': return Package;
+    case 'salesReturn': return ShoppingCart;
+    default: return FileText;
+  }
+};
+
+const getReturnTypeLabel = (type: string) => {
+  switch (type) {
+    case 'purchaseReturn': return 'Purchase Return';
+    case 'salesReturn': return 'Sales Return';
+    default: return type;
   }
 };
 
@@ -245,8 +281,9 @@ const RowActions = ({
                     ⚠️ This return note has been approved
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Deleting will reverse the stock adjustments and restore the
-                    returned quantities to the purchase.
+                    {returnNote.returnType === 'purchaseReturn' 
+                      ? 'Deleting will reverse the stock adjustments and restore the returned quantities to the purchase.'
+                      : 'Deleting will remove the link to the invoice.'}
                   </p>
                 </div>
               )}
@@ -278,7 +315,9 @@ export const getColumns = (
   onViewPdf?: (returnNote: ReturnNote) => void,
   onRefresh?: () => void,
   onViewPurchase?: (purchase: any) => void,
-  onViewDebitNotePdf?: (debitNote: any) => void
+  onViewInvoicePdf?: (invoice: any) => void, // ✅ RENAMED: Opens PDF instead of modal
+  onViewDebitNotePdf?: (debitNote: any) => void,
+  onViewCreditNotePdf?: (creditNote: any) => void
 ): ColumnDef<ReturnNote>[] => [
   {
     id: "returnDate",
@@ -320,22 +359,52 @@ export const getColumns = (
     enableColumnFilter: true,
   },
   {
-    id: "supplierName",
-    accessorKey: "supplierName",
-    header: "Supplier",
+    id: "returnType",
+    accessorKey: "returnType",
+    header: "Type",
     cell: ({ row }) => {
-      const supplierName = row.original.supplierName;
-      return supplierName ? (
-        <Badge variant="warning" appearance="outline">
-          {supplierName}
+      const type = row.original.returnType;
+      const Icon = getReturnTypeIcon(type);
+      return (
+        <Badge
+          variant={getReturnTypeVariant(type) as any}
+          appearance="outline"
+          className="gap-1 pr-2.5 capitalize"
+        >
+          <Icon className="h-3 w-3" />
+          {getReturnTypeLabel(type)}
+        </Badge>
+      );
+    },
+    meta: {
+      label: "Type",
+      variant: "select",
+      options: [
+        { label: "Purchase Return", value: "purchaseReturn", icon: Package },
+        { label: "Sales Return", value: "salesReturn", icon: ShoppingCart },
+      ],
+    },
+    enableColumnFilter: true,
+  },
+  {
+    id: "entity",
+    header: "Entity",
+    cell: ({ row }) => {
+      const returnNote = row.original;
+      const entityName = returnNote.supplierName || returnNote.customerName;
+      const variant = returnNote.returnType === 'purchaseReturn' ? 'warning' : 'primary';
+      
+      return entityName ? (
+        <Badge variant={variant as any} appearance="outline">
+          {entityName}
         </Badge>
       ) : (
         <span className="text-muted-foreground">-</span>
       );
     },
     meta: {
-      label: "Supplier",
-      placeholder: "Search supplier...",
+      label: "Entity",
+      placeholder: "Search entity...",
       variant: "text",
     },
     enableColumnFilter: true,
@@ -350,14 +419,17 @@ export const getColumns = (
 
       return (
         <div className="flex flex-col gap-0.5 text-sm">
-          {displayItems.map((item, idx) => (
-            <div key={idx} className="text-muted-foreground">
-              {item.materialName}:{" "}
-              <span className="font-medium text-red-600">
-                {item.returnQuantity}
-              </span>
-            </div>
-          ))}
+          {displayItems.map((item, idx) => {
+            const itemName = item.materialName || item.productName || 'Unknown';
+            return (
+              <div key={idx} className="text-muted-foreground">
+                {itemName}:{" "}
+                <span className="font-medium text-red-600">
+                  {item.returnQuantity}
+                </span>
+              </div>
+            );
+          })}
           {remainingCount > 0 && (
             <div className="text-muted-foreground">+{remainingCount} more</div>
           )}
@@ -391,9 +463,9 @@ export const getColumns = (
       
       return (
         <StatusBadgeButton
-        returnNote={returnNote}
-        onRefresh={refresh}
-        canUpdateStatus={permissions.canUpdateStatus}
+          returnNote={returnNote}
+          onRefresh={refresh}
+          canUpdateStatus={permissions.canUpdateStatus}
         />
       );
     },
@@ -423,11 +495,13 @@ export const getColumns = (
     header: "Connected",
     cell: ({ row }) => {
       const returnNote = row.original;
-      return (onViewPurchase && onViewDebitNotePdf) ? (
+      return (onViewPurchase && onViewInvoicePdf && onViewDebitNotePdf && onViewCreditNotePdf) ? (
         <ConnectedDocumentsBadges
           returnNote={returnNote as any}
           onViewPurchase={onViewPurchase}
+          onViewInvoicePdf={onViewInvoicePdf}
           onViewDebitNotePdf={onViewDebitNotePdf}
+          onViewCreditNotePdf={onViewCreditNotePdf}
         />
       ) : (
         <span className="text-sm text-muted-foreground">—</span>

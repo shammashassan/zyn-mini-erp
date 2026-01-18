@@ -49,6 +49,7 @@ import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 import { Spinner } from "@/components/ui/spinner";
 
 type InvoiceItem = {
+  productId?: string;
   description: string;
   quantity: number;
   rate: number;
@@ -93,7 +94,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     formState: { isSubmitting, isDirty }
   } = useForm<InvoiceFormData>({
     defaultValues: {
-      items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
+      items: [{ productId: "", description: "", quantity: 1, rate: 0, total: 0 }],
       discount: 0,
       notes: "",
       invoiceDate: new Date(), // ✅ UPDATED: Changed from 'date' to 'invoiceDate'
@@ -206,7 +207,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
           customerName: "",
           customerPhone: "",
           customerEmail: "",
-          items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
+          items: [{ productId: "", description: "", quantity: 1, rate: 0, total: 0 }],
           discount: 0,
           notes: "",
           quotationId: "",
@@ -244,6 +245,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
   };
 
   const handleProductSelect = (index: number, product: IProduct) => {
+    setValue(`items.${index}.productId`, product._id, { shouldDirty: true });
     setValue(`items.${index}.description`, product.name, { shouldDirty: true });
     setValue(`items.${index}.rate`, product.price, { shouldDirty: true });
 
@@ -337,8 +339,10 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
       customerEmail: data.customerEmail.trim(),
       invoiceDate: data.invoiceDate, // ✅ UPDATED: Use invoiceDate
       items: validItems.map(item => ({
-        ...item,
+        productId: item.productId || '',  // ✅ Ensure productId is included
+        description: item.description,
         quantity: Number(item.quantity) || 0,
+        rate: Number(item.rate) || 0,
         total: Number(item.total) || 0
       })),
       discount: Number(data.discount) || 0,
@@ -361,7 +365,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-          
+
           {/* Main Top Grid */}
           <div className={cn("grid grid-cols-1 gap-4", isEditMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
             {/* Customer Field */}
@@ -779,7 +783,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({ description: "", quantity: 1, rate: 0, total: 0 })}
+                onClick={() => append({ productId: "", description: "", quantity: 1, rate: 0, total: 0 })}
                 className="w-full gap-2"
               >
                 <Plus className="h-4 w-4" />

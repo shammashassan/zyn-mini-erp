@@ -39,8 +39,8 @@ export async function POST(request: Request) {
     console.log(`♻️ Restoring debit note ${debitNoteToRestore.debitNoteNumber}...`);
 
     // Restore link to return note if applicable
-    if (debitNoteToRestore.returnNoteId && debitNoteToRestore.debitType === 'return') {
-      await ReturnNote.findByIdAndUpdate(debitNoteToRestore.returnNoteId, {
+    if (debitNoteToRestore.connectedDocuments?.returnNoteId && debitNoteToRestore.debitType === 'return') {
+      await ReturnNote.findByIdAndUpdate(debitNoteToRestore.connectedDocuments.returnNoteId, {
         'connectedDocuments.debitNoteId': debitNoteToRestore._id
       });
     }

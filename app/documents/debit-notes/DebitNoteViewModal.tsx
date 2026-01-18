@@ -159,9 +159,9 @@ export function DebitNoteViewModal({
 
   const isManualEntry = currentData.items?.length === 1 && !currentData.items[0].materialId;
 
-  // ✅ NEW: Check if return note is populated
-  const returnNote = (typeof currentData.returnNoteId === 'object' && currentData.returnNoteId !== null)
-    ? currentData.returnNoteId
+  // Check if return note is populated
+  const returnNote = (typeof currentData.connectedDocuments?.returnNoteId === 'object' && currentData.connectedDocuments?.returnNoteId !== null)
+    ? currentData.connectedDocuments.returnNoteId
     : null;
 
   return (

@@ -1,4 +1,4 @@
-// app/documents/vouchers/columns.tsx - UPDATED: Using voucherDate, moved actions column to right
+// app/documents/vouchers/columns.tsx
 
 "use client"
 
@@ -56,6 +56,36 @@ export interface ConnectedPurchase {
   actionHistory?: any[];
 }
 
+export interface ConnectedExpense {
+  _id: string;
+  referenceNumber: string;
+  description: string;
+  amount: number;
+  category: string;
+  type: 'single' | 'period';
+  date: Date;
+  status: 'pending' | 'approved' | 'cancelled';
+  paymentStatus: 'Pending' | 'Paid' | 'Partially Paid';
+  vendor?: string;
+  connectedDocuments?: any;
+}
+
+export interface ConnectedCreditNote {
+  _id: string;
+  creditNoteNumber: string;
+  grandTotal: number;
+  status: string;
+  paymentStatus: string;
+}
+
+export interface ConnectedDebitNote {
+  _id: string;
+  debitNoteNumber: string;
+  grandTotal: number;
+  status: string;
+  paymentStatus: string;
+}
+
 export interface Voucher {
   _id: string;
   invoiceNumber: string;
@@ -66,7 +96,7 @@ export interface Voucher {
   customerPhone?: string;
   customerEmail?: string;
   grandTotal: number;
-  voucherType: "receipt" | "payment" | "refund";
+  voucherType: "receipt" | "payment";
   items: Array<{
     description: string;
     quantity: number;
@@ -79,9 +109,11 @@ export interface Voucher {
     invoiceIds?: (string | ConnectedInvoice)[];
     purchaseId?: string | ConnectedPurchase;
     purchaseIds?: (string | ConnectedPurchase)[];
-    expenseIds?: any[];
+    expenseIds?: (string | ConnectedExpense)[];
+    creditNoteIds?: (string | ConnectedCreditNote)[];
+    debitNoteIds?: (string | ConnectedDebitNote)[];
   };
-  voucherDate: string; // ✅ NEW: Voucher date field
+  voucherDate: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -93,7 +125,7 @@ interface VoucherPermissions {
 interface RowActionsProps {
   voucher: Voucher;
   onViewPdf: (voucher: Voucher) => void;
-  onView?: (voucher: Voucher) => void; // ✅ NEW: View details option
+  onView?: (voucher: Voucher) => void;
   onDelete?: (id: string) => void;
   onRefresh: () => void;
   permissions: VoucherPermissions;
@@ -120,7 +152,6 @@ const RowActions = ({ voucher, onDelete, onViewPdf, onView, permissions }: RowAc
                 <Eye className="mr-2 w-4 h-4" />
                 View Details
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
             </>
           )}
           <DropdownMenuItem onSelect={() => onViewPdf(voucher)}>
@@ -183,10 +214,15 @@ export const getColumns = (
   onDelete: (id: string) => void,
   permissions: VoucherPermissions,
   onRefresh?: () => void,
-  onView?: (voucher: Voucher) => void, // ✅ NEW: View details option
+  onView?: (voucher: Voucher) => void,
+  onViewInvoice?: (invoice: any) => void,
+  onViewPurchase?: (purchase: any) => void,
+  onViewExpense?: (expense: any) => void,
+  onViewCreditNote?: (creditNote: any) => void,
+  onViewDebitNote?: (debitNote: any) => void,
 ): ColumnDef<Voucher>[] => [
   {
-    accessorKey: "voucherDate", // ✅ UPDATED: Changed from createdAt to voucherDate
+    accessorKey: "voucherDate",
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -197,7 +233,7 @@ export const getColumns = (
       </Button>
     ),
     cell: ({ row }) => {
-      const date = new Date(row.original.voucherDate); // ✅ UPDATED
+      const date = new Date(row.original.voucherDate);
       return (
         <div className="text-left font-medium">
           <div>{formatDisplayDate(date)}</div>
@@ -331,22 +367,27 @@ export const getColumns = (
           <ConnectedDocumentsBadges
             voucher={voucher}
             onViewPdf={onViewPdf}
+            onViewInvoice={onViewInvoice}
+            onViewPurchase={onViewPurchase}
+            onViewExpense={onViewExpense}
+            onViewCreditNote={onViewCreditNote}
+            onViewDebitNote={onViewDebitNote}
           />
         </div>
       )
     },
   },
   {
-    id: "actions", // ✅ MOVED: Actions column is now last
+    id: "actions",
     cell: ({ row }) => (
       <RowActions
         voucher={row.original}
         onDelete={onDelete}
         onViewPdf={onViewPdf}
-        onView={onView} // ✅ NEW: Pass view handler
+        onView={onView}
         onRefresh={onRefresh || (() => { })}
         permissions={permissions}
       />
     ),
   },
-];
+]

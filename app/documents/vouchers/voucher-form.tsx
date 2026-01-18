@@ -1,4 +1,4 @@
-// app/documents/vouchers/voucher-form.tsx - UPDATED: Added voucherDate, improved UI layout
+// app/documents/vouchers/voucher-form.tsx
 
 "use client";
 
@@ -98,13 +98,13 @@ interface ConnectedPurchase {
 type PartyType = 'customer' | 'supplier' | 'payee' | 'vendor';
 
 type VoucherFormData = {
-  voucherType: 'receipt' | 'payment' | 'refund';
+  voucherType: 'receipt' | 'payment';
   partyType: PartyType;
   paymentMethod: string;
   voucherAmount: number;
   discount: number;
   notes: string;
-  voucherDate: Date; // ✅ UPDATED: Changed from 'date' to 'voucherDate'
+  voucherDate: Date;
   selectedInvoiceIds?: string[];
   selectedPurchaseIds?: string[];
 };
@@ -133,7 +133,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
       voucherAmount: 0,
       discount: 0,
       notes: "",
-      voucherDate: new Date(), // ✅ UPDATED
+      voucherDate: new Date(),
     }
   });
 
@@ -160,8 +160,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
 
   const hasLinkedDocuments =
     (voucherType === 'receipt' && selectedInvoiceIds.size > 0) ||
-    (voucherType === 'payment' && selectedPurchaseIds.size > 0) ||
-    (voucherType === 'refund' && selectedInvoiceIds.size > 0);
+    (voucherType === 'payment' && selectedPurchaseIds.size > 0);
 
   useEffect(() => {
     const checkIsDesktop = () => setIsDesktop(window.innerWidth >= 1024);
@@ -192,7 +191,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
 
   // Update party type defaults when voucher type changes
   useEffect(() => {
-    if (voucherType === 'receipt' || voucherType === 'refund') {
+    if (voucherType === 'receipt') {
       setValue('partyType', 'customer');
     } else if (voucherType === 'payment') {
       setValue('partyType', 'supplier');
@@ -201,7 +200,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
 
   // Fetch invoices for customers
   useEffect(() => {
-    if ((voucherType !== 'receipt' && voucherType !== 'refund') ||
+    if ((voucherType !== 'receipt') ||
       partyType !== 'customer' ||
       !selectedParty ||
       !isOpen) return;
@@ -215,45 +214,23 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
         if (res.ok) {
           const fetchedInvoices = await res.json();
 
-          let availableInvoices;
+          const availableInvoices = fetchedInvoices
+            .filter((inv: any) =>
+              inv.status === 'approved' &&
+              (inv.paymentStatus === 'Pending' || inv.paymentStatus === 'Partially Paid')
+            )
+            .map((inv: any) => {
+              const totalAmount = inv.grandTotal;
+              const paid = inv.paidAmount || 0;
+              const remaining = totalAmount - paid;
 
-          if (voucherType === 'receipt') {
-            availableInvoices = fetchedInvoices
-              .filter((inv: any) =>
-                inv.status === 'approved' &&
-                (inv.paymentStatus === 'Pending' || inv.paymentStatus === 'Partially Paid')
-              )
-              .map((inv: any) => {
-                const totalAmount = inv.grandTotal;
-                const paid = inv.paidAmount || 0;
-                const remaining = totalAmount - paid;
-
-                return {
-                  ...inv,
-                  paidAmount: paid,
-                  remainingAmount: remaining
-                };
-              })
-              .filter((inv: any) => inv.remainingAmount > 0);
-          } else if (voucherType === 'refund') {
-            availableInvoices = fetchedInvoices
-              .filter((inv: any) =>
-                inv.status === 'approved' &&
-                inv.paidAmount > 0 &&
-                (inv.paymentStatus === 'Paid' || inv.paymentStatus === 'Partially Paid')
-              )
-              .map((inv: any) => {
-                const refunded = inv.refundedAmount || 0;
-                const maxRefundable = inv.paidAmount - refunded;
-
-                return {
-                  ...inv,
-                  refundedAmount: refunded,
-                  remainingRefundable: maxRefundable
-                };
-              })
-              .filter((inv: any) => inv.remainingRefundable > 0);
-          }
+              return {
+                ...inv,
+                paidAmount: paid,
+                remainingAmount: remaining
+              };
+            })
+            .filter((inv: any) => inv.remainingAmount > 0);
 
           setInvoices(availableInvoices || []);
         }
@@ -304,7 +281,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
       setValue("voucherAmount", 0);
       setValue("discount", 0);
       setValue("notes", "");
-      setValue("voucherDate", new Date()); // ✅ UPDATED
+      setValue("voucherDate", new Date());
       setSelectedParty("");
       setPartySearchQuery("");
       setVendorName("");
@@ -366,9 +343,6 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
   const selectedInvoicesTotalAmount = invoices
     .filter(inv => selectedInvoiceIds.has(inv._id))
     .reduce((sum, inv) => {
-      if (voucherType === 'refund') {
-        return sum + ((inv as any).remainingRefundable || 0);
-      }
       return sum + (inv.remainingAmount || 0);
     }, 0);
 
@@ -378,7 +352,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
 
   useEffect(() => {
     if (hasLinkedDocuments) {
-      const baseAmount = voucherType === 'receipt' || voucherType === 'refund'
+      const baseAmount = voucherType === 'receipt'
         ? selectedInvoicesTotalAmount
         : selectedPurchasesTotalAmount;
       const finalAmount = Math.max(0, baseAmount - discount);
@@ -404,7 +378,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
       return;
     }
 
-    if (!data.voucherDate) { // ✅ UPDATED
+    if (!data.voucherDate) {
       toast.error("Please select a voucher date");
       return;
     }
@@ -498,10 +472,6 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
       if (selectedPurchaseIds.size > 0) {
         selectedDocuments = { purchaseIds: Array.from(selectedPurchaseIds) };
       }
-    } else if (voucherType === 'refund') {
-      if (selectedInvoiceIds.size > 0) {
-        selectedDocuments = { invoiceIds: Array.from(selectedInvoiceIds) };
-      }
     }
 
     const submitData: any = {
@@ -512,7 +482,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
       notes: data.notes,
       totalAmount: data.voucherAmount,
       grandTotal: data.voucherAmount,
-      voucherDate: data.voucherDate, // ✅ UPDATED: Use voucherDate
+      voucherDate: data.voucherDate,
       connectedDocuments: selectedDocuments,
     };
 
@@ -545,8 +515,8 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
   };
 
   const handleVoucherTypeChange = (value: string) => {
-    if (value && (value === 'receipt' || value === 'payment' || value === 'refund')) {
-      setValue("voucherType", value as 'receipt' | 'payment' | 'refund');
+    if (value && (value === 'receipt' || value === 'payment')) {
+      setValue("voucherType", value as 'receipt' | 'payment');
       setSelectedParty("");
       setPartySearchQuery("");
       setVendorName("");
@@ -568,13 +538,13 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
   };
 
   const partyList = getPartyList();
-  const showInvoices = (voucherType === 'receipt' || voucherType === 'refund') && partyType === 'customer';
+  const showInvoices = voucherType === 'receipt' && partyType === 'customer';
   const showPurchases = voucherType === 'payment' && partyType === 'supplier';
 
   const totalSelectedItems = selectedInvoiceIds.size + selectedPurchaseIds.size;
 
   const showSummarySeparator =
-    (voucherType === 'receipt' || voucherType === 'refund') &&
+    (voucherType === 'receipt') &&
     selectedInvoiceIds.size > 0 &&
     hasLinkedDocuments &&
     discount > 0;
@@ -591,7 +561,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-          {/* Voucher Type Tabs - ✅ UPDATED: Takes only needed width */}
+          {/* Voucher Type Tabs */}
           <div className="space-y-2">
             {/* Desktop Toggle Group */}
             <ToggleGroup
@@ -599,11 +569,10 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
               value={voucherType}
               onValueChange={handleVoucherTypeChange}
               variant="outline"
-              className="w-full hidden md:grid grid-cols-3"
+              className="w-full hidden md:grid grid-cols-2"
             >
               <ToggleGroupItem value="receipt" className="flex-1">Receipt</ToggleGroupItem>
               <ToggleGroupItem value="payment" className="flex-1">Payment</ToggleGroupItem>
-              <ToggleGroupItem value="refund" className="flex-1">Refund</ToggleGroupItem>
             </ToggleGroup>
             {/* Mobile Select */}
             <div className="md:hidden">
@@ -617,7 +586,6 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
                 <SelectContent>
                   <SelectItem value="receipt">Receipt</SelectItem>
                   <SelectItem value="payment">Payment</SelectItem>
-                  <SelectItem value="refund">Refund</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -747,7 +715,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
               </div>
             )}
 
-            {/* Voucher Date - ✅ UPDATED */}
+            {/* Voucher Date */}
             <div className="space-y-2">
               <Label>Voucher Date <span className="text-destructive">*</span></Label>
               <Controller
@@ -787,7 +755,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
             </div>
           </div>
 
-          {/* Payment Method - ✅ UPDATED: With icons */}
+          {/* Payment Method */}
           <div className="space-y-2">
             <Label htmlFor="paymentMethod">Payment Method <span className="text-destructive">*</span></Label>
             <Select value={paymentMethod} onValueChange={(value) => setValue("paymentMethod", value)}>
@@ -814,18 +782,14 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
           {showInvoices && selectedParty && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">
-                  {voucherType === 'receipt' ? 'Invoices (Optional)' : 'Paid Invoices (Required for Refund)'}
-                </CardTitle>
+                <CardTitle className="text-base">Invoices (Optional)</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {invoices.length === 0 && !loadingInvoices ? (
                   <div className="flex items-center gap-2 p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
                     <AlertCircle className="h-5 w-5 text-yellow-600" />
                     <p className="text-sm text-yellow-900 dark:text-yellow-100">
-                      {voucherType === 'receipt'
-                        ? 'No approved pending invoices found.'
-                        : 'No approved paid invoices available for refund.'}
+                      No approved pending invoices found.
                     </p>
                   </div>
                 ) : isDesktop && invoices.length > 0 ? (
@@ -839,26 +803,19 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
                           <th className="text-center p-3 font-medium text-sm w-[100px]">Status</th>
                           <th className="text-right p-3 font-medium text-sm w-[100px]">Total</th>
                           <th className="text-right p-3 font-medium text-sm w-[100px]">Paid</th>
-                          <th className="text-right p-3 font-medium text-sm w-[100px]">
-                            {voucherType === 'refund' ? 'Refundable' : 'Remaining'}
-                          </th>
+                          <th className="text-right p-3 font-medium text-sm w-[100px]">Remaining</th>
                         </tr>
                       </thead>
                       <tbody>
                         {invoices.map((invoice) => {
                           const isSelected = selectedInvoiceIds.has(invoice._id);
-                          const displayAmount = voucherType === 'refund'
-                            ? (invoice as any).remainingRefundable
-                            : invoice.remainingAmount;
 
                           return (
                             <tr
                               key={invoice._id}
                               className={cn(
                                 "border-b hover:bg-muted/50",
-                                isSelected && (voucherType === 'refund'
-                                  ? "bg-red-50 dark:bg-red-950/20"
-                                  : "bg-blue-50 dark:bg-blue-950/20")
+                                isSelected && "bg-blue-50 dark:bg-blue-950/20"
                               )}
                             >
                               <td className="p-3 text-center">
@@ -880,11 +837,8 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
                               <td className="p-3 text-right tabular-nums text-green-600">
                                 {formatCurrency(invoice.paidAmount)}
                               </td>
-                              <td className={cn(
-                                "p-3 text-right tabular-nums font-semibold",
-                                voucherType === 'refund' ? "text-red-600" : "text-orange-600"
-                              )}>
-                                {formatCurrency(displayAmount)}
+                              <td className="p-3 text-right tabular-nums font-semibold text-orange-600">
+                                {formatCurrency(invoice.remainingAmount)}
                               </td>
                             </tr>
                           );
@@ -897,18 +851,13 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
                   <div className="space-y-3">
                     {invoices.map((invoice) => {
                       const isSelected = selectedInvoiceIds.has(invoice._id);
-                      const displayAmount = voucherType === 'refund'
-                        ? (invoice as any).remainingRefundable
-                        : invoice.remainingAmount;
 
                       return (
                         <Card
                           key={invoice._id}
                           className={cn(
                             "border-2 transition-colors",
-                            isSelected && (voucherType === 'refund'
-                              ? "border-red-600 bg-red-50 dark:border-red-900 dark:bg-red-950/20"
-                              : "border-blue-600 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20")
+                            isSelected && "border-blue-600 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20"
                           )}
                         >
                           <CardHeader className="pb-3">
@@ -945,14 +894,9 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
                                 </div>
                               </div>
                               <div className="space-y-1">
-                                <div className="text-muted-foreground">
-                                  {voucherType === 'refund' ? 'Refundable' : 'Remaining'}
-                                </div>
-                                <div className={cn(
-                                  "font-semibold",
-                                  voucherType === 'refund' ? "text-red-600" : "text-orange-600"
-                                )}>
-                                  {formatCurrency(displayAmount)}
+                                <div className="text-muted-foreground">Remaining</div>
+                                <div className="font-semibold text-orange-600">
+                                  {formatCurrency(invoice.remainingAmount)}
                                 </div>
                               </div>
                             </div>
@@ -1153,7 +1097,7 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
                         <span className="text-muted-foreground">Base Amount:</span>
                         <span className="font-medium">
                           {formatCurrency(
-                            voucherType === 'receipt' || voucherType === 'refund'
+                            voucherType === 'receipt'
                               ? selectedInvoicesTotalAmount
                               : selectedPurchasesTotalAmount
                           )}

@@ -1,4 +1,4 @@
-// app/documents/invoices/page.tsx - UPDATED: Added Invoice View Modal
+// app/documents/invoices/page.tsx
 
 "use client";
 
@@ -15,7 +15,7 @@ import { DataTable } from "@/components/data-table/data-table";
 import { getColumns, type Invoice } from "./columns";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { InvoiceForm } from "./invoice-form";
-import { InvoiceViewModal } from "./InvoiceViewModal"; // ✅ NEW
+import { InvoiceViewModal } from "./InvoiceViewModal";
 import Link from "next/link";
 import { useInvoicePermissions, useReportPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
@@ -52,7 +52,6 @@ function InvoicesPageContent() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
-  // ✅ NEW: View Modal State
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [invoiceToView, setInvoiceToView] = useState<Invoice | null>(null);
 
@@ -214,21 +213,23 @@ function InvoicesPageContent() {
     let pdfUrl = '';
 
     if (doc.voucherType) {
+      // Handles Receipts
       pdfUrl = `/api/vouchers/${doc._id}/pdf`;
     } else if (doc.documentType === 'quotation' || (!doc.documentType && doc.invoiceNumber?.startsWith('QUO'))) {
       pdfUrl = `/api/quotations/${doc._id}/pdf`;
     } else if (doc.documentType === 'delivery' || (!doc.documentType && doc.invoiceNumber?.startsWith('DN'))) {
       pdfUrl = `/api/delivery-notes/${doc._id}/pdf`;
+    } else if (doc.documentType === 'returnNote' || (!doc.documentType && doc.returnNumber)) {
+      pdfUrl = `/api/return-notes/${doc._id}/pdf`;
     } else {
       pdfUrl = `/api/invoices/${doc._id}/pdf`;
     }
 
     setSelectedPdfUrl(pdfUrl);
-    setSelectedPdfTitle(doc.invoiceNumber || "Document");
+    setSelectedPdfTitle(doc.invoiceNumber || doc.returnNumber || "Document");
     setIsModalOpen(true);
   }, []);
 
-  // ✅ NEW: Handle View Invoice
   const handleViewInvoice = (invoice: Invoice) => {
     setInvoiceToView(invoice);
     setViewModalOpen(true);
@@ -336,7 +337,6 @@ function InvoicesPageContent() {
     setUrlState({ page: 1 });
   };
 
-  // ✅ UPDATED: Pass onView to getColumns
   const columns = useMemo(() => getColumns(
     handleViewPdf,
     handleOpenForm,
@@ -348,7 +348,7 @@ function InvoicesPageContent() {
     },
     { canDelete, canUpdate, canUpdateStatus, canCreateReceipt, canCreateDelivery },
     fetchInvoices,
-    handleViewInvoice // ✅ NEW: Pass view handler
+    handleViewInvoice
   ), [invoices, canDelete, canUpdate, canUpdateStatus, canCreateReceipt, canCreateDelivery, handleViewPdf, fetchInvoices]);
 
   const { table } = useDataTable<Invoice>({

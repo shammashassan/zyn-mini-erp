@@ -59,7 +59,8 @@ const getReferenceTypeVariant = (type: string) => {
     case 'Payment': return 'destructive';
     case 'Purchase': return 'warning';
     case 'Expense': return 'info';
-    case 'Refund': return 'pink';
+    case 'CreditNote': return 'orange';
+    case 'DebitNote': return 'cyan';
     case 'Manual': return 'secondary';
     default: return 'secondary';
   }

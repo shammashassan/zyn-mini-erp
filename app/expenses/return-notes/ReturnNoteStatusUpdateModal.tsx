@@ -1,4 +1,4 @@
-// app/expenses/return-notes/ReturnNoteStatusUpdateModal.tsx - UPDATED: No Commercial Fields
+// app/expenses/return-notes/ReturnNoteStatusUpdateModal.tsx - UPDATED: Fixed type compatibility
 
 import React, { useState, useEffect } from "react";
 import {
@@ -20,8 +20,10 @@ interface ReturnNote {
   returnNumber: string;
   status: 'pending' | 'approved' | 'cancelled';
   supplierName?: string;
+  customerName?: string;
   items?: Array<{
-    materialName: string;
+    materialName?: string;
+    productName?: string;
     returnQuantity: number;
   }>;
 }
@@ -118,6 +120,7 @@ export function ReturnNoteStatusUpdateModal({
   const { willReduceStock, willRestoreStock } = willAffectStock();
 
   const totalReturnedQty = returnNote.items?.reduce((sum, item) => sum + item.returnQuantity, 0) || 0;
+  const entityName = returnNote.supplierName || returnNote.customerName;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -136,10 +139,12 @@ export function ReturnNoteStatusUpdateModal({
               <span className="text-muted-foreground">Return No:</span>
               <span className="font-medium font-mono">{returnNote.returnNumber}</span>
             </div>
-            {returnNote.supplierName && (
+            {entityName && (
               <div className="flex justify-between mt-1">
-                <span className="text-muted-foreground">Supplier:</span>
-                <span className="font-medium">{returnNote.supplierName}</span>
+                <span className="text-muted-foreground">
+                  {returnNote.supplierName ? 'Supplier:' : 'Customer:'}
+                </span>
+                <span className="font-medium">{entityName}</span>
               </div>
             )}
             {returnNote.items && returnNote.items.length > 0 && (

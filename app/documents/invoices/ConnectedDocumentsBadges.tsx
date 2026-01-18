@@ -1,14 +1,17 @@
-// app/invoices/ConnectedDocumentsBadges.tsx - COMPLETE: Added Refund Badges
+// app/invoices/ConnectedDocumentsBadges.tsx
 
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Receipt, ExternalLink, FileText, Truck, Undo2, RotateCcw, Ticket, FileClock } from "lucide-react";
+import { Receipt, ExternalLink, FileText, Truck, RotateCcw, Ticket, FileClock } from "lucide-react";
 
 interface ConnectedDocument {
   _id: string;
-  invoiceNumber: string;
+  invoiceNumber?: string;
+  returnNumber?: string;
   documentType?: string;
+  voucherType?: string;
+  returnType?: 'salesReturn' | 'purchaseReturn';
 }
 
 interface ConnectedDocumentsBadgesProps {
@@ -18,7 +21,7 @@ interface ConnectedDocumentsBadgesProps {
       quotationId?: string | ConnectedDocument;
       deliveryId?: string | ConnectedDocument;
       receiptIds?: (string | ConnectedDocument)[];
-      refundIds?: (string | ConnectedDocument)[]; // ✅ ADDED
+      returnNoteIds?: (string | ConnectedDocument)[];
     };
   };
   onViewPdf: (doc: any) => void;
@@ -41,9 +44,9 @@ export function ConnectedDocumentsBadges({ invoice, onViewPdf }: ConnectedDocume
   const quotation = getDocument(invoice.connectedDocuments?.quotationId);
   const delivery = getDocument(invoice.connectedDocuments?.deliveryId);
   const receipts = getDocuments(invoice.connectedDocuments?.receiptIds);
-  const refunds = getDocuments(invoice.connectedDocuments?.refundIds); // ✅ NEW
+  const returnNotes = getDocuments(invoice.connectedDocuments?.returnNoteIds);
 
-  if (!quotation && !delivery && receipts.length === 0 && refunds.length === 0) {
+  if (!quotation && !delivery && receipts.length === 0 && returnNotes.length === 0) {
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <div className="h-2 w-2 rounded-full bg-muted-foreground/30" />
@@ -97,17 +100,17 @@ export function ConnectedDocumentsBadges({ invoice, onViewPdf }: ConnectedDocume
         </Badge>
       ))}
 
-      {/* ✅ NEW: Refund Badges */}
-      {refunds.map((refund) => (
+      {/* Return Note Badges */}
+      {returnNotes.map((returnNote) => (
         <Badge
-          key={refund._id}
-          variant="pink"
+          key={returnNote._id}
+          variant="destructive"
           appearance="outline"
           className="font-mono cursor-pointer hover:opacity-70 transition-opacity gap-1 w-fit"
-          onClick={() => onViewPdf({ ...refund, voucherType: 'refund' })}
+          onClick={() => onViewPdf({ ...returnNote, documentType: 'returnNote' })}
         >
           <RotateCcw className="h-3 w-3" />
-          {refund.invoiceNumber}
+          {returnNote.returnNumber}
           <ExternalLink className="h-3 w-3 ml-1" />
         </Badge>
       ))}

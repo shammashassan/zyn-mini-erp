@@ -1,24 +1,20 @@
-// models/Invoice.ts - UPDATED: Added invoiceDate field
+// models/Invoice.ts
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
 export interface IItem extends Document {
+  productId?: string;
   description: string;
   quantity: number;
   rate: number;
   total: number;
+  returnedQuantity?: number;
 }
 
 export interface IReceiptAllocation {
   voucherId: mongoose.Types.ObjectId;
   allocatedAmount: number;
   allocationDate: Date;
-}
-
-export interface IRefundAllocation {
-  voucherId: mongoose.Types.ObjectId;
-  refundedAmount: number;
-  refundDate: Date;
 }
 
 export interface IAuditEntry {
@@ -45,22 +41,21 @@ export interface IInvoice extends Document {
   vatAmount: number;
   grandTotal: number;
   notes?: string;
-  invoiceDate: Date; // ✅ NEW: Invoice date field
+  invoiceDate: Date;
   status: 'paid' | 'pending' | 'partial' | 'overdue' | 'approved' | 'cancelled';
   
   receiptAllocations: IReceiptAllocation[];
-  refundAllocations: IRefundAllocation[];
+  
   paidAmount: number;
   receivedAmount: number;
-  refundedAmount: number;
   remainingAmount: number;
-  paymentStatus: 'Paid' | 'Pending' | 'Partially Paid' | 'Refunded' | 'Partially Refunded';
+  paymentStatus: 'Paid' | 'Pending' | 'Partially Paid';
   
   connectedDocuments: {
     receiptIds?: mongoose.Types.ObjectId[];
-    refundIds?: mongoose.Types.ObjectId[];
     deliveryId?: mongoose.Types.ObjectId;
     quotationId?: mongoose.Types.ObjectId;
+    returnNoteIds?: mongoose.Types.ObjectId[];
   };
   
   isDeleted: boolean;
@@ -76,12 +71,8 @@ export interface IInvoice extends Document {
   
   allocateReceipt(voucherId: mongoose.Types.ObjectId, amount: number): void;
   deallocateReceipt(voucherId: mongoose.Types.ObjectId): number;
-  allocateRefund(voucherId: mongoose.Types.ObjectId, amount: number): void;
-  deallocateRefund(voucherId: mongoose.Types.ObjectId): number;
   getTotalAllocated(): number;
-  getTotalRefunded(): number;
   canAllocate(amount: number): boolean;
-  canRefund(amount: number): boolean;
   
   addAuditEntry(
     action: string,
@@ -92,10 +83,12 @@ export interface IInvoice extends Document {
 }
 
 const ItemSchema: Schema = new Schema({
+  productId: { type: String, required: false },
   description: { type: String, required: true },
   quantity: { type: Number, required: true },
   rate: { type: Number, required: true },
   total: { type: Number, required: true },
+  returnedQuantity: { type: Number, default: 0 },
 });
 
 const ReceiptAllocationSchema: Schema = new Schema({
@@ -106,16 +99,6 @@ const ReceiptAllocationSchema: Schema = new Schema({
   },
   allocatedAmount: { type: Number, required: true, min: 0 },
   allocationDate: { type: Date, default: Date.now },
-});
-
-const RefundAllocationSchema: Schema = new Schema({
-  voucherId: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'Voucher',
-    required: true 
-  },
-  refundedAmount: { type: Number, required: true, min: 0 },
-  refundDate: { type: Date, default: Date.now },
 });
 
 const AuditEntrySchema: Schema = new Schema({
@@ -141,7 +124,7 @@ const InvoiceSchema: Schema<IInvoice> = new Schema({
   vatAmount: { type: Number, default: 0 },
   grandTotal: { type: Number, required: true },
   notes: { type: String },
-  invoiceDate: { type: Date, required: true }, // ✅ NEW: Invoice date field
+  invoiceDate: { type: Date, required: true },
   status: { 
     type: String, 
     enum: ['paid', 'pending', 'partial', 'overdue', 'approved', 'cancelled'],
@@ -149,23 +132,21 @@ const InvoiceSchema: Schema<IInvoice> = new Schema({
   },
   
   receiptAllocations: [ReceiptAllocationSchema],
-  refundAllocations: [RefundAllocationSchema],
   
   paidAmount: { type: Number, default: 0, min: 0 },
   receivedAmount: { type: Number, default: 0, min: 0 },
-  refundedAmount: { type: Number, default: 0, min: 0 },
   remainingAmount: { type: Number, default: 0, min: 0 },
   paymentStatus: {
     type: String,
-    enum: ['Paid', 'Pending', 'Partially Paid', 'Refunded', 'Partially Refunded'],
+    enum: ['Paid', 'Pending', 'Partially Paid'],
     default: 'Pending'
   },
   
   connectedDocuments: {
     type: {
       receiptIds: [{ type: Schema.Types.ObjectId, ref: 'Voucher' }],
-      refundIds: [{ type: Schema.Types.ObjectId, ref: 'Voucher' }],
       deliveryId: { type: Schema.Types.ObjectId, ref: 'DeliveryNote' },
+      returnNoteIds: [{ type: Schema.Types.ObjectId, ref: 'ReturnNote' }],
       quotationId: { type: Schema.Types.ObjectId, ref: 'Quotation' }
     },
     default: {}
@@ -181,15 +162,14 @@ const InvoiceSchema: Schema<IInvoice> = new Schema({
 }, { timestamps: true });
 
 // Indexes
-InvoiceSchema.index({ isDeleted: 1, invoiceDate: -1 }); // ✅ UPDATED: Index on invoiceDate
+InvoiceSchema.index({ isDeleted: 1, invoiceDate: -1 });
 InvoiceSchema.index({ status: 1 });
 InvoiceSchema.index({ customerName: 1 });
 InvoiceSchema.index({ paymentStatus: 1 });
 InvoiceSchema.index({ 'connectedDocuments.receiptIds': 1 });
-InvoiceSchema.index({ 'connectedDocuments.refundIds': 1 });
 InvoiceSchema.index({ 'connectedDocuments.quotationId': 1 });
 InvoiceSchema.index({ 'receiptAllocations.voucherId': 1 });
-InvoiceSchema.index({ 'refundAllocations.voucherId': 1 });
+InvoiceSchema.index({ 'connectedDocuments.returnNoteIds': 1 });
 
 // Pre-save middleware
 InvoiceSchema.pre('save', function(next) {
@@ -203,34 +183,16 @@ InvoiceSchema.pre('save', function(next) {
     this.paidAmount = 0;
   }
   
-  // Calculate refunded amount from refund allocations
-  if (this.refundAllocations && this.refundAllocations.length > 0) {
-    this.refundedAmount = this.refundAllocations.reduce(
-      (sum: number, alloc: IRefundAllocation) => sum + alloc.refundedAmount, 
-      0
-    );
-  } else if (!this.isModified('refundedAmount')) {
-    this.refundedAmount = 0;
-  }
-  
   // Use whichever is greater between paidAmount and receivedAmount
   const effectiveAmount = Math.max(this.paidAmount, this.receivedAmount || 0);
   
   // Recalculate remainingAmount
   this.remainingAmount = Math.max(0, this.grandTotal - effectiveAmount);
   
-  // Auto-calculate payment status with partial refund support
+  // Auto-calculate payment status
   const EPSILON = 0.01;
   
-  if (this.refundedAmount > 0) {
-    const refundDifference = this.paidAmount - this.refundedAmount;
-    
-    if (refundDifference <= EPSILON) {
-      this.paymentStatus = 'Refunded';
-    } else {
-      this.paymentStatus = 'Partially Refunded';
-    }
-  } else if (effectiveAmount >= this.grandTotal - EPSILON) {
+  if (effectiveAmount >= this.grandTotal - EPSILON) {
     this.paymentStatus = 'Paid';
   } else if (effectiveAmount > 0) {
     this.paymentStatus = 'Partially Paid';
@@ -249,7 +211,6 @@ InvoiceSchema.pre(/^find/, function(this: Query<any, any>, next) {
     this.find({ isDeleted: false });
   }
   
-  // ✅ UPDATED: Default sort by invoiceDate instead of createdAt
   if (!this.getOptions().sort) {
     this.sort({ invoiceDate: -1 });
   }
@@ -318,71 +279,6 @@ InvoiceSchema.methods.getTotalAllocated = function(): number {
 InvoiceSchema.methods.canAllocate = function(amount: number): boolean {
   const currentAllocated = this.getTotalAllocated();
   return (currentAllocated + amount) <= this.grandTotal;
-};
-
-// Refund allocation methods
-InvoiceSchema.methods.allocateRefund = function(
-  voucherId: mongoose.Types.ObjectId, 
-  amount: number
-): void {
-  if (amount <= 0) {
-    throw new Error('Refund amount must be positive');
-  }
-  
-  const currentRefunded = this.getTotalRefunded();
-  const maxRefundable = this.paidAmount;
-  
-  if (currentRefunded + amount > maxRefundable) {
-    throw new Error(
-      `Cannot refund ${amount}. Would exceed paid amount. ` +
-      `Current Refunded: ${currentRefunded}, Paid Amount: ${maxRefundable}`
-    );
-  }
-  
-  const existingIndex = this.refundAllocations.findIndex(
-    (alloc: any) => alloc.voucherId.toString() === voucherId.toString()
-  );
-  
-  if (existingIndex !== -1) {
-    throw new Error('This refund voucher is already allocated to this invoice');
-  }
-  
-  this.refundAllocations.push({
-    voucherId,
-    refundedAmount: amount,
-    refundDate: new Date(),
-  });
-};
-
-InvoiceSchema.methods.deallocateRefund = function(
-  voucherId: mongoose.Types.ObjectId
-): number {
-  const index = this.refundAllocations.findIndex(
-    (alloc: any) => alloc.voucherId.toString() === voucherId.toString()
-  );
-  
-  if (index === -1) {
-    return 0;
-  }
-  
-  const amount = this.refundAllocations[index].refundedAmount;
-  this.refundAllocations.splice(index, 1);
-  
-  return amount;
-};
-
-InvoiceSchema.methods.getTotalRefunded = function(): number {
-  if (!this.refundAllocations || this.refundAllocations.length === 0) {
-    return 0;
-  }
-  
-  return this.refundAllocations.reduce((sum: number, alloc: IRefundAllocation) => sum + alloc.refundedAmount, 0);
-};
-
-InvoiceSchema.methods.canRefund = function(amount: number): boolean {
-  const currentRefunded = this.getTotalRefunded();
-  const maxRefundable = this.paidAmount;
-  return (currentRefunded + amount) <= maxRefundable;
 };
 
 // Audit entry method

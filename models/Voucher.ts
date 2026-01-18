@@ -11,7 +11,7 @@ export interface IItem extends Document {
 
 export interface IAllocation {
   documentId: mongoose.Types.ObjectId;
-  documentType: 'invoice' | 'purchase' | 'expense' | 'debitNote';
+  documentType: 'invoice' | 'purchase' | 'expense' | 'debitNote' | 'creditNote';
   amount: number;
   createdAt: Date;
 }
@@ -31,7 +31,7 @@ export interface IAuditEntry {
 export interface IVoucher extends Document {
   _id: string;
   invoiceNumber: string;
-  voucherType: 'receipt' | 'payment' | 'refund';
+  voucherType: 'receipt' | 'payment';
   
   // Party References
   customerName?: string;
@@ -62,6 +62,7 @@ export interface IVoucher extends Document {
     purchaseIds?: mongoose.Types.ObjectId[];
     expenseIds?: mongoose.Types.ObjectId[];
     debitNoteIds?: mongoose.Types.ObjectId[];
+    creditNoteIds?: mongoose.Types.ObjectId[];
   };
   
   isDeleted: boolean;
@@ -97,7 +98,7 @@ const AllocationSchema: Schema = new Schema({
   documentId: { type: Schema.Types.ObjectId, required: true },
   documentType: { 
     type: String, 
-    enum: ['invoice', 'purchase', 'expense', 'debitNote'], 
+    enum: ['invoice', 'purchase', 'expense', 'debitNote' , 'creditNote'], 
     required: true 
   },
   amount: { type: Number, required: true, min: 0 },
@@ -120,7 +121,7 @@ const VoucherSchema: Schema<IVoucher> = new Schema({
   invoiceNumber: { type: String, required: true, unique: true },
   voucherType: { 
     type: String, 
-    enum: ['receipt', 'payment', 'refund'],
+    enum: ['receipt', 'payment'],
     required: true 
   },
   
@@ -153,7 +154,8 @@ const VoucherSchema: Schema<IVoucher> = new Schema({
       invoiceIds: [{ type: Schema.Types.ObjectId, ref: 'Invoice' }],
       purchaseIds: [{ type: Schema.Types.ObjectId, ref: 'Purchase' }],
       expenseIds: [{ type: Schema.Types.ObjectId, ref: 'Expense' }],
-      debitNoteIds: [{ type: Schema.Types.ObjectId, ref: 'DebitNote' }]
+      debitNoteIds: [{ type: Schema.Types.ObjectId, ref: 'DebitNote' }],
+      creditNoteIds: [{ type: Schema.Types.ObjectId, ref: 'CreditNote' }]
     },
     default: {}
   },
@@ -181,6 +183,7 @@ VoucherSchema.index({ 'connectedDocuments.invoiceIds': 1 });
 VoucherSchema.index({ 'connectedDocuments.purchaseIds': 1 });
 VoucherSchema.index({ 'connectedDocuments.expenseIds': 1 });
 VoucherSchema.index({ 'connectedDocuments.debitNoteIds': 1 });
+VoucherSchema.index({ 'connectedDocuments.creditNoteIds': 1 });
 VoucherSchema.index({ 'allocations.documentId': 1 });
 
 // Pre-save validation

@@ -22,8 +22,8 @@ interface ConnectedDocumentsBadgesProps {
   debitNote: {
     _id: string;
     debitNoteNumber: string;
-    returnNoteId?: string | ConnectedReturnNote;
     connectedDocuments?: {
+      returnNoteId?: string | ConnectedReturnNote;
       receiptIds?: (string | ConnectedReceipt)[];
     };
   };
@@ -37,7 +37,7 @@ export function ConnectedDocumentsBadges({
   onViewReturnNotePdf 
 }: ConnectedDocumentsBadgesProps) {
   const receiptIds = debitNote.connectedDocuments?.receiptIds || [];
-  const returnNoteId = debitNote.returnNoteId;
+  const returnNoteId = debitNote.connectedDocuments?.returnNoteId;
 
   // Filter out string IDs (not populated) and get only populated objects
   const receipts = receiptIds.filter(

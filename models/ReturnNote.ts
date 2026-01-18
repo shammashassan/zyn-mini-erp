@@ -1,14 +1,18 @@
-// models/ReturnNote.ts - UPDATED: Uniform Connected Documents Pattern
+// models/ReturnNote.ts - UPDATED: Only Sales & Purchase Return Types
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
 export interface IReturnItem {
-  materialId: string;
-  materialName: string;
-  orderedQuantity: number;
-  receivedQuantity: number;
-  returnedQuantity: number;
-  returnQuantity: number; // Current return amount
+  materialId?: string;
+  materialName?: string;
+  productId?: string;
+  productName?: string;
+  orderedQuantity?: number;
+  receivedQuantity?: number;
+  returnedQuantity?: number;
+  returnQuantity: number;
+  rate?: number;
+  total?: number;
 }
 
 export interface IAuditEntry {
@@ -26,18 +30,31 @@ export interface IAuditEntry {
 export interface IReturnNote extends Document {
   _id: string;
   returnNumber: string;
-  purchaseReference: string;
-  supplierName: string;
+  returnType: 'salesReturn' | 'purchaseReturn';
+  
+  // For Purchase Returns
+  supplierName?: string;
+  
+  // For Sales Returns
+  customerName?: string;
+  
   items: IReturnItem[];
   returnDate: Date;
   reason: string;
   notes?: string;
   status: 'pending' | 'approved' | 'cancelled';
   
-  // ✅ UPDATED: Moved purchaseId inside connectedDocuments
+  // Financial fields for sales returns
+  totalAmount?: number;
+  discount?: number;
+  vatAmount?: number;
+  grandTotal?: number;
+  
   connectedDocuments: {
-    purchaseId: mongoose.Types.ObjectId;
+    purchaseId?: mongoose.Types.ObjectId;
+    invoiceId?: mongoose.Types.ObjectId;
     debitNoteId?: mongoose.Types.ObjectId;
+    creditNoteId?: mongoose.Types.ObjectId;
   };
   
   isDeleted: boolean;
@@ -60,11 +77,20 @@ export interface IReturnNote extends Document {
 }
 
 const ReturnItemSchema: Schema = new Schema({
-  materialId: { type: String, required: true },
-  materialName: { type: String, required: true },
-  orderedQuantity: { type: Number, required: true },
-  receivedQuantity: { type: Number, required: true },
-  returnedQuantity: { type: Number, default: 0 },
+  // Purchase return fields
+  materialId: { type: String },
+  materialName: { type: String },
+  
+  // Sales return fields
+  productId: { type: String },
+  productName: { type: String },
+  rate: { type: Number },
+  total: { type: Number },
+  
+  // Common fields
+  orderedQuantity: { type: Number },
+  receivedQuantity: { type: Number },
+  returnedQuantity: { type: Number },
   returnQuantity: { type: Number, required: true },
 });
 
@@ -82,8 +108,19 @@ const AuditEntrySchema: Schema = new Schema({
 
 const ReturnNoteSchema: Schema<IReturnNote> = new Schema({
   returnNumber: { type: String, required: true, unique: true },
-  purchaseReference: { type: String, required: true },
-  supplierName: { type: String, required: true },
+  returnType: { 
+    type: String, 
+    required: true,
+    enum: ['salesReturn', 'purchaseReturn'],
+    default: 'purchaseReturn'
+  },
+  
+  // Purchase return fields
+  supplierName: { type: String },
+  
+  // Sales return fields
+  customerName: { type: String },
+  
   items: [ReturnItemSchema],
   returnDate: { type: Date, required: true },
   reason: { type: String, required: true },
@@ -94,20 +131,20 @@ const ReturnNoteSchema: Schema<IReturnNote> = new Schema({
     default: 'pending'
   },
   
-  // ✅ UPDATED: Uniform connected documents structure
+  // Financial fields (for sales returns)
+  totalAmount: { type: Number },
+  discount: { type: Number },
+  vatAmount: { type: Number },
+  grandTotal: { type: Number },
+  
   connectedDocuments: {
     type: {
-      purchaseId: { 
-        type: Schema.Types.ObjectId, 
-        ref: 'Purchase', 
-        required: true 
-      },
-      debitNoteId: { 
-        type: Schema.Types.ObjectId, 
-        ref: 'DebitNote' 
-      }
+      purchaseId: { type: Schema.Types.ObjectId, ref: 'Purchase' },
+      invoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice' },
+      debitNoteId: { type: Schema.Types.ObjectId, ref: 'DebitNote' },
+      creditNoteId: { type: Schema.Types.ObjectId, ref: 'CreditNote' },
     },
-    required: true
+    default: {}
   },
   
   isDeleted: { type: Boolean, default: false, index: true },
@@ -120,26 +157,32 @@ const ReturnNoteSchema: Schema<IReturnNote> = new Schema({
 }, { timestamps: true });
 
 // Indexes
-ReturnNoteSchema.index({ isDeleted: 1, createdAt: -1 });
+ReturnNoteSchema.index({ isDeleted: 1, returnDate: -1 });
+ReturnNoteSchema.index({ returnType: 1 });
 ReturnNoteSchema.index({ status: 1 });
-ReturnNoteSchema.index({ 'connectedDocuments.purchaseId': 1 });
 ReturnNoteSchema.index({ supplierName: 1 });
-ReturnNoteSchema.index({ 'connectedDocuments.debitNoteId': 1 });
+ReturnNoteSchema.index({ customerName: 1 });
+ReturnNoteSchema.index({ 'connectedDocuments.purchaseId': 1 });
+ReturnNoteSchema.index({ 'connectedDocuments.invoiceId': 1 });
 
-// Pre-find hook
+// Pre-find hook to exclude deleted records by default
 ReturnNoteSchema.pre(/^find/, function(this: Query<any, any>, next) {
   const options = this.getOptions();
   
-  if (!options.includeDeleted) {
+  if (options.includeDeleted !== true) {
     this.find({ isDeleted: false });
+  }
+  
+  if (!this.getOptions().sort) {
+    this.sort({ returnDate: -1 });
   }
   
   next();
 });
 
-// Audit entry method
+// Add audit entry method
 ReturnNoteSchema.methods.addAuditEntry = function(
-  action: string, 
+  action: string,
   userId: string | null = null,
   username: string | null = null,
   changes?: IAuditEntry['changes']

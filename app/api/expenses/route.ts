@@ -5,6 +5,7 @@ import dbConnect from "@/lib/dbConnect";
 import Expense from "@/models/Expense";
 import Payee from "@/models/Payee";
 import Supplier from "@/models/Supplier";
+import Voucher from "@/models/Voucher";
 import { getActive } from "@/utils/softDelete";
 import { getUserInfo } from "@/lib/auth-helpers";
 import { createJournalForExpense } from '@/utils/journalAutoCreate';
@@ -23,6 +24,8 @@ export async function GET(request: Request) {
     if (error) return error;
 
     await dbConnect();
+
+    const _ensureModels = [Payee, Supplier, Voucher];
 
     const { searchParams } = new URL(request.url);
 

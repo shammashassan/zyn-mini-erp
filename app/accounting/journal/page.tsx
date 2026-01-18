@@ -515,7 +515,9 @@ function JournalPageContent() {
                           <SelectItem value="Payment">Payment</SelectItem>
                           <SelectItem value="Purchase">Purchase</SelectItem>
                           <SelectItem value="Expense">Expense</SelectItem>
-                          <SelectItem value="Refund">Refund</SelectItem>
+                          <SelectItem value="DebitNote">Debit Note</SelectItem>
+                          <SelectItem value="CreditNote">Credit Note</SelectItem>
+                          <SelectItem value="ReturnNote">Return Note</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

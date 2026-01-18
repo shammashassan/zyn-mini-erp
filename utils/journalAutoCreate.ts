@@ -331,79 +331,6 @@ export async function createJournalForVoucher(
 }
 
 /**
- * Auto-create journal entry for Refund Voucher
- */
-export async function createJournalForRefund(
-  voucher: any,
-  userId: string | null = null,
-  username: string | null = null
-) {
-  try {
-    const entries: JournalEntryData[] = [];
-    const amountToRecord = voucher.grandTotal;
-
-    const { partyType, partyId, partyName, itemType, itemName } = await extractVoucherPartyAndItemInfo(voucher);
-
-    const narration = `Refund issued to ${partyName || voucher.customerName || 'Customer'} via ${voucher.paymentMethod}`;
-
-    entries.push({
-      accountCode: 'I1003',
-      accountName: 'Sales Returns',
-      debit: amountToRecord,
-      credit: 0,
-    });
-
-    const paymentAccount = voucher.paymentMethod === 'Cash' ? 'A1001' : 'A1002';
-    const paymentAccountName = voucher.paymentMethod === 'Cash' ? 'Cash in Hand' : 'Cash at Bank';
-
-    entries.push({
-      accountCode: paymentAccount,
-      accountName: paymentAccountName,
-      debit: 0,
-      credit: amountToRecord,
-    });
-
-    const journalNumber = await generateInvoiceNumber('journal');
-
-    const journal = new Journal({
-      journalNumber,
-      entryDate: voucher.createdAt || new Date(),
-      referenceType: 'Refund', 
-      referenceId: voucher._id,
-      referenceNumber: voucher.invoiceNumber,
-      
-      partyType,
-      partyId,
-      partyName,
-      itemType,
-      itemName,
-      
-      narration,
-      entries,
-      totalDebit: entries.reduce((sum, e) => sum + e.debit, 0),
-      totalCredit: entries.reduce((sum, e) => sum + e.credit, 0),
-      status: 'posted',
-      createdBy: userId,
-      postedBy: userId,
-      postedAt: new Date(),
-      actionHistory: [{
-        action: 'Auto-created from Refund Voucher',
-        userId,
-        username,
-        timestamp: new Date(),
-      }],
-    });
-
-    await journal.save();
-    console.log(`✅ Journal entry ${journalNumber} created for Refund ${voucher.invoiceNumber}`);
-    return journal;
-  } catch (error) {
-    console.error('Error creating journal for refund:', error);
-    return null;
-  }
-}
-
-/**
  * Handle journal for invoice status change
  */
 export async function handleInvoiceStatusChange(
@@ -655,6 +582,220 @@ export async function handleDebitNoteStatusChange(
     }
   } catch (error) {
     console.error('Error handling debit note status change:', error);
+  }
+}
+
+/**
+ * Helper: Extract party and item info from credit note WITH ID lookup
+ */
+async function extractCreditNotePartyAndItemInfo(creditNote: any) {
+  const result: {
+    partyType?: 'Customer' | 'Supplier' | 'Payee' | 'Vendor';
+    partyId?: string;
+    partyName?: string;
+    itemType?: 'Material' | 'Product';
+    itemName?: string;
+  } = {};
+
+  if (creditNote.customerName) {
+    result.partyType = 'Customer';
+    result.partyName = creditNote.customerName;
+    
+    try {
+      const Customer = (await import('@/models/Customer')).default;
+      const customer = await Customer.findOne({ name: creditNote.customerName, isDeleted: false });
+      if (customer) {
+        result.partyId = customer._id.toString();
+      }
+    } catch (error) {
+      console.error('Error looking up customer ID:', error);
+    }
+  } else if (creditNote.supplierName) {
+    result.partyName = creditNote.supplierName;
+    
+    try {
+      const Supplier = (await import('@/models/Supplier')).default;
+      const supplier = await Supplier.findOne({ name: creditNote.supplierName, isDeleted: false });
+      if (supplier) {
+        result.partyType = 'Supplier';
+        result.partyId = supplier._id.toString();
+      } else {
+        result.partyType = 'Vendor';
+      }
+    } catch (error) {
+      result.partyType = 'Vendor';
+    }
+  } else if (creditNote.payeeName) {
+    result.partyType = 'Payee';
+    result.partyName = creditNote.payeeName;
+    
+    if (creditNote.payeeId) {
+       result.partyId = creditNote.payeeId.toString();
+    }
+  } else if (creditNote.vendorName) {
+    result.partyType = 'Vendor';
+    result.partyName = creditNote.vendorName;
+  }
+
+  if (creditNote.items && creditNote.items.length > 0) {
+    const firstItem = creditNote.items[0];
+    if (firstItem.description) {
+      result.itemType = 'Product';
+      result.itemName = firstItem.description;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Auto-create journal entry for Credit Note (Approved only)
+ */
+export async function createJournalForCreditNote(
+  creditNote: any,
+  userId: string | null = null,
+  username: string | null = null
+) {
+  try {
+    if (creditNote.status !== 'approved') {
+      console.log(`⏭️ Skipping journal creation - credit note status is '${creditNote.status}', not 'approved'`);
+      return null;
+    }
+
+    const entries: JournalEntryData[] = [];
+    const { partyType, partyId, partyName, itemType, itemName } = await extractCreditNotePartyAndItemInfo(creditNote);
+
+    const grossTotal = Number(creditNote.totalAmount) || 0;
+    const discount = Number(creditNote.discount) || 0;
+    const subtotal = grossTotal - discount;
+    const vatAmount = creditNote.isTaxPayable ? (subtotal * 0.05) : 0;
+    const grandTotal = subtotal + vatAmount;
+
+    const narration = creditNote.creditType === 'return'
+      ? `Credit Note for Invoice ${creditNote.invoiceNumber || 'N/A'} - ${creditNote.items.length} item(s) returned`
+      : `Credit Note ${creditNote.creditNoteNumber} - ${creditNote.reason || 'Adjustment'}`;
+
+    // Dr. Sales Returns / Sales Revenue (depending on type)
+    if (creditNote.creditType === 'return') {
+      entries.push({
+        accountCode: 'I1003',
+        accountName: 'Sales Returns',
+        debit: subtotal,
+        credit: 0,
+      });
+    } else {
+      // For adjustments/standalone, debit Sales Revenue directly
+      entries.push({
+        accountCode: 'I1001',
+        accountName: 'Sales Revenue',
+        debit: subtotal,
+        credit: 0,
+      });
+    }
+
+    // Dr. VAT Payable (if tax payable) - reduces VAT liability
+    if (creditNote.isTaxPayable && vatAmount > 0) {
+      entries.push({
+        accountCode: 'L1002',
+        accountName: 'VAT Payable',
+        debit: vatAmount,
+        credit: 0,
+      });
+    }
+
+    // Cr. Accounts Receivable = Grand Total
+    entries.push({
+      accountCode: 'A1100',
+      accountName: 'Accounts Receivable',
+      debit: 0,
+      credit: grandTotal,
+    });
+
+    const totalDebit = entries.reduce((sum, e) => sum + e.debit, 0);
+    const totalCredit = entries.reduce((sum, e) => sum + e.credit, 0);
+    
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      throw new Error(
+        `Journal entry is not balanced! Debit: ${totalDebit.toFixed(2)}, Credit: ${totalCredit.toFixed(2)}`
+      );
+    }
+
+    const journalNumber = await generateInvoiceNumber('journal');
+
+    const journal = new Journal({
+      journalNumber,
+      entryDate: creditNote.creditDate || new Date(),
+      referenceType: 'CreditNote',
+      referenceId: creditNote._id,
+      referenceNumber: creditNote.creditNoteNumber,
+      
+      partyType,
+      partyId,
+      partyName,
+      itemType,
+      itemName,
+      
+      narration,
+      entries,
+      totalDebit,
+      totalCredit,
+      status: 'posted',
+      createdBy: userId,
+      postedBy: userId,
+      postedAt: new Date(),
+      actionHistory: [{
+        action: 'Auto-created from Credit Note (Approved)',
+        userId,
+        username,
+        timestamp: new Date(),
+      }],
+    });
+
+    await journal.save();
+    console.log(`✅ Journal entry ${journalNumber} created for credit note ${creditNote.creditNoteNumber}`);
+    if (discount > 0) {
+      console.log(`   💰 Discount of ${discount.toFixed(2)} applied`);
+    }
+    return journal;
+  } catch (error) {
+    console.error('❌ Error creating journal for credit note:', error);
+    return null;
+  }
+}
+
+/**
+ * Handle journal for credit note status change
+ */
+export async function handleCreditNoteStatusChange(
+  creditNote: any,
+  oldStatus: string,
+  newStatus: string,
+  userId: string | null = null,
+  username: string | null = null
+) {
+  try {
+    console.log(`📄 Handling credit note status change: ${oldStatus} → ${newStatus}`);
+
+    // Void journal when moving away from 'approved'
+    if (oldStatus === 'approved' && newStatus !== 'approved') {
+      console.log('🔴 Voiding journal - status changed from approved');
+      await voidJournalsForReference(
+        creditNote._id,
+        userId,
+        username,
+        `Credit note status changed from ${oldStatus} to ${newStatus}`
+      );
+      return;
+    }
+
+    // Create journal when moving to 'approved'
+    if (oldStatus !== 'approved' && newStatus === 'approved') {
+      console.log('✅ Creating journal - status changed to approved');
+      await createJournalForCreditNote(creditNote, userId, username);
+      return;
+    }
+  } catch (error) {
+    console.error('Error handling credit note status change:', error);
   }
 }
 

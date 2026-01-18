@@ -1,11 +1,13 @@
-// app/api/return-notes/route.ts - UPDATED: Bidirectional Connected Documents
+// app/api/return-notes/route.ts - CLEANED: No Payee/Vendor Support
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import ReturnNote from "@/models/ReturnNote";
 import Purchase from "@/models/Purchase";
+import Invoice from "@/models/Invoice";
 import Material from "@/models/Material";
 import DebitNote from "@/models/DebitNote";
+import CreditNote from "@/models/CreditNote";
 import StockAdjustment from "@/models/StockAdjustment";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
@@ -20,7 +22,7 @@ export async function GET(request: Request) {
 
     await dbConnect();
 
-    const _ensureModels = [DebitNote, Purchase, Material];
+    const _ensureModels = [DebitNote, CreditNote, Purchase, Invoice, Material];
 
     const { searchParams } = new URL(request.url);
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
@@ -54,8 +56,18 @@ export async function GET(request: Request) {
           match: { isDeleted: false }
         },
         {
+          path: 'connectedDocuments.invoiceId',
+          select: 'invoiceNumber customerName items status',
+          match: { isDeleted: false }
+        },
+        {
           path: 'connectedDocuments.debitNoteId',
           select: 'debitNoteNumber status',
+          match: { isDeleted: false }
+        },
+        {
+          path: 'connectedDocuments.creditNoteId',
+          select: 'creditNoteNumber status',
           match: { isDeleted: false }
         }
       ] : undefined;
@@ -101,8 +113,18 @@ export async function GET(request: Request) {
             match: { isDeleted: false }
           })
           .populate({
+            path: 'connectedDocuments.invoiceId',
+            select: 'invoiceNumber customerName items status',
+            match: { isDeleted: false }
+          })
+          .populate({
             path: 'connectedDocuments.debitNoteId',
             select: 'debitNoteNumber status',
+            match: { isDeleted: false }
+          })
+          .populate({
+            path: 'connectedDocuments.creditNoteId',
+            select: 'creditNoteNumber status',
             match: { isDeleted: false }
           });
       }
@@ -129,17 +151,39 @@ export async function POST(request: Request) {
     const user = session.user;
 
     const {
+      returnType = 'purchaseReturn',
       purchaseId,
+      invoiceId,
+      supplierName,
+      customerName,
       items,
       reason,
       notes,
       returnDate,
-      status = 'pending'
+      status = 'pending',
+      totalAmount,
+      grandTotal
     } = body;
 
-    // Validate required fields
-    if (!purchaseId) {
-      return NextResponse.json({ error: "Purchase ID is required" }, { status: 400 });
+    // ✅ CLEANED: Only validate purchaseReturn or salesReturn
+    if (returnType === 'purchaseReturn') {
+      if (!purchaseId) {
+        return NextResponse.json({ error: "Purchase ID is required for purchase returns" }, { status: 400 });
+      }
+      if (!supplierName) {
+        return NextResponse.json({ error: "Supplier name is required for purchase returns" }, { status: 400 });
+      }
+    } else if (returnType === 'salesReturn') {
+      if (!invoiceId) {
+        return NextResponse.json({ error: "Invoice ID is required for sales returns" }, { status: 400 });
+      }
+      if (!customerName) {
+        return NextResponse.json({ error: "Customer name is required for sales returns" }, { status: 400 });
+      }
+    } else {
+      return NextResponse.json({ 
+        error: "Invalid return type. Must be 'purchaseReturn' or 'salesReturn'" 
+      }, { status: 400 });
     }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -150,38 +194,72 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Return reason is required" }, { status: 400 });
     }
 
-    // Get purchase
-    const purchase = await Purchase.findById(purchaseId);
-    if (!purchase || purchase.isDeleted) {
-      return NextResponse.json({ error: "Purchase not found" }, { status: 404 });
-    }
+    // Validate against source document
+    if (returnType === 'purchaseReturn') {
+      const purchase = await Purchase.findById(purchaseId);
+      if (!purchase || purchase.isDeleted) {
+        return NextResponse.json({ error: "Purchase not found" }, { status: 404 });
+      }
 
-    // Validate inventory status
-    if (purchase.inventoryStatus !== 'received' && purchase.inventoryStatus !== 'partially received') {
-      return NextResponse.json({
-        error: "Can only create returns for purchases with 'received' or 'partially received' status"
-      }, { status: 400 });
-    }
-
-    // Validate return quantities
-    for (const returnItem of items) {
-      const purchaseItem = purchase.items.find((pi: any) => pi.materialId === returnItem.materialId);
-
-      if (!purchaseItem) {
+      if (purchase.inventoryStatus !== 'received' && purchase.inventoryStatus !== 'partially received') {
         return NextResponse.json({
-          error: `Item ${returnItem.materialName} not found in purchase`
+          error: "Can only create returns for purchases with 'received' or 'partially received' status"
         }, { status: 400 });
       }
 
-      const receivedQty = purchaseItem.receivedQuantity || 0;
-      const alreadyReturned = purchaseItem.returnedQuantity || 0;
-      const availableToReturn = receivedQty - alreadyReturned;
+      // Validate return quantities
+      for (const returnItem of items) {
+        const purchaseItem = purchase.items.find((pi: any) => pi.materialId === returnItem.materialId);
 
-      if (returnItem.returnQuantity > availableToReturn) {
+        if (!purchaseItem) {
+          return NextResponse.json({
+            error: `Item ${returnItem.materialName} not found in purchase`
+          }, { status: 400 });
+        }
+
+        const receivedQty = purchaseItem.receivedQuantity || 0;
+        const alreadyReturned = purchaseItem.returnedQuantity || 0;
+        const availableToReturn = receivedQty - alreadyReturned;
+
+        if (returnItem.returnQuantity > availableToReturn) {
+          return NextResponse.json({
+            error: `Cannot return ${returnItem.returnQuantity} units of ${returnItem.materialName}. ` +
+              `Available to return: ${availableToReturn}`
+          }, { status: 400 });
+        }
+      }
+    } else if (returnType === 'salesReturn') {
+      const invoice = await Invoice.findById(invoiceId);
+      if (!invoice || invoice.isDeleted) {
+        return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+      }
+
+      if (invoice.status !== 'approved') {
         return NextResponse.json({
-          error: `Cannot return ${returnItem.returnQuantity} units of ${returnItem.materialName}. ` +
-            `Available to return: ${availableToReturn} (Received: ${receivedQty}, Already returned: ${alreadyReturned})`
+          error: "Can only create returns for approved invoices"
         }, { status: 400 });
+      }
+
+      // Validate return quantities
+      for (const returnItem of items) {
+        const invoiceItem = invoice.items.find((ii: any) => ii.description === returnItem.productName);
+
+        if (!invoiceItem) {
+          return NextResponse.json({
+            error: `Item ${returnItem.productName} not found in invoice`
+          }, { status: 400 });
+        }
+
+        const invoicedQty = invoiceItem.quantity || 0;
+        const alreadyReturned = invoiceItem.returnedQuantity || 0;
+        const availableToReturn = invoicedQty - alreadyReturned;
+
+        if (returnItem.returnQuantity > availableToReturn) {
+          return NextResponse.json({
+            error: `Cannot return ${returnItem.returnQuantity} units of ${returnItem.productName}. ` +
+              `Available to return: ${availableToReturn}`
+          }, { status: 400 });
+        }
       }
     }
 
@@ -200,19 +278,16 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    // ✅ UPDATED: Create return note with connectedDocuments structure
-    const newReturnNote = new ReturnNote({
+    // Create return note data
+    const returnNoteData: any = {
       returnNumber,
-      purchaseReference: purchase.referenceNumber,
-      supplierName: purchase.supplierName,
+      returnType,
       items,
       returnDate: returnDate || new Date(),
       reason,
       notes,
       status,
-      connectedDocuments: {
-        purchaseId: purchase._id
-      },
+      connectedDocuments: {},
       isDeleted: false,
       deletedAt: null,
       deletedBy: null,
@@ -224,72 +299,120 @@ export async function POST(request: Request) {
         username: user.username || user.name,
         timestamp: new Date(),
       }],
-    });
+    };
 
-    const savedReturnNote = await newReturnNote.save();
-
-    // ✅ NEW: Add return note ID to purchase connectedDocuments
-    const currentReturnNoteIds = purchase.connectedDocuments?.returnNoteIds || [];
-    if (!currentReturnNoteIds.some((rid: any) => rid.toString() === savedReturnNote._id.toString())) {
-      currentReturnNoteIds.push(savedReturnNote._id);
-      purchase.connectedDocuments = {
-        ...purchase.connectedDocuments,
-        returnNoteIds: currentReturnNoteIds
-      };
+    // Add type-specific fields
+    if (returnType === 'purchaseReturn') {
+      const purchase = await Purchase.findById(purchaseId);
+      returnNoteData.supplierName = supplierName;
+      returnNoteData.connectedDocuments.purchaseId = purchase._id;
+    } else if (returnType === 'salesReturn') {
+      const invoice = await Invoice.findById(invoiceId);
+      returnNoteData.customerName = customerName;
+      returnNoteData.totalAmount = totalAmount;
+      returnNoteData.grandTotal = grandTotal;
+      returnNoteData.connectedDocuments.invoiceId = invoice._id;
     }
 
-    // If status is 'approved', process the return immediately
-    if (status === 'approved') {
-      // Update purchase item returned quantities
-      for (const returnItem of items) {
-        const purchaseItemIndex = purchase.items.findIndex(
-          (pi: any) => pi.materialId === returnItem.materialId
+    const newReturnNote = new ReturnNote(returnNoteData);
+    const savedReturnNote = await newReturnNote.save();
+
+    // Update source document
+    if (returnType === 'purchaseReturn') {
+      const purchase = await Purchase.findById(purchaseId);
+      const currentReturnNoteIds = purchase.connectedDocuments?.returnNoteIds || [];
+      if (!currentReturnNoteIds.some((rid: any) => rid.toString() === savedReturnNote._id.toString())) {
+        currentReturnNoteIds.push(savedReturnNote._id);
+        purchase.connectedDocuments = {
+          ...purchase.connectedDocuments,
+          returnNoteIds: currentReturnNoteIds
+        };
+      }
+
+      // If status is 'approved', process the return immediately
+      if (status === 'approved') {
+        // Update purchase item returned quantities
+        for (const returnItem of items) {
+          const purchaseItemIndex = purchase.items.findIndex(
+            (pi: any) => pi.materialId === returnItem.materialId
+          );
+
+          if (purchaseItemIndex !== -1) {
+            const currentReturned = purchase.items[purchaseItemIndex].returnedQuantity || 0;
+            purchase.items[purchaseItemIndex].returnedQuantity = currentReturned + returnItem.returnQuantity;
+          }
+        }
+
+        purchase.addAuditEntry(
+          `Return Note ${returnNumber} approved - ${items.length} item(s) returned`,
+          user.id,
+          user.username || user.name
         );
 
-        if (purchaseItemIndex !== -1) {
-          const currentReturned = purchase.items[purchaseItemIndex].returnedQuantity || 0;
-          purchase.items[purchaseItemIndex].returnedQuantity = currentReturned + returnItem.returnQuantity;
+        await purchase.save();
+
+        // Reduce stock (materials only)
+        for (const returnItem of items) {
+          const material = await Material.findById(returnItem.materialId);
+          if (material) {
+            const oldStock = material.stock;
+            const newStock = oldStock - returnItem.returnQuantity;
+
+            await Material.findByIdAndUpdate(returnItem.materialId, { stock: newStock });
+
+            const newAdjustment = new StockAdjustment({
+              materialId: returnItem.materialId,
+              materialName: returnItem.materialName,
+              adjustmentType: 'decrement',
+              value: returnItem.returnQuantity,
+              oldStock,
+              newStock,
+              oldUnitCost: material.unitCost,
+              newUnitCost: material.unitCost,
+              adjustmentReason: `Return Note ${returnNumber} approved`,
+              createdAt: new Date(),
+            });
+
+            await newAdjustment.save();
+          }
+        }
+
+        console.log(`✅ Purchase Return Note ${returnNumber} approved - stock reduced`);
+      } else {
+        await purchase.save();
+      }
+    } else if (returnType === 'salesReturn') {
+      const invoice = await Invoice.findById(invoiceId);
+      const currentReturnNoteIds = invoice.connectedDocuments?.returnNoteIds || [];
+      if (!currentReturnNoteIds.some((rid: any) => rid.toString() === savedReturnNote._id.toString())) {
+        currentReturnNoteIds.push(savedReturnNote._id);
+        invoice.connectedDocuments = {
+          ...invoice.connectedDocuments,
+          returnNoteIds: currentReturnNoteIds
+        };
+      }
+      if (status === 'approved') {
+        for (const returnItem of items) {
+          const invoiceItemIndex = invoice.items.findIndex(
+            (ii: any) => ii.description === returnItem.productName
+          );
+
+          if (invoiceItemIndex !== -1) {
+            const currentReturned = invoice.items[invoiceItemIndex].returnedQuantity || 0;
+            invoice.items[invoiceItemIndex].returnedQuantity = currentReturned + returnItem.returnQuantity;
+          }
         }
       }
 
-      purchase.addAuditEntry(
-        `Return Note ${returnNumber} approved - ${items.length} item(s) returned`,
+      invoice.addAuditEntry(
+        `Sales Return Note ${returnNumber} created${status === 'approved' ? ' and approved' : ''}`,
         user.id,
         user.username || user.name
       );
 
-      await purchase.save();
+      await invoice.save();
 
-      // Reduce stock
-      for (const returnItem of items) {
-        const material = await Material.findById(returnItem.materialId);
-        if (material) {
-          const oldStock = material.stock;
-          const newStock = oldStock - returnItem.returnQuantity;
-
-          await Material.findByIdAndUpdate(returnItem.materialId, { stock: newStock });
-
-          const newAdjustment = new StockAdjustment({
-            materialId: returnItem.materialId,
-            materialName: returnItem.materialName,
-            adjustmentType: 'decrement',
-            value: returnItem.returnQuantity,
-            oldStock,
-            newStock,
-            oldUnitCost: material.unitCost,
-            newUnitCost: material.unitCost,
-            adjustmentReason: `Return Note ${returnNumber} approved`,
-            createdAt: new Date(),
-          });
-
-          await newAdjustment.save();
-        }
-      }
-
-      console.log(`✅ Return Note ${returnNumber} approved - stock reduced`);
-    } else {
-      // Just save purchase with new return note reference
-      await purchase.save();
+      console.log(`✅ Sales Return Note ${returnNumber} linked to invoice${status === 'approved' ? ' - returned quantities updated' : ''}`);
     }
 
     return NextResponse.json({

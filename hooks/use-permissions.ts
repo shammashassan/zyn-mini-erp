@@ -224,6 +224,21 @@ export function useDebitNotePermissions() {
   });
 }
 
+// Specific hook for credit note permissions
+export function useCreditNotePermissions() {
+  return usePermissions({
+    canRead: { creditNote: ["read"] },
+    canCreate: { creditNote: ["create"] },
+    canUpdate: { creditNote: ["update"] },
+    canUpdateStatus: { creditNote: ["update_status"] },
+    canDelete: { creditNote: ["soft_delete"] },
+    canViewTrash: { creditNote: ["view_trash"] },
+    canRestore: { creditNote: ["restore"] },
+    canPermanentDelete: { creditNote: ["permanent_delete"] },
+    canCreatePayment: { creditNote: ["create_payment"] },
+  });
+}
+
 // Specific hook for delivery notes
 export function useDeliveryNotePermissions() {
   return usePermissions({

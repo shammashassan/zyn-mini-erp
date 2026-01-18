@@ -25,7 +25,7 @@ export interface IJournal extends Document {
   _id: string;
   journalNumber: string;
   entryDate: Date;
-  referenceType: 'Invoice' | 'Receipt' | 'Payment' | 'Purchase' | 'Expense' | 'Refund' | 'Manual';
+  referenceType: 'Invoice' | 'Receipt' | 'Payment' | 'Purchase' | 'Expense' | 'DebitNote' | 'CreditNote' | 'Manual';
   referenceId?: string;
   referenceNumber?: string;
   
@@ -97,7 +97,7 @@ const JournalSchema: Schema<IJournal> = new Schema({
   },
   referenceType: { 
     type: String, 
-    enum: ['Invoice', 'Receipt', 'Payment', 'Purchase', 'Expense', 'Refund', 'Manual'],
+    enum: ['Invoice', 'Receipt', 'Payment', 'Purchase', 'Expense', 'DebitNote', 'CreditNote', 'Manual'],
     required: true,
     index: true 
   },

@@ -31,8 +31,6 @@ export interface IAuditEntry {
 export interface IDebitNote extends Document {
   _id: string;
   debitNoteNumber: string;
-  returnNoteId?: mongoose.Types.ObjectId;
-  returnNumber?: string;
   supplierName?: string;
   supplierId?: mongoose.Types.ObjectId;
   customerName?: string;
@@ -60,6 +58,7 @@ export interface IDebitNote extends Document {
   debitType: 'return' | 'adjustment' | 'standalone';
   
   connectedDocuments: {
+    returnNoteId?: mongoose.Types.ObjectId;
     receiptIds?: mongoose.Types.ObjectId[];
   };
   
@@ -119,11 +118,6 @@ const AuditEntrySchema: Schema = new Schema({
 
 const DebitNoteSchema: Schema<IDebitNote> = new Schema({
   debitNoteNumber: { type: String, required: true, unique: true },
-  returnNoteId: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'ReturnNote',
-  },
-  returnNumber: { type: String },
   supplierName: { type: String, required: false },
   supplierId: { type: Schema.Types.ObjectId, ref: 'Supplier', required: false },
   customerName: { type: String, required: false },
@@ -164,6 +158,7 @@ const DebitNoteSchema: Schema<IDebitNote> = new Schema({
   
   connectedDocuments: {
     type: {
+      returnNoteId: { type: Schema.Types.ObjectId, ref: 'ReturnNote' },
       receiptIds: [{ type: Schema.Types.ObjectId, ref: 'Voucher' }]
     },
     default: { receiptIds: [] }
@@ -182,7 +177,7 @@ const DebitNoteSchema: Schema<IDebitNote> = new Schema({
 DebitNoteSchema.index({ isDeleted: 1, debitDate: -1 });
 DebitNoteSchema.index({ status: 1 });
 DebitNoteSchema.index({ paymentStatus: 1 });
-DebitNoteSchema.index({ returnNoteId: 1 });
+DebitNoteSchema.index({ 'connectedDocuments.returnNoteId': 1 });
 DebitNoteSchema.index({ supplierName: 1 });
 DebitNoteSchema.index({ supplierId: 1 });
 DebitNoteSchema.index({ customerName: 1 });

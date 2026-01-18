@@ -1,4 +1,4 @@
-// app/api/invoices/route.ts - FIXED: Added Date Range Filtering
+// app/api/invoices/route.ts
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -36,14 +36,12 @@ export async function GET(request: Request) {
       // 🚀 SERVER-SIDE MODE: Handle pagination, sorting, and filtering
       const { page, pageSize, sorting, filters } = extractTableParams(searchParams);
       
-      console.log('📊 Server-side request:', { page, pageSize, sorting, filters, startDateParam, endDateParam });
-
       // Base filter (always exclude deleted items)
       const baseFilter: any = { isDeleted: false };
 
-      // ✅ UPDATED: Apply Date Range Filter using invoiceDate
+      // Apply Date Range Filter using invoiceDate
       if (startDateParam || endDateParam) {
-        baseFilter.invoiceDate = {}; // Changed from createdAt to invoiceDate
+        baseFilter.invoiceDate = {};
         if (startDateParam) {
           baseFilter.invoiceDate.$gte = new Date(startDateParam);
         }
@@ -64,11 +62,6 @@ export async function GET(request: Request) {
           match: { isDeleted: false }
         },
         {
-          path: 'connectedDocuments.refundIds',
-          select: 'invoiceNumber grandTotal voucherType isDeleted',
-          match: { isDeleted: false }
-        },
-        {
           path: 'connectedDocuments.deliveryId',
           select: 'invoiceNumber status isDeleted',
           match: { isDeleted: false }
@@ -77,17 +70,22 @@ export async function GET(request: Request) {
           path: 'connectedDocuments.quotationId',
           select: 'invoiceNumber status isDeleted',
           match: { isDeleted: false }
-        }
+        },
+        {
+          path: 'connectedDocuments.returnNoteIds',
+          select: 'returnNumber returnType status isDeleted',
+          match: { isDeleted: false }
+        },
       ] : undefined;
 
-      // Execute paginated query - ✅ UPDATED: Default sort by invoiceDate
+      // Execute paginated query
       const result = await executePaginatedQuery(Invoice, {
         baseFilter,
         columnFilters: filters,
         sorting,
         page,
         pageSize,
-        defaultSort: { invoiceDate: -1 }, // Changed from createdAt to invoiceDate
+        defaultSort: { invoiceDate: -1 },
         populate: populateOptions,
       });
 
@@ -120,9 +118,9 @@ export async function GET(request: Request) {
         filter.status = 'overdue';
       }
 
-      // ✅ UPDATED: Apply Date Range using invoiceDate (Supports both 'startDate/endDate' and 'from/to')
+      // Apply Date Range using invoiceDate
       if (startDateParam || endDateParam) {
-        filter.invoiceDate = {}; // Changed from createdAt to invoiceDate
+        filter.invoiceDate = {};
         if (startDateParam) filter.invoiceDate.$gte = new Date(startDateParam);
         if (endDateParam) {
           const toDate = new Date(endDateParam);
@@ -131,7 +129,7 @@ export async function GET(request: Request) {
         }
       }
 
-      let query = Invoice.find(filter).sort({ invoiceDate: -1 }); // ✅ UPDATED: Sort by invoiceDate
+      let query = Invoice.find(filter).sort({ invoiceDate: -1 });
 
       if (populate) {
         query = query
@@ -141,13 +139,13 @@ export async function GET(request: Request) {
             match: { isDeleted: false }
           })
           .populate({
-            path: 'connectedDocuments.refundIds',
-            select: 'invoiceNumber grandTotal voucherType isDeleted',
+            path: 'connectedDocuments.deliveryId',
+            select: 'invoiceNumber status isDeleted',
             match: { isDeleted: false }
           })
           .populate({
-            path: 'connectedDocuments.deliveryId',
-            select: 'invoiceNumber status isDeleted',
+            path: 'connectedDocuments.returnNoteIds',
+            select: 'returnNumber returnType status isDeleted',
             match: { isDeleted: false }
           })
           .populate({
@@ -203,7 +201,7 @@ export async function POST(request: Request) {
       discount = 0,
       notes,
       status,
-      invoiceDate, // ✅ NEW: Invoice date field
+      invoiceDate,
       connectedDocuments,
       vatAmount: customVatAmount,
       totalAmount: customTotalAmount,
@@ -223,7 +221,6 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // ✅ NEW: Validate invoice date
     if (!invoiceDate) {
       return NextResponse.json({
         error: 'Invoice date is required'
@@ -279,7 +276,7 @@ export async function POST(request: Request) {
       items,
       discount,
       notes,
-      invoiceDate: new Date(invoiceDate), // ✅ NEW: Set invoice date
+      invoiceDate: new Date(invoiceDate),
       totalAmount: finalTotalAmount,
       vatAmount: finalVatAmount,
       grandTotal: finalGrandTotal,
@@ -308,7 +305,6 @@ export async function POST(request: Request) {
       await newInvoice.save();
 
       console.log(`✅ Successfully created invoice: ${newInvoice.invoiceNumber}`);
-      console.log(`   Gross Total: ${grossTotal}, VAT: ${finalVatAmount}, Subtotal: ${subtotal}, Discount: ${discount}, Grand Total: ${finalGrandTotal}`);
 
       // Conditional journal entry creation - only for APPROVED invoices
       if (newInvoice.status === 'approved') {

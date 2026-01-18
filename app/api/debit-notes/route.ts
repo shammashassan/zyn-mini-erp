@@ -44,7 +44,7 @@ export async function GET(request: Request) {
 
       const populateOptions = populate ? [
         {
-          path: 'returnNoteId',
+          path: 'connectedDocuments.returnNoteId',
           select: 'returnNumber purchaseReference supplierName',
           match: { isDeleted: false }
         },
@@ -92,7 +92,7 @@ export async function GET(request: Request) {
       if (populate) {
         query = query
           .populate({
-            path: 'returnNoteId',
+            path: 'connectedDocuments.returnNoteId',
             select: 'returnNumber purchaseReference supplierName',
             match: { isDeleted: false }
           })
@@ -160,7 +160,6 @@ export async function POST(request: Request) {
     }
 
     // If linked to return note, validate
-    let returnNumber = undefined;
     if (returnNoteId && debitType === 'return') {
       const returnNote = await ReturnNote.findById(returnNoteId);
       if (!returnNote || returnNote.isDeleted) {
@@ -172,8 +171,6 @@ export async function POST(request: Request) {
           error: "This return note already has a linked debit note"
         }, { status: 400 });
       }
-
-      returnNumber = returnNote.returnNumber;
     }
 
     // Calculate amounts
@@ -210,8 +207,6 @@ export async function POST(request: Request) {
     // Create debit note
     const newDebitNote = new DebitNote({
       debitNoteNumber,
-      returnNoteId: returnNoteId || undefined,
-      returnNumber,
       supplierName: supplierName || undefined,
       supplierId: supplierId || undefined,
       customerName: customerName || undefined,
@@ -234,7 +229,10 @@ export async function POST(request: Request) {
       receivedAmount: 0,
       remainingAmount: grandTotal,
       paymentStatus: 'pending',
-      connectedDocuments: { receiptIds: [] },
+      connectedDocuments: { 
+        returnNoteId: returnNoteId || undefined,
+        receiptIds: [] 
+      },
       isDeleted: false,
       deletedAt: null,
       deletedBy: null,
@@ -251,8 +249,8 @@ export async function POST(request: Request) {
     const savedDebitNote = await newDebitNote.save();
 
     // If linked to return note, update it
-    if (returnNoteId && debitType === 'return') {
-      await ReturnNote.findByIdAndUpdate(returnNoteId, {
+    if (savedDebitNote.connectedDocuments?.returnNoteId) {
+      await ReturnNote.findByIdAndUpdate(savedDebitNote.connectedDocuments.returnNoteId, {
         'connectedDocuments.debitNoteId': savedDebitNote._id
       });
     }

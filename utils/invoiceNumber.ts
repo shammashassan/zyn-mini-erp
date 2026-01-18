@@ -1,4 +1,4 @@
-// utils/invoiceNumber.ts - UPDATED: Added refund type
+// utils/invoiceNumber.ts - FIXED: Voucher number generation
 
 import dbConnect from '@/lib/dbConnect';
 import Invoice from '@/models/Invoice';
@@ -17,8 +17,8 @@ type DocumentType =
   | 'quotation'
   | 'receipt'
   | 'payment'
-  | 'refund' // ✅ ADDED
   | 'debitNote'
+  | 'creditNote'
   | 'delivery'
   | 'journal'
   | 'purchase'
@@ -31,8 +31,8 @@ const prefixes: Record<DocumentType, string> = {
   quotation: 'QT',
   receipt: 'RCP',
   payment: 'PAY',
-  refund: 'RFN', // ✅ ADDED
   debitNote: 'DBN',
+  creditNote: 'CRN',
   delivery: 'DLV',
   journal: 'JE',
   purchase: 'PUR',
@@ -43,7 +43,7 @@ const prefixes: Record<DocumentType, string> = {
 /**
  * Generate a unique reference number with retry mechanism
  * Format: PREFIX-YYYYMMDD-SEQUENCE
- * Examples: INV-20251024-0001, QT-20251025-0001, RFN-20251024-0001
+ * Examples: INV-20251024-0001, QT-20251025-0001, RCP-20251024-0001, PAY-20251024-0001
  */
 export default async function generateInvoiceNumber(
   documentType: DocumentType,
@@ -72,9 +72,9 @@ export default async function generateInvoiceNumber(
           Model = Quotation;
           query = { invoiceNumber: { $regex: searchPattern } };
           break;
+        // ✅ FIXED: Receipt and Payment use Voucher model with invoiceNumber field
         case 'receipt':
         case 'payment':
-        case 'refund': // ✅ ADDED: Refund uses Voucher model
           Model = Voucher;
           query = { invoiceNumber: { $regex: searchPattern } };
           break;
@@ -82,6 +82,10 @@ export default async function generateInvoiceNumber(
           Model = (await import('@/models/DebitNote')).default;
           query = { debitNoteNumber: { $regex: searchPattern } };
           break;
+        case 'creditNote':
+          Model = (await import('@/models/CreditNote')).default;
+          query = { creditNoteNumber: { $regex: searchPattern } };
+          break;  
         case 'delivery':
           Model = DeliveryNote;
           query = { invoiceNumber: { $regex: searchPattern } };
@@ -98,7 +102,7 @@ export default async function generateInvoiceNumber(
           Model = Journal;
           query = { journalNumber: { $regex: searchPattern } };
           break;
-        case 'return': // ✅ Return notes
+        case 'return':
           Model = ReturnNote;
           query = { returnNumber: { $regex: searchPattern } };
           break;
@@ -124,7 +128,10 @@ export default async function generateInvoiceNumber(
         exists = await Model.findOne({ returnNumber: generatedNumber });
       } else if (documentType === 'debitNote') {
         exists = await Model.findOne({ debitNoteNumber: generatedNumber });
+      } else if (documentType === 'creditNote') {
+        exists = await Model.findOne({ creditNoteNumber: generatedNumber });
       } else {
+        // ✅ For invoice, quotation, delivery, receipt, payment - all use invoiceNumber
         exists = await Model.findOne({ invoiceNumber: generatedNumber });
       }
 

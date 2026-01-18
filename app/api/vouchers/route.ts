@@ -1,4 +1,4 @@
-// app/api/vouchers/route.ts - UPDATED: Added Debit Note Allocation Support
+// app/api/vouchers/route.ts
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -7,10 +7,12 @@ import Customer from "@/models/Customer";
 import Supplier from "@/models/Supplier";
 import Payee from "@/models/Payee";
 import Purchase from "@/models/Purchase";
+import Expense from "@/models/Expense";
 import Invoice from "@/models/Invoice";
-import DebitNote from "@/models/DebitNote"; // ✅ NEW
+import DebitNote from "@/models/DebitNote";
+import CreditNote from "@/models/CreditNote";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
-import { createJournalForVoucher, createJournalForRefund } from '@/utils/journalAutoCreate';
+import { createJournalForVoucher } from '@/utils/journalAutoCreate';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
@@ -25,19 +27,19 @@ export async function GET(request: Request) {
     await dbConnect();
 
     const { searchParams } = new URL(request.url);
-    
+
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
 
     const startDateParam = searchParams.get('startDate') || searchParams.get('from');
     const endDateParam = searchParams.get('endDate') || searchParams.get('to');
-    
+
     if (isServerSide) {
       const { page, pageSize, sorting, filters } = extractTableParams(searchParams);
-      
+
       console.log('📊 Server-side voucher request:', { page, pageSize, sorting, filters, startDateParam, endDateParam });
 
       const baseFilter: any = { isDeleted: false };
-      
+
       if (startDateParam || endDateParam) {
         baseFilter.voucherDate = {};
         if (startDateParam) {
@@ -54,7 +56,7 @@ export async function GET(request: Request) {
       if (partyFilterIndex !== -1) {
         const partyFilter = filters[partyFilterIndex];
         const searchRegex = { $regex: partyFilter.value, $options: 'i' };
-        
+
         baseFilter.$or = [
           { customerName: searchRegex },
           { supplierName: searchRegex },
@@ -88,10 +90,14 @@ export async function GET(request: Request) {
           select: 'referenceNumber amount status paymentStatus isDeleted',
           match: { isDeleted: false }
         },
-        // ✅ NEW: Debit Note population
         {
           path: 'connectedDocuments.debitNoteIds',
           select: 'debitNoteNumber grandTotal status isDeleted',
+          match: { isDeleted: false }
+        },
+        {
+          path: 'connectedDocuments.creditNoteIds',
+          select: 'creditNoteNumber grandTotal status isDeleted',
           match: { isDeleted: false }
         },
         { path: 'payeeId', select: 'name type', match: { isDeleted: false } },
@@ -159,10 +165,14 @@ export async function GET(request: Request) {
             select: 'referenceNumber amount status paymentStatus isDeleted',
             match: { isDeleted: false }
           })
-          // ✅ NEW: Debit Note population
           .populate({
             path: 'connectedDocuments.debitNoteIds',
             select: 'debitNoteNumber grandTotal status isDeleted',
+            match: { isDeleted: false }
+          })
+          .populate({
+            path: 'connectedDocuments.creditNoteIds',
+            select: 'creditNoteNumber grandTotal status isDeleted',
             match: { isDeleted: false }
           })
           .populate('payeeId', 'name type')
@@ -190,7 +200,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    
+
     const { error, session } = await requireAuthAndPermission({
       voucher: ["create"],
     });
@@ -220,9 +230,9 @@ export async function POST(request: Request) {
     } = body;
 
     // Validation
-    if (!voucherType || !['receipt', 'payment', 'refund'].includes(voucherType)) {
+    if (!voucherType || !['receipt', 'payment'].includes(voucherType)) {
       return NextResponse.json({
-        error: 'Valid voucherType (receipt, payment, or refund) is required'
+        error: 'Valid voucherType (receipt or payment) is required'
       }, { status: 400 });
     }
 
@@ -233,8 +243,8 @@ export async function POST(request: Request) {
     }
 
     if (!Array.isArray(items)) {
-      return NextResponse.json({ 
-        error: 'Items array is required' 
+      return NextResponse.json({
+        error: 'Items array is required'
       }, { status: 400 });
     }
 
@@ -307,8 +317,8 @@ export async function POST(request: Request) {
     }
 
     const allocations: any[] = [];
-    let connectedIds: any = {};
-    
+    let connectedIds: any = {}; // ✅ Initialize empty object
+
     // ✅ RECEIPT: Handle Invoice allocations
     if (voucherType === 'receipt' && connectedDocuments?.invoiceIds) {
       const invoiceIds = connectedDocuments.invoiceIds;
@@ -337,10 +347,10 @@ export async function POST(request: Request) {
           }
         }
       }
-      connectedIds = { invoiceIds };
+      connectedIds.invoiceIds = invoiceIds; // ✅ Add to object
     }
-    
-    // ✅ NEW: RECEIPT - Handle Debit Note allocations
+
+    // ✅ RECEIPT - Handle Debit Note allocations
     if (voucherType === 'receipt' && connectedDocuments?.debitNoteIds) {
       const debitNoteIds = connectedDocuments.debitNoteIds;
       if (debitNoteIds.length > 0) {
@@ -350,11 +360,11 @@ export async function POST(request: Request) {
             const debitNote = debitNotes[0];
             const remaining = debitNote.grandTotal - debitNote.getTotalAllocated();
             if (remaining >= finalGrandTotal) {
-              allocations.push({ 
-                documentId: debitNote._id, 
-                documentType: 'debitNote', 
-                amount: finalGrandTotal, 
-                createdAt: new Date() 
+              allocations.push({
+                documentId: debitNote._id,
+                documentType: 'debitNote',
+                amount: finalGrandTotal,
+                createdAt: new Date()
               });
             }
           } else {
@@ -364,19 +374,19 @@ export async function POST(request: Request) {
               for (let i = 0; i < debitNotes.length; i++) {
                 const debitNote = debitNotes[i];
                 const debitNoteRemaining = debitNote.grandTotal - debitNote.getTotalAllocated();
-                let allocationAmount = (i === debitNotes.length - 1) 
-                  ? remaining 
+                let allocationAmount = (i === debitNotes.length - 1)
+                  ? remaining
                   : Math.min(
-                      Math.round(finalGrandTotal * (debitNoteRemaining / totalRemaining) * 100) / 100, 
-                      debitNoteRemaining, 
-                      remaining
-                    );
+                    Math.round(finalGrandTotal * (debitNoteRemaining / totalRemaining) * 100) / 100,
+                    debitNoteRemaining,
+                    remaining
+                  );
                 if (allocationAmount > 0) {
-                  allocations.push({ 
-                    documentId: debitNote._id, 
-                    documentType: 'debitNote', 
-                    amount: allocationAmount, 
-                    createdAt: new Date() 
+                  allocations.push({
+                    documentId: debitNote._id,
+                    documentType: 'debitNote',
+                    amount: allocationAmount,
+                    createdAt: new Date()
                   });
                   remaining -= allocationAmount;
                 }
@@ -385,101 +395,101 @@ export async function POST(request: Request) {
           }
         }
       }
-      connectedIds = { ...connectedIds, debitNoteIds };
+      connectedIds.debitNoteIds = debitNoteIds; // ✅ Add to object
     }
-    
-    // PAYMENT: Handle Purchase allocations
+
+    // ✅ PAYMENT: Handle Purchase allocations
     if (voucherType === 'payment' && connectedDocuments?.purchaseIds) {
-       const purchaseIds = connectedDocuments.purchaseIds;
-       if (purchaseIds.length > 0) {
-         const purchases = await Purchase.find({ _id: { $in: purchaseIds }, isDeleted: false });
-         if (purchases.length === purchaseIds.length) {
-             if (purchaseIds.length === 1) {
-                const purchase = purchases[0];
-                if (purchase.canAllocate(finalGrandTotal)) {
-                   allocations.push({ documentId: purchase._id, documentType: 'purchase', amount: finalGrandTotal, createdAt: new Date() });
+      const purchaseIds = connectedDocuments.purchaseIds;
+      if (purchaseIds.length > 0) {
+        const purchases = await Purchase.find({ _id: { $in: purchaseIds }, isDeleted: false });
+        if (purchases.length === purchaseIds.length) {
+          if (purchaseIds.length === 1) {
+            const purchase = purchases[0];
+            if (purchase.canAllocate(finalGrandTotal)) {
+              allocations.push({ documentId: purchase._id, documentType: 'purchase', amount: finalGrandTotal, createdAt: new Date() });
+            }
+          } else {
+            let remaining = finalGrandTotal;
+            const totalRemaining = purchases.reduce((sum, p) => sum + (p.grandTotal - p.getTotalAllocated()), 0);
+            if (totalRemaining >= finalGrandTotal) {
+              for(let i=0; i<purchases.length; i++){
+                const p = purchases[i];
+                const pRem = p.grandTotal - p.getTotalAllocated();
+                let amt = (i === purchases.length - 1) ? remaining : Math.min(Math.round(finalGrandTotal * (pRem / totalRemaining) * 100) / 100, pRem, remaining);
+                if(amt > 0) {
+                  allocations.push({ documentId: p._id, documentType: 'purchase', amount: amt, createdAt: new Date() });
+                  remaining -= amt;
                 }
-             } else {
-                let remaining = finalGrandTotal;
-                const totalRemaining = purchases.reduce((sum, p) => sum + (p.grandTotal - p.getTotalAllocated()), 0);
-                if (totalRemaining >= finalGrandTotal) {
-                    for(let i=0; i<purchases.length; i++){
-                        const p = purchases[i];
-                        const pRem = p.grandTotal - p.getTotalAllocated();
-                        let amt = (i === purchases.length - 1) ? remaining : Math.min(Math.round(finalGrandTotal * (pRem / totalRemaining) * 100) / 100, pRem, remaining);
-                        if(amt > 0) {
-                            allocations.push({ documentId: p._id, documentType: 'purchase', amount: amt, createdAt: new Date() });
-                            remaining -= amt;
-                        }
-                    }
-                }
-             }
-         }
-       }
-       connectedIds = { purchaseIds };
+              }
+            }
+          }
+        }
+      }
+      connectedIds.purchaseIds = purchaseIds; // ✅ Add to object
     }
 
-    // PAYMENT: Handle Expense allocations
+    // ✅ PAYMENT: Handle Expense allocations
     if (voucherType === 'payment' && connectedDocuments?.expenseIds) {
-        const expenseIds = connectedDocuments.expenseIds;
-        if(expenseIds.length > 0) {
-            const Expense = (await import('@/models/Expense')).default;
-            const expenses = await Expense.find({ _id: { $in: expenseIds }, isDeleted: false });
-             if (expenses.length === expenseIds.length) {
-                if (expenseIds.length === 1) {
-                    const exp = expenses[0];
-                    if (exp.canAllocate(finalGrandTotal)) {
-                        allocations.push({ documentId: exp._id, documentType: 'expense', amount: finalGrandTotal, createdAt: new Date() });
-                    }
-                } else {
-                     let remaining = finalGrandTotal;
-                     const totalRemaining = expenses.reduce((sum, e) => sum + (e.amount - e.getTotalAllocated()), 0);
-                     if (totalRemaining >= finalGrandTotal) {
-                        for(let i=0; i<expenses.length; i++){
-                            const e = expenses[i];
-                            const eRem = e.amount - e.getTotalAllocated();
-                            let amt = (i === expenses.length - 1) ? remaining : Math.min(Math.round(finalGrandTotal * (eRem / totalRemaining) * 100) / 100, eRem, remaining);
-                            if(amt > 0) {
-                                allocations.push({ documentId: e._id, documentType: 'expense', amount: amt, createdAt: new Date() });
-                                remaining -= amt;
-                            }
-                        }
-                     }
+      const expenseIds = connectedDocuments.expenseIds;
+      if(expenseIds.length > 0) {
+        const expenses = await Expense.find({ _id: { $in: expenseIds }, isDeleted: false });
+        if (expenses.length === expenseIds.length) {
+          if (expenseIds.length === 1) {
+            const exp = expenses[0];
+            if (exp.canAllocate(finalGrandTotal)) {
+              allocations.push({ documentId: exp._id, documentType: 'expense', amount: finalGrandTotal, createdAt: new Date() });
+            }
+          } else {
+            let remaining = finalGrandTotal;
+            const totalRemaining = expenses.reduce((sum, e) => sum + (e.amount - e.getTotalAllocated()), 0);
+            if (totalRemaining >= finalGrandTotal) {
+              for(let i=0; i<expenses.length; i++){
+                const e = expenses[i];
+                const eRem = e.amount - e.getTotalAllocated();
+                let amt = (i === expenses.length - 1) ? remaining : Math.min(Math.round(finalGrandTotal * (eRem / totalRemaining) * 100) / 100, eRem, remaining);
+                if(amt > 0) {
+                  allocations.push({ documentId: e._id, documentType: 'expense', amount: amt, createdAt: new Date() });
+                  remaining -= amt;
                 }
-             }
+              }
+            }
+          }
         }
-        connectedIds = { expenseIds };
+      }
+      connectedIds.expenseIds = expenseIds; // ✅ Add to object (FIXED - was overwriting)
     }
 
-    // REFUND: Handle Invoice allocations
-    if (voucherType === 'refund' && connectedDocuments?.invoiceIds) {
-        const invoiceIds = connectedDocuments.invoiceIds;
-        if (invoiceIds.length > 0) {
-            const invoices = await Invoice.find({ _id: { $in: invoiceIds }, isDeleted: false });
-             if (invoices.length === invoiceIds.length) {
-                if (invoiceIds.length === 1) {
-                    const inv = invoices[0];
-                    if (inv.canRefund(finalGrandTotal)) {
-                         allocations.push({ documentId: inv._id, documentType: 'invoice', amount: finalGrandTotal, createdAt: new Date() });
-                    }
-                } else {
-                    let remaining = finalGrandTotal;
-                    const totalPaid = invoices.reduce((sum, inv) => sum + inv.paidAmount, 0);
-                    if (totalPaid >= finalGrandTotal) {
-                         for(let i=0; i<invoices.length; i++) {
-                             const inv = invoices[i];
-                             const maxRefund = inv.paidAmount - inv.getTotalRefunded();
-                             let amt = (i === invoices.length - 1) ? remaining : Math.min(Math.round(finalGrandTotal * (inv.paidAmount / totalPaid) * 100) / 100, maxRefund, remaining);
-                             if (amt > 0) {
-                                 allocations.push({ documentId: inv._id, documentType: 'invoice', amount: amt, createdAt: new Date() });
-                                 remaining -= amt;
-                             }
-                         }
-                    }
+    // ✅ PAYMENT - Handle Credit Note allocations
+    if (voucherType === 'payment' && connectedDocuments?.creditNoteIds) {
+      const creditNoteIds = connectedDocuments.creditNoteIds;
+      if (creditNoteIds.length > 0) {
+        const creditNotes = await CreditNote.find({ _id: { $in: creditNoteIds }, isDeleted: false });
+        if (creditNotes.length === creditNoteIds.length) {
+          if (creditNoteIds.length === 1) {
+            const creditNote = creditNotes[0];
+            const remaining = creditNote.grandTotal - creditNote.getTotalAllocated();
+            if (remaining >= finalGrandTotal) {
+              allocations.push({ documentId: creditNote._id, documentType: 'creditNote', amount: finalGrandTotal, createdAt: new Date() });
+            }
+          } else {
+            let remaining = finalGrandTotal;
+            const totalRemaining = creditNotes.reduce((sum, cn) => sum + (cn.grandTotal - cn.getTotalAllocated()), 0);
+            if (totalRemaining >= finalGrandTotal) {
+              for (let i = 0; i < creditNotes.length; i++) {
+                const cn = creditNotes[i];
+                const cnRem = cn.grandTotal - cn.getTotalAllocated();
+                let amt = (i === creditNotes.length - 1) ? remaining : Math.min(Math.round(finalGrandTotal * (cnRem / totalRemaining) * 100) / 100, cnRem, remaining);
+                if (amt > 0) {
+                  allocations.push({ documentId: cn._id, documentType: 'creditNote', amount: amt, createdAt: new Date() });
+                  remaining -= amt;
                 }
-             }
+              }
+            }
+          }
         }
-        connectedIds = { invoiceIds };
+      }
+      connectedIds.creditNoteIds = creditNoteIds; // ✅ Add to object
     }
 
     const voucherData: any = {
@@ -531,7 +541,7 @@ export async function POST(request: Request) {
       }
 
       // ✅ Apply Allocations to Invoices
-       if (voucherType === 'receipt' && allocations.length > 0) {
+      if (voucherType === 'receipt' && allocations.length > 0) {
         for (const allocation of allocations) {
           if (allocation.documentType === 'invoice') {
             const invoice = await Invoice.findById(allocation.documentId);
@@ -546,7 +556,6 @@ export async function POST(request: Request) {
               await invoice.save();
             }
           }
-          // ✅ NEW: Apply allocations to Debit Notes
           else if (allocation.documentType === 'debitNote') {
             const debitNote = await DebitNote.findById(allocation.documentId);
             if (debitNote && !debitNote.isDeleted) {
@@ -563,7 +572,7 @@ export async function POST(request: Request) {
         }
       }
 
-      // Apply allocations to Purchases
+      // Apply allocations to Purchases and Credit Notes
       if (voucherType === 'payment' && allocations.length > 0) {
         for (const allocation of allocations) {
           if (allocation.documentType === 'purchase') {
@@ -579,56 +588,37 @@ export async function POST(request: Request) {
               await purchase.save();
             }
           } else if (allocation.documentType === 'expense') {
-             const Expense = (await import('@/models/Expense')).default;
-             const expense = await Expense.findById(allocation.documentId);
-             if (expense && !expense.isDeleted) {
-               expense.allocatePayment(newVoucher._id, allocation.amount);
-               const currentIds = expense.connectedDocuments?.paymentIds || [];
-               if (!currentIds.some((id: any) => id.toString() === newVoucher._id.toString())) {
-                  currentIds.push(newVoucher._id);
-                  expense.connectedDocuments = expense.connectedDocuments || { paymentIds: [] };
-                  expense.connectedDocuments.paymentIds = currentIds;
-               }
-               await expense.save();
-             }
+            const expense = await Expense.findById(allocation.documentId);
+            if (expense && !expense.isDeleted) {
+              expense.allocatePayment(newVoucher._id, allocation.amount);
+              const currentIds = expense.connectedDocuments?.paymentIds || [];
+              if (!currentIds.some((id: any) => id.toString() === newVoucher._id.toString())) {
+                currentIds.push(newVoucher._id);
+                expense.connectedDocuments = expense.connectedDocuments || { paymentIds: [] };
+                expense.connectedDocuments.paymentIds = currentIds;
+              }
+              await expense.save();
+            }
+          }
+          else if (allocation.documentType === 'creditNote') {
+            const creditNote = await CreditNote.findById(allocation.documentId);
+            if (creditNote && !creditNote.isDeleted) {
+              creditNote.allocatePayment(newVoucher._id, allocation.amount);
+              const currentPaymentIds = creditNote.connectedDocuments?.paymentIds || [];
+              if (!currentPaymentIds.some((pid: any) => pid.toString() === newVoucher._id.toString())) {
+                currentPaymentIds.push(newVoucher._id);
+                creditNote.connectedDocuments = creditNote.connectedDocuments || { paymentIds: [] };
+                creditNote.connectedDocuments.paymentIds = currentPaymentIds;
+              }
+              await creditNote.save();
+            }
           }
         }
       }
 
-      // Apply allocations for Refunds
-      if (voucherType === 'refund' && allocations.length > 0) {
-         for (const allocation of allocations) {
-            const invoice = await Invoice.findById(allocation.documentId);
-            if (invoice && !invoice.isDeleted) {
-               invoice.allocateRefund(newVoucher._id, allocation.amount);
-               const currentIds = invoice.connectedDocuments?.refundIds || [];
-               if (!currentIds.some((id: any) => id.toString() === newVoucher._id.toString())) {
-                  currentIds.push(newVoucher._id);
-                  invoice.connectedDocuments = invoice.connectedDocuments || { refundIds: [] };
-                  invoice.connectedDocuments.refundIds = currentIds;
-               }
-               invoice.status = 'cancelled';
-               await invoice.save();
-
-               const { handleInvoiceStatusChange } = await import('@/utils/journalAutoCreate');
-               await handleInvoiceStatusChange(
-                invoice.toObject(),
-                'approved',
-                'cancelled',
-                user.id,
-                user.username || user.name
-               );
-            }
-         }
-      }
-
       // Create journal entries
       try {
-        if (voucherType === 'refund') {
-          await createJournalForRefund(newVoucher.toObject(), user.id, user.username || user.name);
-        } else {
-          await createJournalForVoucher(newVoucher.toObject(), user.id, user.username || user.name);
-        }
+        await createJournalForVoucher(newVoucher.toObject(), user.id, user.username || user.name);
       } catch (journalError) {
         console.error('Failed to create journal entry:', journalError);
       }
@@ -652,7 +642,6 @@ export async function POST(request: Request) {
       }
       throw saveError;
     }
-
   } catch (error: any) {
     console.error('❌ Error in POST /api/vouchers:', error);
     return NextResponse.json({

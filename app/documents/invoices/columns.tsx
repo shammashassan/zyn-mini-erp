@@ -1,4 +1,4 @@
-// app/invoices/columns.tsx - UPDATED: Added View Details option
+// app/invoices/columns.tsx
 
 "use client";
 
@@ -68,6 +68,7 @@ export interface Invoice {
   grandTotal: number;
   status: "pending" | "approved" | "cancelled";
   items: Array<{
+    productId?: string;
     description: string;
     quantity: number;
     rate: number;
@@ -75,11 +76,10 @@ export interface Invoice {
   }>;
   connectedDocuments?: {
     receiptIds?: (string | ConnectedDocument)[];
-    refundIds?: (string | ConnectedDocument)[];
     deliveryId?: string | ConnectedDocument;
     quotationId?: string | ConnectedDocument;
   };
-  paymentStatus: 'Paid' | 'Pending' | 'Partially Paid' | 'Refunded';
+  paymentStatus: 'Paid' | 'Pending' | 'Partially Paid';
   paidAmount: number;
   receivedAmount: number;
   remainingAmount?: number;
@@ -121,7 +121,6 @@ const getPaymentStatusVariant = (status: string) => {
     case 'Paid': return 'success';
     case 'Partially Paid': return 'primary';
     case 'Pending': return 'warning';
-    case 'Refunded': return 'pink';
     default: return 'secondary';
   }
 };
@@ -131,7 +130,6 @@ const getPaymentStatusIcon = (status: string) => {
     case 'Paid': return CheckCircle;
     case 'Partially Paid': return CreditCard;
     case 'Pending': return Clock;
-    case 'Refunded': return RotateCcw;
     default: return DollarSign;
   }
 };
@@ -139,7 +137,7 @@ const getPaymentStatusIcon = (status: string) => {
 const CreateReceiptButton = ({ invoice, onRefresh, canCreateReceipt }: { invoice: Invoice; onRefresh: () => void; canCreateReceipt: boolean }) => {
   const [isOpen, setIsOpen] = React.useState(false);
 
-  if (invoice.status !== 'approved' || invoice.paymentStatus === 'Paid' || invoice.paymentStatus === 'Refunded') {
+  if (invoice.status !== 'approved' || invoice.paymentStatus === 'Paid') {
     return null;
   }
 
@@ -176,7 +174,7 @@ const CreateReceiptButton = ({ invoice, onRefresh, canCreateReceipt }: { invoice
 const CreateDeliveryButton = ({ invoice, onRefresh, canCreateDelivery }: { invoice: Invoice; onRefresh: () => void; canCreateDelivery: boolean }) => {
   const [isOpen, setIsOpen] = React.useState(false);
 
-  if (invoice.status !== 'approved' || invoice.connectedDocuments?.deliveryId || invoice.paymentStatus === 'Refunded') {
+  if (invoice.status !== 'approved' || invoice.connectedDocuments?.deliveryId) {
     return null;
   }
 
@@ -247,7 +245,7 @@ const StatusBadgeButton = ({ invoice, onRefresh, canUpdateStatus }: { invoice: I
 interface RowActionsProps {
   invoice: Invoice;
   onViewPdf: (invoice: Invoice) => void;
-  onView?: (invoice: Invoice) => void; // ✅ NEW: View details option
+  onView?: (invoice: Invoice) => void;
   onEdit: (invoice: Invoice) => void;
   onDelete: (id: string) => void;
   permissions: InvoicePermissions;
@@ -271,7 +269,6 @@ const RowActions = ({ invoice, onViewPdf, onView, onEdit, onDelete, permissions 
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
 
-          {/* ✅ NEW: View Details option */}
           {onView && (
             <DropdownMenuItem
               onClick={() => onView(invoice)}
@@ -343,14 +340,13 @@ const RowActions = ({ invoice, onViewPdf, onView, onEdit, onDelete, permissions 
   );
 };
 
-// ✅ UPDATED: Added onView parameter
 export const getColumns = (
   onViewPdf: (invoice: Invoice) => void,
   onEdit: (invoice: Invoice) => void,
   onDelete: (id: string) => void,
   permissions: InvoicePermissions,
   onRefresh?: () => void,
-  onView?: (invoice: Invoice) => void // ✅ NEW
+  onView?: (invoice: Invoice) => void
 ): ColumnDef<Invoice>[] => [
     {
       accessorKey: "invoiceDate",
@@ -474,7 +470,6 @@ export const getColumns = (
           { label: "Paid", value: "Paid", icon: CheckCircle },
           { label: "Partially Paid", value: "Partially Paid", icon: CreditCard },
           { label: "Pending", value: "Pending", icon: Clock },
-          { label: "Refunded", value: "Refunded", icon: RotateCcw },
         ],
       },
       enableColumnFilter: true,
@@ -518,7 +513,7 @@ export const getColumns = (
           <RowActions
             invoice={row.original}
             onViewPdf={onViewPdf}
-            onView={onView} // ✅ NEW: Pass onView
+            onView={onView}
             onEdit={onEdit}
             onDelete={onDelete}
             permissions={permissions}

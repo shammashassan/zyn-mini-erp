@@ -1,4 +1,4 @@
-// app/documents/vouchers/page.tsx - UPDATED: Added Silent Background Fetch on Focus
+// app/documents/vouchers/page.tsx
 
 "use client";
 
@@ -14,6 +14,10 @@ import { DataTable } from "@/components/data-table/data-table";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { VoucherForm } from "./voucher-form";
 import { VoucherViewModal } from "./VoucherViewModal";
+import { PurchaseViewModal } from "@/app/expenses/purchases/PurchaseViewModal";
+import { ExpenseViewModal } from "@/app/expenses/expenses/ExpenseViewModal";
+import type { IPurchase } from "@/models/Purchase";
+import type { IExpense } from "@/models/Expense";
 import { toast } from "sonner";
 import { Ticket, Trash2, BarChart3, Plus, CalendarIcon } from "lucide-react";
 import Link from "next/link";
@@ -50,9 +54,16 @@ function VouchersPageContent() {
   const [isVoucherFormOpen, setIsVoucherFormOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  // ✅ NEW: View Modal State
+  // View Modal State
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [voucherToView, setVoucherToView] = useState<Voucher | null>(null);
+
+  // External View Modals State
+  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [selectedPurchase, setSelectedPurchase] = useState<IPurchase | null>(null);
+
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<IExpense | null>(null);
 
   // Date Range State (Default 6 months)
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -85,11 +96,9 @@ function VouchersPageContent() {
     setIsMounted(true);
   }, []);
 
-  // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
   const fetchVouchers = useCallback(async (background = false) => {
     if (!canRead) return;
     try {
-      // Only show loading spinner/skeleton if it's NOT a background fetch
       if (!background) {
         setIsLoading(true);
       }
@@ -131,7 +140,6 @@ function VouchersPageContent() {
         setVouchers(result.filter((v: Voucher) => v.voucherType === activeTab));
       }
     } catch (error) {
-      // Only show toast error if it's a user interaction, not a background poll
       if (!background) {
         toast.error("Could not load vouchers.");
       }
@@ -143,19 +151,15 @@ function VouchersPageContent() {
     }
   }, [canRead, urlState.page, urlState.pageSize, urlState.sort, urlState.filters, activeTab, dateRange]);
 
-  // Standard fetch on dependency change
   useEffect(() => {
     if (isMounted && canRead) {
       fetchVouchers();
     }
   }, [isMounted, canRead, fetchVouchers]);
 
-  // ✅ NEW: Window Focus Listener - SILENT MODE
-  // This triggers a silent "background" fetch when you tab back to this page.
   useEffect(() => {
     const onFocus = () => {
       if (isMounted && canRead) {
-        // Pass true to indicate this is a background fetch (no loading UI/opacity change)
         fetchVouchers(true);
       }
     };
@@ -215,6 +219,54 @@ function VouchersPageContent() {
     setIsModalOpen(true);
   };
 
+  // ✅ HANDLERS FOR VIEWING DOCUMENTS
+  const handleViewInvoicePdf = useCallback((invoice: any) => {
+    if (!invoice || !invoice._id) {
+      toast.error("Cannot view PDF. Invoice data is missing.");
+      return;
+    }
+    const pdfUrl = `/api/invoices/${invoice._id}/pdf`;
+    setSelectedPdfUrl(pdfUrl);
+    setSelectedPdfTitle(invoice.invoiceNumber || "Invoice");
+    setIsModalOpen(true);
+  }, []);
+
+  const handleViewPurchase = useCallback((purchase: any) => {
+    if (purchase) {
+      setSelectedPurchase(purchase as unknown as IPurchase);
+      setIsPurchaseModalOpen(true);
+    }
+  }, []);
+
+  const handleViewExpense = useCallback((expense: any) => {
+    if (expense) {
+      setSelectedExpense(expense as unknown as IExpense);
+      setIsExpenseModalOpen(true);
+    }
+  }, []);
+
+  const handleViewCreditNotePdf = useCallback((creditNote: any) => {
+    if (!creditNote || !creditNote._id) {
+      toast.error("Cannot view PDF. Credit note data is missing.");
+      return;
+    }
+    const pdfUrl = `/api/credit-notes/${creditNote._id}/pdf`;
+    setSelectedPdfUrl(pdfUrl);
+    setSelectedPdfTitle(creditNote.creditNoteNumber || "Credit Note");
+    setIsModalOpen(true);
+  }, []);
+
+  const handleViewDebitNotePdf = useCallback((debitNote: any) => {
+    if (!debitNote || !debitNote._id) {
+      toast.error("Cannot view PDF. Debit note data is missing.");
+      return;
+    }
+    const pdfUrl = `/api/debit-notes/${debitNote._id}/pdf`;
+    setSelectedPdfUrl(pdfUrl);
+    setSelectedPdfTitle(debitNote.debitNoteNumber || "Debit Note");
+    setIsModalOpen(true);
+  }, []);
+
   const handleVoucherFormSubmit = async (data: any) => {
     if (isSubmittingRef.current) return;
 
@@ -244,9 +296,7 @@ function VouchersPageContent() {
 
       const voucherTypeLabel = data.voucherType === 'receipt' 
         ? 'Receipt' 
-        : data.voucherType === 'payment' 
-          ? 'Payment' 
-          : 'Refund';
+        : 'Payment';
 
       toast.success(`${voucherTypeLabel} Voucher ${voucherNumber} created!`);
 
@@ -300,7 +350,6 @@ function VouchersPageContent() {
     setUrlState({ page: 1 });
   };
 
-  // ✅ NEW: Handle View Voucher
   const handleViewVoucher = (voucher: Voucher) => {
     setVoucherToView(voucher);
     setViewModalOpen(true);
@@ -317,8 +366,22 @@ function VouchersPageContent() {
     },
     { canDelete },
     fetchVouchers,
-    handleViewVoucher, // ✅ NEW: Pass view handler
-  ), [vouchers, canDelete, fetchVouchers]);
+    handleViewVoucher,
+    handleViewInvoicePdf,
+    handleViewPurchase, // Pass the modal opener for purchase
+    handleViewExpense, // Pass the modal opener for expense
+    handleViewCreditNotePdf,
+    handleViewDebitNotePdf,
+  ), [
+    vouchers, 
+    canDelete, 
+    fetchVouchers, 
+    handleViewInvoicePdf, 
+    handleViewPurchase, 
+    handleViewExpense, 
+    handleViewCreditNotePdf, 
+    handleViewDebitNotePdf
+  ]);
 
   const { table } = useDataTable<Voucher>({
     data: vouchers,
@@ -384,7 +447,7 @@ function VouchersPageContent() {
                     )}
                   </div>
                   <p className="text-muted-foreground">
-                    Manage receipt, payment, and refund vouchers
+                    Manage receipt and payment vouchers
                   </p>
                 </div>
               </div>
@@ -477,15 +540,12 @@ function VouchersPageContent() {
             <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <div className="flex justify-center">
-                  <TabsList className="flex justify-center w-full max-w-2xl grid-cols-3">
+                  <TabsList className="flex justify-center w-full max-w-2xl grid-cols-2">
                     <TabsTrigger value="receipt" className="flex items-center gap-2">
                       Receipt
                     </TabsTrigger>
                     <TabsTrigger value="payment" className="flex items-center gap-2">
                       Payment
-                    </TabsTrigger>
-                    <TabsTrigger value="refund" className="flex items-center gap-2">
-                      Refund
                     </TabsTrigger>
                   </TabsList>
                 </div>
@@ -545,7 +605,7 @@ function VouchersPageContent() {
         title={selectedPdfTitle}
       />
 
-      {/* ✅ NEW: Voucher View Modal */}
+      {/* Voucher View Modal */}
       <VoucherViewModal
         isOpen={viewModalOpen}
         onClose={() => {
@@ -554,6 +614,32 @@ function VouchersPageContent() {
         }}
         voucher={voucherToView}
         onViewPdf={handleViewPdf}
+        onViewInvoice={handleViewInvoicePdf}
+        onViewPurchase={handleViewPurchase}
+        onViewExpense={handleViewExpense}
+        onViewCreditNote={handleViewCreditNotePdf}
+        onViewDebitNote={handleViewDebitNotePdf}
+      />
+
+      {/* External Document View Modals */}
+      <PurchaseViewModal
+        isOpen={isPurchaseModalOpen}
+        onClose={() => {
+          setIsPurchaseModalOpen(false);
+          setSelectedPurchase(null);
+        }}
+        purchase={selectedPurchase}
+        onViewPdf={() => {}}
+      />
+
+      <ExpenseViewModal
+        isOpen={isExpenseModalOpen}
+        onClose={() => {
+          setIsExpenseModalOpen(false);
+          setSelectedExpense(null);
+        }}
+        expense={selectedExpense}
+        onViewPdf={() => {}}
       />
     </>
   );

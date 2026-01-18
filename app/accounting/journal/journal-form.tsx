@@ -57,7 +57,7 @@ type JournalEntry = {
 
 type JournalFormData = {
   entryDate: Date;
-  referenceType: 'Invoice' | 'Receipt' | 'Payment' | 'Purchase' | 'Expense' | 'Refund' | 'Manual';
+  referenceType: 'Invoice' | 'Receipt' | 'Payment' | 'Purchase' | 'Expense' | 'DebitNote' | 'CreditNote' | 'ReturnNote' | 'Manual';
   referenceNumber?: string;
   partyType?: 'Customer' | 'Supplier' | 'Payee' | 'Vendor';
   partyId?: string;
@@ -363,7 +363,9 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                       <SelectItem value="Payment">Payment</SelectItem>
                       <SelectItem value="Purchase">Purchase</SelectItem>
                       <SelectItem value="Expense">Expense</SelectItem>
-                      <SelectItem value="Refund">Refund</SelectItem>
+                      <SelectItem value="CreditNote">Credit Note</SelectItem>
+                      <SelectItem value="DebitNote">Debit Note</SelectItem>
+                      <SelectItem value="ReturnNote">Return Note</SelectItem>
                     </SelectContent>
                   </Select>
                 )}

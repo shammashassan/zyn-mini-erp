@@ -1,4 +1,4 @@
-// app/documents/invoices/InvoiceViewModal.tsx - UPDATED: Payment Information Card with Progress Bar
+// app/documents/invoices/InvoiceViewModal.tsx
 
 "use client";
 
@@ -23,7 +23,6 @@ import {
   AlertCircle,
   DollarSign,
   CreditCard,
-  RotateCcw,
   Percent,
   Wallet
 } from "lucide-react";
@@ -64,7 +63,6 @@ const getPaymentStatusVariant = (status: string) => {
     case 'Paid': return 'success';
     case 'Partially Paid': return 'primary';
     case 'Pending': return 'warning';
-    case 'Refunded': return 'pink';
     default: return 'neutral';
   }
 };
@@ -74,7 +72,6 @@ const getPaymentStatusIcon = (status: string) => {
     case 'Paid': return CheckCircle;
     case 'Partially Paid': return CreditCard;
     case 'Pending': return Clock;
-    case 'Refunded': return RotateCcw;
     default: return DollarSign;
   }
 };
@@ -386,7 +383,7 @@ export function InvoiceViewModal({
               </CardContent>
             </Card>
 
-            {/* ✅ NEW: Payment Information Card */}
+            {/* Payment Information Card */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm sm:text-base flex items-center gap-2">
@@ -455,8 +452,8 @@ export function InvoiceViewModal({
 
             {/* Connected Documents */}
             {(currentData.connectedDocuments?.receiptIds?.length > 0 ||
-              currentData.connectedDocuments?.refundIds?.length > 0 ||
               currentData.connectedDocuments?.deliveryId ||
+              currentData.connectedDocuments?.returnNoteIds?.length > 0 ||
               currentData.connectedDocuments?.quotationId) && (
               <Card>
                 <CardHeader>

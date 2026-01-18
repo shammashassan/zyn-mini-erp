@@ -274,24 +274,16 @@ export function ExpenseViewModal({ isOpen, onClose, expense: initialExpense, onV
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Description Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm sm:text-base">Description</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words">
-                  {currentData.description || "No description provided."}
-                </p>
-                {currentData.notes && (
-                  <div className="mt-4 pt-4 border-t">
-                    <div className="text-xs sm:text-sm font-semibold mb-1">Additional Notes</div>
-                    <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground break-words">
-                      {currentData.notes}
-                    </p>
+                {/* Description - Styled like Debit Note Reason */}
+                {currentData.description && (
+                  <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900 mt-4">
+                    <div className="text-xs font-medium text-orange-900 dark:text-orange-100 mb-1">
+                      Description:
+                    </div>
+                    <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                      {currentData.description}
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -372,6 +364,20 @@ export function ExpenseViewModal({ isOpen, onClose, expense: initialExpense, onV
                   ) : (
                     <span className="text-xs sm:text-sm text-muted-foreground">—</span>
                   )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Additional Notes - Now in a separate card like Debit Note */}
+            {currentData.notes && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm sm:text-base">Additional Notes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground break-words">
+                    {currentData.notes}
+                  </p>
                 </CardContent>
               </Card>
             )}

@@ -1,4 +1,4 @@
-// app/expenses/return-notes/page.tsx - UPDATED: Proper PDF handler naming
+// app/expenses/return-notes/page.tsx - COMPLETE: Multi-Type Support with Invoice & Credit Note Viewing
 
 "use client";
 
@@ -330,6 +330,19 @@ function ReturnNotesPageContent() {
     }
   }, []);
 
+  // Handler for viewing connected invoice
+  const handleViewInvoicePdf = useCallback((invoice: any) => {
+  if (!invoice || !invoice._id) {
+    toast.error("Cannot view PDF. Invoice data is missing.");
+    return;
+  }
+
+  const pdfUrl = `/api/invoices/${invoice._id}/pdf`;
+  setSelectedPdfUrl(pdfUrl);
+  setSelectedPdfTitle(invoice.invoiceNumber || "Invoice");
+  setIsModalOpen(true);
+}, []);
+
   // Handler for viewing PDFs of documents connected to purchases (from inside PurchaseViewModal)
   const handleViewPurchaseDocumentPdf = useCallback((bill: any) => {
     if (!bill || !bill._id) {
@@ -358,7 +371,33 @@ function ReturnNotesPageContent() {
     setIsModalOpen(true);
   }, []);
 
-  // NEW: Handler for viewing debit note PDFs
+  // Handler for viewing PDFs of documents connected to invoices
+  const handleViewInvoiceDocumentPdf = useCallback((doc: any) => {
+    if (!doc || !doc._id) {
+      toast.error("Cannot view PDF. Document data is missing.");
+      return;
+    }
+
+    let pdfUrl = '';
+
+    if (doc.voucherType) {
+      pdfUrl = `/api/vouchers/${doc._id}/pdf`;
+    } else if (doc.documentType === 'returnNote' || doc.returnNumber) {
+      pdfUrl = `/api/return-notes/${doc._id}/pdf`;
+    } else if (doc.documentType === 'quotation' || doc.invoiceNumber?.startsWith('QUO')) {
+      pdfUrl = `/api/quotations/${doc._id}/pdf`;
+    } else if (doc.documentType === 'delivery' || doc.invoiceNumber?.startsWith('DN')) {
+      pdfUrl = `/api/delivery-notes/${doc._id}/pdf`;
+    } else {
+      pdfUrl = `/api/invoices/${doc._id}/pdf`;
+    }
+
+    setSelectedPdfUrl(pdfUrl);
+    setSelectedPdfTitle(doc.invoiceNumber || doc.returnNumber || "Document");
+    setIsModalOpen(true);
+  }, []);
+
+  // Handler for viewing debit note PDFs
   const handleViewDebitNotePdf = useCallback((debitNote: any) => {
     if (!debitNote || !debitNote._id) {
       toast.error("Cannot view PDF. Debit note data is missing.");
@@ -367,6 +406,18 @@ function ReturnNotesPageContent() {
     const pdfUrl = `/api/debit-notes/${debitNote._id}/pdf`;
     setSelectedPdfUrl(pdfUrl);
     setSelectedPdfTitle(debitNote.debitNoteNumber || "Debit Note");
+    setIsModalOpen(true);
+  }, []);
+
+  // Handler for viewing credit note PDFs
+  const handleViewCreditNotePdf = useCallback((creditNote: any) => {
+    if (!creditNote || !creditNote._id) {
+      toast.error("Cannot view PDF. Credit note data is missing.");
+      return;
+    }
+    const pdfUrl = `/api/credit-notes/${creditNote._id}/pdf`;
+    setSelectedPdfUrl(pdfUrl);
+    setSelectedPdfTitle(creditNote.creditNoteNumber || "Credit Note");
     setIsModalOpen(true);
   }, []);
 
@@ -419,9 +470,11 @@ function ReturnNotesPageContent() {
         handleViewPdf,
         fetchReturnNotes,
         handleViewPurchase,
-        handleViewDebitNotePdf // NEW: For debit notes
+        handleViewInvoicePdf,
+        handleViewDebitNotePdf,
+        handleViewCreditNotePdf
       ),
-    [returnNotes, canUpdate, canDelete, handleViewPdf, fetchReturnNotes, handleViewPurchase, handleViewDebitNotePdf]
+    [returnNotes, canUpdate, canDelete, handleViewPdf, fetchReturnNotes, handleViewPurchase, handleViewInvoicePdf, handleViewDebitNotePdf, handleViewCreditNotePdf]
   );
 
   const { table } = useDataTable<ReturnNote>({
@@ -487,7 +540,7 @@ function ReturnNotesPageContent() {
                     )}
                   </div>
                   <p className="text-muted-foreground">
-                    Track material returns to suppliers
+                    Track material and product returns
                   </p>
                 </div>
               </div>
@@ -601,7 +654,7 @@ function ReturnNotesPageContent() {
                     <PackageX className="h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold mb-2">No return notes yet</h3>
                     <p className="text-muted-foreground text-center mb-4">
-                      Start tracking material returns by creating your first return note.
+                      Start tracking returns by creating your first return note.
                     </p>
                     <Button onClick={() => handleOpenForm()} className="gap-2">
                       <Plus className="h-4 w-4" /> Create Return Note
@@ -633,6 +686,10 @@ function ReturnNotesPageContent() {
           setReturnNoteToView(null);
         }}
         returnNote={returnNoteToView}
+        onViewPurchase={handleViewPurchase}
+        onViewInvoicePdf={handleViewInvoicePdf}
+        onViewDebitNotePdf={handleViewDebitNotePdf}
+        onViewCreditNotePdf={handleViewCreditNotePdf}
       />
 
       <PDFViewerModal

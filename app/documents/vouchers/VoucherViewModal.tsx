@@ -1,4 +1,4 @@
-// app/documents/vouchers/VoucherViewModal.tsx - UPDATED: Voucher Details Modal
+// app/documents/vouchers/VoucherViewModal.tsx - UPDATED: Connected Documents in Separate Card
 
 "use client";
 
@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   FileText,
   Calendar,
-  Package,
   User,
   CircleUserRound,
   DollarSign,
@@ -35,13 +34,17 @@ interface VoucherViewModalProps {
   onClose: () => void;
   voucher: Voucher | any | null;
   onViewPdf?: (doc: any) => void;
+  onViewInvoice?: (invoice: any) => void;
+  onViewPurchase?: (purchase: any) => void;
+  onViewExpense?: (expense: any) => void;
+  onViewCreditNote?: (creditNote: any) => void;
+  onViewDebitNote?: (debitNote: any) => void;
 }
 
 const getVoucherTypeVariant = (type: string) => {
   switch (type) {
     case 'receipt': return 'success';
     case 'payment': return 'primary';
-    case 'refund': return 'destructive';
     default: return 'secondary';
   }
 };
@@ -50,7 +53,6 @@ const getVoucherTypeIcon = (type: string) => {
   switch (type) {
     case 'receipt': return DollarSign;
     case 'payment': return Landmark;
-    case 'refund': return CreditCard;
     default: return Wallet;
   }
 };
@@ -91,7 +93,12 @@ export function VoucherViewModal({
   isOpen, 
   onClose, 
   voucher: initialVoucher, 
-  onViewPdf 
+  onViewPdf,
+  onViewInvoice,
+  onViewPurchase,
+  onViewExpense,
+  onViewCreditNote,
+  onViewDebitNote
 }: VoucherViewModalProps) {
   const [voucher, setVoucher] = useState<any>(initialVoucher);
   const [isLoading, setIsLoading] = useState(false);
@@ -138,6 +145,16 @@ export function VoucherViewModal({
 
   const VoucherTypeIcon = getVoucherTypeIcon(currentData.voucherType);
   const PaymentMethodIcon = getPaymentMethodIcon(currentData.paymentMethod);
+
+  // Check for existence of connected documents
+  const hasConnectedDocuments = 
+    currentData.connectedDocuments?.invoiceIds?.length > 0 ||
+    currentData.connectedDocuments?.invoiceId ||
+    currentData.connectedDocuments?.purchaseIds?.length > 0 ||
+    currentData.connectedDocuments?.purchaseId ||
+    currentData.connectedDocuments?.expenseIds?.length > 0 ||
+    currentData.connectedDocuments?.creditNoteIds?.length > 0 ||
+    currentData.connectedDocuments?.debitNoteIds?.length > 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -234,28 +251,25 @@ export function VoucherViewModal({
               </CardContent>
             </Card>
 
-            {/* Connected Documents */}
-            {(currentData.connectedDocuments?.invoiceIds?.length > 0 ||
-              currentData.connectedDocuments?.invoiceId ||
-              currentData.connectedDocuments?.purchaseIds?.length > 0 ||
-              currentData.connectedDocuments?.purchaseId ||
-              currentData.connectedDocuments?.expenseIds?.length > 0) && (
+            {/* Connected Documents - Separate Card */}
+            {hasConnectedDocuments && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-                    <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <Wallet className="h-3 w-3 sm:h-4 sm:w-4" />
                     Connected Documents
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {onViewPdf ? (
-                    <ConnectedDocumentsBadges
-                      voucher={currentData}
-                      onViewPdf={onViewPdf}
-                    />
-                  ) : (
-                    <span className="text-xs sm:text-sm text-muted-foreground">—</span>
-                  )}
+                  <ConnectedDocumentsBadges
+                    voucher={currentData}
+                    onViewPdf={onViewPdf || (() => {})}
+                    onViewInvoice={onViewInvoice}
+                    onViewPurchase={onViewPurchase}
+                    onViewExpense={onViewExpense}
+                    onViewCreditNote={onViewCreditNote}
+                    onViewDebitNote={onViewDebitNote}
+                  />
                 </CardContent>
               </Card>
             )}

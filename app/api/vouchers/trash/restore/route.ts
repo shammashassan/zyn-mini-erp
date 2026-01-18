@@ -1,11 +1,13 @@
-// app/api/vouchers/trash/restore/route.ts - FIXED: Added Purchase Payment Validation (Invoice-Receipt Pattern)
+// app/api/vouchers/trash/restore/route.ts
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Voucher from "@/models/Voucher";
 import Purchase from "@/models/Purchase";
+import Expense from "@/models/Expense";
 import Invoice from "@/models/Invoice";
 import DebitNote from "@/models/DebitNote";
+import CreditNote from "@/models/CreditNote";
 import { restore } from "@/utils/softDelete";
 import { getVoidedJournalsForReference, createJournalWithDate } from "@/utils/journalManager";
 import { formatCurrency } from "@/utils/formatters/currency";
@@ -85,33 +87,8 @@ export async function POST(request: Request) {
               console.log(`   ✅ Valid: Has room for ${formatCurrency(invoice.grandTotal - currentAllocated)}`);
             }
           }
+        }
 
-          // ✅ REFUND: Check if refund would exceed paid amount
-          else if (voucherToRestore.voucherType === 'refund') {
-            const currentRefunded = invoice.getTotalRefunded();
-            const wouldBeRefunded = currentRefunded + allocation.amount;
-            const maxRefundable = invoice.paidAmount;
-
-            console.log(`💰 Invoice ${invoice.invoiceNumber} (Refund Check):`);
-            console.log(`   Current Refunded: ${formatCurrency(currentRefunded)}`);
-            console.log(`   Would Refund: ${formatCurrency(allocation.amount)}`);
-            console.log(`   Total Would Be: ${formatCurrency(wouldBeRefunded)}`);
-            console.log(`   Paid Amount: ${formatCurrency(maxRefundable)}`);
-
-            if (wouldBeRefunded > maxRefundable) {
-              restorationBlocked.push(
-                `Cannot restore: Refund of ${formatCurrency(allocation.amount)} ` +
-                `to invoice ${invoice.invoiceNumber} would exceed paid amount. ` +
-                `Currently refunded: ${formatCurrency(currentRefunded)}, ` +
-                `Paid amount: ${formatCurrency(maxRefundable)}, ` +
-                `Available: ${formatCurrency(maxRefundable - currentRefunded)}`
-              );
-            } else {
-              console.log(`   ✅ Valid: Can refund up to ${formatCurrency(maxRefundable - currentRefunded)}`);
-            }
-          }
-        } 
-        
         // ✅ PAYMENT VOUCHER - SAME VALIDATION AS RECEIPT
         else if (allocation.documentType === 'purchase') {
           const purchase = await Purchase.findById(allocation.documentId);
@@ -145,9 +122,8 @@ export async function POST(request: Request) {
             console.log(`   ✅ Valid: Has room for ${formatCurrency(purchase.grandTotal - currentAllocated)}`);
           }
         }
-        
+
         else if (allocation.documentType === 'expense') {
-          const Expense = (await import('@/models/Expense')).default;
           const expense = await Expense.findById(allocation.documentId);
 
           if (!expense || expense.isDeleted) {
@@ -179,7 +155,7 @@ export async function POST(request: Request) {
             console.log(`   ✅ Valid: Has room for ${formatCurrency(expense.amount - currentAllocated)}`);
           }
         }
-        
+
         else if (allocation.documentType === 'debitNote') {
           const debitNote = await DebitNote.findById(allocation.documentId);
 
@@ -212,11 +188,44 @@ export async function POST(request: Request) {
             console.log(`   ✅ Valid: Has room for ${formatCurrency(debitNote.grandTotal - currentAllocated)}`);
           }
         }
+
+        else if (allocation.documentType === 'creditNote') {
+          const creditNote = await CreditNote.findById(allocation.documentId);
+
+          if (!creditNote || creditNote.isDeleted) {
+            restorationWarnings.push(
+              `Credit Note ${allocation.documentId} no longer exists or is deleted. ` +
+              `Allocation of ${formatCurrency(allocation.amount)} will be skipped.`
+            );
+            continue;
+          }
+
+          const currentAllocated = creditNote.getTotalAllocated();
+          const wouldBeAllocated = currentAllocated + allocation.amount;
+
+          console.log(`💳 Credit Note ${creditNote.creditNoteNumber}:`);
+          console.log(`   Current Allocated: ${formatCurrency(currentAllocated)}`);
+          console.log(`   Would Allocate: ${formatCurrency(allocation.amount)}`);
+          console.log(`   Total Would Be: ${formatCurrency(wouldBeAllocated)}`);
+          console.log(`   Credit Note Total: ${formatCurrency(creditNote.grandTotal)}`);
+
+          if (wouldBeAllocated > creditNote.grandTotal) {
+            restorationBlocked.push(
+              `Cannot restore: Allocation of ${formatCurrency(allocation.amount)} ` +
+              `to credit note ${creditNote.creditNoteNumber} would exceed its total. ` +
+              `Currently allocated: ${formatCurrency(currentAllocated)}, ` +
+              `Credit note total: ${formatCurrency(creditNote.grandTotal)}, ` +
+              `Available: ${formatCurrency(creditNote.grandTotal - currentAllocated)}`
+            );
+          } else {
+            console.log(`   ✅ Valid: Has room for ${formatCurrency(creditNote.grandTotal - currentAllocated)}`);
+          }
+        }
       }
     }
 
     if (restorationBlocked.length > 0) {
-      console.log(`❌ Restoration BLOCKED due to overpayment/overrefund risk`);
+      console.log(`❌ Restoration BLOCKED due to overpayment risk`);
       return NextResponse.json({
         error: 'Cannot restore voucher',
         reasons: restorationBlocked,
@@ -299,49 +308,8 @@ export async function POST(request: Request) {
 
               console.log(`✅ Reapplied allocation to invoice ${invoice.invoiceNumber}`);
             }
+          }
 
-            // ✅ REFUND
-            else if (restoredVoucher.voucherType === 'refund') {
-              invoice.allocateRefund(restoredVoucher._id, allocation.amount);
-
-              const currentRefundIds = invoice.connectedDocuments?.refundIds || [];
-              if (!currentRefundIds.some((rid: any) => rid.toString() === id)) {
-                currentRefundIds.push(id);
-                invoice.connectedDocuments = invoice.connectedDocuments || { refundIds: [] };
-                invoice.connectedDocuments.refundIds = currentRefundIds;
-              }
-
-              const oldStatus = invoice.status;
-              invoice.status = 'cancelled';
-
-              invoice.addAuditEntry(
-                `Refund voucher ${restoredVoucher.invoiceNumber} restored - refunded: ${formatCurrency(allocation.amount)}`,
-                user?.id || null,
-                user?.username || 'System'
-              );
-
-              await invoice.save();
-
-              reconnectionResults.push(
-                `Refunded ${formatCurrency(allocation.amount)} to invoice ${invoice.invoiceNumber}`
-              );
-
-              console.log(`✅ Reapplied refund to invoice ${invoice.invoiceNumber}`);
-
-              if (oldStatus === 'approved' && invoice.status === 'cancelled') {
-                console.log(`🔄 Voiding invoice journal due to refund restoration (${oldStatus} → cancelled)`);
-                const { handleInvoiceStatusChange } = await import('@/utils/journalAutoCreate');
-                await handleInvoiceStatusChange(
-                  invoice.toObject(),
-                  oldStatus,
-                  'cancelled',
-                  user?.id || null,
-                  user?.username || user?.name || null
-                );
-              }
-            }
-          } 
-          
           // ✅ PAYMENT VOUCHER - SAME AS RECEIPT
           else if (allocation.documentType === 'purchase') {
             const purchase = await Purchase.findById(allocation.documentId);
@@ -374,9 +342,8 @@ export async function POST(request: Request) {
 
             console.log(`✅ Reapplied allocation to purchase ${purchase.referenceNumber}`);
           }
-          
+
           else if (allocation.documentType === 'expense') {
-            const Expense = (await import('@/models/Expense')).default;
             const expense = await Expense.findById(allocation.documentId);
 
             if (!expense || expense.isDeleted) {
@@ -407,7 +374,7 @@ export async function POST(request: Request) {
 
             console.log(`✅ Reapplied allocation to expense ${expense.referenceNumber}`);
           }
-          
+
           else if (allocation.documentType === 'debitNote') {
             const debitNote = await DebitNote.findById(allocation.documentId);
 
@@ -438,6 +405,38 @@ export async function POST(request: Request) {
             );
 
             console.log(`✅ Reapplied allocation to debit note ${debitNote.debitNoteNumber}`);
+          }
+
+          else if (allocation.documentType === 'creditNote') {
+            const creditNote = await CreditNote.findById(allocation.documentId);
+
+            if (!creditNote || creditNote.isDeleted) {
+              reconnectionResults.push(`Skipped credit note ${allocation.documentId} (deleted or not found)`);
+              continue;
+            }
+
+            creditNote.allocatePayment(restoredVoucher._id, allocation.amount);
+
+            const currentPaymentIds = creditNote.connectedDocuments?.paymentIds || [];
+            if (!currentPaymentIds.some((pid: any) => pid.toString() === id)) {
+              currentPaymentIds.push(id);
+              creditNote.connectedDocuments = creditNote.connectedDocuments || { paymentIds: [] };
+              creditNote.connectedDocuments.paymentIds = currentPaymentIds;
+            }
+
+            creditNote.addAuditEntry(
+              `Payment voucher ${restoredVoucher.invoiceNumber} restored - allocated: ${formatCurrency(allocation.amount)}`,
+              user?.id || null,
+              user?.username || 'System'
+            );
+
+            await creditNote.save();
+
+            reconnectionResults.push(
+              `Allocated ${formatCurrency(allocation.amount)} to credit note ${creditNote.creditNoteNumber}`
+            );
+
+            console.log(`✅ Reapplied allocation to credit note ${creditNote.creditNoteNumber}`);
           }
         } catch (allocationError: any) {
           console.error(`Failed to reapply allocation:`, allocationError);
