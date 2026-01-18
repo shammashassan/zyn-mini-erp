@@ -1,416 +1,364 @@
-// components/ReturnNoteDocument.tsx - Return Note PDF (Quantity-Only)
-
 import React from 'react';
-import { Page, Text, View, Document, StyleSheet, Font, Image, Svg, Path } from '@react-pdf/renderer';
-import path from 'path';
+import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
 import type { IReturnNote } from '@/models/ReturnNote';
 import type { ICompanyDetails } from '@/models/CompanyDetails';
-import { formatDisplayDate, formatDateTime } from '@/utils/formatters/date';
+import { formatDisplayDate } from '@/utils/formatters/date';
+import { formatCurrency } from '@/utils/formatters/currency';
 
-try {
-  Font.register({
-    family: 'Roboto',
-    fonts: [
-      { src: path.join(process.cwd(), 'public', 'fonts', 'Roboto-Regular.ttf') },
-      { src: path.join(process.cwd(), 'public', 'fonts', 'Roboto-Bold.ttf'), fontWeight: 'bold' },
-      { src: path.join(process.cwd(), 'public', 'fonts', 'Roboto-Italic.ttf'), fontStyle: 'italic' },
-    ],
-  });
-} catch (error) {
-  console.error("Failed to register fonts.", error);
-}
-
-// Icon Components
-const MapPinIcon = () => (
-  <Svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#90caf9" strokeWidth="2">
-    <Path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-    <Path d="M12 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
-  </Svg>
-);
-
-const PhoneIcon = () => (
-  <Svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#90caf9" strokeWidth="2">
-    <Path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-  </Svg>
-);
-
-const MailIcon = () => (
-  <Svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#90caf9" strokeWidth="2">
-    <Path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-    <Path d="M22 6l-10 7L2 6" />
-  </Svg>
-);
+// Shared Components
+import { commonStyles, registerPdfFonts, pdfColors } from './pdf/styles';
+import { PDFHeader } from './pdf/Header';
+import { PDFFooter } from './pdf/Footer';
 
 const styles = StyleSheet.create({
-  page: {
-    fontFamily: 'Roboto',
-    fontSize: 9,
-    padding: 0,
-    backgroundColor: '#ffffff',
-    position: 'relative',
-  },
+  content: { padding: '15 25 25 25', flexGrow: 1 },
+  
+  entityName: { fontSize: 11, fontWeight: 'bold', color: pdfColors.textMain, marginBottom: 2 },
+  dateInfo: { alignItems: 'flex-end' },
+  dateLabel: { fontSize: 7, color: pdfColors.textMuted, marginBottom: 2 },
+  dateValue: { fontSize: 10, fontWeight: 'bold', color: pdfColors.primary },
 
-  watermark: {
-    position: 'absolute',
-    top: '35%',
-    left: '15%',
-    fontSize: 80,
-    color: '#f0f0f0',
-    opacity: 0.05,
-    transform: 'rotate(-45deg)',
-    fontWeight: 'bold',
-  },
+  // Equal Column Widths for Purchase Return (5 columns = 20% each)
+  col5_20: { width: '20%', textAlign: 'center' },
+  col5_20_left: { width: '20%', textAlign: 'left' },
+  col5_20_right: { width: '20%', textAlign: 'right' },
 
-  header: {
-    backgroundColor: '#1a237e',
-    padding: '15 25',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  logo: {
-    width: 55,
-    height: 55,
-    objectFit: 'contain',
-  },
-  companyInfo: {
-    alignItems: 'flex-end',
-  },
-  companyDetail: {
-    fontSize: 8,
-    color: '#e3f2fd',
-    marginBottom: 3,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
+  // Equal Column Widths for Sales Return (4 columns = 25% each)
+  col4_25: { width: '25%', textAlign: 'center' },
+  col4_25_left: { width: '25%', textAlign: 'left' },
+  col4_25_right: { width: '25%', textAlign: 'right' },
+  
+  // Specific styling for readability
+  headerText: { fontWeight: 'bold', color: pdfColors.white },
+  headerTextAccent: { fontWeight: 'bold', color: pdfColors.accent },
+  
+  textBold: { fontWeight: 'bold', color: pdfColors.primary },
 
-  titleSection: {
-    backgroundColor: '#283593',
-    padding: '10 25',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  documentTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    letterSpacing: 2,
-  },
-  documentNumber: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#ffeb3b',
-  },
-
-  infoBar: {
-    backgroundColor: '#e8eaf6',
-    padding: '12 25',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderBottomWidth: 2,
-    borderBottomColor: '#1a237e',
-  },
-  supplierSection: {
-    flex: 1,
-  },
-  sectionLabel: {
-    fontSize: 8,
-    color: '#1a237e',
-    fontWeight: 'bold',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
-  supplierName: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 2,
-  },
-  purchaseRef: {
-    fontSize: 8,
-    color: '#424242',
-    marginBottom: 1,
-    fontFamily: 'Courier',
-  },
-  dateInfo: {
-    alignItems: 'flex-end',
-  },
-  dateLabel: {
-    fontSize: 7,
-    color: '#666666',
-    marginBottom: 2,
-  },
-  dateValue: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#1a237e',
-  },
-
-  content: {
-    padding: '15 25 25 25',
-    flexGrow: 1,
-  },
-
-  table: {
-    marginTop: 10,
-    marginBottom: 15,
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#1a237e',
-    padding: 8,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
-  },
-  tableHeaderText: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    textTransform: 'uppercase',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    padding: 8,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#e0e0e0',
-  },
-  tableCell: {
-    fontSize: 8.5,
-    color: '#424242',
-  },
-  descCol: { width: '35%' },
-  orderedCol: { width: '15%', textAlign: 'center' },
-  receivedCol: { width: '15%', textAlign: 'center' },
-  alreadyReturnedCol: { width: '15%', textAlign: 'center' },
-  returnedCol: { width: '20%', textAlign: 'center', fontWeight: 'bold', color: '#1a237e' },
-
-  summaryContainer: {
-    marginTop: 20,
-  },
-
-  totalsBox: {
-    backgroundColor: '#e8eaf6',
-    border: '1.5 solid #1a237e',
+  // Reason Box (Blue Style)
+  reasonBox: {
+    backgroundColor: pdfColors.secondary,
+    border: `1.5 solid ${pdfColors.primary}`,
     borderRadius: 4,
-    padding: 12,
+    padding: 10,
     marginBottom: 15,
+  },
+  reasonLabel: { fontSize: 8, color: pdfColors.primary, fontWeight: 'bold', marginBottom: 4, textTransform: 'uppercase' },
+  reasonText: { fontSize: 8.5, color: pdfColors.textDark, lineHeight: 1.4 },
+
+  // Layout for Bottom Section (Terms left, Totals right)
+  summaryContainer: { 
+    marginTop: 20, 
+    flexDirection: 'row', 
+    justifyContent: 'space-between',
+    gap: 20,
+  },
+  leftColumn: {
+    flex: 1,
+    flexDirection: 'column',
+    gap: 10,
+  },
+  
+  // Totals Box
+  totalsBox: {
+    width: '40%',
+    backgroundColor: pdfColors.white,
+    border: `1.5 solid ${pdfColors.primary}`,
+    borderRadius: 4,
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 4,
+    padding: '6 10',
+    borderBottomWidth: 0.5,
+    borderBottomColor: pdfColors.border,
   },
-  totalLabel: {
-    fontSize: 9,
-    color: '#424242',
-    fontWeight: 'bold',
-  },
-  totalValue: {
-    fontSize: 10,
-    color: '#1a237e',
-    fontWeight: 'bold',
-  },
-
-  reasonBox: {
-    backgroundColor: '#fff3e0',
-    border: '1.5 solid #ff6f00',
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 15,
-  },
-  reasonTitle: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: '#ff6f00',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  reasonText: {
-    fontSize: 8,
-    color: '#424242',
-    lineHeight: 1.4,
-  },
-
-  notesBox: {
-    backgroundColor: '#f5f5f5',
-    border: '1 solid #e0e0e0',
-    borderRadius: 4,
-    padding: 10,
-  },
-  notesTitle: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: '#1a237e',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  notesText: {
-    fontSize: 8,
-    color: '#424242',
-    lineHeight: 1.4,
-  },
-
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#1a237e',
-    padding: '10 25',
+  grandTotalRow: {
+    backgroundColor: pdfColors.primary,
+    padding: '8 10',
+    borderBottomWidth: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 'auto', // This pushes the row to the bottom if container has height
   },
-  footerText: {
-    fontSize: 7,
-    color: '#e3f2fd',
+  totalLabel: { fontSize: 8.5, color: pdfColors.textDark },
+  totalValue: { fontSize: 8.5, color: pdfColors.textDark, fontWeight: 'bold' },
+  grandTotalLabel: { fontSize: 10, fontWeight: 'bold', color: pdfColors.white },
+  grandTotalValue: { fontSize: 11, fontWeight: 'bold', color: pdfColors.accent },
+
+  // Terms & Notes Styling
+  termsBox: { 
+    backgroundColor: pdfColors.warning, 
+    border: `1 solid ${pdfColors.warningBorder}`, 
+    borderRadius: 4, 
+    padding: 10,
   },
-  systemNote: {
-    fontSize: 6,
-    color: '#90caf9',
-    fontStyle: 'italic',
+  boxTitle: { 
+    fontSize: 9, 
+    fontWeight: 'bold', 
+    color: pdfColors.primary, 
+    marginBottom: 6, 
+    textTransform: 'uppercase' 
+  },
+  boxContent: { 
+    fontSize: 8, 
+    color: pdfColors.textDark, 
+    lineHeight: 1.4 
+  },
+  notesBox: { 
+    backgroundColor: '#f5f5f5', 
+    border: `1 solid ${pdfColors.border}`, 
+    borderRadius: 4, 
+    padding: 10 
+  },
+  notesTitle: { 
+    fontSize: 9, 
+    fontWeight: 'bold', 
+    color: pdfColors.primary, 
+    marginBottom: 6, 
+    textTransform: 'uppercase' 
+  },
+  notesText: { 
+    fontSize: 8, 
+    color: pdfColors.textDark, 
+    lineHeight: 1.4 
+  },
+
+  // Signatures (Stick to bottom)
+  signatureSection: {
+    position: 'absolute',
+    bottom: 80,
+    left: 25,
+    right: 25,
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    gap: 15,
+  },
+  signatureBox: {
+    flex: 1, 
+    backgroundColor: '#f5f5f5', 
+    border: `1.5 solid ${pdfColors.primary}`, 
+    borderRadius: 4, 
+    height: 80, 
+    padding: 10, 
+    flexDirection: 'column', 
+    justifyContent: 'flex-end',
+  },
+  signatureLabel: { 
+    fontSize: 7, 
+    color: pdfColors.primary, 
+    fontWeight: 'bold', 
+    textAlign: 'center', 
+    textTransform: 'uppercase' 
   },
 });
 
+interface PopulatedPurchase { _id: string; referenceNumber: string; supplierName?: string; }
+interface PopulatedInvoice { _id: string; invoiceNumber: string; customerName?: string; }
+
 interface ReturnNoteDocumentProps {
-  returnNote: IReturnNote;
+  returnNote: IReturnNote & {
+    connectedDocuments?: {
+      purchaseId?: PopulatedPurchase | string;
+      invoiceId?: PopulatedInvoice | string;
+    };
+  };
   companyDetails: ICompanyDetails | null;
 }
 
-export const ReturnNoteDocument: React.FC<ReturnNoteDocumentProps> = ({ 
-  returnNote, 
-  companyDetails 
-}) => {
+export const ReturnNoteDocument: React.FC<ReturnNoteDocumentProps> = ({ returnNote, companyDetails }) => {
+  registerPdfFonts();
+
   const totalItemsCount = returnNote.items.length;
   const totalReturnedQty = returnNote.items.reduce((sum, item) => sum + item.returnQuantity, 0);
+  
+  // Calculate Grand Total safely (use stored value or calculate on fly for older records)
+  const calculateTotal = () => {
+    if (returnNote.grandTotal !== undefined && returnNote.grandTotal !== null) {
+      return returnNote.grandTotal;
+    }
+    return returnNote.items.reduce((sum, item) => sum + (item.total || 0), 0);
+  };
+  const grandTotal = calculateTotal();
+
+  const isPurchaseReturn = returnNote.returnType === 'purchaseReturn';
+  const isSalesReturn = returnNote.returnType === 'salesReturn';
+  const entityName = isPurchaseReturn ? returnNote.supplierName : returnNote.customerName;
+
+  const purchase = typeof returnNote.connectedDocuments?.purchaseId === 'object' ? returnNote.connectedDocuments.purchaseId as PopulatedPurchase : null;
+  const invoice = typeof returnNote.connectedDocuments?.invoiceId === 'object' ? returnNote.connectedDocuments.invoiceId as PopulatedInvoice : null;
+
+  const documentRef = purchase?.referenceNumber || invoice?.invoiceNumber;
+  const entityLabel = isPurchaseReturn ? 'Supplier' : 'Customer';
+  const documentLabel = isPurchaseReturn ? 'Purchase' : 'Invoice';
+
+  // Dynamic Content Logic
+  let termsList = [
+    "Goods returned are subject to inspection.",
+    "Please retain this document for your records."
+  ];
+
+  let leftSigLabel = "Returned By\n(Name, Signature & Date)";
+  let rightSigLabel = "Received By\n(Name, Signature & Date)";
+
+  if (isSalesReturn) {
+    termsList = [
+        "Goods are subject to inspection and approval.",
+        "Credit Note issued upon successful verification.",
+        "Items must be in original packaging."
+    ];
+    leftSigLabel = "Returned By (Customer)\n(Name, Signature & Date)";
+    rightSigLabel = "Received By (Authorized)\n(Name, Signature & Date)";
+  } else if (isPurchaseReturn) {
+     termsList = [
+        "Goods returned to supplier for credit/replacement.",
+        "Debit Note issued against this return.",
+        "Subject to supplier acceptance."
+    ];
+    leftSigLabel = "Returned By (Authorized)\n(Name, Signature & Date)";
+    rightSigLabel = "Received By (Supplier)\n(Name, Signature & Date)";
+  }
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
-        {/* Watermark */}
-        <Text style={styles.watermark}>RETURN NOTE</Text>
+      <Page size="A4" style={commonStyles.page}>
+        <Text style={commonStyles.watermark}>RETURN NOTE</Text>
 
-        {/* Header */}
-        <View style={styles.header}>
-          {companyDetails?.logoUrl ? (
-            <Image style={styles.logo} src={companyDetails.logoUrl} />
-          ) : (
-            <View style={{ width: 55, height: 55 }} />
-          )}
-          <View style={styles.companyInfo}>
-            {companyDetails?.address && (
-              <View style={styles.companyDetail}>
-                <MapPinIcon />
-                <Text>{companyDetails.address}</Text>
-              </View>
-            )}
-            {companyDetails?.contactNumber && (
-              <View style={styles.companyDetail}>
-                <PhoneIcon />
-                <Text>
-                  {companyDetails.contactNumber}
-                  {companyDetails.telephone && ` / ${companyDetails.telephone}`}
-                </Text>
-              </View>
-            )}
-            {companyDetails?.email && (
-              <View style={styles.companyDetail}>
-                <MailIcon />
-                <Text>{companyDetails.email}</Text>
-              </View>
-            )}
-            {companyDetails?.website && (
-              <Text style={[styles.companyDetail, { gap: 0 }]}>{companyDetails.website}</Text>
-            )}
-          </View>
+        <PDFHeader companyDetails={companyDetails} />
+
+        <View style={commonStyles.titleSection}>
+          <Text style={commonStyles.documentTitle}>
+            {isPurchaseReturn ? 'PURCHASE RETURN NOTE' : 'SALES RETURN NOTE'}
+          </Text>
+          <Text style={commonStyles.documentNumber}>{returnNote.returnNumber}</Text>
         </View>
 
-        {/* Title Section */}
-        <View style={styles.titleSection}>
-          <Text style={styles.documentTitle}>RETURN NOTE</Text>
-          <Text style={styles.documentNumber}>{returnNote.returnNumber}</Text>
-        </View>
-
-        {/* Info Bar */}
-        <View style={styles.infoBar}>
-          <View style={styles.supplierSection}>
-            <Text style={styles.sectionLabel}>Supplier:</Text>
-            <Text style={styles.supplierName}>{returnNote.supplierName}</Text>
-            <Text style={styles.purchaseRef}>Purchase: {returnNote.purchaseReference}</Text>
+        <View style={commonStyles.infoBar}>
+          <View style={{ flex: 1 }}>
+            <Text style={commonStyles.sectionLabel}>{entityLabel}:</Text>
+            <Text style={styles.entityName}>{entityName}</Text>
           </View>
           <View style={styles.dateInfo}>
             <Text style={styles.dateLabel}>Return Date</Text>
             <Text style={styles.dateValue}>{formatDisplayDate(returnNote.returnDate)}</Text>
-          </View>
-        </View>
-
-        {/* Main Content */}
-        <View style={styles.content}>
-          {/* Items Table */}
-          <View style={styles.table}>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableHeaderText, styles.descCol]}>Material</Text>
-              <Text style={[styles.tableHeaderText, styles.orderedCol]}>Ordered</Text>
-              <Text style={[styles.tableHeaderText, styles.receivedCol]}>Received</Text>
-              <Text style={[styles.tableHeaderText, styles.alreadyReturnedCol]}>Prev. Returned</Text>
-              <Text style={[styles.tableHeaderText, styles.returnedCol]}>Returned Now</Text>
-            </View>
-            {returnNote.items.map((item, index) => (
-              <View style={styles.tableRow} key={index}>
-                <Text style={[styles.tableCell, styles.descCol]}>{item.materialName}</Text>
-                <Text style={[styles.tableCell, styles.orderedCol]}>{item.orderedQuantity.toFixed(2)}</Text>
-                <Text style={[styles.tableCell, styles.receivedCol]}>{item.receivedQuantity.toFixed(2)}</Text>
-                <Text style={[styles.tableCell, styles.alreadyReturnedCol]}>
-                  {item.returnedQuantity.toFixed(2)}
-                </Text>
-                <Text style={[styles.tableCell, styles.returnedCol]}>{item.returnQuantity.toFixed(2)}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Summary */}
-          <View style={styles.summaryContainer}>
-            <View style={styles.totalsBox}>
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Total Items:</Text>
-                <Text style={styles.totalValue}>{totalItemsCount}</Text>
-              </View>
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Total Quantity Returned:</Text>
-                <Text style={styles.totalValue}>{totalReturnedQty.toFixed(2)}</Text>
-              </View>
-            </View>
-
-            {/* Return Reason */}
-            <View style={styles.reasonBox}>
-              <Text style={styles.reasonTitle}>Return Reason</Text>
-              <Text style={styles.reasonText}>{returnNote.reason}</Text>
-            </View>
-
-            {/* Notes (if any) */}
-            {returnNote.notes && (
-              <View style={styles.notesBox}>
-                <Text style={styles.notesTitle}>Additional Notes</Text>
-                <Text style={styles.notesText}>{returnNote.notes}</Text>
-              </View>
+            {documentRef && (
+              <>
+                <Text style={[styles.dateLabel, { marginTop: 8 }]}>Against {documentLabel}</Text>
+                <Text style={styles.dateValue}>{documentRef}</Text>
+              </>
             )}
           </View>
         </View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Generated: {formatDateTime(new Date())}
-          </Text>
-          <Text style={styles.systemNote}>
-            This is a system-generated return note
-          </Text>
-          <Text style={styles.footerText}>
-            {companyDetails?.companyName || 'Company Name'} © {new Date().getFullYear()}
-          </Text>
+        <View style={styles.content}>
+          
+          {/* Reason Box */}
+          {returnNote.reason && (
+            <View style={styles.reasonBox}>
+              <Text style={styles.reasonLabel}>Reason:</Text>
+              <Text style={styles.reasonText}>{returnNote.reason}</Text>
+            </View>
+          )}
+
+          <View style={commonStyles.table}>
+            {isPurchaseReturn && (
+              <>
+                <View style={commonStyles.tableHeader}>
+                  <Text style={[commonStyles.tableHeaderText, styles.col5_20_left, styles.headerText]}>Material</Text>
+                  <Text style={[commonStyles.tableHeaderText, styles.col5_20, styles.headerText]}>Ordered</Text>
+                  <Text style={[commonStyles.tableHeaderText, styles.col5_20, styles.headerText]}>Received</Text>
+                  <Text style={[commonStyles.tableHeaderText, styles.col5_20, styles.headerTextAccent]}>Returned</Text>
+                  <Text style={[commonStyles.tableHeaderText, styles.col5_20_right, styles.headerTextAccent]}>Total</Text>
+                </View>
+                {returnNote.items.map((item, index) => (
+                  <View style={commonStyles.tableRow} key={index}>
+                    <Text style={[commonStyles.tableCell, styles.col5_20_left]}>{item.materialName || 'Unknown'}</Text>
+                    <Text style={[commonStyles.tableCell, styles.col5_20]}>{item.orderedQuantity ? item.orderedQuantity.toFixed(2) : '0.00'}</Text>
+                    <Text style={[commonStyles.tableCell, styles.col5_20]}>{item.receivedQuantity ? item.receivedQuantity.toFixed(2) : '0.00'}</Text>
+                    <Text style={[commonStyles.tableCell, styles.col5_20, styles.textBold]}>{item.returnQuantity.toFixed(2)}</Text>
+                    <Text style={[commonStyles.tableCell, styles.col5_20_right, styles.textBold]}>{formatCurrency(item.total || 0)}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+
+            {isSalesReturn && (
+              <>
+                <View style={commonStyles.tableHeader}>
+                  <Text style={[commonStyles.tableHeaderText, styles.col4_25_left, styles.headerText]}>Product</Text>
+                  <Text style={[commonStyles.tableHeaderText, styles.col4_25, styles.headerText]}>Quantity</Text>
+                  <Text style={[commonStyles.tableHeaderText, styles.col4_25, styles.headerText]}>Rate</Text>
+                  <Text style={[commonStyles.tableHeaderText, styles.col4_25_right, styles.headerTextAccent]}>Total</Text>
+                </View>
+                {returnNote.items.map((item, index) => (
+                  <View style={commonStyles.tableRow} key={index}>
+                    <Text style={[commonStyles.tableCell, styles.col4_25_left]}>{item.productName || 'Unknown'}</Text>
+                    <Text style={[commonStyles.tableCell, styles.col4_25]}>{item.returnQuantity.toFixed(2)}</Text>
+                    <Text style={[commonStyles.tableCell, styles.col4_25]}>{item.rate ? formatCurrency(item.rate) : '0.00'}</Text>
+                    <Text style={[commonStyles.tableCell, styles.col4_25_right, styles.textBold]}>{item.total ? formatCurrency(item.total) : '0.00'}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+          </View>
+
+          {/* New Horizontal Layout for Terms & Totals */}
+          <View style={styles.summaryContainer}>
+            
+            {/* Left Column: Terms & Notes */}
+            <View style={styles.leftColumn}>
+              <View style={styles.termsBox}>
+                <Text style={styles.boxTitle}>Terms & Conditions</Text>
+                <Text style={styles.boxContent}>
+                  {termsList.map((term, i) => `• ${term}\n`).join('')}
+                </Text>
+              </View>
+
+              {returnNote.notes && (
+                <View style={styles.notesBox}>
+                  <Text style={styles.notesTitle}>Additional Notes</Text>
+                  <Text style={styles.notesText}>{returnNote.notes}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Right Column: Totals */}
+            <View style={styles.totalsBox}>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total Items</Text>
+                <Text style={styles.totalValue}>{totalItemsCount}</Text>
+              </View>
+              
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total Amount</Text>
+                <Text style={styles.totalValue}>{formatCurrency(grandTotal)}</Text>
+              </View>
+              
+              {/* Spacer ensures the grand total row is pushed to bottom */}
+              <View style={{ flex: 1 }} />
+
+              <View style={styles.grandTotalRow}>
+                <Text style={styles.grandTotalLabel}>Total Quantity Returned</Text>
+                <Text style={styles.grandTotalValue}>{totalReturnedQty.toFixed(2)}</Text>
+              </View>
+            </View>
+          </View>
         </View>
+
+        {/* Signatures - Sticky at Bottom */}
+        <View style={styles.signatureSection}>
+          <View style={styles.signatureBox}>
+            <Text style={styles.signatureLabel}>{leftSigLabel}</Text>
+          </View>
+          <View style={styles.signatureBox}>
+            <Text style={styles.signatureLabel}>{rightSigLabel}</Text>
+          </View>
+        </View>
+
+        <PDFFooter companyDetails={companyDetails} />
       </Page>
     </Document>
   );
