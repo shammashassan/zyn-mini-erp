@@ -122,7 +122,7 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
       if (defaultValues?.payeeId) {
         initialPartyType = 'payee';
         const pVal = defaultValues.payeeId as any;
-        
+
         if (pVal && typeof pVal === 'object' && pVal.name) {
           initialPartyName = pVal.name;
         } else {
@@ -343,6 +343,8 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
                             <CommandList
                               className="max-h-[200px] overflow-y-auto"
                               onWheel={(e) => e.stopPropagation()}
+                              onTouchStart={(e) => e.stopPropagation()}
+                              onTouchMove={(e) => e.stopPropagation()}
                             >
                               <CommandEmpty>
                                 {payeeSearchQuery.trim() ? "No payee found." : "Start typing to search..."}
@@ -426,6 +428,8 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
                             <CommandList
                               className="max-h-[200px] overflow-y-auto"
                               onWheel={(e) => e.stopPropagation()}
+                              onTouchStart={(e) => e.stopPropagation()}
+                              onTouchMove={(e) => e.stopPropagation()}
                             >
                               <CommandEmpty>
                                 {supplierSearchQuery.trim() ? "No supplier found." : "Start typing to search..."}
@@ -695,8 +699,8 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isSubmitting || (!!defaultValues && !isDirty)}
             >
               {isSubmitting ? (

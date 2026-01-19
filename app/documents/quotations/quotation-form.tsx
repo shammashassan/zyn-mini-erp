@@ -74,14 +74,14 @@ interface QuotationFormProps {
 }
 
 export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: QuotationFormProps) {
-  const { 
-    register, 
-    handleSubmit, 
-    control, 
-    reset, 
-    watch, 
-    setValue, 
-    formState: { isSubmitting, isDirty } 
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    watch,
+    setValue,
+    formState: { isSubmitting, isDirty }
   } = useForm<QuotationFormData>({
     defaultValues: {
       items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
@@ -309,7 +309,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
         </DialogHeader>
 
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-          
+
           {/* Main Top Grid */}
           <div className={cn("grid grid-cols-1 gap-4", isEditMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
             {/* Customer Field */}
@@ -348,6 +348,8 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                         <CommandList
                           className="max-h-[200px] overflow-y-auto"
                           onWheel={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
                         >
                           <CommandEmpty>
                             {searchQuery.trim() ? "No customer found." : "Start typing to search..."}
@@ -502,6 +504,8 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                                       <CommandList
                                         className="max-h-[200px] overflow-y-auto"
                                         onWheel={(e) => e.stopPropagation()}
+                                        onTouchStart={(e) => e.stopPropagation()}
+                                        onTouchMove={(e) => e.stopPropagation()}
                                       >
                                         <CommandEmpty>No product found.</CommandEmpty>
                                         <CommandGroup>
@@ -588,6 +592,8 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                                     <CommandList
                                       className="max-h-[200px] overflow-y-auto"
                                       onWheel={(e) => e.stopPropagation()}
+                                      onTouchStart={(e) => e.stopPropagation()}
+                                      onTouchMove={(e) => e.stopPropagation()}
                                     >
                                       <CommandEmpty>No product found.</CommandEmpty>
                                       <CommandGroup>
@@ -710,8 +716,8 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isSubmitting || (isEditMode && !isDirty)}
             >
               {isSubmitting ? (isEditMode ? (

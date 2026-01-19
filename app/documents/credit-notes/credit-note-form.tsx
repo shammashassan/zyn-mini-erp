@@ -658,6 +658,8 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                               <CommandList
                                 className="max-h-[200px] overflow-y-auto"
                                 onWheel={(e) => e.stopPropagation()}
+                                onTouchStart={(e) => e.stopPropagation()}
+                                onTouchMove={(e) => e.stopPropagation()}
                               >
                                 <CommandEmpty>
                                   {partySearchQuery.trim() ? `No ${partyType} found.` : "Start typing to search..."}
@@ -765,7 +767,12 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                       <Command>
                         <CommandInput placeholder="Search return notes..." />
-                        <CommandList className="max-h-[200px] overflow-y-auto" onWheel={(e) => e.stopPropagation()}>
+                        <CommandList
+                          className="max-h-[200px] overflow-y-auto"
+                          onWheel={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
+                        >
                           <CommandEmpty>No approved return notes found.</CommandEmpty>
                           <CommandGroup>
                             {returnNotes.map((returnNote) => (
@@ -976,6 +983,8 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                                           <CommandList
                                             className="max-h-[200px] overflow-y-auto"
                                             onWheel={(e) => e.stopPropagation()}
+                                            onTouchStart={(e) => e.stopPropagation()}
+                                            onTouchMove={(e) => e.stopPropagation()}
                                           >
                                             <CommandEmpty>No product found.</CommandEmpty>
                                             <CommandGroup>
@@ -1122,6 +1131,8 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                                         <CommandList
                                           className="max-h-[200px] overflow-y-auto"
                                           onWheel={(e) => e.stopPropagation()}
+                                          onTouchStart={(e) => e.stopPropagation()}
+                                          onTouchMove={(e) => e.stopPropagation()}
                                         >
                                           <CommandEmpty>No product found.</CommandEmpty>
                                           <CommandGroup>

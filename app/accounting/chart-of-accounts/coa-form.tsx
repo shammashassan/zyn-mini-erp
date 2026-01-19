@@ -90,14 +90,14 @@ const COMMON_SUBGROUPS: Record<string, string[]> = {
 };
 
 export function COAForm({ isOpen, onClose, onSubmit, defaultValues, existingSubGroups, existingAccounts }: COAFormProps) {
-  const { 
-    register, 
-    handleSubmit, 
-    control, 
-    reset, 
-    watch, 
-    setValue, 
-    formState: { isSubmitting, isDirty } 
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    watch,
+    setValue,
+    formState: { isSubmitting, isDirty }
   } = useForm<COAFormData>({
     defaultValues: {
       isActive: true,
@@ -107,7 +107,7 @@ export function COAForm({ isOpen, onClose, onSubmit, defaultValues, existingSubG
 
   const [subGroupPopoverOpen, setSubGroupPopoverOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   const selectedGroup = watch("groupName");
   const accountCode = watch("accountCode");
   const isActive = watch("isActive");
@@ -156,13 +156,13 @@ export function COAForm({ isOpen, onClose, onSubmit, defaultValues, existingSubG
 
   const handleFormSubmit = (data: COAFormData) => {
     // Manual Validation
-    
+
     // Account Code Validation
     if (!data.accountCode || !data.accountCode.trim()) {
       toast.error("Account Code is required");
       return;
     }
-    
+
     const normalizedCode = data.accountCode.toUpperCase().trim();
     if (!/^[A-Z0-9]{3,10}$/.test(normalizedCode)) {
       toast.error("Code must be 3-10 alphanumeric characters");
@@ -184,7 +184,7 @@ export function COAForm({ isOpen, onClose, onSubmit, defaultValues, existingSubG
       toast.error("Account Name is required");
       return;
     }
-    
+
     if (data.accountName.length > 100) {
       toast.error("Account Name cannot exceed 100 characters");
       return;
@@ -332,8 +332,8 @@ export function COAForm({ isOpen, onClose, onSubmit, defaultValues, existingSubG
               name="subGroup"
               control={control}
               render={({ field }) => (
-                <Popover 
-                  open={subGroupPopoverOpen} 
+                <Popover
+                  open={subGroupPopoverOpen}
                   onOpenChange={(open) => {
                     setSubGroupPopoverOpen(open);
                     if (open) setSearchQuery(field.value || "");
@@ -361,9 +361,11 @@ export function COAForm({ isOpen, onClose, onSubmit, defaultValues, existingSubG
                       <CommandList
                         className="max-h-[200px] overflow-y-auto"
                         onWheel={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchMove={(e) => e.stopPropagation()}
                       >
                         <CommandEmpty>No subgroups found</CommandEmpty>
-                        
+
                         {availableSubGroups.length > 0 && (
                           <CommandGroup heading="Existing Subgroups">
                             {availableSubGroups

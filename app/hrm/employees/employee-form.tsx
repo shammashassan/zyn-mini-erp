@@ -152,7 +152,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
   };
 
   // Filter roles based on search input
-  const filteredRoles = existingRoles.filter(role => 
+  const filteredRoles = existingRoles.filter(role =>
     !customRole || role.toLowerCase().includes(customRole.toLowerCase())
   );
 
@@ -189,8 +189,8 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
                 name="role"
                 rules={{ required: "Role is required" }}
                 render={({ field }) => (
-                  <Popover 
-                    open={isRolePopoverOpen} 
+                  <Popover
+                    open={isRolePopoverOpen}
                     onOpenChange={(open) => {
                       setIsRolePopoverOpen(open);
                       if (open) setCustomRole(field.value || "");
@@ -216,9 +216,11 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
                         <CommandList
                           className="max-h-[200px] overflow-y-auto"
                           onWheel={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
                         >
                           <CommandEmpty>No roles found.</CommandEmpty>
-                          
+
                           {filteredRoles.length > 0 && (
                             <CommandGroup heading="Existing Roles">
                               {filteredRoles.map((role) => (

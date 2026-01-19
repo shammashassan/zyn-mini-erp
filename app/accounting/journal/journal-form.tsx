@@ -75,14 +75,14 @@ interface JournalFormProps {
 }
 
 export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: JournalFormProps) {
-  const { 
-    register, 
-    handleSubmit, 
-    control, 
-    reset, 
-    watch, 
-    setValue, 
-    formState: { isSubmitting, isDirty } 
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    watch,
+    setValue,
+    formState: { isSubmitting, isDirty }
   } = useForm<JournalFormData>({
     defaultValues: {
       entryDate: new Date(),
@@ -260,7 +260,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
     }
 
     const validEntries = data.entries.filter(e => e.accountCode && (Number(e.debit) > 0 || Number(e.credit) > 0));
-    
+
     if (validEntries.length < 2) {
       toast.error("At least two valid entries (with account & amount) are required");
       return;
@@ -449,11 +449,11 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                   />
 
                   {watchedPartyType && watchedPartyType !== 'Vendor' && (
-                    <Popover 
-                      open={partyPopoverOpen} 
+                    <Popover
+                      open={partyPopoverOpen}
                       onOpenChange={(open) => {
                         setPartyPopoverOpen(open);
-                        if(open) setPartySearchQuery(watch('partyName') || "");
+                        if (open) setPartySearchQuery(watch('partyName') || "");
                       }}
                     >
                       <PopoverTrigger asChild>
@@ -471,14 +471,16 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                       </PopoverTrigger>
                       <PopoverContent className="w-[300px] p-0">
                         <Command shouldFilter={false}>
-                          <CommandInput 
-                            placeholder={`Search ${watchedPartyType?.toLowerCase()}s...`} 
+                          <CommandInput
+                            placeholder={`Search ${watchedPartyType?.toLowerCase()}s...`}
                             value={partySearchQuery}
                             onValueChange={setPartySearchQuery}
                           />
                           <CommandList
                             className="max-h-[200px] overflow-y-auto"
                             onWheel={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onTouchMove={(e) => e.stopPropagation()}
                           >
                             <CommandEmpty>No {watchedPartyType?.toLowerCase()} found.</CommandEmpty>
                             <CommandGroup>
@@ -560,7 +562,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                     <tbody>
                       {fields.map((field, index) => {
                         const account = accounts.find(a => a.accountCode === watchedEntries[index]?.accountCode);
-                        
+
                         return (
                           <tr key={field.id} className="border-b">
                             <td className="p-2 text-sm text-muted-foreground">{index + 1}</td>
@@ -593,6 +595,8 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                                         <CommandList
                                           className="max-h-[200px] overflow-y-auto"
                                           onWheel={(e) => e.stopPropagation()}
+                                          onTouchStart={(e) => e.stopPropagation()}
+                                          onTouchMove={(e) => e.stopPropagation()}
                                         >
                                           <CommandEmpty>No account found.</CommandEmpty>
                                           <CommandGroup>
@@ -681,7 +685,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                 <div className="space-y-4">
                   {fields.map((field, index) => {
                     const account = accounts.find(a => a.accountCode === watchedEntries[index]?.accountCode);
-                    
+
                     return (
                       <Card key={field.id} className="border-2">
                         <CardHeader className="pb-2">
@@ -738,6 +742,8 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                                       <CommandList
                                         className="max-h-[250px] overflow-y-auto"
                                         onWheel={(e) => e.stopPropagation()}
+                                        onTouchStart={(e) => e.stopPropagation()}
+                                        onTouchMove={(e) => e.stopPropagation()}
                                       >
                                         <CommandEmpty>No account found.</CommandEmpty>
                                         <CommandGroup>
@@ -814,7 +820,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
           <div
             className={cn(
               "rounded-lg border p-4 transition-colors duration-300 flex items-center gap-3",
-              isZero 
+              isZero
                 ? "border-yellow-500/50 bg-yellow-50 text-yellow-900 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-200"
                 : isBalanced
                   ? "border-green-500/50 bg-green-50 text-green-900 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-200"
@@ -831,10 +837,10 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
 
             <div className="flex-1 flex items-center justify-between">
               <span className="font-semibold text-base">
-                {isZero 
-                  ? "No Amounts Recorded" 
-                  : isBalanced 
-                    ? "Entry is Balanced" 
+                {isZero
+                  ? "No Amounts Recorded"
+                  : isBalanced
+                    ? "Entry is Balanced"
                     : "Entry is Not Balanced"}
               </span>
 
@@ -853,8 +859,8 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isSubmitting || (!!defaultValues && !isDirty)}
             >
               {isSubmitting ? (

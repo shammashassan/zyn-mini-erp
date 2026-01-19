@@ -56,13 +56,13 @@ export function ProductForm({
   defaultValues,
   existingTypes = []
 }: ProductFormProps) {
-  const { 
-    register, 
-    handleSubmit, 
-    reset, 
+  const {
+    register,
+    handleSubmit,
+    reset,
     control,
     watch,
-    formState: { isSubmitting, isDirty } 
+    formState: { isSubmitting, isDirty }
   } = useForm<ProductFormData>({
     defaultValues: {
       name: "",
@@ -134,9 +134,9 @@ export function ProductForm({
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Product Name *</Label>
-            <Input 
-              id="name" 
-              {...register("name")} 
+            <Input
+              id="name"
+              {...register("name")}
             />
           </div>
 
@@ -168,6 +168,8 @@ export function ProductForm({
                         <CommandList
                           className="max-h-[200px] overflow-y-auto"
                           onWheel={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
                         >
                           {existingTypes.length > 0 && (
                             <CommandGroup heading="Existing Types">
@@ -210,11 +212,11 @@ export function ProductForm({
 
             <div className="space-y-2">
               <Label htmlFor="price">Price *</Label>
-              <Input 
-                id="price" 
-                type="number" 
-                step="0.01" 
-                {...register("price", { valueAsNumber: true })} 
+              <Input
+                id="price"
+                type="number"
+                step="0.01"
+                {...register("price", { valueAsNumber: true })}
               />
             </div>
           </div>
@@ -223,8 +225,8 @@ export function ProductForm({
             <DialogClose asChild>
               <Button type="button" variant="outline">Cancel</Button>
             </DialogClose>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isSubmitting || (!!defaultValues && !isDirty)}
             >
               {isSubmitting ? (

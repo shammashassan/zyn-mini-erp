@@ -218,7 +218,7 @@ export function DeliveryNoteForm({
     setValue("invoiceId", invoice._id, { shouldDirty: true });
     setSelectedInvoice(invoice);
     setInvoicePopoverOpen(false);
-    
+
     // Don't auto-generate notes - let user add them manually
   };
 
@@ -317,6 +317,8 @@ export function DeliveryNoteForm({
                         <CommandList
                           className="max-h-[200px] overflow-y-auto"
                           onWheel={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
                         >
                           <CommandEmpty>No customer found.</CommandEmpty>
                           <CommandGroup>
@@ -388,6 +390,8 @@ export function DeliveryNoteForm({
                         <CommandList
                           className="max-h-[200px] overflow-y-auto"
                           onWheel={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
                         >
                           <CommandEmpty>No invoices found.</CommandEmpty>
                           <CommandGroup>
@@ -534,7 +538,7 @@ export function DeliveryNoteForm({
                   <Package className="h-4 w-4" />
                   Items to Ship
                 </Label>
-                
+
                 {/* Desktop View (Table) */}
                 <div className="hidden md:block overflow-x-auto rounded-md border bg-background">
                   <table className="w-full">
@@ -619,7 +623,7 @@ export function DeliveryNoteForm({
                   {...field}
                   id="notes"
                   placeholder={
-                    selectedInvoice 
+                    selectedInvoice
                       ? `Add delivery notes... (Default: "Delivery note for invoice ${selectedInvoice.invoiceNumber}")`
                       : "Add delivery notes..."
                   }

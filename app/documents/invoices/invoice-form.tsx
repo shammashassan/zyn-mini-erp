@@ -404,6 +404,8 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                         <CommandList
                           className="max-h-[200px] overflow-y-auto"
                           onWheel={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
                         >
                           <CommandEmpty>
                             {searchQuery.trim() ? "No customer found." : "Start typing to search..."}
@@ -536,6 +538,8 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                     <CommandList
                       className="max-h-[200px] overflow-y-auto"
                       onWheel={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onTouchMove={(e) => e.stopPropagation()}
                     >
                       <CommandEmpty>No approved quotations found.</CommandEmpty>
                       <CommandGroup>
@@ -621,6 +625,8 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                                       <CommandList
                                         className="max-h-[200px] overflow-y-auto"
                                         onWheel={(e) => e.stopPropagation()}
+                                        onTouchStart={(e) => e.stopPropagation()}
+                                        onTouchMove={(e) => e.stopPropagation()}
                                       >
                                         <CommandEmpty>No product found.</CommandEmpty>
                                         <CommandGroup>
@@ -725,6 +731,8 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                                     <CommandList
                                       className="max-h-[200px] overflow-y-auto"
                                       onWheel={(e) => e.stopPropagation()}
+                                      onTouchStart={(e) => e.stopPropagation()}
+                                      onTouchMove={(e) => e.stopPropagation()}
                                     >
                                       <CommandEmpty>No product found.</CommandEmpty>
                                       <CommandGroup>

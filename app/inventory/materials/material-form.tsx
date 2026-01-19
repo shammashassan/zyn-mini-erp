@@ -82,13 +82,13 @@ export function MaterialForm({
   existingTypes = [],
   existingUnits = []
 }: MaterialFormProps) {
-  const { 
-    register, 
-    handleSubmit, 
-    reset, 
+  const {
+    register,
+    handleSubmit,
+    reset,
     control,
     watch,
-    formState: { isSubmitting, isDirty } 
+    formState: { isSubmitting, isDirty }
   } = useForm<MaterialFormData>({
     defaultValues: {
       name: "",
@@ -201,9 +201,9 @@ export function MaterialForm({
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Material Name *</Label>
-            <Input 
-              id="name" 
-              {...register("name")} 
+            <Input
+              id="name"
+              {...register("name")}
             />
           </div>
 
@@ -234,6 +234,8 @@ export function MaterialForm({
                       <CommandList
                         className="max-h-[200px] overflow-y-auto"
                         onWheel={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchMove={(e) => e.stopPropagation()}
                       >
                         {existingTypes.length > 0 && (
                           <CommandGroup heading="Existing Types">
@@ -278,20 +280,20 @@ export function MaterialForm({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="stock">Stock</Label>
-              <Input 
-                id="stock" 
-                type="number" 
-                {...register("stock", { valueAsNumber: true })} 
+              <Input
+                id="stock"
+                type="number"
+                {...register("stock", { valueAsNumber: true })}
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="unitCost">Unit Cost</Label>
-              <Input 
-                id="unitCost" 
-                type="number" 
-                step="0.01" 
-                {...register("unitCost", { valueAsNumber: true })} 
+              <Input
+                id="unitCost"
+                type="number"
+                step="0.01"
+                {...register("unitCost", { valueAsNumber: true })}
               />
             </div>
 
@@ -322,6 +324,8 @@ export function MaterialForm({
                         <CommandList
                           className="max-h-[200px] overflow-y-auto"
                           onWheel={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
                         >
                           <CommandGroup heading="Select Unit">
                             {allUnits.filter(u => !customUnit || u.toLowerCase().includes(customUnit.toLowerCase())).map((u) => (
@@ -365,8 +369,8 @@ export function MaterialForm({
             <DialogClose asChild>
               <Button type="button" variant="outline">Cancel</Button>
             </DialogClose>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isSubmitting || (!!defaultValues && !isDirty)}
             >
               {isSubmitting ? (

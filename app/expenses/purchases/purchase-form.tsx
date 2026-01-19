@@ -309,6 +309,8 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                         <CommandList
                           className="max-h-[200px] overflow-y-auto"
                           onWheel={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
                         >
                           <CommandEmpty>
                             {supplierSearchQuery.trim() ? "No supplier found." : "Start typing to search..."}
@@ -497,14 +499,16 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                                       </PopoverTrigger>
                                       <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
                                         <Command>
-                                          <CommandInput 
-                                            placeholder="Search materials..." 
+                                          <CommandInput
+                                            placeholder="Search materials..."
                                             value={watchedItems[index]?.materialName || ""}
                                             onValueChange={(val) => setValue(`items.${index}.materialName`, val)}
                                           />
                                           <CommandList
                                             className="max-h-[200px] overflow-y-auto"
                                             onWheel={(e) => e.stopPropagation()}
+                                            onTouchStart={(e) => e.stopPropagation()}
+                                            onTouchMove={(e) => e.stopPropagation()}
                                           >
                                             <CommandEmpty>No material found.</CommandEmpty>
                                             <CommandGroup>
@@ -619,14 +623,16 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[300px] p-0" align="start">
                                       <Command>
-                                        <CommandInput 
-                                            placeholder="Search materials..." 
-                                            value={watchedItems[index]?.materialName || ""}
-                                            onValueChange={(val) => setValue(`items.${index}.materialName`, val)}
+                                        <CommandInput
+                                          placeholder="Search materials..."
+                                          value={watchedItems[index]?.materialName || ""}
+                                          onValueChange={(val) => setValue(`items.${index}.materialName`, val)}
                                         />
                                         <CommandList
                                           className="max-h-[200px] overflow-y-auto"
                                           onWheel={(e) => e.stopPropagation()}
+                                          onTouchStart={(e) => e.stopPropagation()}
+                                          onTouchMove={(e) => e.stopPropagation()}
                                         >
                                           <CommandEmpty>No material found.</CommandEmpty>
                                           <CommandGroup>

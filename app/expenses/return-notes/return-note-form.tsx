@@ -801,6 +801,8 @@ export function ReturnNoteForm({
                     <CommandList
                       className="max-h-[200px] overflow-y-auto"
                       onWheel={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onTouchMove={(e) => e.stopPropagation()}
                     >
                       <CommandEmpty>No {getEntityLabel().toLowerCase()} found.</CommandEmpty>
                       <CommandGroup>
@@ -879,6 +881,8 @@ export function ReturnNoteForm({
                     <CommandList
                       className="max-h-[200px] overflow-y-auto"
                       onWheel={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onTouchMove={(e) => e.stopPropagation()}
                     >
                       <CommandEmpty>No {getDocumentLabel().toLowerCase()}s found.</CommandEmpty>
                       <CommandGroup>

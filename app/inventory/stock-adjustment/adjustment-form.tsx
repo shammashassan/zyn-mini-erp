@@ -37,13 +37,13 @@ interface AdjustmentFormProps {
 }
 
 export function AdjustmentForm({ isOpen, onClose, onSubmit, materials, isLoadingMaterials }: AdjustmentFormProps) {
-  const { 
-    handleSubmit, 
-    control, 
-    reset, 
-    watch, 
+  const {
+    handleSubmit,
+    control,
+    reset,
+    watch,
     setValue,
-    formState: { isSubmitting } 
+    formState: { isSubmitting }
   } = useForm<AdjustmentFormData>({
     defaultValues: {
       materialId: "",
@@ -76,10 +76,10 @@ export function AdjustmentForm({ isOpen, onClose, onSubmit, materials, isLoading
   // Sync Search Query
   useEffect(() => {
     if (isPopoverOpen && watchedMaterialId) {
-       const selected = materials.find(m => m._id === watchedMaterialId);
-       if (selected) {
-         setSearchQuery(selected.name);
-       }
+      const selected = materials.find(m => m._id === watchedMaterialId);
+      if (selected) {
+        setSearchQuery(selected.name);
+      }
     }
   }, [isPopoverOpen, watchedMaterialId, materials]);
 
@@ -105,7 +105,7 @@ export function AdjustmentForm({ isOpen, onClose, onSubmit, materials, isLoading
     } else if (adjustmentMode === 'price') {
       // Force stock logic to neutral
       submissionData = { ...submissionData, adjustmentType: 'increment', value: 0 };
-      
+
       const unitCostValue = submissionData.newUnitCost;
       if (typeof unitCostValue !== 'number' || !isFinite(unitCostValue) || unitCostValue < 0) {
         toast.error("Please enter a valid unit cost");
@@ -151,14 +151,16 @@ export function AdjustmentForm({ isOpen, onClose, onSubmit, materials, isLoading
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                     <Command shouldFilter={false}>
-                      <CommandInput 
-                        placeholder="Search material..." 
+                      <CommandInput
+                        placeholder="Search material..."
                         value={searchQuery}
                         onValueChange={setSearchQuery}
                       />
                       <CommandList
                         className="max-h-[200px] overflow-y-auto"
                         onWheel={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchMove={(e) => e.stopPropagation()}
                       >
                         <CommandEmpty>No material found.</CommandEmpty>
                         <CommandGroup>
@@ -294,9 +296,9 @@ export function AdjustmentForm({ isOpen, onClose, onSubmit, materials, isLoading
             <DialogClose asChild>
               <Button type="button" variant="outline" className="w-full sm:w-auto">Cancel</Button>
             </DialogClose>
-            <Button 
-              type="submit" 
-              disabled={isSubmitting} 
+            <Button
+              type="submit"
+              disabled={isSubmitting}
               className="w-full sm:w-auto"
             >
               {isSubmitting ? (

@@ -655,6 +655,8 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
                       <CommandList
                         className="max-h-[200px] overflow-y-auto"
                         onWheel={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchMove={(e) => e.stopPropagation()}
                       >
                         <CommandEmpty>
                           {partySearchQuery.trim() ? `No ${partyType} found.` : "Start typing to search..."}
