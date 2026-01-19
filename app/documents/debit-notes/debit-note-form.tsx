@@ -224,12 +224,13 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
       if (returnNoteData) {
         const itemsFromReturn = returnNoteData.items.map((item: any) => {
           const material = materials.find(m => m._id === item.materialId);
+          const unitCost = item.rate || material?.unitCost || 0;
           return {
             materialId: item.materialId,
             materialName: item.materialName,
             quantity: item.returnQuantity,
-            unitCost: material?.unitCost || 0,
-            total: item.returnQuantity * (material?.unitCost || 0),
+            unitCost: unitCost,
+            total: item.returnQuantity * unitCost,
           };
         });
 
@@ -336,12 +337,13 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
     // Auto-fill items from return note
     const itemsFromReturn = returnNote.items.map((item: any) => {
       const material = materials.find(m => m._id === item.materialId);
+      const unitCost = item.rate || material?.unitCost || 0;
       return {
         materialId: item.materialId,
         materialName: item.materialName,
         quantity: item.returnQuantity,
-        unitCost: material?.unitCost || 0,
-        total: item.returnQuantity * (material?.unitCost || 0),
+        unitCost: unitCost,
+        total: item.returnQuantity * unitCost,
       };
     });
 

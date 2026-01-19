@@ -234,13 +234,15 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
           }
 
           const productName = item.productName || item.description;
+          const price = item.rate || matchedProduct?.price || 0;
+          const total = item.total || (item.returnQuantity * price);
 
           return {
             productId: item.productId || matchedProduct?._id || '',
             description: productName || '',
             quantity: item.returnQuantity || 0,
-            price: item.rate || matchedProduct?.price || 0,
-            total: item.total || (item.returnQuantity * (item.rate || matchedProduct?.price || 0)),
+            price: price,
+            total: total,
           };
         });
 
@@ -354,13 +356,15 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
       }
 
       const productName = item.productName || item.description;
+      const price = item.rate || matchedProduct?.price || 0;
+      const total = item.total || (item.returnQuantity * price);
 
       return {
         productId: item.productId || matchedProduct?._id || '',
         description: productName || '',
         quantity: item.returnQuantity || 0,
-        price: item.rate || matchedProduct?.price || 0,
-        total: item.total || (item.returnQuantity * (item.rate || matchedProduct?.price || 0)),
+        price: price,
+        total: total,
       };
     });
 
