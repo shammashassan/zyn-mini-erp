@@ -631,6 +631,8 @@ export function ReturnNoteForm({
           receivedQuantity: item.receivedQuantity || 0,
           returnedQuantity: item.returnedQuantity || 0,
           returnQuantity: returnQty,
+          rate: item.unitCost || 0,  // ✅ ADD THIS
+          total: returnQty * (item.unitCost || 0),  // ✅ ADD THIS
         });
       }
     } else if (returnType === 'salesReturn') {
@@ -665,6 +667,9 @@ export function ReturnNoteForm({
     if (returnType === 'purchaseReturn') {
       submitData.purchaseId = selectedDocument._id;
       submitData.supplierName = selectedEntity;
+      const totalAmount = returnItems.reduce((sum, item) => sum + (item.total || 0), 0);
+      submitData.totalAmount = totalAmount;
+      submitData.grandTotal = totalAmount;
     } else if (returnType === 'salesReturn') {
       submitData.invoiceId = selectedDocument._id;
       submitData.customerName = selectedEntity;
