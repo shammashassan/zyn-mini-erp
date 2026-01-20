@@ -3,6 +3,8 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Purchase from "@/models/Purchase";
+import Voucher from "@/models/Voucher";
+import ReturnNote from "@/models/ReturnNote";
 import Supplier from "@/models/Supplier";
 import Material from "@/models/Material";
 import StockAdjustment from "@/models/StockAdjustment";
@@ -24,6 +26,8 @@ export async function GET(request: Request) {
     if (error) return error;
 
     await dbConnect();
+
+    const ensureModels = [Purchase, Voucher, ReturnNote, Supplier, Material, StockAdjustment];
 
     const { searchParams } = new URL(request.url);
 

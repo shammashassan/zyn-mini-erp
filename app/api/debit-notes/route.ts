@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import DebitNote from "@/models/DebitNote";
 import ReturnNote from "@/models/ReturnNote";
+import Voucher from "@/models/Voucher";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
@@ -16,6 +17,8 @@ export async function GET(request: Request) {
     if (error) return error;
 
     await dbConnect();
+
+    const ensureModels = [DebitNote, ReturnNote, Voucher];
 
     const { searchParams } = new URL(request.url);
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');

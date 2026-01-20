@@ -4,6 +4,10 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Invoice from "@/models/Invoice";
 import Customer from "@/models/Customer";
+import Quotation from "@/models/Quotation";
+import DeliveryNote from "@/models/DeliveryNote";
+import ReturnNote from "@/models/ReturnNote";
+import Voucher from "@/models/Voucher";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { createJournalForInvoice } from '@/utils/journalAutoCreate';
 import { UAE_VAT_PERCENTAGE } from '@/utils/constants';
@@ -22,6 +26,8 @@ export async function GET(request: Request) {
     if (error) return error;
 
     await dbConnect();
+    
+    const ensureModels = [Invoice, Customer, Quotation, DeliveryNote, ReturnNote, Voucher];
 
     const { searchParams } = new URL(request.url);
     

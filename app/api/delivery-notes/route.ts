@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import DeliveryNote from "@/models/DeliveryNote";
+import Quotation from "@/models/Quotation";
 import Invoice from "@/models/Invoice"; // ✅ ADDED
 import Customer from "@/models/Customer";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
@@ -18,6 +19,8 @@ export async function GET(request: Request) {
     if (error) return error;
 
     await dbConnect();
+
+    const ensureModels = [DeliveryNote, Quotation, Invoice];
 
     const { searchParams } = new URL(request.url);
     
