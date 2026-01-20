@@ -1,4 +1,4 @@
-// app/documents/customers/customer-form.tsx - FIXED: Standardized validation and dirty state check
+// app/people/customers/customer-form.tsx - FIXED: Standardized validation and dirty state check
 
 "use client";
 

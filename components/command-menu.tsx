@@ -36,7 +36,8 @@ import {
   CircleQuestionMark,
   Factory,
   Bell,
-  Undo2
+  Undo2,
+  Redo2
 } from "lucide-react";
 
 import {
@@ -107,18 +108,19 @@ const navigationData = [
   { title: "Suppliers", url: "/people/suppliers", icon: Building2, group: "People" },
   { title: "Payees", url: "/people/payees", icon: Users, group: "People" },
 
-  // Documents
-  { title: "Quotations", url: "/documents/quotations", icon: FileClock, group: "Documents" },
-  { title: "Invoices", url: "/documents/invoices", icon: FileText, group: "Documents" },
-  { title: "Vouchers", url: "/documents/vouchers", icon: Ticket, group: "Documents" },
-  { title: "Debit Notes", url: "/documents/debit-notes", icon: ClipboardCheck, group: "Documents" },
-  { title: "Credit Notes", url: "/documents/credit-notes", icon: ClipboardCheck, group: "Documents" },
-  { title: "Delivery notes", url: "/documents/delivery-notes", icon: Truck, group: "Documents" },
+  // Sales
+  { title: "Quotations", url: "/documents/quotations", icon: FileClock, group: "Sales" },
+  { title: "Invoices", url: "/documents/invoices", icon: FileText, group: "Sales" },
+  { title: "Vouchers", url: "/documents/vouchers", icon: Ticket, group: "Sales" },
+  { title: "Delivery notes", url: "/documents/delivery-notes", icon: Truck, group: "Sales" },
+  { title: "Sales Returns", url: "/documents/sales-returns", icon: Undo2, group: "Sales" },
+  { title: "Debit Notes", url: "/documents/debit-notes", icon: ClipboardCheck, group: "Sales" },
 
-  // Expenses
-  { title: "Purchases", url: "/expenses/purchases", icon: ShoppingCart, group: "Expenses" },
-  { title: "Expenses", url: "/expenses/expenses", icon: Banknote, group: "Expenses" },
-  { title: "Return Notes", url: "/expenses/return-notes", icon: Undo2, group: "Expenses" },
+  // Procurement
+  { title: "Purchases", url: "/procurement/purchases", icon: ShoppingCart, group: "Procurement" },
+  { title: "Expenses", url: "/procurement/expenses", icon: Banknote, group: "Procurement" },
+  { title: "Purchase Returns", url: "/procurement/purchase-returns", icon: Redo2, group: "Procurement" },
+  { title: "Credit Notes", url: "/procurement/credit-notes", icon: ClipboardCheck, group: "Procurement" },
 
   // Reports
   { title: "Sales Report", url: "/reports/sales-report", icon: TrendingUp, group: "Reports" },

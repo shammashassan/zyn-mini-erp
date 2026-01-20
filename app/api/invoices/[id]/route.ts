@@ -10,6 +10,7 @@ import { handleInvoiceStatusChange } from '@/utils/journalAutoCreate';
 import { voidJournalsForReference } from '@/utils/journalManager';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
+import { getUserInfo } from "@/lib/auth-helpers";
 
 interface RequestContext {
   params: Promise<{
@@ -97,7 +98,7 @@ export async function PUT(request: Request, context: RequestContext) {
     });
     if (error) return error;
 
-    const user = session.user;
+    const user = await getUserInfo();
 
     const currentInvoice = await Invoice.findById(id);
     if (!currentInvoice) {
@@ -182,7 +183,7 @@ export async function DELETE(request: Request, context: RequestContext) {
     });
     if (error) return error;
 
-    const user = session.user;
+    const user = await getUserInfo();
 
     const invoice = await Invoice.findById(id);
 

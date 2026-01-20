@@ -1,4 +1,4 @@
-// app/api/return-notes/route.ts - CLEANED: No Payee/Vendor Support
+// app/api/return-notes/route.ts - UPDATED: Added returnType filtering
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -29,11 +29,17 @@ export async function GET(request: Request) {
 
     const startDateParam = searchParams.get('startDate');
     const endDateParam = searchParams.get('endDate');
+    const returnTypeParam = searchParams.get('returnType'); // ✅ GET returnType parameter
 
     if (isServerSide) {
       const { page, pageSize, sorting, filters } = extractTableParams(searchParams);
 
       const baseFilter: any = { isDeleted: false };
+
+      // ✅ ADD returnType filter
+      if (returnTypeParam) {
+        baseFilter.returnType = returnTypeParam;
+      }
 
       if (startDateParam || endDateParam) {
         baseFilter.returnDate = {};
@@ -92,6 +98,11 @@ export async function GET(request: Request) {
     } else {
       const populate = searchParams.get('populate') === 'true';
       const filter: any = { isDeleted: false };
+
+      // ✅ ADD returnType filter for non-server-side requests too
+      if (returnTypeParam) {
+        filter.returnType = returnTypeParam;
+      }
 
       if (startDateParam || endDateParam) {
         filter.returnDate = {};
@@ -165,7 +176,7 @@ export async function POST(request: Request) {
       grandTotal
     } = body;
 
-    // ✅ CLEANED: Only validate purchaseReturn or salesReturn
+    // Validate return type
     if (returnType === 'purchaseReturn') {
       if (!purchaseId) {
         return NextResponse.json({ error: "Purchase ID is required for purchase returns" }, { status: 400 });

@@ -1,0 +1,75 @@
+// app/procurement/purchase-returns/trash/page.tsx
+
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { TrashPage } from "@/components/TrashPage";
+import { PackageX, Redo2 } from "lucide-react";
+import { useReturnNotePermissions } from "@/hooks/use-permissions";
+import { AccessDenied } from "@/components/access-denied";
+import { Spinner } from "@/components/ui/spinner";
+
+interface DeletedPurchaseReturn {
+  _id: string;
+  returnNumber?: string;
+  purchaseReference?: string;
+  supplierName?: string;
+  items?: Array<{
+    returnQuantity: number;
+  }>;
+  reason?: string;
+  status?: string;
+  deletedAt?: Date | string;
+  deletedBy?: string;
+  actionHistory?: Array<{
+    action: string;
+    username?: string;
+    userId?: string;
+  }>;
+}
+
+export default function PurchaseReturnsTrashPage() {
+  const [isMounted, setIsMounted] = useState(false);
+  const {
+    permissions: { canViewTrash },
+    isPending,
+  } = useReturnNotePermissions();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted || isPending) {
+    return (
+      <div className="flex h-[50vh] w-full items-center justify-center">
+        <Spinner className="size-10" />
+      </div>
+    );
+  }
+
+  if (!canViewTrash) {
+    return <AccessDenied />;
+  }
+
+  return (
+    <TrashPage<DeletedPurchaseReturn>
+      title="Purchase Returns Trash"
+      description="Deleted purchase returns that can be restored or permanently removed"
+      icon={<Redo2 className="h-8 w-8 text-destructive" />}
+      apiEndpoint="/api/return-notes/trash?returnType=purchaseReturn"
+      restoreEndpoint="/api/return-notes/trash/restore"
+      deleteEndpoint="/api/return-notes/trash/delete"
+      backUrl="../purchase-returns"
+      backLabel="Back to Purchase Returns"
+      getItemName={(item) => item.returnNumber || "Unnamed Purchase Return"}
+      getItemDescription={(item) => {
+        const totalQuantity =
+          item.items?.reduce((sum, i) => sum + (i.returnQuantity || 0), 0) || 0;
+        const deleteAction = item.actionHistory?.find((a) => a.action === "Soft Deleted");
+        const deletedByUsername = deleteAction?.username || item.deletedBy || "Unknown";
+        
+        return `${item.purchaseReference || "N/A"} • ${item.supplierName || "Unknown Supplier"} • ${totalQuantity.toFixed(2)} units • ${item.reason || "No reason"} • Deleted by @${deletedByUsername}`;
+      }}
+    />
+  );
+}

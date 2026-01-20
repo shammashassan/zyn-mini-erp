@@ -8,6 +8,7 @@ import { softDelete } from "@/utils/softDelete";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { handleDebitNoteStatusChange } from '@/utils/journalAutoCreate';
 import { voidJournalsForReference } from '@/utils/journalManager';
+import { getUserInfo } from "@/lib/auth-helpers";
 
 interface RequestContext {
   params: Promise<{
@@ -84,7 +85,7 @@ export async function PUT(request: Request, context: RequestContext) {
     });
     if (error) return error;
 
-    const user = session.user;
+    const user = await getUserInfo();
 
     const currentDebitNote = await DebitNote.findById(id);
     if (!currentDebitNote) {
@@ -164,7 +165,7 @@ export async function DELETE(request: Request, context: RequestContext) {
     });
     if (error) return error;
 
-    const user = session.user;
+    const user = await getUserInfo();
 
     const debitNote = await DebitNote.findById(id);
 

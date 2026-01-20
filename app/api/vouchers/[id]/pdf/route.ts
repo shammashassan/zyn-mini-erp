@@ -52,6 +52,16 @@ export async function GET(
         model: 'Purchase',
         select: 'referenceNumber' // ✅ Using referenceNumber as per your Purchase model
       })
+      .populate({
+        path: 'connectedDocuments.debitNoteIds',
+        model: 'DebitNote',
+        select: 'debitNoteNumber' 
+      })
+      .populate({
+        path: 'connectedDocuments.creditNoteIds',
+        model: 'CreditNote',
+        select: 'creditNoteNumber' 
+      })
       .setOptions({ includeDeleted: true });
 
     if (!voucher) {

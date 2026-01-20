@@ -33,13 +33,13 @@ const routeGroups: Record<string, { label: string; path: string }[]> = {
     { label: "Profit & Loss", path: "/accounting/profit-loss" },
     { label: "Trial Balance", path: "/accounting/trial-balance" },
   ],
-  documents: [
-    { label: "Invoices", path: "/documents/invoices" },
-    { label: "Quotations", path: "/documents/quotations" },
-    { label: "Vouchers", path: "/documents/vouchers" },
-    { label: "Debit Notes", path: "/documents/debit-notes" },
-    { label: "Credit Notes", path: "/documents/credit-notes" },
-    { label: "Delivery Notes", path: "/documents/delivery-notes" },
+  sales: [
+    { label: "Invoices", path: "/sales/invoices" },
+    { label: "Quotations", path: "/sales/quotations" },
+    { label: "Vouchers", path: "/sales/vouchers" },
+    { label: "Delivery Notes", path: "/sales/delivery-notes" },
+    { label: "Sales Returns", path: "/sales/sales-returns" },
+    { label: "Debit Notes", path: "/sales/debit-notes" },
   ],
   hrm: [
     { label: "Employees", path: "/hrm/employees" },
@@ -60,10 +60,11 @@ const routeGroups: Record<string, { label: string; path: string }[]> = {
     { label: "Suppliers", path: "/people/suppliers" },
     { label: "Payees", path: "/people/payees" },
   ],
-  expenses: [
-    { label: "Purchases", path: "/expenses/purchases" },
-    { label: "Expenses", path: "/expenses/expenses" },
-    { label: "Return Notes", path: "/expenses/return-notes" },
+  procurement: [
+    { label: "Purchases", path: "/procurement/purchases" },
+    { label: "Expenses", path: "/procurement/expenses" },
+    { label: "Purchase Returns", path: "/procurement/purchase-returns" },
+    { label: "Credit Notes", path: "/procurement/credit-notes" },
   ],
   reports: [
     { label: "Expense Report", path: "/reports/expense-report" },

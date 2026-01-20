@@ -1,4 +1,4 @@
-// app/documents/payees/payee-form.tsx - FIXED: Standardized validation and dirty state check
+// app/people/payees/payee-form.tsx - FIXED: Standardized validation and dirty state check
 
 "use client";
 

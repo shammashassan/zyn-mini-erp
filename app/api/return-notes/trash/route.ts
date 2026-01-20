@@ -1,12 +1,11 @@
-// app/api/return-notes/trash/route.ts
+// app/api/return-notes/trash/route.ts - UPDATED: Added returnType filtering
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import ReturnNote from "@/models/ReturnNote";
-import { getTrash } from "@/utils/softDelete";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { error } = await requireAuthAndPermission({
       returnNote: ["view_trash"],
@@ -15,7 +14,19 @@ export async function GET() {
 
     await dbConnect();
 
-    const trashedReturnNotes = await getTrash(ReturnNote);
+    const { searchParams } = new URL(request.url);
+    const returnTypeParam = searchParams.get('returnType'); // ✅ GET returnType parameter
+
+    const filter: any = { isDeleted: true };
+
+    // ✅ ADD returnType filter
+    if (returnTypeParam) {
+      filter.returnType = returnTypeParam;
+    }
+
+    const trashedReturnNotes = await ReturnNote.find(filter)
+      .setOptions({ includeDeleted: true })
+      .sort({ deletedAt: -1 });
 
     return NextResponse.json(trashedReturnNotes);
   } catch (error) {

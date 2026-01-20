@@ -1,4 +1,4 @@
-// app/documents/suppliers/supplier-form.tsx - FIXED: Standardized validation and dirty state check
+// app/people/suppliers/supplier-form.tsx - FIXED: Standardized validation and dirty state check
 
 "use client";
 

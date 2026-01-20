@@ -1,4 +1,4 @@
-// app/documents/products/product-form.tsx - UPDATED: Sync search input with selection
+// app/inventory/products/product-form.tsx - UPDATED: Sync search input with selection
 
 "use client";
 

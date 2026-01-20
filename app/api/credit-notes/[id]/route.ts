@@ -9,6 +9,7 @@ import { softDelete } from "@/utils/softDelete";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { handleCreditNoteStatusChange } from '@/utils/journalAutoCreate';
 import { voidJournalsForReference } from '@/utils/journalManager';
+import { getUserInfo } from "@/lib/auth-helpers";
 
 interface RequestContext {
   params: Promise<{
@@ -88,7 +89,7 @@ export async function PUT(request: Request, context: RequestContext) {
     });
     if (error) return error;
 
-    const user = session.user;
+    const user = await getUserInfo();
 
     const currentCreditNote = await CreditNote.findById(id);
     if (!currentCreditNote) {
@@ -166,7 +167,7 @@ export async function DELETE(request: Request, context: RequestContext) {
     });
     if (error) return error;
 
-    const user = session.user;
+    const user = await getUserInfo();
 
     const creditNote = await CreditNote.findById(id);
 

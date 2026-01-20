@@ -49,18 +49,19 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Suppliers": { supplier: ["read"] },
   "Payees": { payee: ["read"] },
   
-  // Documents
+  // Sales
   "Quotations": { invoice: ["read"] },
   "Invoices": { invoice: ["read"] },
   "Vouchers": { voucher: ["read"] },
   "Debit Notes": { debitNote: ["read"] },
   "Credit Notes": { creditNote: ["read"] },
   "Delivery notes": { deliveryNote: ["read"] },
+  "Sales Return": { returnNote: ["read"] },
   
-  // Expenses
+  // Procurement
   "Purchases": { purchase: ["read"] },
   "Expenses": { expense: ["read"] },
-  "Return Notes": { returnNote: ["read"] },
+  "Purchase Return": { returnNote: ["read"] },
   
   // Reports
   "Sales Report": { report: ["read"] },
@@ -111,26 +112,27 @@ const staticData = {
       ],
     },
     {
-      title: "Documents",
+      title: "Sales",
       url: "/#",
       icon: FileText,
       items: [
-        { title: "Quotations", url: "/documents/quotations" },
-        { title: "Invoices", url: "/documents/invoices" },
-        { title: "Vouchers", url: "/documents/vouchers" },
-        { title: "Debit Notes", url: "/documents/debit-notes" },
-        { title: "Credit Notes", url: "/documents/credit-notes" },
-        { title: "Delivery notes", url: "/documents/delivery-notes" },
+        { title: "Quotations", url: "/sales/quotations" },
+        { title: "Invoices", url: "/sales/invoices" },
+        { title: "Vouchers", url: "/sales/vouchers" },
+        { title: "Delivery notes", url: "/sales/delivery-notes" },
+        { title: "Sales Returns", url: "/sales/sales-returns" },
+        { title: "Debit Notes", url: "/sales/debit-notes" },
       ]
     },
     {
-      title: "Expenses",
+      title: "Procurement",
       url: "#",
       icon: Receipt,
       items: [
-        { title: "Purchases", url: "/expenses/purchases" },
-        { title: "Expenses", url: "/expenses/expenses" },
-        { title: "Return Notes", url: "/expenses/return-notes" },
+        { title: "Purchases", url: "/procurement/purchases" },
+        { title: "Expenses", url: "/procurement/expenses" },
+        { title: "Purchase Returns", url: "/procurement/purchase-returns" },
+        { title: "Credit Notes", url: "/procurement/credit-notes" },
       ],
     },
     {
