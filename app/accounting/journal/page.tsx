@@ -88,8 +88,25 @@ function JournalPageContent() {
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [typePopoverOpen, setTypePopoverOpen] = useState(false);
+  const [typeSearchQuery, setTypeSearchQuery] = useState("");
   const [partyTypeFilter, setPartyTypeFilter] = useState<string>("all");
   const [selectedPartyId, setSelectedPartyId] = useState<string>("");
+
+  const typeOptions = [
+    { value: "all", label: "All Types" },
+    { value: "General", label: "General" },
+    { value: "Contra", label: "Contra" },
+    { value: "Adjustment", label: "Adjustment" },
+    { value: "Invoice", label: "Invoice" },
+    { value: "Receipt", label: "Receipt" },
+    { value: "Payment", label: "Payment" },
+    { value: "Purchase", label: "Purchase" },
+    { value: "Expense", label: "Expense" },
+    { value: "CreditNote", label: "Credit Note" },
+    { value: "DebitNote", label: "Debit Note" },
+    { value: "ReturnNote", label: "Return Note" },
+  ];
 
   const [customers, setCustomers] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -489,7 +506,7 @@ function JournalPageContent() {
                     <div className="space-y-2">
                       <Label>Status</Label>
                       <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val); setUrlState({ page: 1 }); }}>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full justify-between font-normal px-3">
                           <SelectValue placeholder="All statuses" />
                         </SelectTrigger>
                         <SelectContent>
@@ -503,23 +520,51 @@ function JournalPageContent() {
 
                     <div className="space-y-2">
                       <Label>Type</Label>
-                      <Select value={typeFilter} onValueChange={(val) => { setTypeFilter(val); setUrlState({ page: 1 }); }}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="All types" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Types</SelectItem>
-                          <SelectItem value="Manual">Manual</SelectItem>
-                          <SelectItem value="Invoice">Invoice</SelectItem>
-                          <SelectItem value="Receipt">Receipt</SelectItem>
-                          <SelectItem value="Payment">Payment</SelectItem>
-                          <SelectItem value="Purchase">Purchase</SelectItem>
-                          <SelectItem value="Expense">Expense</SelectItem>
-                          <SelectItem value="DebitNote">Debit Note</SelectItem>
-                          <SelectItem value="CreditNote">Credit Note</SelectItem>
-                          <SelectItem value="ReturnNote">Return Note</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Popover open={typePopoverOpen} onOpenChange={setTypePopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="w-full justify-between font-normal px-3"
+                          >
+                            <span className="truncate">
+                              {typeOptions.find((t) => t.value === typeFilter)?.label || "All types"}
+                            </span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[200px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search type..." />
+                            <CommandList className="max-h-[200px] overflow-y-auto">
+                              <CommandEmpty>No type found.</CommandEmpty>
+                              <CommandGroup>
+                                {typeOptions.map((type) => (
+                                  <CommandItem
+                                    key={type.value}
+                                    value={type.label}
+                                    onSelect={() => {
+                                      setTypeFilter(type.value);
+                                      setUrlState({ page: 1 });
+                                      setTypePopoverOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        typeFilter === type.value
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      )}
+                                    />
+                                    {type.label}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
 
                     <div className="space-y-2">

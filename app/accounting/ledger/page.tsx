@@ -122,7 +122,7 @@ function LedgerPageContent() {
         console.error("Failed to fetch accounts:", error);
       }
     };
-    
+
     if (canRead) {
       fetchAccounts();
     }
@@ -145,7 +145,7 @@ function LedgerPageContent() {
         console.error("Failed to fetch party data:", error);
       }
     };
-    
+
     if (canRead) {
       fetchPartyData();
     }
@@ -191,7 +191,7 @@ function LedgerPageContent() {
 
     try {
       if (!background) setIsLoading(true);
-      
+
       const params = new URLSearchParams();
       params.append('accountCode', selectedAccountCode);
       params.append('startDate', dateRange.from.toISOString());
@@ -226,7 +226,7 @@ function LedgerPageContent() {
     };
 
     window.addEventListener("focus", onFocus);
-    
+
     return () => {
       window.removeEventListener("focus", onFocus);
     };
@@ -322,7 +322,9 @@ function LedgerPageContent() {
         { label: "Payment", value: "Payment", count: ledgerData.entries.filter(e => e.referenceType === "Payment").length },
         { label: "Purchase", value: "Purchase", count: ledgerData.entries.filter(e => e.referenceType === "Purchase").length },
         { label: "Expense", value: "Expense", count: ledgerData.entries.filter(e => e.referenceType === "Expense").length },
-        { label: "Manual", value: "Manual", count: ledgerData.entries.filter(e => e.referenceType === "Manual").length },
+        { label: "General", value: "General", count: ledgerData.entries.filter(e => e.referenceType === "General").length },
+        { label: "Contra", value: "Contra", count: ledgerData.entries.filter(e => e.referenceType === "Contra").length },
+        { label: "Adjustment", value: "Adjustment", count: ledgerData.entries.filter(e => e.referenceType === "Adjustment").length },
       ].filter(opt => opt.count > 0)
       : [];
 
@@ -384,7 +386,7 @@ function LedgerPageContent() {
   if (!isMounted || isPending) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
   }
@@ -412,13 +414,13 @@ function LedgerPageContent() {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-                 <ExportMenu
-                    onExportPDF={handleExportPDF}
-                    onExportExcel={handleExportExcel}
-                    canExport={canExport ?? false}
-                    isExporting={isExporting}
-                    disabled={!selectedAccountCode || !ledgerData}
-                 />
+                <ExportMenu
+                  onExportPDF={handleExportPDF}
+                  onExportExcel={handleExportExcel}
+                  canExport={canExport ?? false}
+                  isExporting={isExporting}
+                  disabled={!selectedAccountCode || !ledgerData}
+                />
               </div>
             </div>
 

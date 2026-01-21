@@ -61,7 +61,9 @@ const getReferenceTypeVariant = (type: string) => {
     case 'Expense': return 'info';
     case 'CreditNote': return 'orange';
     case 'DebitNote': return 'cyan';
-    case 'Manual': return 'secondary';
+    case 'General': return 'neutral';
+    case 'Contra': return 'amber';
+    case 'Adjustment': return 'emerald';
     default: return 'secondary';
   }
 };
@@ -288,18 +290,14 @@ export const getJournalColumns = (
         const refNumber = row.original.referenceNumber;
         const refType = row.original.referenceType;
 
-        if (!refNumber) {
-          return <span className="text-sm text-muted-foreground">Not Specified</span>;
-        }
-
         return (
           <Badge
             variant={getReferenceTypeVariant(refType) as any}
             appearance="outline"
             className="font-mono cursor-pointer hover:opacity-70 transition-opacity"
-            onClick={() => copyToClipboard(refNumber)}
+            onClick={() => copyToClipboard(refNumber || refType)}
           >
-            {refNumber}
+            {refNumber || refType}
           </Badge>
         );
       },
@@ -318,7 +316,11 @@ export const getJournalColumns = (
         const partyName = row.original.partyName;
 
         if (!partyType || !partyName) {
-          return <span className="text-xs text-muted-foreground">Not Specified</span>;
+          return (
+            <Badge variant="secondary" appearance="outline" className="text-xs text-muted-foreground">
+              N/A
+            </Badge>
+          );
         }
 
         const getPartyVariant = (type: string) => {

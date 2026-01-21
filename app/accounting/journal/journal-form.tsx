@@ -57,7 +57,8 @@ type JournalEntry = {
 
 type JournalFormData = {
   entryDate: Date;
-  referenceType: 'Invoice' | 'Receipt' | 'Payment' | 'Purchase' | 'Expense' | 'DebitNote' | 'CreditNote' | 'ReturnNote' | 'Manual';
+  referenceType: 'Invoice' | 'Receipt' | 'Payment' | 'Purchase' | 'Expense' | 'DebitNote' | 'CreditNote' | 'ReturnNote' | 'General' | 'Contra' | 'Adjustment';
+
   referenceNumber?: string;
   partyType?: 'Customer' | 'Supplier' | 'Payee' | 'Vendor';
   partyId?: string;
@@ -86,7 +87,8 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
   } = useForm<JournalFormData>({
     defaultValues: {
       entryDate: new Date(),
-      referenceType: 'Manual',
+      referenceType: 'General',
+
       status: 'draft',
       entries: [
         { accountCode: '', accountName: '', debit: 0, credit: 0 },
@@ -108,6 +110,8 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
   const [payees, setPayees] = useState<any[]>([]);
   const [partyPopoverOpen, setPartyPopoverOpen] = useState(false);
   const [partySearchQuery, setPartySearchQuery] = useState("");
+  const [refTypeOpen, setRefTypeOpen] = useState(false);
+  const [refTypeSearchQuery, setRefTypeSearchQuery] = useState("");
 
   // Responsive check
   const [isDesktop, setIsDesktop] = useState(true);
@@ -161,6 +165,20 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
     fetchData();
   }, []);
 
+  const referenceTypes = [
+    { value: "General", label: "General" },
+    { value: "Contra", label: "Contra" },
+    { value: "Adjustment", label: "Adjustment" },
+    { value: "Invoice", label: "Invoice" },
+    { value: "Receipt", label: "Receipt" },
+    { value: "Payment", label: "Payment" },
+    { value: "Purchase", label: "Purchase" },
+    { value: "Expense", label: "Expense" },
+    { value: "CreditNote", label: "Credit Note" },
+    { value: "DebitNote", label: "Debit Note" },
+    { value: "ReturnNote", label: "Return Note" },
+  ];
+
   useEffect(() => {
     if (isOpen) {
       if (defaultValues) {
@@ -179,10 +197,12 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
           status: defaultValues.status,
         });
         setPartySearchQuery(defaultValues.partyName || "");
+        setRefTypeSearchQuery(defaultValues.referenceType || "");
       } else {
         reset({
           entryDate: new Date(),
-          referenceType: 'Manual',
+          referenceType: 'General',
+
           referenceNumber: "",
           partyType: undefined,
           partyId: undefined,
@@ -352,22 +372,69 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                 name="referenceType"
                 control={control}
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger ref={field.ref} className="w-full h-9 px-3">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Manual">Manual Entry</SelectItem>
-                      <SelectItem value="Invoice">Invoice</SelectItem>
-                      <SelectItem value="Receipt">Receipt</SelectItem>
-                      <SelectItem value="Payment">Payment</SelectItem>
-                      <SelectItem value="Purchase">Purchase</SelectItem>
-                      <SelectItem value="Expense">Expense</SelectItem>
-                      <SelectItem value="CreditNote">Credit Note</SelectItem>
-                      <SelectItem value="DebitNote">Debit Note</SelectItem>
-                      <SelectItem value="ReturnNote">Return Note</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Popover
+                    open={refTypeOpen}
+                    onOpenChange={(isOpen) => {
+                      setRefTypeOpen(isOpen);
+                      if (isOpen) {
+                        const type = referenceTypes.find(t => t.value === field.value);
+                        setRefTypeSearchQuery(type ? type.label : "");
+                      }
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        ref={field.ref}
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between h-9 px-3"
+                      >
+                        {field.value ? referenceTypes.find(t => t.value === field.value)?.label : "Select type"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Search type..."
+                          value={refTypeSearchQuery}
+                          onValueChange={setRefTypeSearchQuery}
+                        />
+                        <CommandList
+                          className="max-h-[200px] overflow-y-auto"
+                          onWheel={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
+                        >
+                          <CommandEmpty>No type found.</CommandEmpty>
+                          <CommandGroup>
+                            {referenceTypes
+                              .filter(t => !refTypeSearchQuery || t.label.toLowerCase().includes(refTypeSearchQuery.toLowerCase()))
+                              .map((type) => (
+                                <CommandItem
+                                  key={type.value}
+                                  value={type.label}
+                                  onSelect={() => {
+                                    field.onChange(type.value);
+                                    setRefTypeSearchQuery(type.label);
+                                    setRefTypeOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      field.value === type.value ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {type.label}
+                                </CommandItem>
+                              ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 )}
               />
             </div>

@@ -61,26 +61,26 @@ export async function GET(request: NextRequest) {
 
     // Calculate opening balance (transactions before start date)
     let openingBalance = 0;
-    
+
     if (startDate) {
       // OPTIMIZATION: Use Aggregation instead of fetching all docs to memory
       const result = await Journal.aggregate([
-        { 
+        {
           $match: {
             'entries.accountCode': accountCode, // Index optimization
             entryDate: { $lt: new Date(startDate) },
             status: 'posted',
             isDeleted: false,
             ...partyFilter // Apply party filter to opening balance
-          } 
+          }
         },
         { $unwind: "$entries" }, // Flatten the entries array
-        { 
-          $match: { 
+        {
+          $match: {
             "entries.accountCode": accountCode // Filter only the specific account line items
-          } 
+          }
         },
-        { 
+        {
           $group: {
             _id: null,
             totalDebit: { $sum: "$entries.debit" },
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
       // Calculate balance from aggregation result
       if (result.length > 0) {
         const { totalDebit, totalCredit } = result[0];
-        
+
         if (account.nature === 'debit') {
           openingBalance = totalDebit - totalCredit;
         } else {
@@ -140,6 +140,8 @@ export async function GET(request: NextRequest) {
             credit,
             balance: runningBalance,
             journalId: journal._id,
+            partyType: journal.partyType,
+            partyName: journal.partyName,
           });
         }
       });

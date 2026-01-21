@@ -22,6 +22,8 @@ export interface LedgerEntry {
   credit: number;
   balance: number;
   journalId: string;
+  partyType?: string;
+  partyName?: string;
 }
 
 interface AccountColorConfig {
@@ -109,7 +111,9 @@ const getReferenceTypeVariant = (type: string) => {
     case 'DebitNote': return 'cyan';
     case 'CreditNote': return 'orange';
     case 'ReturnNote': return 'destructive';
-    case 'Manual': return 'secondary';
+    case 'General': return 'neutral';
+    case 'Contra': return 'amber';
+    case 'Adjustment': return 'emerald';
     default: return 'secondary';
   }
 };
@@ -189,18 +193,14 @@ export const getLedgerColumns = (
         const refNumber = row.original.referenceNumber;
         const refType = row.original.referenceType;
 
-        if (!refNumber) {
-          return <span className="text-muted-foreground text-xs">Not Specified</span>;
-        }
-
         return (
           <Badge
             variant={getReferenceTypeVariant(refType) as any}
             appearance="outline"
             className="font-mono cursor-pointer hover:opacity-70 transition-opacity"
-            onClick={() => copyToClipboard(refNumber)}
+            onClick={() => copyToClipboard(refNumber || refType)}
           >
-            {refNumber}
+            {refNumber || refType}
           </Badge>
         );
       },
@@ -208,6 +208,45 @@ export const getLedgerColumns = (
         label: "Reference",
         placeholder: "Search reference...",
         variant: "text",
+      },
+      enableColumnFilter: true,
+    },
+    {
+      id: "partyReference",
+      header: "Party",
+      cell: ({ row }) => {
+        const partyType = row.original.partyType;
+        const partyName = row.original.partyName;
+
+        if (!partyType || !partyName) {
+          return (
+            <Badge variant="secondary" appearance="outline" className="text-xs text-muted-foreground">
+              N/A
+            </Badge>
+          );
+        }
+
+        const getPartyVariant = (type: string) => {
+          switch (type) {
+            case 'Customer': return 'primary';
+            case 'Supplier': return 'warning';
+            case 'Payee': return 'cyan';
+            case 'Vendor': return 'secondary';
+            default: return 'secondary';
+          }
+        };
+
+        return (
+          <div className="min-w-[120px]">
+            <Badge
+              variant={getPartyVariant(partyType) as any}
+              appearance="outline"
+              className="text-xs"
+            >
+              {partyName}
+            </Badge>
+          </div>
+        );
       },
     },
     {

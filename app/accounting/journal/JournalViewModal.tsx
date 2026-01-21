@@ -41,7 +41,9 @@ const getReferenceTypeVariant = (type: string) => {
     case 'DebitNote': return 'cyan';
     case 'CreditNote': return 'orange';
     case 'ReturnNote': return 'destructive';
-    case 'Manual': return 'gray';
+    case 'General': return 'neutral';
+    case 'Contra': return 'amber';
+    case 'Adjustment': return 'emerald';
     default: return 'gray';
   }
 };
@@ -324,7 +326,7 @@ export function JournalViewModal({ isOpen, onClose, journal }: JournalViewModalP
                           <div className="text-sm font-medium break-words mt-1">{entry.accountName}</div>
                         </div>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-3 pt-2 border-t text-sm">
                         <div>
                           <div className="text-xs text-green-600 mb-0.5">Debit</div>
