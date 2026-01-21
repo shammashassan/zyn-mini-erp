@@ -71,9 +71,8 @@ interface ConnectedInvoice {
   invoiceNumber: string;
   grandTotal: number;
   status: string;
-  paymentStatus: 'Paid' | 'Pending' | 'Partially Paid' | 'Refunded';
+  paymentStatus: 'Paid' | 'Pending' | 'Partially Paid';
   paidAmount: number;
-  refundedAmount?: number;
   remainingAmount: number;
   connectedDocuments?: {
     receiptIds?: any[];
@@ -84,9 +83,10 @@ interface ConnectedPurchase {
   _id: string;
   referenceNumber: string;
   totalAmount: number;
-  grandTotal?: number;
-  paymentStatus: 'Paid' | 'Pending' | 'Partially Paid';
+  grandTotal: number;
+  paymentStatus: 'pending' | 'paid' | 'partially paid';
   paidAmount: number;
+  totalPaid?: number;
   remainingAmount: number;
   connectedDocuments?: {
     paymentIds?: any[];
@@ -254,12 +254,39 @@ export function VoucherForm({ isOpen, onClose, onSubmit }: VoucherFormProps) {
         const res = await fetch(`/api/purchases?populate=true`);
         if (res.ok) {
           const allPurchases = await res.json();
-          const availablePurchases = allPurchases.filter(
-            (purchase: any) =>
-              purchase.supplierName === selectedParty &&
-              (purchase.paymentStatus === 'Pending' || purchase.paymentStatus === 'Partially Paid') &&
-              (purchase.remainingAmount > 0 || (purchase.totalAmount - (purchase.paidAmount || 0)) > 0)
-          );
+
+          // Filter purchases for the selected supplier with proper field handling
+          const availablePurchases = allPurchases
+            .filter((purchase: any) => {
+              // Match supplier name
+              if (purchase.supplierName !== selectedParty) return false;
+
+              // Check payment status
+              const paymentStatus = purchase.paymentStatus?.toLowerCase();
+              if (paymentStatus !== 'pending' && paymentStatus !== 'partially paid') return false;
+
+              // Calculate remaining amount properly
+              const total = purchase.grandTotal ?? purchase.totalAmount ?? 0;
+              const paid = purchase.paidAmount ?? purchase.totalPaid ?? 0;
+              const remaining = purchase.remainingAmount ?? (total - paid);
+
+              // Only include if there's a remaining amount
+              return remaining > 0;
+            })
+            .map((purchase: any) => {
+              // Ensure all required fields are present and properly calculated
+              const total = purchase.grandTotal ?? purchase.totalAmount ?? 0;
+              const paid = purchase.paidAmount ?? purchase.totalPaid ?? 0;
+              const remaining = purchase.remainingAmount ?? (total - paid);
+
+              return {
+                ...purchase,
+                grandTotal: total,
+                paidAmount: paid,
+                remainingAmount: remaining
+              };
+            });
+
           setPurchases(availablePurchases);
         }
       } catch (error) {

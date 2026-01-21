@@ -1,4 +1,4 @@
-// models/Purchase.ts - FIXED: Track payment status changes in pre-save hook
+// models/Purchase.ts - UPDATED: Removed automatic paid amount audit tracking
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -43,37 +43,37 @@ export interface IPurchase extends Document {
   grandTotal: number;
   date: Date;
   purchaseDate: Date;
-  
+
   purchaseStatus: 'pending' | 'approved' | 'cancelled';
   inventoryStatus: 'pending' | 'received' | 'partially received';
   paymentStatus: 'pending' | 'paid' | 'partially paid';
-  
+
   paymentAllocations: IPaymentAllocation[];
   paidAmount: number;
   totalPaid: number;
   remainingAmount: number;
-  
+
   connectedDocuments: {
     paymentIds: mongoose.Types.ObjectId[];
     returnNoteIds: mongoose.Types.ObjectId[];
   };
-  
+
   isDeleted: boolean;
   deletedAt: Date | null;
   deletedBy: string | null;
-  
+
   createdBy: string | null;
   updatedBy: string | null;
   actionHistory: IAuditEntry[];
-  
+
   createdAt: Date;
   updatedAt: Date;
-  
+
   allocatePayment(voucherId: mongoose.Types.ObjectId, amount: number): void;
   deallocatePayment(voucherId: mongoose.Types.ObjectId): number;
   getTotalAllocated(): number;
   canAllocate(amount: number): boolean;
-  
+
   addAuditEntry(
     action: string,
     userId?: string | null,
@@ -93,10 +93,10 @@ const PurchaseItemSchema: Schema = new Schema({
 });
 
 const PaymentAllocationSchema: Schema = new Schema({
-  voucherId: { 
-    type: Schema.Types.ObjectId, 
+  voucherId: {
+    type: Schema.Types.ObjectId,
     ref: 'Voucher',
-    required: true 
+    required: true
   },
   allocatedAmount: { type: Number, required: true, min: 0 },
   allocationDate: { type: Date, default: Date.now },
@@ -115,10 +115,10 @@ const AuditEntrySchema: Schema = new Schema({
 });
 
 const PurchaseSchema: Schema<IPurchase> = new Schema({
-  referenceNumber: { 
-    type: String, 
-    required: true, 
-    unique: true 
+  referenceNumber: {
+    type: String,
+    required: true,
+    unique: true
   },
   supplierId: { type: String, required: false },
   supplierName: { type: String, required: false, trim: true },
@@ -130,14 +130,14 @@ const PurchaseSchema: Schema<IPurchase> = new Schema({
   grandTotal: { type: Number, min: 0 },
   date: { type: Date, required: true },
   purchaseDate: { type: Date, required: true },
-  
-  purchaseStatus: { 
-    type: String, 
+
+  purchaseStatus: {
+    type: String,
     enum: ['pending', 'approved', 'cancelled'],
     default: 'pending'
   },
-  inventoryStatus: { 
-    type: String, 
+  inventoryStatus: {
+    type: String,
     enum: ['pending', 'received', 'partially received'],
     default: 'pending'
   },
@@ -146,9 +146,9 @@ const PurchaseSchema: Schema<IPurchase> = new Schema({
     enum: ['pending', 'paid', 'partially paid'],
     default: 'pending'
   },
-  
+
   paymentAllocations: [PaymentAllocationSchema],
-  
+
   connectedDocuments: {
     type: {
       paymentIds: [{ type: Schema.Types.ObjectId, ref: 'Voucher' }],
@@ -156,20 +156,20 @@ const PurchaseSchema: Schema<IPurchase> = new Schema({
     },
     default: { paymentIds: [], returnNoteIds: [] }
   },
-  
+
   paidAmount: { type: Number, default: 0, min: 0 },
   totalPaid: { type: Number, default: 0, min: 0 },
   remainingAmount: { type: Number, default: 0, min: 0 },
-  
+
   isDeleted: { type: Boolean, default: false },
   deletedAt: { type: Date, default: null },
   deletedBy: { type: String, default: null },
-  
+
   createdBy: { type: String, default: null },
   updatedBy: { type: String, default: null },
   actionHistory: [AuditEntrySchema],
-}, { 
-  timestamps: true 
+}, {
+  timestamps: true
 });
 
 // Indexes
@@ -181,41 +181,38 @@ PurchaseSchema.index({ 'connectedDocuments.returnNoteIds': 1 });
 PurchaseSchema.index({ purchaseDate: 1 });
 PurchaseSchema.index({ 'paymentAllocations.voucherId': 1 });
 
-// ✅ FIXED: Pre-save middleware with payment status change tracking
-PurchaseSchema.pre('save', function(next) {
+// ✅ UPDATED: Removed automatic audit tracking for paid amount changes
+PurchaseSchema.pre('save', function (next) {
   const grossTotal = this.totalAmount;
   const discount = this.discount || 0;
   const subtotal = grossTotal - discount;
   const vatAmount = this.isTaxPayable ? (subtotal * 0.05) : 0;
-  
+
   this.vatAmount = vatAmount;
   this.grandTotal = subtotal + vatAmount;
-  
+
   // Sync date with purchaseDate for backward compatibility
   if (this.isModified('purchaseDate') && !this.isModified('date')) {
     this.date = this.purchaseDate;
   } else if (this.isModified('date') && !this.isModified('purchaseDate')) {
     this.purchaseDate = this.date;
   }
-  
+
   // Calculate paid amount from payment allocations
   if (this.paymentAllocations && this.paymentAllocations.length > 0) {
     this.paidAmount = this.paymentAllocations.reduce(
-      (sum: number, alloc: IPaymentAllocation) => sum + alloc.allocatedAmount, 
+      (sum: number, alloc: IPaymentAllocation) => sum + alloc.allocatedAmount,
       0
     );
   } else if (!this.isModified('paidAmount')) {
     this.paidAmount = 0;
   }
-  
+
   this.totalPaid = this.paidAmount;
   this.remainingAmount = Math.max(0, this.grandTotal - this.paidAmount);
-  
-  // ✅ FIXED: Track payment status changes and auto-add audit entry
-  const oldPaymentStatus = (this as any)._doc?.paymentStatus;
-  let newPaymentStatus: 'pending' | 'paid' | 'partially paid';
-  
+
   // Auto-calculate payment status
+  let newPaymentStatus: 'pending' | 'paid' | 'partially paid';
   if (this.paidAmount >= this.grandTotal) {
     newPaymentStatus = 'paid';
   } else if (this.paidAmount > 0) {
@@ -223,70 +220,52 @@ PurchaseSchema.pre('save', function(next) {
   } else {
     newPaymentStatus = 'pending';
   }
-  
-  // ✅ Check if payment status changed and add audit entry
-  if (oldPaymentStatus && oldPaymentStatus !== newPaymentStatus && !this.isNew) {
-    console.log(`💰 Payment status changed: ${oldPaymentStatus} → ${newPaymentStatus}`);
-    
-    // Add audit entry for automatic payment status change
-    this.actionHistory.push({
-      action: 'Payment Status Auto-Updated',
-      userId: this.updatedBy,
-      username: null, // Will be set by the calling function if available
-      timestamp: new Date(),
-      changes: [{
-        field: 'paymentStatus',
-        oldValue: oldPaymentStatus,
-        newValue: newPaymentStatus,
-      }]
-    });
-  }
-  
+
   this.paymentStatus = newPaymentStatus;
-  
+
   next();
 });
 
 // Pre-find hook - default sort by purchaseDate
-PurchaseSchema.pre(/^find/, function(this: Query<any, any>, next) {
+PurchaseSchema.pre(/^find/, function (this: Query<any, any>, next) {
   const options = this.getOptions();
-  
+
   if (!options.includeDeleted) {
     this.find({ isDeleted: false });
   }
-  
+
   if (!this.getOptions().sort) {
     this.sort({ purchaseDate: -1 });
   }
-  
+
   next();
 });
 
-PurchaseSchema.methods.allocatePayment = function(
-  voucherId: mongoose.Types.ObjectId, 
+PurchaseSchema.methods.allocatePayment = function (
+  voucherId: mongoose.Types.ObjectId,
   amount: number
 ): void {
   if (amount <= 0) {
     throw new Error('Allocation amount must be positive');
   }
-  
+
   const currentAllocated = this.getTotalAllocated();
-  
+
   if (currentAllocated + amount > this.grandTotal) {
     throw new Error(
       `Cannot allocate ${amount}. Would exceed purchase total. ` +
       `Current: ${currentAllocated}, Purchase Total: ${this.grandTotal}`
     );
   }
-  
+
   const existingIndex = this.paymentAllocations.findIndex(
     (alloc: any) => alloc.voucherId.toString() === voucherId.toString()
   );
-  
+
   if (existingIndex !== -1) {
     throw new Error('This voucher is already allocated to this purchase');
   }
-  
+
   this.paymentAllocations.push({
     voucherId,
     allocatedAmount: amount,
@@ -294,38 +273,38 @@ PurchaseSchema.methods.allocatePayment = function(
   });
 };
 
-PurchaseSchema.methods.deallocatePayment = function(
+PurchaseSchema.methods.deallocatePayment = function (
   voucherId: mongoose.Types.ObjectId
 ): number {
   const index = this.paymentAllocations.findIndex(
     (alloc: any) => alloc.voucherId.toString() === voucherId.toString()
   );
-  
+
   if (index === -1) {
     return 0;
   }
-  
+
   const amount = this.paymentAllocations[index].allocatedAmount;
   this.paymentAllocations.splice(index, 1);
-  
+
   return amount;
 };
 
-PurchaseSchema.methods.getTotalAllocated = function(): number {
+PurchaseSchema.methods.getTotalAllocated = function (): number {
   if (!this.paymentAllocations || this.paymentAllocations.length === 0) {
     return 0;
   }
-  
+
   return this.paymentAllocations.reduce((sum: number, alloc: IPaymentAllocation) => sum + alloc.allocatedAmount, 0);
 };
 
-PurchaseSchema.methods.canAllocate = function(amount: number): boolean {
+PurchaseSchema.methods.canAllocate = function (amount: number): boolean {
   const currentAllocated = this.getTotalAllocated();
   return (currentAllocated + amount) <= this.grandTotal;
 };
 
-PurchaseSchema.methods.addAuditEntry = function(
-  action: string, 
+PurchaseSchema.methods.addAuditEntry = function (
+  action: string,
   userId: string | null = null,
   username: string | null = null,
   changes?: IAuditEntry['changes']

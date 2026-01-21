@@ -595,9 +595,19 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                               {action.changes.map((change: any, idx: number) => (
                                 <div key={idx} className="text-xs text-muted-foreground break-words">
                                   <span className="font-medium">{change.field}:</span>{' '}
-                                  <span className="line-through">{String(change.oldValue)}</span>
-                                  {' → '}
-                                  <span className="text-green-600">{String(change.newValue)}</span>
+                                  {change.field === 'paidAmount' ? (
+                                    <>
+                                      <span className="line-through">{formatCurrency(change.oldValue)}</span>
+                                      {' → '}
+                                      <span className="text-green-600">{formatCurrency(change.newValue)}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="line-through">{String(change.oldValue)}</span>
+                                      {' → '}
+                                      <span className="text-green-600">{String(change.newValue)}</span>
+                                    </>
+                                  )}
                                 </div>
                               ))}
                             </div>

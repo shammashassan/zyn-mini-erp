@@ -1,4 +1,4 @@
-// models/CreditNote.ts - UPDATED: Added returnNoteId field
+// models/CreditNote.ts - UPDATED: Removed automatic paid amount audit tracking
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -188,7 +188,7 @@ CreditNoteSchema.index({ vendorName: 1 });
 CreditNoteSchema.index({ 'connectedDocuments.paymentIds': 1 });
 CreditNoteSchema.index({ 'paymentAllocations.voucherId': 1 });
 
-// Pre-save middleware
+// ✅ UPDATED: Removed automatic audit tracking for paid amount changes
 CreditNoteSchema.pre('save', function(next) {
   const grossTotal = this.totalAmount;
   const discount = this.discount || 0;

@@ -1,4 +1,4 @@
-// models/Invoice.ts
+// models/Invoice.ts - UPDATED: Removed automatic paid amount audit tracking
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -43,37 +43,37 @@ export interface IInvoice extends Document {
   notes?: string;
   invoiceDate: Date;
   status: 'paid' | 'pending' | 'partial' | 'overdue' | 'approved' | 'cancelled';
-  
+
   receiptAllocations: IReceiptAllocation[];
-  
+
   paidAmount: number;
   receivedAmount: number;
   remainingAmount: number;
   paymentStatus: 'Paid' | 'Pending' | 'Partially Paid';
-  
+
   connectedDocuments: {
     receiptIds?: mongoose.Types.ObjectId[];
     deliveryId?: mongoose.Types.ObjectId;
     quotationId?: mongoose.Types.ObjectId;
     returnNoteIds?: mongoose.Types.ObjectId[];
   };
-  
+
   isDeleted: boolean;
   deletedAt: Date | null;
   deletedBy: string | null;
-  
+
   createdBy: string | null;
   updatedBy: string | null;
   actionHistory: IAuditEntry[];
-  
+
   createdAt: Date;
   updatedAt: Date;
-  
+
   allocateReceipt(voucherId: mongoose.Types.ObjectId, amount: number): void;
   deallocateReceipt(voucherId: mongoose.Types.ObjectId): number;
   getTotalAllocated(): number;
   canAllocate(amount: number): boolean;
-  
+
   addAuditEntry(
     action: string,
     userId?: string | null,
@@ -92,10 +92,10 @@ const ItemSchema: Schema = new Schema({
 });
 
 const ReceiptAllocationSchema: Schema = new Schema({
-  voucherId: { 
-    type: Schema.Types.ObjectId, 
+  voucherId: {
+    type: Schema.Types.ObjectId,
     ref: 'Voucher',
-    required: true 
+    required: true
   },
   allocatedAmount: { type: Number, required: true, min: 0 },
   allocationDate: { type: Date, default: Date.now },
@@ -125,14 +125,14 @@ const InvoiceSchema: Schema<IInvoice> = new Schema({
   grandTotal: { type: Number, required: true },
   notes: { type: String },
   invoiceDate: { type: Date, required: true },
-  status: { 
-    type: String, 
+  status: {
+    type: String,
     enum: ['paid', 'pending', 'partial', 'overdue', 'approved', 'cancelled'],
     default: 'pending'
   },
-  
+
   receiptAllocations: [ReceiptAllocationSchema],
-  
+
   paidAmount: { type: Number, default: 0, min: 0 },
   receivedAmount: { type: Number, default: 0, min: 0 },
   remainingAmount: { type: Number, default: 0, min: 0 },
@@ -141,7 +141,7 @@ const InvoiceSchema: Schema<IInvoice> = new Schema({
     enum: ['Paid', 'Pending', 'Partially Paid'],
     default: 'Pending'
   },
-  
+
   connectedDocuments: {
     type: {
       receiptIds: [{ type: Schema.Types.ObjectId, ref: 'Voucher' }],
@@ -151,11 +151,11 @@ const InvoiceSchema: Schema<IInvoice> = new Schema({
     },
     default: {}
   },
-  
+
   isDeleted: { type: Boolean, default: false, index: true },
   deletedAt: { type: Date, default: null },
   deletedBy: { type: String, default: null },
-  
+
   createdBy: { type: String, default: null },
   updatedBy: { type: String, default: null },
   actionHistory: [AuditEntrySchema],
@@ -171,27 +171,27 @@ InvoiceSchema.index({ 'connectedDocuments.quotationId': 1 });
 InvoiceSchema.index({ 'receiptAllocations.voucherId': 1 });
 InvoiceSchema.index({ 'connectedDocuments.returnNoteIds': 1 });
 
-// Pre-save middleware
-InvoiceSchema.pre('save', function(next) {
+// ✅ UPDATED: Removed automatic audit tracking for paid/received amount changes
+InvoiceSchema.pre('save', function (next) {
   // Calculate paid amount from receipt allocations
   if (this.receiptAllocations && this.receiptAllocations.length > 0) {
     this.paidAmount = this.receiptAllocations.reduce(
-      (sum: number, alloc: IReceiptAllocation) => sum + alloc.allocatedAmount, 
+      (sum: number, alloc: IReceiptAllocation) => sum + alloc.allocatedAmount,
       0
     );
   } else if (!this.isModified('paidAmount')) {
     this.paidAmount = 0;
   }
-  
+
   // Use whichever is greater between paidAmount and receivedAmount
   const effectiveAmount = Math.max(this.paidAmount, this.receivedAmount || 0);
-  
+
   // Recalculate remainingAmount
   this.remainingAmount = Math.max(0, this.grandTotal - effectiveAmount);
-  
+
   // Auto-calculate payment status
   const EPSILON = 0.01;
-  
+
   if (effectiveAmount >= this.grandTotal - EPSILON) {
     this.paymentStatus = 'Paid';
   } else if (effectiveAmount > 0) {
@@ -199,51 +199,51 @@ InvoiceSchema.pre('save', function(next) {
   } else {
     this.paymentStatus = 'Pending';
   }
-  
+
   next();
 });
 
 // Pre-find hook
-InvoiceSchema.pre(/^find/, function(this: Query<any, any>, next) {
+InvoiceSchema.pre(/^find/, function (this: Query<any, any>, next) {
   const options = this.getOptions();
-  
+
   if (options.includeDeleted !== true) {
     this.find({ isDeleted: false });
   }
-  
+
   if (!this.getOptions().sort) {
     this.sort({ invoiceDate: -1 });
   }
-  
+
   next();
 });
 
 // Existing methods
-InvoiceSchema.methods.allocateReceipt = function(
-  voucherId: mongoose.Types.ObjectId, 
+InvoiceSchema.methods.allocateReceipt = function (
+  voucherId: mongoose.Types.ObjectId,
   amount: number
 ): void {
   if (amount <= 0) {
     throw new Error('Allocation amount must be positive');
   }
-  
+
   const currentAllocated = this.getTotalAllocated();
-  
+
   if (currentAllocated + amount > this.grandTotal) {
     throw new Error(
       `Cannot allocate ${amount}. Would exceed invoice total. ` +
       `Current: ${currentAllocated}, Invoice Total: ${this.grandTotal}`
     );
   }
-  
+
   const existingIndex = this.receiptAllocations.findIndex(
     (alloc: any) => alloc.voucherId.toString() === voucherId.toString()
   );
-  
+
   if (existingIndex !== -1) {
     throw new Error('This voucher is already allocated to this invoice');
   }
-  
+
   this.receiptAllocations.push({
     voucherId,
     allocatedAmount: amount,
@@ -251,39 +251,39 @@ InvoiceSchema.methods.allocateReceipt = function(
   });
 };
 
-InvoiceSchema.methods.deallocateReceipt = function(
+InvoiceSchema.methods.deallocateReceipt = function (
   voucherId: mongoose.Types.ObjectId
 ): number {
   const index = this.receiptAllocations.findIndex(
     (alloc: any) => alloc.voucherId.toString() === voucherId.toString()
   );
-  
+
   if (index === -1) {
     return 0;
   }
-  
+
   const amount = this.receiptAllocations[index].allocatedAmount;
   this.receiptAllocations.splice(index, 1);
-  
+
   return amount;
 };
 
-InvoiceSchema.methods.getTotalAllocated = function(): number {
+InvoiceSchema.methods.getTotalAllocated = function (): number {
   if (!this.receiptAllocations || this.receiptAllocations.length === 0) {
     return 0;
   }
-  
+
   return this.receiptAllocations.reduce((sum: number, alloc: IReceiptAllocation) => sum + alloc.allocatedAmount, 0);
 };
 
-InvoiceSchema.methods.canAllocate = function(amount: number): boolean {
+InvoiceSchema.methods.canAllocate = function (amount: number): boolean {
   const currentAllocated = this.getTotalAllocated();
   return (currentAllocated + amount) <= this.grandTotal;
 };
 
 // Audit entry method
-InvoiceSchema.methods.addAuditEntry = function(
-  action: string, 
+InvoiceSchema.methods.addAuditEntry = function (
+  action: string,
   userId: string | null = null,
   username: string | null = null,
   changes?: IAuditEntry['changes']

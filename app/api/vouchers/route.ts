@@ -317,7 +317,7 @@ export async function POST(request: Request) {
     }
 
     const allocations: any[] = [];
-    let connectedIds: any = {}; // ✅ Initialize empty object
+    let connectedIds: any = {};
 
     // ✅ RECEIPT: Handle Invoice allocations
     if (voucherType === 'receipt' && connectedDocuments?.invoiceIds) {
@@ -347,7 +347,7 @@ export async function POST(request: Request) {
           }
         }
       }
-      connectedIds.invoiceIds = invoiceIds; // ✅ Add to object
+      connectedIds.invoiceIds = invoiceIds;
     }
 
     // ✅ RECEIPT - Handle Debit Note allocations
@@ -395,7 +395,7 @@ export async function POST(request: Request) {
           }
         }
       }
-      connectedIds.debitNoteIds = debitNoteIds; // ✅ Add to object
+      connectedIds.debitNoteIds = debitNoteIds;
     }
 
     // ✅ PAYMENT: Handle Purchase allocations
@@ -426,7 +426,7 @@ export async function POST(request: Request) {
           }
         }
       }
-      connectedIds.purchaseIds = purchaseIds; // ✅ Add to object
+      connectedIds.purchaseIds = purchaseIds;
     }
 
     // ✅ PAYMENT: Handle Expense allocations
@@ -457,7 +457,7 @@ export async function POST(request: Request) {
           }
         }
       }
-      connectedIds.expenseIds = expenseIds; // ✅ Add to object (FIXED - was overwriting)
+      connectedIds.expenseIds = expenseIds;
     }
 
     // ✅ PAYMENT - Handle Credit Note allocations
@@ -489,7 +489,7 @@ export async function POST(request: Request) {
           }
         }
       }
-      connectedIds.creditNoteIds = creditNoteIds; // ✅ Add to object
+      connectedIds.creditNoteIds = creditNoteIds;
     }
 
     const voucherData: any = {
@@ -540,13 +540,26 @@ export async function POST(request: Request) {
         await newVoucher.save();
       }
 
-      // ✅ Apply Allocations to Invoices
+      // ✅ UPDATED: Apply Allocations to Invoices with audit entry
       if (voucherType === 'receipt' && allocations.length > 0) {
         for (const allocation of allocations) {
           if (allocation.documentType === 'invoice') {
             const invoice = await Invoice.findById(allocation.documentId);
             if (invoice && !invoice.isDeleted) {
               invoice.allocateReceipt(newVoucher._id, allocation.amount);
+              
+              // ✅ Add audit entry for receipt voucher creation
+              invoice.addAuditEntry(
+                'Receipt Voucher Created',
+                user.id,
+                user.username || user.name,
+                [{
+                  field: 'Allocated Amount',
+                  oldValue: formatCurrency(0),
+                  newValue: formatCurrency(allocation.amount)
+                }]
+              );
+              
               const currentReceiptIds = invoice.connectedDocuments?.receiptIds || [];
               if (!currentReceiptIds.some((rid: any) => rid.toString() === newVoucher._id.toString())) {
                 currentReceiptIds.push(newVoucher._id);
@@ -560,6 +573,19 @@ export async function POST(request: Request) {
             const debitNote = await DebitNote.findById(allocation.documentId);
             if (debitNote && !debitNote.isDeleted) {
               debitNote.allocateReceipt(newVoucher._id, allocation.amount);
+              
+              // ✅ Add audit entry for receipt voucher creation
+              debitNote.addAuditEntry(
+                'Receipt Voucher Created',
+                user.id,
+                user.username || user.name,
+                [{
+                  field: 'Allocated Amount',
+                  oldValue: formatCurrency(0),
+                  newValue: formatCurrency(allocation.amount)
+                }]
+              );
+              
               const currentReceiptIds = debitNote.connectedDocuments?.receiptIds || [];
               if (!currentReceiptIds.some((rid: any) => rid.toString() === newVoucher._id.toString())) {
                 currentReceiptIds.push(newVoucher._id);
@@ -572,13 +598,26 @@ export async function POST(request: Request) {
         }
       }
 
-      // Apply allocations to Purchases and Credit Notes
+      // ✅ UPDATED: Apply allocations to Purchases, Expenses, and Credit Notes with audit entries
       if (voucherType === 'payment' && allocations.length > 0) {
         for (const allocation of allocations) {
           if (allocation.documentType === 'purchase') {
             const purchase = await Purchase.findById(allocation.documentId);
             if (purchase && !purchase.isDeleted) {
               purchase.allocatePayment(newVoucher._id, allocation.amount);
+              
+              // ✅ Add audit entry for payment voucher creation
+              purchase.addAuditEntry(
+                'Payment Voucher Created',
+                user.id,
+                user.username || user.name,
+                [{
+                  field: 'Allocated Amount',
+                  oldValue: formatCurrency(0),
+                  newValue: formatCurrency(allocation.amount)
+                }]
+              );
+              
               const currentPaymentIds = purchase.connectedDocuments?.paymentIds || [];
               if (!currentPaymentIds.some((pid: any) => pid.toString() === newVoucher._id.toString())) {
                 currentPaymentIds.push(newVoucher._id);
@@ -591,6 +630,19 @@ export async function POST(request: Request) {
             const expense = await Expense.findById(allocation.documentId);
             if (expense && !expense.isDeleted) {
               expense.allocatePayment(newVoucher._id, allocation.amount);
+              
+              // ✅ Add audit entry for payment voucher creation
+              expense.addAuditEntry(
+                'Payment Voucher Created',
+                user.id,
+                user.username || user.name,
+                [{
+                  field: 'Allocated Amount',
+                  oldValue: formatCurrency(0),
+                  newValue: formatCurrency(allocation.amount)
+                }]
+              );
+              
               const currentIds = expense.connectedDocuments?.paymentIds || [];
               if (!currentIds.some((id: any) => id.toString() === newVoucher._id.toString())) {
                 currentIds.push(newVoucher._id);
@@ -604,6 +656,19 @@ export async function POST(request: Request) {
             const creditNote = await CreditNote.findById(allocation.documentId);
             if (creditNote && !creditNote.isDeleted) {
               creditNote.allocatePayment(newVoucher._id, allocation.amount);
+              
+              // ✅ Add audit entry for payment voucher creation
+              creditNote.addAuditEntry(
+                'Payment Voucher Created',
+                user.id,
+                user.username || user.name,
+                [{
+                  field: 'Allocated Amount',
+                  oldValue: formatCurrency(0),
+                  newValue: formatCurrency(allocation.amount)
+                }]
+              );
+              
               const currentPaymentIds = creditNote.connectedDocuments?.paymentIds || [];
               if (!currentPaymentIds.some((pid: any) => pid.toString() === newVoucher._id.toString())) {
                 currentPaymentIds.push(newVoucher._id);

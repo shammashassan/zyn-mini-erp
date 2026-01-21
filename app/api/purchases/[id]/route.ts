@@ -296,7 +296,7 @@ export async function PUT(request: Request, context: RequestContext) {
 
     const itemsChanged = body.items && haveItemsChanged(currentPurchase.items, body.items);
 
-    console.log(`\n📝 Purchase Update: ${currentPurchase.referenceNumber}`);
+    console.log(`\n🔍 Purchase Update: ${currentPurchase.referenceNumber}`);
     console.log(`   Old Purchase Status: ${oldPurchaseStatus}, New: ${newPurchaseStatus}`);
     console.log(`   Old Inventory Status: ${oldInventoryStatus}, New: ${newInventoryStatus}`);
     console.log(`   Old Payment Status: ${oldPaymentStatus}`);
@@ -496,17 +496,7 @@ export async function PUT(request: Request, context: RequestContext) {
       updatedBy: user.id,
     });
 
-    // ✅ FIXED: Update the last audit entry with username if payment status auto-changed
     await currentPurchase.save();
-    
-    // After save, check if the last audit entry is "Payment Status Auto-Updated" and add username
-    if (currentPurchase.actionHistory.length > 0) {
-      const lastEntry = currentPurchase.actionHistory[currentPurchase.actionHistory.length - 1];
-      if (lastEntry.action === 'Payment Status Auto-Updated' && !lastEntry.username) {
-        lastEntry.username = user.username;
-        await currentPurchase.save();
-      }
-    }
 
     const finalInventoryStatus = currentPurchase.inventoryStatus;
 

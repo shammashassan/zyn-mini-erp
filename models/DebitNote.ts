@@ -1,4 +1,4 @@
-// models/DebitNote.ts - UPDATED: Added status field
+// models/DebitNote.ts - UPDATED: Removed automatic received amount audit tracking
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -47,37 +47,37 @@ export interface IDebitNote extends Document {
   debitDate: Date;
   notes?: string;
   reason?: string;
-  
+
   status: 'pending' | 'approved' | 'cancelled';
-  
+
   receiptAllocations: IReceiptAllocation[];
   receivedAmount: number;
   remainingAmount: number;
   paymentStatus: 'pending' | 'paid' | 'partially paid';
-  
+
   debitType: 'return' | 'adjustment' | 'standalone';
-  
+
   connectedDocuments: {
     returnNoteId?: mongoose.Types.ObjectId;
     receiptIds?: mongoose.Types.ObjectId[];
   };
-  
+
   isDeleted: boolean;
   deletedAt: Date | null;
   deletedBy: string | null;
-  
+
   createdBy: string | null;
   updatedBy: string | null;
   actionHistory: IAuditEntry[];
-  
+
   createdAt: Date;
   updatedAt: Date;
-  
+
   allocateReceipt(voucherId: mongoose.Types.ObjectId, amount: number): void;
   deallocateReceipt(voucherId: mongoose.Types.ObjectId): number;
   getTotalAllocated(): number;
   canAllocate(amount: number): boolean;
-  
+
   addAuditEntry(
     action: string,
     userId?: string | null,
@@ -95,10 +95,10 @@ const DebitNoteItemSchema: Schema = new Schema({
 });
 
 const ReceiptAllocationSchema: Schema = new Schema({
-  voucherId: { 
-    type: Schema.Types.ObjectId, 
+  voucherId: {
+    type: Schema.Types.ObjectId,
     ref: 'Voucher',
-    required: true 
+    required: true
   },
   allocatedAmount: { type: Number, required: true, min: 0 },
   allocationDate: { type: Date, default: Date.now },
@@ -134,13 +134,13 @@ const DebitNoteSchema: Schema<IDebitNote> = new Schema({
   debitDate: { type: Date, required: true },
   notes: { type: String },
   reason: { type: String },
-  
+
   status: {
     type: String,
     enum: ['pending', 'approved', 'cancelled'],
     default: 'pending'
   },
-  
+
   receiptAllocations: [ReceiptAllocationSchema],
   receivedAmount: { type: Number, default: 0, min: 0 },
   remainingAmount: { type: Number, default: 0, min: 0 },
@@ -149,13 +149,13 @@ const DebitNoteSchema: Schema<IDebitNote> = new Schema({
     enum: ['pending', 'paid', 'partially paid'],
     default: 'pending'
   },
-  
+
   debitType: {
     type: String,
     enum: ['return', 'adjustment', 'standalone'],
     default: 'standalone'
   },
-  
+
   connectedDocuments: {
     type: {
       returnNoteId: { type: Schema.Types.ObjectId, ref: 'ReturnNote' },
@@ -163,11 +163,11 @@ const DebitNoteSchema: Schema<IDebitNote> = new Schema({
     },
     default: { receiptIds: [] }
   },
-  
+
   isDeleted: { type: Boolean, default: false, index: true },
   deletedAt: { type: Date, default: null },
   deletedBy: { type: String, default: null },
-  
+
   createdBy: { type: String, default: null },
   updatedBy: { type: String, default: null },
   actionHistory: [AuditEntrySchema],
@@ -188,29 +188,29 @@ DebitNoteSchema.index({ vendorName: 1 });
 DebitNoteSchema.index({ 'connectedDocuments.receiptIds': 1 });
 DebitNoteSchema.index({ 'receiptAllocations.voucherId': 1 });
 
-// Pre-save middleware
-DebitNoteSchema.pre('save', function(next) {
+// ✅ UPDATED: Removed automatic audit tracking for received amount changes
+DebitNoteSchema.pre('save', function (next) {
   // Calculate amounts
   const grossTotal = this.totalAmount;
   const discount = this.discount || 0;
   const subtotal = grossTotal - discount;
   const vatAmount = this.isTaxPayable ? (subtotal * 0.05) : 0;
-  
+
   this.vatAmount = vatAmount;
   this.grandTotal = subtotal + vatAmount;
-  
+
   // Calculate receipt allocations
   if (this.receiptAllocations && this.receiptAllocations.length > 0) {
     this.receivedAmount = this.receiptAllocations.reduce(
-      (sum: number, alloc: IReceiptAllocation) => sum + alloc.allocatedAmount, 
+      (sum: number, alloc: IReceiptAllocation) => sum + alloc.allocatedAmount,
       0
     );
   } else if (!this.isModified('receivedAmount')) {
     this.receivedAmount = 0;
   }
-  
+
   this.remainingAmount = Math.max(0, this.grandTotal - this.receivedAmount);
-  
+
   // Auto-calculate payment status
   if (this.receivedAmount >= this.grandTotal) {
     this.paymentStatus = 'paid';
@@ -219,51 +219,51 @@ DebitNoteSchema.pre('save', function(next) {
   } else {
     this.paymentStatus = 'pending';
   }
-  
+
   next();
 });
 
 // Pre-find hook
-DebitNoteSchema.pre(/^find/, function(this: Query<any, any>, next) {
+DebitNoteSchema.pre(/^find/, function (this: Query<any, any>, next) {
   const options = this.getOptions();
-  
+
   if (!options.includeDeleted) {
     this.find({ isDeleted: false });
   }
-  
+
   if (!this.getOptions().sort) {
     this.sort({ debitDate: -1 });
   }
-  
+
   next();
 });
 
 // Receipt allocation methods
-DebitNoteSchema.methods.allocateReceipt = function(
-  voucherId: mongoose.Types.ObjectId, 
+DebitNoteSchema.methods.allocateReceipt = function (
+  voucherId: mongoose.Types.ObjectId,
   amount: number
 ): void {
   if (amount <= 0) {
     throw new Error('Allocation amount must be positive');
   }
-  
+
   const currentAllocated = this.getTotalAllocated();
-  
+
   if (currentAllocated + amount > this.grandTotal) {
     throw new Error(
       `Cannot allocate ${amount}. Would exceed debit note total. ` +
       `Current: ${currentAllocated}, Total: ${this.grandTotal}`
     );
   }
-  
+
   const existingIndex = this.receiptAllocations.findIndex(
     (alloc: any) => alloc.voucherId.toString() === voucherId.toString()
   );
-  
+
   if (existingIndex !== -1) {
     throw new Error('This voucher is already allocated to this debit note');
   }
-  
+
   this.receiptAllocations.push({
     voucherId,
     allocatedAmount: amount,
@@ -271,42 +271,42 @@ DebitNoteSchema.methods.allocateReceipt = function(
   });
 };
 
-DebitNoteSchema.methods.deallocateReceipt = function(
+DebitNoteSchema.methods.deallocateReceipt = function (
   voucherId: mongoose.Types.ObjectId
 ): number {
   const index = this.receiptAllocations.findIndex(
     (alloc: any) => alloc.voucherId.toString() === voucherId.toString()
   );
-  
+
   if (index === -1) {
     return 0;
   }
-  
+
   const amount = this.receiptAllocations[index].allocatedAmount;
   this.receiptAllocations.splice(index, 1);
-  
+
   return amount;
 };
 
-DebitNoteSchema.methods.getTotalAllocated = function(): number {
+DebitNoteSchema.methods.getTotalAllocated = function (): number {
   if (!this.receiptAllocations || this.receiptAllocations.length === 0) {
     return 0;
   }
-  
+
   return this.receiptAllocations.reduce(
-    (sum: number, alloc: IReceiptAllocation) => sum + alloc.allocatedAmount, 
+    (sum: number, alloc: IReceiptAllocation) => sum + alloc.allocatedAmount,
     0
   );
 };
 
-DebitNoteSchema.methods.canAllocate = function(amount: number): boolean {
+DebitNoteSchema.methods.canAllocate = function (amount: number): boolean {
   const currentAllocated = this.getTotalAllocated();
   return (currentAllocated + amount) <= this.grandTotal;
 };
 
 // Audit entry method
-DebitNoteSchema.methods.addAuditEntry = function(
-  action: string, 
+DebitNoteSchema.methods.addAuditEntry = function (
+  action: string,
   userId: string | null = null,
   username: string | null = null,
   changes?: IAuditEntry['changes']

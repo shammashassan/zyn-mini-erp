@@ -83,11 +83,11 @@ const getCreatorUsername = (invoice: any): string | null => {
   return createAction?.username || null;
 };
 
-export function InvoiceViewModal({ 
-  isOpen, 
-  onClose, 
-  invoice: initialInvoice, 
-  onViewPdf 
+export function InvoiceViewModal({
+  isOpen,
+  onClose,
+  invoice: initialInvoice,
+  onViewPdf
 }: InvoiceViewModalProps) {
   const [invoice, setInvoice] = useState<any>(initialInvoice);
   const [isLoading, setIsLoading] = useState(false);
@@ -455,25 +455,25 @@ export function InvoiceViewModal({
               currentData.connectedDocuments?.deliveryId ||
               currentData.connectedDocuments?.returnNoteIds?.length > 0 ||
               currentData.connectedDocuments?.quotationId) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-                    <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
-                    Connected Documents
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {onViewPdf ? (
-                    <ConnectedDocumentsBadges
-                      invoice={currentData}
-                      onViewPdf={onViewPdf}
-                    />
-                  ) : (
-                    <span className="text-xs sm:text-sm text-muted-foreground">—</span>
-                  )}
-                </CardContent>
-              </Card>
-            )}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                      <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
+                      Connected Documents
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {onViewPdf ? (
+                      <ConnectedDocumentsBadges
+                        invoice={currentData}
+                        onViewPdf={onViewPdf}
+                      />
+                    ) : (
+                      <span className="text-xs sm:text-sm text-muted-foreground">—</span>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
             {/* Notes */}
             {currentData.notes && (
@@ -498,8 +498,8 @@ export function InvoiceViewModal({
                 <CardContent>
                   <div className="space-y-2">
                     {currentData.actionHistory.map((action: any, index: number) => (
-                      <div 
-                        key={index} 
+                      <div
+                        key={index}
                         className="flex items-start gap-3 text-xs sm:text-sm p-2 sm:p-3 rounded-lg bg-muted/50"
                       >
                         <div className="flex-1 min-w-0">
@@ -519,9 +519,19 @@ export function InvoiceViewModal({
                               {action.changes.map((change: any, idx: number) => (
                                 <div key={idx} className="text-xs text-muted-foreground break-words">
                                   <span className="font-medium">{change.field}:</span>{' '}
-                                  <span className="line-through">{String(change.oldValue)}</span>
-                                  {' → '}
-                                  <span className="text-green-600">{String(change.newValue)}</span>
+                                  {change.field === 'paidAmount' ? (
+                                    <>
+                                      <span className="line-through">{formatCurrency(change.oldValue)}</span>
+                                      {' → '}
+                                      <span className="text-green-600">{formatCurrency(change.newValue)}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="line-through">{String(change.oldValue)}</span>
+                                      {' → '}
+                                      <span className="text-green-600">{String(change.newValue)}</span>
+                                    </>
+                                  )}
                                 </div>
                               ))}
                             </div>

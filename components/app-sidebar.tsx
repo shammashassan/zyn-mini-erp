@@ -38,31 +38,33 @@ type RoleType = "user" | "admin" | "manager" | "owner";
 const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   // General
   "Dashboard": { dashboard: ["read"] },
-  
+
   // Inventory
   "Products": { product: ["read"] },
   "Materials": { material: ["read"] },
   "Stock Adjustment": { stockAdjustment: ["read"] },
-  
+
   // People
   "Customers": { customer: ["read"] },
   "Suppliers": { supplier: ["read"] },
   "Payees": { payee: ["read"] },
-  
+
   // Sales
   "Quotations": { invoice: ["read"] },
   "Invoices": { invoice: ["read"] },
   "Vouchers": { voucher: ["read"] },
+  "Receipts": { voucher: ["read"] },
   "Debit Notes": { debitNote: ["read"] },
-  "Credit Notes": { creditNote: ["read"] },
   "Delivery notes": { deliveryNote: ["read"] },
   "Sales Return": { returnNote: ["read"] },
-  
+
   // Procurement
   "Purchases": { purchase: ["read"] },
   "Expenses": { expense: ["read"] },
+  "Payments": { voucher: ["read"] },
   "Purchase Return": { returnNote: ["read"] },
-  
+  "Credit Notes": { creditNote: ["read"] },
+
   // Reports
   "Sales Report": { report: ["read"] },
   "Purchase Report": { report: ["read"] },
@@ -70,7 +72,7 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Payments Report": { report: ["read"] },
   "Tax Report": { report: ["read"] },
   "Inventory Report": { report: ["read"] },
-  
+
   // Accounting
   "Chart of Accounts": { chartOfAccounts: ["read"] },
   "Journal": { journal: ["read"] },
@@ -78,7 +80,7 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Trial Balance": { trialBalance: ["read"] },
   "Profit & Loss": { profitLoss: ["read"] },
   "Financial Statements": { financialStatements: ["read"] },
-  
+
   // HRM
   "Employees": { employee: ["read"] },
   "User Management": { user: ["list"] },
@@ -119,6 +121,7 @@ const staticData = {
         { title: "Quotations", url: "/sales/quotations" },
         { title: "Invoices", url: "/sales/invoices" },
         { title: "Vouchers", url: "/sales/vouchers" },
+        { title: "Receipts", url: "/sales/receipts" },
         { title: "Delivery notes", url: "/sales/delivery-notes" },
         { title: "Sales Returns", url: "/sales/sales-returns" },
         { title: "Debit Notes", url: "/sales/debit-notes" },
@@ -131,6 +134,7 @@ const staticData = {
       items: [
         { title: "Purchases", url: "/procurement/purchases" },
         { title: "Expenses", url: "/procurement/expenses" },
+        { title: "Payments", url: "/procurement/payments" },
         { title: "Purchase Returns", url: "/procurement/purchase-returns" },
         { title: "Credit Notes", url: "/procurement/credit-notes" },
       ],
@@ -213,7 +217,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
     const hasAccess = (itemTitle: string) => {
       const requiredPermission = PERMISSION_MAP[itemTitle];
-      
+
       // If no permission is mapped, assume it's public (or change to false to restrict)
       if (!requiredPermission) return true;
 
@@ -227,7 +231,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return staticData.navMain.map((item) => {
       // Case 1: Item has sub-items (Group)
       if (item.items) {
-        const visibleChildren = item.items.filter((subItem) => 
+        const visibleChildren = item.items.filter((subItem) =>
           hasAccess(subItem.title)
         );
 
@@ -243,13 +247,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       return null;
     }).filter(Boolean) as typeof staticData.navMain;
-    
+
   }, [session, isPending]);
 
   return (
-    <Sidebar 
-    className="top-(--header-height) h-[calc(100svh-var(--header-height))]!"
-    collapsible="icon" {...props}>
+    <Sidebar
+      className="top-(--header-height) h-[calc(100svh-var(--header-height))]!"
+      collapsible="icon" {...props}>
       {/* <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>

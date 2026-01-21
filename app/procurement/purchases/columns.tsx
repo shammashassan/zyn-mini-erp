@@ -239,21 +239,41 @@ const RowActions = ({
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Purchase</AlertDialogTitle>
           <AlertDialogDescription asChild>
-            <div className="space-y-4">
+            <div className="w-full space-y-4">
               <p>
                 Are you sure you want to delete purchase {purchase.referenceNumber}?
               </p>
 
-              {hasPayments && (
-                <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    ℹ️ This purchase has {purchase.connectedDocuments!.paymentIds!.length} connected payment(s)
+              {purchase.purchaseStatus === "approved" && (
+                <div className="space-y-3 p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
+                  <p className="text-sm font-medium text-orange-900 dark:text-orange-100">
+                    ⚠️ This purchase has been approved
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    The purchase will be unlinked from payment vouchers, but the payment vouchers will remain intact.
+                    Deleting will void associated journal entries.
                   </p>
                 </div>
               )}
+              {/* {["partially paid", "paid"].includes(purchase.paymentStatus) && (
+                <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    💳 This purchase has {purchase.connectedDocuments?.paymentIds?.length ?? 0} connected payment(s)
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    The purchase will be unlinked from payment vouchers, but the vouchers will remain intact.
+                  </p>
+                </div>
+              )}
+              {["partially received", "received"].includes(purchase.inventoryStatus) && (
+                <div className="space-y-3 p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                  <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+                    📦 Inventory has been received for this purchase
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Deleting this purchase may affect stock quantities and linked inventory records.
+                  </p>
+                </div>
+              )} */}
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>

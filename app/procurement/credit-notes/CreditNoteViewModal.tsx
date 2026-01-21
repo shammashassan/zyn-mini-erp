@@ -89,9 +89,9 @@ const getCreatorUsername = (creditNote: any): string | null => {
   return createAction?.username || null;
 };
 
-export function CreditNoteViewModal({ 
-  isOpen, 
-  onClose, 
+export function CreditNoteViewModal({
+  isOpen,
+  onClose,
   creditNote: initialCreditNote,
   onCreatePayment,
   canCreatePayment,
@@ -151,9 +151,9 @@ export function CreditNoteViewModal({
   const StatusIcon = getStatusIcon(currentData.status);
   const PaymentIcon = getPaymentStatusIcon(currentData.paymentStatus);
 
-  const canShowPaymentButton = 
-    canCreatePayment && 
-    currentData.status === 'approved' && 
+  const canShowPaymentButton =
+    canCreatePayment &&
+    currentData.status === 'approved' &&
     currentData.paymentStatus !== 'paid' &&
     onCreatePayment;
 
@@ -169,7 +169,7 @@ export function CreditNoteViewModal({
       <DialogContent className="max-w-[98vw] sm:max-w-[95vw] lg:max-w-4xl max-h-[95vh] overflow-y-auto sidebar-scroll p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <FileText className="h-4 w-4 sm:h-5 sm:w-5"/>
+            <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
             Credit Note Details
           </DialogTitle>
         </DialogHeader>
@@ -619,9 +619,19 @@ export function CreditNoteViewModal({
                               {action.changes.map((change: any, idx: number) => (
                                 <div key={idx} className="text-xs text-muted-foreground break-words">
                                   <span className="font-medium">{change.field}:</span>{' '}
-                                  <span className="line-through">{String(change.oldValue)}</span>
-                                  {' →'}
-                                  <span className="text-green-600">{String(change.newValue)}</span>
+                                  {change.field === 'paidAmount' ? (
+                                    <>
+                                      <span className="line-through">{formatCurrency(change.oldValue)}</span>
+                                      {' → '}
+                                      <span className="text-green-600">{formatCurrency(change.newValue)}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="line-through">{String(change.oldValue)}</span>
+                                      {' → '}
+                                      <span className="text-green-600">{String(change.newValue)}</span>
+                                    </>
+                                  )}
                                 </div>
                               ))}
                             </div>

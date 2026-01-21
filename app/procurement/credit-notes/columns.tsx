@@ -316,7 +316,7 @@ const RowActions = ({
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Credit Note</AlertDialogTitle>
           <AlertDialogDescription asChild>
-            <div className="space-y-4">
+            <div className="w-full space-y-4">
               <p>
                 Are you sure you want to delete credit note {creditNote.creditNoteNumber}?
               </p>

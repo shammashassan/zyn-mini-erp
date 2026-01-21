@@ -239,7 +239,7 @@ const RowActions = ({
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Sales Return</AlertDialogTitle>
           <AlertDialogDescription asChild>
-            <div className="space-y-4">
+            <div className="w-full space-y-4">
               <p>
                 Are you sure you want to delete sales return {salesReturn.returnNumber}?
               </p>
@@ -250,7 +250,7 @@ const RowActions = ({
                     ⚠️ This sales return has been approved
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Deleting will remove the link to the invoice and update returned quantities.
+                    Deleting will remove the link to the invoice and revert returned quantities.
                   </p>
                 </div>
               )}

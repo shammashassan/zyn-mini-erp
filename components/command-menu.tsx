@@ -55,42 +55,66 @@ type RoleType = "user" | "admin" | "manager" | "owner"
 
 // Same permission map as in app-sidebar.tsx
 const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
+  // General
   "Dashboard": { dashboard: ["read"] },
   "Billing": { bill: ["create"] },
+
+  // Inventory
   "Products": { product: ["read"] },
   "Materials": { material: ["read"] },
   "Stock Adjustment": { stockAdjustment: ["read"] },
+
+  // People
   "Customers": { customer: ["read"] },
   "Suppliers": { supplier: ["read"] },
   "Payees": { payee: ["read"] },
-  "Quotations": { invoice: ["read"] },
+
+  // Sales
+  "Quotations": { quotation: ["read"] },
   "Invoices": { invoice: ["read"] },
   "Vouchers": { voucher: ["read"] },
-  "Debit Notes": { debitNote: ["read"] },
-  "Credit Notes": { creditNote: ["read"] },
+  "Receipts": { voucher: ["read"] },
   "Delivery notes": { deliveryNote: ["read"] },
+  "Sales Returns": { returnNote: ["read"] },
+  "Debit Notes": { debitNote: ["read"] },
+
+  // Procurement
   "Purchases": { purchase: ["read"] },
   "Expenses": { expense: ["read"] },
-  "Return Notes": { returnNote: ["read"] },
+  "Payments": { voucher: ["read"] },
+  "Purchase Returns": { returnNote: ["read"] },
+  "Credit Notes": { creditNote: ["read"] },
+
+  // Reports
   "Sales Report": { report: ["read"] },
   "Purchase Report": { report: ["read"] },
   "Expense Report": { report: ["read"] },
   "Payments Report": { report: ["read"] },
   "Tax Report": { report: ["read"] },
   "Inventory Report": { report: ["read"] },
+
+  // Accounting
   "Chart of Accounts": { chartOfAccounts: ["read"] },
   "Journal": { journal: ["read"] },
-  "ledger": { journal: ["read"] },
+  "ledger": { ledger: ["read"] },
   "Trial Balance": { trialBalance: ["read"] },
   "Profit & Loss": { profitLoss: ["read"] },
   "Financial Statements": { financialStatements: ["read"] },
+
+  // HRM
   "Employees": { employee: ["read"] },
   "User Management": { user: ["list"] },
-  "Company Details": { companyDetails: ["read"] },
+
+  // Settings
   "Settings": { settings: ["read"] },
   "Account": { account: ["read"] },
-  "Get Help": { help: ["read"] },
+  "Company Details": { companyDetails: ["read"] },
+
+  // Notifications
   "Notifications": { notification: ["read"] },
+
+  // Help
+  "Get Help": { help: ["read"] },
 }
 
 const navigationData = [
@@ -109,16 +133,18 @@ const navigationData = [
   { title: "Payees", url: "/people/payees", icon: Users, group: "People" },
 
   // Sales
-  { title: "Quotations", url: "/documents/quotations", icon: FileClock, group: "Sales" },
-  { title: "Invoices", url: "/documents/invoices", icon: FileText, group: "Sales" },
-  { title: "Vouchers", url: "/documents/vouchers", icon: Ticket, group: "Sales" },
-  { title: "Delivery notes", url: "/documents/delivery-notes", icon: Truck, group: "Sales" },
-  { title: "Sales Returns", url: "/documents/sales-returns", icon: Undo2, group: "Sales" },
-  { title: "Debit Notes", url: "/documents/debit-notes", icon: ClipboardCheck, group: "Sales" },
+  { title: "Quotations", url: "/sales/quotations", icon: FileClock, group: "Sales" },
+  { title: "Invoices", url: "/sales/invoices", icon: FileText, group: "Sales" },
+  { title: "Vouchers", url: "/sales/vouchers", icon: Ticket, group: "Sales" },
+  { title: "Receipts", url: "/sales/receipts", icon: Ticket, group: "Sales" },
+  { title: "Delivery notes", url: "/sales/delivery-notes", icon: Truck, group: "Sales" },
+  { title: "Sales Returns", url: "/sales/sales-returns", icon: Undo2, group: "Sales" },
+  { title: "Debit Notes", url: "/sales/debit-notes", icon: ClipboardCheck, group: "Sales" },
 
   // Procurement
   { title: "Purchases", url: "/procurement/purchases", icon: ShoppingCart, group: "Procurement" },
   { title: "Expenses", url: "/procurement/expenses", icon: Banknote, group: "Procurement" },
+  { title: "Payments", url: "/procurement/payments", icon: Banknote, group: "Procurement" },
   { title: "Purchase Returns", url: "/procurement/purchase-returns", icon: Redo2, group: "Procurement" },
   { title: "Credit Notes", url: "/procurement/credit-notes", icon: ClipboardCheck, group: "Procurement" },
 
@@ -179,7 +205,7 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
   // Group items by category
   const groupedNavigation = React.useMemo(() => {
     const groups: Record<string, typeof navigationData> = {}
-    
+
     filteredNavigation.forEach((item) => {
       if (!groups[item.group]) {
         groups[item.group] = []

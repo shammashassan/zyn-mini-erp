@@ -319,8 +319,23 @@ const RowActions = ({ invoice, onViewPdf, onView, onEdit, onDelete, permissions 
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
-          <AlertDialogDescription>
-            Are you sure you want to delete invoice {invoice.invoiceNumber}? This action will move it to trash.
+          <AlertDialogDescription asChild>
+            <div className="w-full space-y-4">
+              <p>
+                Are you sure you want to delete invoice {invoice.invoiceNumber}?
+              </p>
+
+              {invoice.status === "approved" && (
+                <div className="space-y-3 p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
+                  <p className="text-sm font-medium text-orange-900 dark:text-orange-100">
+                    ⚠️ This invoice has been approved
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Deleting will void associated journal entries.
+                  </p>
+                </div>
+              )}
+            </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

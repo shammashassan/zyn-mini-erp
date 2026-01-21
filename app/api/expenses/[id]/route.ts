@@ -176,12 +176,14 @@ export async function PUT(request: Request, context: RequestContext) {
 
     const changes = detectChanges(currentExpense.toObject(), body);
 
-    currentExpense.addAuditEntry(
-      'Updated', 
-      user.id, 
-      user.username,
-      changes.length > 0 ? changes : undefined
-    );
+    if (changes.length > 0) {
+      currentExpense.addAuditEntry(
+        'Updated',
+        user.id,
+        user.username,
+        changes
+      );
+    }
 
     currentExpense.set({
       ...body,

@@ -37,6 +37,7 @@ const routeGroups: Record<string, { label: string; path: string }[]> = {
     { label: "Invoices", path: "/sales/invoices" },
     { label: "Quotations", path: "/sales/quotations" },
     { label: "Vouchers", path: "/sales/vouchers" },
+    { label: "Receipts", path: "/sales/receipts" },
     { label: "Delivery Notes", path: "/sales/delivery-notes" },
     { label: "Sales Returns", path: "/sales/sales-returns" },
     { label: "Debit Notes", path: "/sales/debit-notes" },
@@ -63,6 +64,7 @@ const routeGroups: Record<string, { label: string; path: string }[]> = {
   procurement: [
     { label: "Purchases", path: "/procurement/purchases" },
     { label: "Expenses", path: "/procurement/expenses" },
+    { label: "Payments", path: "/procurement/payments" },
     { label: "Purchase Returns", path: "/procurement/purchase-returns" },
     { label: "Credit Notes", path: "/procurement/credit-notes" },
   ],
@@ -107,18 +109,18 @@ export function SiteHeader() {
   // Generate breadcrumb items from pathname
   const generateBreadcrumbs = () => {
     const paths = pathname.split("/").filter(Boolean);
-    
+
     const breadcrumbs = paths.map((path, index) => {
       const href = "/" + paths.slice(0, index + 1).join("/");
       const label = path.charAt(0).toUpperCase() + path.slice(1).replace(/-/g, " ");
-      
+
       // Check if this segment has a group
       const hasGroup = routeGroups[path] !== undefined;
       const group = hasGroup ? routeGroups[path] : null;
-      
+
       // Check if it's a valid standalone route
       const isStandalone = standaloneRoutes.includes(href);
-      
+
       return { href, label, hasGroup, group, isStandalone };
     });
 
@@ -137,13 +139,13 @@ export function SiteHeader() {
             orientation="vertical"
             className="mx-2 data-[orientation=vertical]:h-4"
           />
-          
+
           <Breadcrumb className="hidden md:block">
             <BreadcrumbList>
               <BreadcrumbItem>
                 <BreadcrumbLink href="/dashboard">Home</BreadcrumbLink>
               </BreadcrumbItem>
-              
+
               {breadcrumbs.map((crumb, index) => (
                 <div key={crumb.href} className="flex items-center gap-1.5">
                   <BreadcrumbSeparator />
