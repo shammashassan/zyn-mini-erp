@@ -285,7 +285,7 @@ export const getColumns = (
                     );
                 }
 
-                return <span className="text-muted-foreground">—</span>;
+                return <span className="text-muted-foreground">Not Specified</span>;
             },
             meta: {
                 label: "Party",

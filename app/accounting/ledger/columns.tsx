@@ -190,7 +190,7 @@ export const getLedgerColumns = (
         const refType = row.original.referenceType;
 
         if (!refNumber) {
-          return <span className="text-muted-foreground text-xs">—</span>;
+          return <span className="text-muted-foreground text-xs">Not Specified</span>;
         }
 
         return (

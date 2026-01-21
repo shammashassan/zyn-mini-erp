@@ -203,13 +203,13 @@ const StatusBadgeButton = ({
   );
 };
 
-const CreatePaymentButton = ({ 
-  creditNote, 
-  onRefresh, 
-  canCreatePayment 
-}: { 
-  creditNote: CreditNote; 
-  onRefresh: () => void; 
+const CreatePaymentButton = ({
+  creditNote,
+  onRefresh,
+  canCreatePayment
+}: {
+  creditNote: CreditNote;
+  onRefresh: () => void;
   canCreatePayment: boolean;
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
@@ -361,204 +361,204 @@ export const getColumns = (
   onViewPaymentPdf?: (payment: any) => void,
   onViewReturnNotePdf?: (returnNote: any) => void
 ): ColumnDef<CreditNote>[] => [
-  {
-    id: "creditDate",
-    accessorKey: "creditDate",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-8 px-2"
-      >
-        Date
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const date = new Date(row.original.creditDate);
-      return (
-        <div className="text-left font-medium min-w-[100px]">
-          <div>{formatDisplayDate(date)}</div>
-          <div className="text-xs text-muted-foreground">{formatTime(date)}</div>
-        </div>
-      );
-    },
-  },
-  {
-    id: "creditNoteNumber",
-    accessorKey: "creditNoteNumber",
-    header: "Credit Note No.",
-    cell: ({ row }) => (
-      <span className="font-mono font-medium">
-        {row.getValue("creditNoteNumber")}
-      </span>
-    ),
-    meta: {
-      label: "Credit Note No.",
-      placeholder: "Search credit note no...",
-      variant: "text",
-    },
-    enableColumnFilter: true,
-  },
-  {
-    id: "partyName",
-    accessorFn: (row) => row.customerName || row.supplierName || row.payeeName || row.vendorName || "",
-    header: "Party",
-    cell: ({ row }) => {
-      const creditNote = row.original;
-      
-      if (creditNote.customerName) {
+    {
+      id: "creditDate",
+      accessorKey: "creditDate",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-8 px-2"
+        >
+          Date
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const date = new Date(row.original.creditDate);
         return (
-          <Badge variant="primary" appearance="outline" className="gap-1">
-            {creditNote.customerName}
-          </Badge>
-        );
-      }
-      
-      if (creditNote.supplierName) {
-        return (
-          <Badge variant="warning" appearance="outline" className="gap-1">
-            {creditNote.supplierName}
-          </Badge>
-        );
-      }
-
-      if (creditNote.payeeName) {
-        return (
-          <Badge variant="cyan" appearance="outline" className="gap-1">
-            {creditNote.payeeName}
-          </Badge>
-        );
-      }
-
-      if (creditNote.vendorName) {
-        return (
-          <Badge variant="secondary" appearance="outline" className="gap-1">
-            {creditNote.vendorName}
-          </Badge>
-        );
-      }
-
-      return <span className="text-muted-foreground">—</span>;
-    },
-    meta: {
-      label: "Party",
-      placeholder: "Search party name...",
-      variant: "text",
-    },
-    enableColumnFilter: true,
-  },
-  {
-    id: "status",
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const creditNote = row.original;
-      const refresh = onRefresh || (() => {});
-
-      return (
-        <StatusBadgeButton
-          creditNote={creditNote}
-          onRefresh={refresh}
-          canUpdateStatus={permissions.canUpdateStatus}
-        />
-      );
-    },
-    meta: {
-      label: "Status",
-      variant: "select",
-      options: [
-        { label: "Pending", value: "pending", icon: Clock },
-        { label: "Approved", value: "approved", icon: CheckCircle },
-        { label: "Cancelled", value: "cancelled", icon: XCircle },
-      ],
-    },
-    enableColumnFilter: true,
-  },
-  {
-    id: "paymentStatus",
-    accessorKey: "paymentStatus",
-    header: "Payment",
-    cell: ({ row }) => {
-      const creditNote = row.original;
-      const paidAmount = creditNote.paidAmount || 0;
-      const Icon = getPaymentStatusIcon(creditNote.paymentStatus);
-
-      return (
-        <div className="space-y-1">
-          <Badge
-            variant={getPaymentStatusVariant(creditNote.paymentStatus) as any}
-            appearance="outline"
-            className="gap-1 pr-2.5 capitalize"
-          >
-            <Icon className="h-3 w-3" />
-            {creditNote.paymentStatus}
-          </Badge>
-          <div className="text-xs text-muted-foreground">
-            <span>{formatCurrency(paidAmount)}</span>
-            <span className="mx-1">/</span>
-            <span className="text-green-600">{formatCurrency(creditNote.grandTotal)}</span>
+          <div className="text-left font-medium min-w-[100px]">
+            <div>{formatDisplayDate(date)}</div>
+            <div className="text-xs text-muted-foreground">{formatTime(date)}</div>
           </div>
-        </div>
-      );
+        );
+      },
     },
-    meta: {
-      label: "Payment",
-      variant: "select",
-      icon: DollarSign,
-      options: [
-        { label: "Paid", value: "paid", icon: CheckCircle },
-        { label: "Partially Paid", value: "partially paid", icon: CreditCard },
-        { label: "Pending", value: "pending", icon: Clock },
-      ],
+    {
+      id: "creditNoteNumber",
+      accessorKey: "creditNoteNumber",
+      header: "Credit Note No.",
+      cell: ({ row }) => (
+        <span className="font-mono font-medium">
+          {row.getValue("creditNoteNumber")}
+        </span>
+      ),
+      meta: {
+        label: "Credit Note No.",
+        placeholder: "Search credit note no...",
+        variant: "text",
+      },
+      enableColumnFilter: true,
     },
-    enableColumnFilter: true,
-  },
-  {
-    id: "connectedDocuments",
-    header: "Connected",
-    cell: ({ row }) => {
-      const creditNote = row.original;
-      return (onViewPaymentPdf && onViewReturnNotePdf) ? (
-        <ConnectedDocumentsBadges
-          creditNote={creditNote as any}
-          onViewPaymentPdf={onViewPaymentPdf}
-          onViewReturnNotePdf={onViewReturnNotePdf}
-        />
-      ) : (
-        <span className="text-sm text-muted-foreground">—</span>
-      );
-    },
-  },
-  {
-    id: "quickActions",
-    header: "",
-    cell: ({ row }) => {
-      const creditNote = row.original;
-      const refresh = onRefresh || (() => {});
+    {
+      id: "partyName",
+      accessorFn: (row) => row.customerName || row.supplierName || row.payeeName || row.vendorName || "",
+      header: "Party",
+      cell: ({ row }) => {
+        const creditNote = row.original;
 
-      return (
-        <div className="flex gap-2">
-          <CreatePaymentButton 
-            creditNote={creditNote} 
-            onRefresh={refresh} 
-            canCreatePayment={permissions.canCreatePayment} 
-          />
-        </div>
-      );
+        if (creditNote.customerName) {
+          return (
+            <Badge variant="primary" appearance="outline" className="gap-1">
+              {creditNote.customerName}
+            </Badge>
+          );
+        }
+
+        if (creditNote.supplierName) {
+          return (
+            <Badge variant="warning" appearance="outline" className="gap-1">
+              {creditNote.supplierName}
+            </Badge>
+          );
+        }
+
+        if (creditNote.payeeName) {
+          return (
+            <Badge variant="cyan" appearance="outline" className="gap-1">
+              {creditNote.payeeName}
+            </Badge>
+          );
+        }
+
+        if (creditNote.vendorName) {
+          return (
+            <Badge variant="secondary" appearance="outline" className="gap-1">
+              {creditNote.vendorName}
+            </Badge>
+          );
+        }
+
+        return <span className="text-muted-foreground">Not Specified</span>;
+      },
+      meta: {
+        label: "Party",
+        placeholder: "Search party name...",
+        variant: "text",
+      },
+      enableColumnFilter: true,
     },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => (
-      <RowActions
-        creditNote={row.original}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onView={onView}
-        onViewPdf={onViewPdf}
-        permissions={permissions}
-      />
-    ),
-  },
-];
+    {
+      id: "status",
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const creditNote = row.original;
+        const refresh = onRefresh || (() => { });
+
+        return (
+          <StatusBadgeButton
+            creditNote={creditNote}
+            onRefresh={refresh}
+            canUpdateStatus={permissions.canUpdateStatus}
+          />
+        );
+      },
+      meta: {
+        label: "Status",
+        variant: "select",
+        options: [
+          { label: "Pending", value: "pending", icon: Clock },
+          { label: "Approved", value: "approved", icon: CheckCircle },
+          { label: "Cancelled", value: "cancelled", icon: XCircle },
+        ],
+      },
+      enableColumnFilter: true,
+    },
+    {
+      id: "paymentStatus",
+      accessorKey: "paymentStatus",
+      header: "Payment",
+      cell: ({ row }) => {
+        const creditNote = row.original;
+        const paidAmount = creditNote.paidAmount || 0;
+        const Icon = getPaymentStatusIcon(creditNote.paymentStatus);
+
+        return (
+          <div className="space-y-1">
+            <Badge
+              variant={getPaymentStatusVariant(creditNote.paymentStatus) as any}
+              appearance="outline"
+              className="gap-1 pr-2.5 capitalize"
+            >
+              <Icon className="h-3 w-3" />
+              {creditNote.paymentStatus}
+            </Badge>
+            <div className="text-xs text-muted-foreground">
+              <span>{formatCurrency(paidAmount)}</span>
+              <span className="mx-1">/</span>
+              <span className="text-green-600">{formatCurrency(creditNote.grandTotal)}</span>
+            </div>
+          </div>
+        );
+      },
+      meta: {
+        label: "Payment",
+        variant: "select",
+        icon: DollarSign,
+        options: [
+          { label: "Paid", value: "paid", icon: CheckCircle },
+          { label: "Partially Paid", value: "partially paid", icon: CreditCard },
+          { label: "Pending", value: "pending", icon: Clock },
+        ],
+      },
+      enableColumnFilter: true,
+    },
+    {
+      id: "connectedDocuments",
+      header: "Connected",
+      cell: ({ row }) => {
+        const creditNote = row.original;
+        return (onViewPaymentPdf && onViewReturnNotePdf) ? (
+          <ConnectedDocumentsBadges
+            creditNote={creditNote as any}
+            onViewPaymentPdf={onViewPaymentPdf}
+            onViewReturnNotePdf={onViewReturnNotePdf}
+          />
+        ) : (
+          <span className="text-sm text-muted-foreground">—</span>
+        );
+      },
+    },
+    {
+      id: "quickActions",
+      header: "",
+      cell: ({ row }) => {
+        const creditNote = row.original;
+        const refresh = onRefresh || (() => { });
+
+        return (
+          <div className="flex gap-2">
+            <CreatePaymentButton
+              creditNote={creditNote}
+              onRefresh={refresh}
+              canCreatePayment={permissions.canCreatePayment}
+            />
+          </div>
+        );
+      },
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <RowActions
+          creditNote={row.original}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onView={onView}
+          onViewPdf={onViewPdf}
+          permissions={permissions}
+        />
+      ),
+    },
+  ];

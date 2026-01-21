@@ -454,11 +454,11 @@ export function COAForm({ isOpen, onClose, onSubmit, defaultValues, existingSubG
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                 <div>
                   <p className="text-muted-foreground">Code</p>
-                  <p className="font-mono font-bold">{watch("accountCode") || "—"}</p>
+                  <p className="font-mono font-bold">{watch("accountCode") || "Not Set"}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Group</p>
-                  <p className="font-medium">{watch("groupName") || "—"}</p>
+                  <p className="font-medium">{watch("groupName") || "Not Set"}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Nature</p>
@@ -467,7 +467,7 @@ export function COAForm({ isOpen, onClose, onSubmit, defaultValues, existingSubG
                     appearance="outline"
                     className="capitalize mt-1"
                   >
-                    {watch("nature") || "—"}
+                    {watch("nature") || "Not Set"}
                   </Badge>
                 </div>
                 <div>

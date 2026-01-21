@@ -67,13 +67,13 @@ const getReferenceTypeVariant = (type: string) => {
 };
 
 // ✅ NEW: Clickable Status Badge Component
-const StatusBadgeButton = ({ 
-  journal, 
-  onRefresh, 
-  canPost 
-}: { 
-  journal: IJournal; 
-  onRefresh: () => void; 
+const StatusBadgeButton = ({
+  journal,
+  onRefresh,
+  canPost
+}: {
+  journal: IJournal;
+  onRefresh: () => void;
   canPost: boolean;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -289,7 +289,7 @@ export const getJournalColumns = (
         const refType = row.original.referenceType;
 
         if (!refNumber) {
-          return <span className="text-sm text-muted-foreground">—</span>;
+          return <span className="text-sm text-muted-foreground">Not Specified</span>;
         }
 
         return (
@@ -318,7 +318,7 @@ export const getJournalColumns = (
         const partyName = row.original.partyName;
 
         if (!partyType || !partyName) {
-          return <span className="text-xs text-muted-foreground">—</span>;
+          return <span className="text-xs text-muted-foreground">Not Specified</span>;
         }
 
         const getPartyVariant = (type: string) => {
@@ -408,10 +408,10 @@ export const getJournalColumns = (
         const refresh = onRefresh || (() => { });
 
         return (
-          <StatusBadgeButton 
-            journal={journal} 
-            onRefresh={refresh} 
-            canPost={permissions.canPost} 
+          <StatusBadgeButton
+            journal={journal}
+            onRefresh={refresh}
+            canPost={permissions.canPost}
           />
         );
       },
