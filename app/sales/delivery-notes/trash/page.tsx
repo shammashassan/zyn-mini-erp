@@ -22,9 +22,9 @@ interface DeletedDeliveryNote {
 
 export default function DeliveryNotesTrashPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const { 
-    permissions: { canViewTrash }, 
-    isPending 
+  const {
+    permissions: { canViewTrash },
+    isPending
   } = useDeliveryNotePermissions();
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export default function DeliveryNotesTrashPage() {
   if (!isMounted || isPending) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
   }
@@ -51,10 +51,10 @@ export default function DeliveryNotesTrashPage() {
       apiEndpoint="/api/delivery-notes/trash"
       restoreEndpoint="/api/delivery-notes/trash/restore"
       deleteEndpoint="/api/delivery-notes/trash/delete"
-      backUrl="/documents/delivery-notes"
+      backUrl="../delivery-notes"
       backLabel="Back to Delivery Notes"
       getItemName={(item) => item.invoiceNumber || "Unnamed Delivery Note"}
-      getItemDescription={(item) => 
+      getItemDescription={(item) =>
         `${item.customerName || 'Unknown Customer'} • ${formatCurrency(item.grandTotal || 0.00)} • ${item.status || 'N/A'}`
       }
     />

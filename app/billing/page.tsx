@@ -173,14 +173,14 @@ export default function CreateBillPage() {
       if (!payload.voucherAmount || payload.voucherAmount <= 0) return false;
     } else {
       if (payload.items.length === 0) return false;
-      
+
       // Ensure ALL items have a description, positive quantity, and a non-empty rate
-      const allItemsValid = payload.items.every(item => 
-        item.description.trim() && 
-        Number(item.quantity) > 0 && 
+      const allItemsValid = payload.items.every(item =>
+        item.description.trim() &&
+        Number(item.quantity) > 0 &&
         (item.rate as any) !== "" // Check that rate is not an empty string
       );
-      
+
       if (!allItemsValid) return false;
       if (grandTotal < 0) return false;
     }
@@ -264,7 +264,7 @@ export default function CreateBillPage() {
         case "invoice":
           endpoint = "/api/invoices";
           responseKey = "invoice";
-          targetRoute = "/documents/invoices";
+          targetRoute = "/sales/invoices";
           payloadToSend.items = payload.items.map(item => ({
             ...item,
             quantity: Number(item.quantity) || 0,
@@ -276,7 +276,7 @@ export default function CreateBillPage() {
         case "quotation":
           endpoint = "/api/quotations";
           responseKey = "quotation";
-          targetRoute = "/documents/quotations";
+          targetRoute = "/sales/quotations";
           payloadToSend.items = payload.items.map(item => ({
             ...item,
             quantity: Number(item.quantity) || 0,
@@ -286,10 +286,14 @@ export default function CreateBillPage() {
           break;
 
         case "receipt":
+          endpoint = "/api/vouchers";
+          responseKey = "receipt";
+          targetRoute = "/sales/receipts";
+          break;
         case "payment":
           endpoint = "/api/vouchers";
-          responseKey = "voucher";
-          targetRoute = "/documents/vouchers";
+          responseKey = "payment";
+          targetRoute = "/sales/payments";
 
           payloadToSend = {
             voucherType: payload.documentType,

@@ -342,7 +342,7 @@ function DashboardContent() {
                             className="cursor-pointer transition-all hover:bg-muted/50"
                           >
                             <button
-                              onClick={() => router.push('/documents/invoices')}
+                              onClick={() => router.push('/sales/invoices')}
                               className="w-full text-left"
                             >
                               <ItemMedia variant="icon">
@@ -364,7 +364,7 @@ function DashboardContent() {
                             className="cursor-pointer transition-all hover:bg-muted/50"
                           >
                             <button
-                              onClick={() => router.push('/documents/quotations')}
+                              onClick={() => router.push('/sales/quotations')}
                               className="w-full text-left"
                             >
                               <ItemMedia variant="icon">
@@ -386,7 +386,7 @@ function DashboardContent() {
                             className="cursor-pointer transition-all hover:bg-muted/50"
                           >
                             <button
-                              onClick={() => router.push('/documents/vouchers')}
+                              onClick={() => router.push('/sales/vouchers')}
                               className="w-full text-left"
                             >
                               <ItemMedia variant="icon">
@@ -408,7 +408,7 @@ function DashboardContent() {
                             className="cursor-pointer transition-all hover:bg-muted/50"
                           >
                             <button
-                              onClick={() => router.push('/documents/delivery-notes')}
+                              onClick={() => router.push('/sales/delivery-notes')}
                               className="w-full text-left"
                             >
                               <ItemMedia variant="icon">
@@ -430,7 +430,7 @@ function DashboardContent() {
                             className="cursor-pointer transition-all hover:bg-muted/50"
                           >
                             <button
-                              onClick={() => router.push('/purchases')}
+                              onClick={() => router.push('/procurement/purchases')}
                               className="w-full text-left"
                             >
                               <ItemMedia variant="icon">
@@ -452,7 +452,7 @@ function DashboardContent() {
                             className="cursor-pointer transition-all hover:bg-muted/50"
                           >
                             <button
-                              onClick={() => router.push('/expenses')}
+                              onClick={() => router.push('/procurement/expenses')}
                               className="w-full text-left"
                             >
                               <ItemMedia variant="icon">
