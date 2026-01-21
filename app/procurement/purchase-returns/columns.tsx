@@ -46,11 +46,11 @@ export interface PurchaseReturn {
   _id: string;
   returnNumber: string;
   returnType: 'purchaseReturn';
-  
+
   purchaseId?: string | any;
   purchaseReference?: string;
   supplierName?: string;
-  
+
   items: Array<{
     materialName?: string;
     orderedQuantity?: number;
@@ -124,13 +124,13 @@ const getStatusIcon = (status: string) => {
   }
 };
 
-const StatusBadgeButton = ({ 
-  purchaseReturn, 
-  onRefresh, 
-  canUpdateStatus 
-}: { 
-  purchaseReturn: PurchaseReturn; 
-  onRefresh: () => void; 
+const StatusBadgeButton = ({
+  purchaseReturn,
+  onRefresh,
+  canUpdateStatus
+}: {
+  purchaseReturn: PurchaseReturn;
+  onRefresh: () => void;
   canUpdateStatus: boolean;
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
@@ -258,7 +258,7 @@ const RowActions = ({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            className={cn(buttonVariants({ variant: "destructive" }))}
+            variant="destructive"
             onClick={() => {
               onDelete(String(purchaseReturn._id));
               setIsDeleteOpen(false);
@@ -282,175 +282,175 @@ export const getColumns = (
   onViewPurchase?: (purchase: any) => void,
   onViewDebitNotePdf?: (debitNote: any) => void
 ): ColumnDef<PurchaseReturn>[] => [
-  {
-    id: "returnDate",
-    accessorKey: "returnDate",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-8 px-2"
-      >
-        Date
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const date = new Date(row.original.returnDate);
-      return (
-        <div className="text-left font-medium min-w-[100px]">
-          <div>{formatDisplayDate(date)}</div>
-          <div className="text-xs text-muted-foreground">{formatTime(date)}</div>
-        </div>
-      );
+    {
+      id: "returnDate",
+      accessorKey: "returnDate",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-8 px-2"
+        >
+          Date
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const date = new Date(row.original.returnDate);
+        return (
+          <div className="text-left font-medium min-w-[100px]">
+            <div>{formatDisplayDate(date)}</div>
+            <div className="text-xs text-muted-foreground">{formatTime(date)}</div>
+          </div>
+        );
+      },
     },
-  },
-  {
-    id: "returnNumber",
-    accessorKey: "returnNumber",
-    header: "Return No.",
-    cell: ({ row }) => (
-      <span className="font-mono font-medium">
-        {row.getValue("returnNumber")}
-      </span>
-    ),
-    meta: {
-      label: "Return No.",
-      placeholder: "Search return no...",
-      variant: "text",
+    {
+      id: "returnNumber",
+      accessorKey: "returnNumber",
+      header: "Return No.",
+      cell: ({ row }) => (
+        <span className="font-mono font-medium">
+          {row.getValue("returnNumber")}
+        </span>
+      ),
+      meta: {
+        label: "Return No.",
+        placeholder: "Search return no...",
+        variant: "text",
+      },
+      enableColumnFilter: true,
     },
-    enableColumnFilter: true,
-  },
-  {
-    id: "supplierName",
-    accessorKey: "supplierName",
-    header: "Supplier",
-    cell: ({ row }) => {
-      const supplierName = row.original.supplierName;
-      
-      return supplierName ? (
-        <Badge variant="warning" appearance="outline">
-          {supplierName}
-        </Badge>
-      ) : (
-        <span className="text-muted-foreground">-</span>
-      );
-    },
-    meta: {
-      label: "Supplier",
-      placeholder: "Search supplier...",
-      variant: "text",
-    },
-    enableColumnFilter: true,
-  },
-  {
-    id: "itemsCount",
-    header: "Items Returned",
-    cell: ({ row }) => {
-      const items = row.original.items || [];
-      const displayItems = items.slice(0, 2);
-      const remainingCount = items.length - 2;
+    {
+      id: "supplierName",
+      accessorKey: "supplierName",
+      header: "Supplier",
+      cell: ({ row }) => {
+        const supplierName = row.original.supplierName;
 
-      return (
-        <div className="flex flex-col gap-0.5 text-sm">
-          {displayItems.map((item, idx) => {
-            const itemName = item.materialName || 'Unknown';
-            return (
-              <div key={idx} className="text-muted-foreground">
-                {itemName}:{" "}
-                <span className="font-medium text-red-600">
-                  {item.returnQuantity}
-                </span>
-              </div>
-            );
-          })}
-          {remainingCount > 0 && (
-            <div className="text-muted-foreground">+{remainingCount} more</div>
-          )}
-        </div>
-      );
+        return supplierName ? (
+          <Badge variant="warning" appearance="outline">
+            {supplierName}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
+      },
+      meta: {
+        label: "Supplier",
+        placeholder: "Search supplier...",
+        variant: "text",
+      },
+      enableColumnFilter: true,
     },
-  },
-  {
-    id: "totalQuantity",
-    header: "Total Qty",
-    cell: ({ row }) => {
-      const totalQty = row.original.items?.reduce(
-        (sum, item) => sum + item.returnQuantity,
-        0
-      ) || 0;
+    {
+      id: "itemsCount",
+      header: "Items Returned",
+      cell: ({ row }) => {
+        const items = row.original.items || [];
+        const displayItems = items.slice(0, 2);
+        const remainingCount = items.length - 2;
 
-      return (
-        <div className="text-center font-semibold text-red-600">
-          {totalQty.toFixed(2)}
-        </div>
-      );
+        return (
+          <div className="flex flex-col gap-0.5 text-sm">
+            {displayItems.map((item, idx) => {
+              const itemName = item.materialName || 'Unknown';
+              return (
+                <div key={idx} className="text-muted-foreground">
+                  {itemName}:{" "}
+                  <span className="font-medium text-red-600">
+                    {item.returnQuantity}
+                  </span>
+                </div>
+              );
+            })}
+            {remainingCount > 0 && (
+              <div className="text-muted-foreground">+{remainingCount} more</div>
+            )}
+          </div>
+        );
+      },
     },
-  },
-  {
-    id: "status",
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const purchaseReturn = row.original;
-      const refresh = onRefresh || (() => {});
-      
-      return (
-        <StatusBadgeButton
-          purchaseReturn={purchaseReturn}
-          onRefresh={refresh}
-          canUpdateStatus={permissions.canUpdateStatus}
+    {
+      id: "totalQuantity",
+      header: "Total Qty",
+      cell: ({ row }) => {
+        const totalQty = row.original.items?.reduce(
+          (sum, item) => sum + item.returnQuantity,
+          0
+        ) || 0;
+
+        return (
+          <div className="text-center font-semibold text-red-600">
+            {totalQty.toFixed(2)}
+          </div>
+        );
+      },
+    },
+    {
+      id: "status",
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const purchaseReturn = row.original;
+        const refresh = onRefresh || (() => { });
+
+        return (
+          <StatusBadgeButton
+            purchaseReturn={purchaseReturn}
+            onRefresh={refresh}
+            canUpdateStatus={permissions.canUpdateStatus}
+          />
+        );
+      },
+      meta: {
+        label: "Status",
+        variant: "select",
+        options: [
+          { label: "Pending", value: "pending", icon: Clock },
+          { label: "Approved", value: "approved", icon: CheckCircle },
+          { label: "Cancelled", value: "cancelled", icon: XCircle },
+        ],
+      },
+      enableColumnFilter: true,
+    },
+    {
+      id: "reason",
+      accessorKey: "reason",
+      header: "Reason",
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground max-w-[200px] truncate block">
+          {row.getValue("reason")}
+        </span>
+      ),
+    },
+    {
+      id: "connectedDocuments",
+      header: "Connected",
+      cell: ({ row }) => {
+        const purchaseReturn = row.original;
+        return (onViewPurchase && onViewDebitNotePdf) ? (
+          <ConnectedDocumentsBadges
+            purchaseReturn={purchaseReturn as any}
+            onViewPurchase={onViewPurchase}
+            onViewDebitNotePdf={onViewDebitNotePdf}
+          />
+        ) : (
+          <span className="text-sm text-muted-foreground">—</span>
+        );
+      },
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <RowActions
+          purchaseReturn={row.original}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onView={onView}
+          onViewPdf={onViewPdf}
+          permissions={permissions}
         />
-      );
+      ),
     },
-    meta: {
-      label: "Status",
-      variant: "select",
-      options: [
-        { label: "Pending", value: "pending", icon: Clock },
-        { label: "Approved", value: "approved", icon: CheckCircle },
-        { label: "Cancelled", value: "cancelled", icon: XCircle },
-      ],
-    },
-    enableColumnFilter: true,
-  },
-  {
-    id: "reason",
-    accessorKey: "reason",
-    header: "Reason",
-    cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground max-w-[200px] truncate block">
-        {row.getValue("reason")}
-      </span>
-    ),
-  },
-  {
-    id: "connectedDocuments",
-    header: "Connected",
-    cell: ({ row }) => {
-      const purchaseReturn = row.original;
-      return (onViewPurchase && onViewDebitNotePdf) ? (
-        <ConnectedDocumentsBadges
-          purchaseReturn={purchaseReturn as any}
-          onViewPurchase={onViewPurchase}
-          onViewDebitNotePdf={onViewDebitNotePdf}
-        />
-      ) : (
-        <span className="text-sm text-muted-foreground">—</span>
-      );
-    },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => (
-      <RowActions
-        purchaseReturn={row.original}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onView={onView}
-        onViewPdf={onViewPdf}
-        permissions={permissions}
-      />
-    ),
-  },
-];
+  ];

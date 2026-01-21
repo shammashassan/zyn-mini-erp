@@ -337,7 +337,7 @@ const RowActions = ({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            className={cn(buttonVariants({ variant: "destructive" }))}
+            variant="destructive"
             onClick={() => {
               onDelete(String(creditNote._id));
               setIsDeleteOpen(false);

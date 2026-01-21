@@ -59,18 +59,18 @@ const RowActions = ({ customer, onEdit, onDelete, onViewDocuments, permissions }
             <Eye className="mr-2 h-4 w-4" />
             View Details
           </DropdownMenuItem>
-                    
+
           {canUpdate && (
             <DropdownMenuItem onClick={() => onEdit(customer)}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </DropdownMenuItem>
           )}
-          
+
           {canDelete && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => setIsDeleteOpen(true)}
               >
@@ -93,7 +93,7 @@ const RowActions = ({ customer, onEdit, onDelete, onViewDocuments, permissions }
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className={cn(buttonVariants({ variant: "destructive" }))}
+              variant="destructive"
               onClick={() => {
                 onDelete(String(customer._id));
                 setIsDeleteOpen(false);

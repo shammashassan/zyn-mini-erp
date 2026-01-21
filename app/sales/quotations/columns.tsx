@@ -259,7 +259,7 @@ const RowActions = ({ quotation, onViewPdf, onView, onEdit, onDelete, permission
               onDelete(quotation._id);
               setIsDeleteOpen(false);
             }}
-            className={cn(buttonVariants({ variant: "destructive" }))}
+            variant="destructive"
           >
             Delete Quotation
           </AlertDialogAction>

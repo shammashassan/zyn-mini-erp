@@ -87,10 +87,7 @@ function RowActions({ employee, onView, onEdit, onDelete, canUpdate, canDelete }
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            className={cn(buttonVariants({ variant: "destructive" }))}
-            onClick={() => onDelete(employee)}
-          >
+          <AlertDialogAction variant="destructive" onClick={() => onDelete(employee)}>
             Delete
           </AlertDialogAction>
         </AlertDialogFooter>

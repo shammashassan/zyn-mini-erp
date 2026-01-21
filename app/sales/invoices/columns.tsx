@@ -345,7 +345,7 @@ const RowActions = ({ invoice, onViewPdf, onView, onEdit, onDelete, permissions 
               onDelete(invoice._id);
               setIsDeleteOpen(false);
             }}
-            className={cn(buttonVariants({ variant: "destructive" }))}
+            variant="destructive"
           >
             Delete Invoice
           </AlertDialogAction>

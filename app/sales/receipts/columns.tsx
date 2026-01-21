@@ -149,7 +149,7 @@ const RowActions = ({ receipt, onDelete, onViewPdf, onView, permissions }: RowAc
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            className={cn(buttonVariants({ variant: "destructive" }))}
+                            variant="destructive"
                             onClick={() => {
                                 onDelete?.(receipt._id)
                                 setIsDeleteDialogOpen(false)

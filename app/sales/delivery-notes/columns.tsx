@@ -91,14 +91,14 @@ const RowActions = ({ note, onEdit, onView, onDelete, onViewPdf, onRefresh, perm
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          
+
           {onView && (
             <DropdownMenuItem onSelect={() => onView(note)}>
               <Eye className="mr-2 w-4 h-4" />
               View Details
             </DropdownMenuItem>
           )}
-          
+
           <DropdownMenuItem onSelect={() => onViewPdf(note)}>
             <FileText className="mr-2 w-4 h-4" />
             View PDF
@@ -138,7 +138,7 @@ const RowActions = ({ note, onEdit, onView, onDelete, onViewPdf, onRefresh, perm
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className={cn(buttonVariants({ variant: "destructive" }))}
+              variant="destructive"
               onClick={() => {
                 onDelete?.(note._id)
                 setIsDeleteDialogOpen(false)
@@ -215,141 +215,141 @@ export const getColumns = (
   onEdit?: (note: DeliveryNote) => void,
   onView?: (note: DeliveryNote) => void,
 ): ColumnDef<DeliveryNote>[] => [
-  {
-    accessorKey: "deliveryDate", // ✅ UPDATED: Changed from createdAt to deliveryDate
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-8 px-2"
-      >
-        Date
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const date = new Date(row.original.deliveryDate); // ✅ UPDATED
-      return (
-        <div className="text-left font-medium">
-          <div>{formatDisplayDate(date)}</div>
-          <div className="text-xs text-muted-foreground">
-            {formatTime(date)}
+    {
+      accessorKey: "deliveryDate", // ✅ UPDATED: Changed from createdAt to deliveryDate
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-8 px-2"
+        >
+          Date
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const date = new Date(row.original.deliveryDate); // ✅ UPDATED
+        return (
+          <div className="text-left font-medium">
+            <div>{formatDisplayDate(date)}</div>
+            <div className="text-xs text-muted-foreground">
+              {formatTime(date)}
+            </div>
           </div>
-        </div>
-      );
+        );
+      },
+      sortingFn: (rowA, rowB) => {
+        const dateA = new Date(rowA.original.deliveryDate); // ✅ UPDATED
+        const dateB = new Date(rowB.original.deliveryDate); // ✅ UPDATED
+        return dateB.getTime() - dateA.getTime();
+      },
     },
-    sortingFn: (rowA, rowB) => {
-      const dateA = new Date(rowA.original.deliveryDate); // ✅ UPDATED
-      const dateB = new Date(rowB.original.deliveryDate); // ✅ UPDATED
-      return dateB.getTime() - dateA.getTime();
+    {
+      accessorKey: "invoiceNumber",
+      header: "Delivery No.",
+      cell: ({ row }) => (
+        <span className="font-mono font-medium">
+          {row.getValue("invoiceNumber")}
+        </span>
+      ),
+      meta: {
+        label: "Delivery No",
+        placeholder: "search delivery no...",
+        variant: "text"
+      },
+      enableColumnFilter: true,
     },
-  },
-  {
-    accessorKey: "invoiceNumber",
-    header: "Delivery No.",
-    cell: ({ row }) => (
-      <span className="font-mono font-medium">
-        {row.getValue("invoiceNumber")}
-      </span>
-    ),
-    meta: {
-      label: "Delivery No",
-      placeholder: "search delivery no...",
-      variant: "text"
+    {
+      accessorKey: "customerName",
+      header: "Customer",
+      cell: ({ row }) => {
+        const customerName = row.original.customerName;
+        return customerName ? (
+          <Badge variant="primary" appearance="outline">
+            {customerName}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
+      },
+      meta: {
+        label: "Customer",
+        placeholder: "search customer name...",
+        variant: "text"
+      },
+      enableColumnFilter: true,
     },
-    enableColumnFilter: true,
-  },
-  {
-    accessorKey: "customerName",
-    header: "Customer",
-    cell: ({ row }) => {
-      const customerName = row.original.customerName;
-      return customerName ? (
-        <Badge variant="primary" appearance="outline">
-          {customerName}
-        </Badge>
-      ) : (
-        <span className="text-muted-foreground">-</span>
-      );
-    },
-    meta: {
-      label: "Customer",
-      placeholder: "search customer name...",
-      variant: "text"
-    },
-    enableColumnFilter: true,
-  },
-  {
-    id: "itemsCount",
-    header: "Items",
-    cell: ({ row }) => {
-      const items = row.original.items || [];
-      const displayItems = items.slice(0, 2);
-      const remainingCount = items.length - 2;
+    {
+      id: "itemsCount",
+      header: "Items",
+      cell: ({ row }) => {
+        const items = row.original.items || [];
+        const displayItems = items.slice(0, 2);
+        const remainingCount = items.length - 2;
 
-      return (
-        <div className="flex flex-col gap-0.5 text-sm">
-          {displayItems.map((item, idx) => (
-            <div key={idx} className="text-muted-foreground">
-              {item.description}: <span className="font-medium text-foreground">{item.quantity}</span>
-            </div>
-          ))}
-          {remainingCount > 0 && (
-            <div className="text-muted-foreground">
-              +{remainingCount} more
-            </div>
-          )}
-        </div>
-      );
+        return (
+          <div className="flex flex-col gap-0.5 text-sm">
+            {displayItems.map((item, idx) => (
+              <div key={idx} className="text-muted-foreground">
+                {item.description}: <span className="font-medium text-foreground">{item.quantity}</span>
+              </div>
+            ))}
+            {remainingCount > 0 && (
+              <div className="text-muted-foreground">
+                +{remainingCount} more
+              </div>
+            )}
+          </div>
+        );
+      },
     },
-  },
-  {
-    id: "status",
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const note = row.original;
-      const refresh = onRefresh || (() => { });
+    {
+      id: "status",
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const note = row.original;
+        const refresh = onRefresh || (() => { });
 
-      return <StatusBadgeButton note={note} onRefresh={refresh} canUpdate={permissions.canUpdate} />;
+        return <StatusBadgeButton note={note} onRefresh={refresh} canUpdate={permissions.canUpdate} />;
+      },
+      meta: {
+        label: "Status",
+        variant: "select",
+        options: [
+          { label: "Pending", value: "pending", icon: Clock },
+          { label: "Dispatched", value: "dispatched", icon: Truck },
+          { label: "Delivered", value: "delivered", icon: CheckCircle },
+          { label: "Cancelled", value: "cancelled", icon: XCircle },
+        ],
+      },
+      enableColumnFilter: true,
     },
-    meta: {
-      label: "Status",
-      variant: "select",
-      options: [
-        { label: "Pending", value: "pending", icon: Clock },
-        { label: "Dispatched", value: "dispatched", icon: Truck },
-        { label: "Delivered", value: "delivered", icon: CheckCircle },
-        { label: "Cancelled", value: "cancelled", icon: XCircle },
-      ],
+    {
+      id: "connectedDocs",
+      header: "Connected Documents",
+      cell: ({ row }) => {
+        const note = row.original
+        return (
+          <ConnectedDocumentsBadges
+            deliveryNote={note}
+            onViewPdf={onViewPdf}
+          />
+        )
+      },
     },
-    enableColumnFilter: true,
-  },
-  {
-    id: "connectedDocs",
-    header: "Connected Documents",
-    cell: ({ row }) => {
-      const note = row.original
-      return (
-        <ConnectedDocumentsBadges
-          deliveryNote={note}
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <RowActions
+          note={row.original}
+          onEdit={onEdit}
+          onView={onView}
+          onDelete={onDelete}
           onViewPdf={onViewPdf}
+          onRefresh={onRefresh || (() => { })}
+          permissions={permissions}
         />
-      )
+      ),
     },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => (
-      <RowActions
-        note={row.original}
-        onEdit={onEdit}
-        onView={onView}
-        onDelete={onDelete}
-        onViewPdf={onViewPdf}
-        onRefresh={onRefresh || (() => { })}
-        permissions={permissions}
-      />
-    ),
-  },
-]
+  ]

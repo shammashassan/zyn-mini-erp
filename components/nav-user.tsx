@@ -206,7 +206,7 @@ export function NavUser({ user }: NavUserProps) {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              className={cn(buttonVariants({ variant: "destructive" }))}
+              variant="destructive"
               onClick={handleLogoutConfirm}
               disabled={isLoggingOut}
             >

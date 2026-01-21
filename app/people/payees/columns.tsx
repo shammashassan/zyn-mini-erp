@@ -92,18 +92,18 @@ const RowActions = ({ payee, onEdit, onDelete, onViewDetails, permissions }: Row
             <Eye className="mr-2 h-4 w-4" />
             View Details
           </DropdownMenuItem>
-          
+
           {canUpdate && (
             <DropdownMenuItem onClick={() => onEdit(payee)}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </DropdownMenuItem>
           )}
-          
+
           {canDelete && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => setIsDeleteOpen(true)}
               >
@@ -126,7 +126,7 @@ const RowActions = ({ payee, onEdit, onDelete, onViewDetails, permissions }: Row
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className={cn(buttonVariants({ variant: "destructive" }))}
+              variant="destructive"
               onClick={() => {
                 onDelete(String(payee._id));
                 setIsDeleteOpen(false);
@@ -147,86 +147,86 @@ export const getColumns = (
   onViewDetails: (payee: IPayee) => void,
   permissions: PayeePermissions
 ): ColumnDef<IPayee>[] => [
-  {
-    accessorKey: "name",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Name
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    meta: {
-      label: "Name",
-      placeholder: "Search payee...",
-      variant: "text",
-    },
-    enableColumnFilter: true,
-  },
-  {
-    accessorKey: "type",
-    header: "Type",
-    cell: ({ row }) => {
-      const type = row.getValue("type") as string;
-      const Icon = getTypeIcon(type);
-      return (
-        <Badge 
-          variant={getTypeColor(type) as any} 
-          appearance="outline"
-          className="gap-1"
+    {
+      accessorKey: "name",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          <Icon className="h-3 w-3" />
-          {type.replace(/_/g, ' ')}
-        </Badge>
-      );
+          Name
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      meta: {
+        label: "Name",
+        placeholder: "Search payee...",
+        variant: "text",
+      },
+      enableColumnFilter: true,
     },
-    meta: {
-      label: "Type",
-      variant: "select",
-      options: [
-        { label: "Employee", value: "employee", icon: User },
-        { label: "Landlord", value: "landlord", icon: Home },
-        { label: "Consultant", value: "consultant", icon: UserCheck },
-        { label: "Restaurant", value: "restaurant", icon: Utensils },
-        { label: "Vendor", value: "vendor", icon: Briefcase },
-        { label: "Contractor", value: "contractor", icon: UserCheck },
-        { label: "Utility Company", value: "utility_company", icon: Boxes },
-        { label: "Service Provider", value: "service_provider", icon: Briefcase },
-        { label: "Government", value: "government", icon: Briefcase },
-        { label: "Individual", value: "individual", icon: User },
-        { label: "Miscellaneous", value: "miscellaneous", icon: Boxes },
-      ],
+    {
+      accessorKey: "type",
+      header: "Type",
+      cell: ({ row }) => {
+        const type = row.getValue("type") as string;
+        const Icon = getTypeIcon(type);
+        return (
+          <Badge
+            variant={getTypeColor(type) as any}
+            appearance="outline"
+            className="gap-1"
+          >
+            <Icon className="h-3 w-3" />
+            {type.replace(/_/g, ' ')}
+          </Badge>
+        );
+      },
+      meta: {
+        label: "Type",
+        variant: "select",
+        options: [
+          { label: "Employee", value: "employee", icon: User },
+          { label: "Landlord", value: "landlord", icon: Home },
+          { label: "Consultant", value: "consultant", icon: UserCheck },
+          { label: "Restaurant", value: "restaurant", icon: Utensils },
+          { label: "Vendor", value: "vendor", icon: Briefcase },
+          { label: "Contractor", value: "contractor", icon: UserCheck },
+          { label: "Utility Company", value: "utility_company", icon: Boxes },
+          { label: "Service Provider", value: "service_provider", icon: Briefcase },
+          { label: "Government", value: "government", icon: Briefcase },
+          { label: "Individual", value: "individual", icon: User },
+          { label: "Miscellaneous", value: "miscellaneous", icon: Boxes },
+        ],
+      },
+      enableColumnFilter: true,
     },
-    enableColumnFilter: true,
-  },
-  {
-    accessorKey: "email",
-    header: "Email",
-    cell: ({ row }) => {
-      const email = row.getValue("email") as string | undefined;
-      return email ? email : <span className="text-muted-foreground">N/A</span>;
-    }
-  },
-  {
-    accessorKey: "phone",
-    header: "Phone",
-    cell: ({ row }) => {
-      const phone = row.getValue("phone") as string | undefined;
-      return phone ? phone : <span className="text-muted-foreground">N/A</span>;
-    }
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => (
-      <RowActions
-        payee={row.original}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onViewDetails={onViewDetails}
-        permissions={permissions}
-      />
-    )
-  },
-];
+    {
+      accessorKey: "email",
+      header: "Email",
+      cell: ({ row }) => {
+        const email = row.getValue("email") as string | undefined;
+        return email ? email : <span className="text-muted-foreground">N/A</span>;
+      }
+    },
+    {
+      accessorKey: "phone",
+      header: "Phone",
+      cell: ({ row }) => {
+        const phone = row.getValue("phone") as string | undefined;
+        return phone ? phone : <span className="text-muted-foreground">N/A</span>;
+      }
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <RowActions
+          payee={row.original}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onViewDetails={onViewDetails}
+          permissions={permissions}
+        />
+      )
+    },
+  ];

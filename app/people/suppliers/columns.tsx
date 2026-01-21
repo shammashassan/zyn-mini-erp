@@ -40,23 +40,23 @@ const RowActions = ({ supplier, onEdit, onDelete, onViewDetails, permissions }: 
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          
+
           <DropdownMenuItem onClick={() => onViewDetails(supplier.name)}>
             <Eye className="mr-2 w-4 h-4" />
             View Details
           </DropdownMenuItem>
-          
+
           {canUpdate && (
             <DropdownMenuItem onClick={() => onEdit(supplier)}>
               <Pencil className="mr-2 w-4 h-4" />
               Edit
             </DropdownMenuItem>
           )}
-          
+
           {canDelete && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 className="text-destructive"
                 onSelect={(e) => {
                   e.preventDefault();
@@ -86,7 +86,7 @@ const RowActions = ({ supplier, onEdit, onDelete, onViewDetails, permissions }: 
                 onDelete(supplier);
                 setIsDeleteOpen(false);
               }}
-              className={cn(buttonVariants({ variant: "destructive" }))}
+              variant="destructive"
             >
               Delete
             </AlertDialogAction>

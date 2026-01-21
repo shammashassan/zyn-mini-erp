@@ -2,17 +2,17 @@
 
 import * as React from "react";
 import { ColumnDef } from "@tanstack/react-table";
-import { 
-  Ban, 
-  Eye, 
-  MoreHorizontal, 
-  Trash2, 
-  XCircle, 
-  Pencil, 
-  Shield, 
-  CheckCircle2, 
-  User, 
-  UserCog, 
+import {
+  Ban,
+  Eye,
+  MoreHorizontal,
+  Trash2,
+  XCircle,
+  Pencil,
+  Shield,
+  CheckCircle2,
+  User,
+  UserCog,
   ArrowUpDown,
   Crown,
   Briefcase
@@ -94,7 +94,7 @@ function RowActions({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          
+
           <DropdownMenuItem onClick={() => onView(user)}>
             {isCurrentUser ? (
               <>
@@ -117,7 +117,7 @@ function RowActions({
               </DropdownMenuItem>
             </>
           )}
-          
+
           {!isCurrentUser && canBan && (
             <>
               <DropdownMenuSeparator />
@@ -127,7 +127,7 @@ function RowActions({
               </DropdownMenuItem>
             </>
           )}
-          
+
           {!isCurrentUser && canDelete && (
             <>
               <DropdownMenuSeparator />
@@ -141,7 +141,7 @@ function RowActions({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      
+
       {!isCurrentUser && (
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -152,10 +152,7 @@ function RowActions({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className={cn(buttonVariants({ variant: "destructive" }))}
-              onClick={() => onDelete(user)}
-            >
+            <AlertDialogAction variant="destructive" onClick={() => onDelete(user)}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -175,245 +172,245 @@ export const getColumns = (
   canDelete: boolean = false,
   canBan: boolean = false
 ): ColumnDef<BetterAuthUser>[] => [
-  {
-    id: "name",
-    accessorKey: "name",
-    header: ({ column }) => (
-      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        User
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const user = row.original;
-      const displayName = user.name || user.email;
-      const fallback = user.name
-        ? user.name.substring(0, 2).toUpperCase()
-        : user.email.substring(0, 2).toUpperCase();
-      
-      const isSelf = currentUser?.id === user.id;
+    {
+      id: "name",
+      accessorKey: "name",
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          User
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const user = row.original;
+        const displayName = user.name || user.email;
+        const fallback = user.name
+          ? user.name.substring(0, 2).toUpperCase()
+          : user.email.substring(0, 2).toUpperCase();
 
-      return (
-        <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={user.image || undefined} />
-            <AvatarFallback className={cn(
-              "font-medium text-white",
-              isSelf ? "bg-primary" : "bg-gradient-to-br from-blue-500 to-purple-600"
-            )}>
-              {fallback}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
-                {displayName}
-              </span>
-              {isSelf && (
-                <Badge variant="secondary" appearance="outline">
-                  You
-                </Badge>
-              )}
-            </div>
-            <div className="text-sm text-muted-foreground truncate">
-              {user.email}
+        const isSelf = currentUser?.id === user.id;
+
+        return (
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={user.image || undefined} />
+              <AvatarFallback className={cn(
+                "font-medium text-white",
+                isSelf ? "bg-primary" : "bg-gradient-to-br from-blue-500 to-purple-600"
+              )}>
+                {fallback}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
+                  {displayName}
+                </span>
+                {isSelf && (
+                  <Badge variant="secondary" appearance="outline">
+                    You
+                  </Badge>
+                )}
+              </div>
+              <div className="text-sm text-muted-foreground truncate">
+                {user.email}
+              </div>
             </div>
           </div>
-        </div>
-      );
+        );
+      },
+      meta: {
+        label: "User",
+        placeholder: "Search users...",
+        variant: "text",
+        icon: User,
+      },
+      enableColumnFilter: true,
+      filterFn: (row, id, value) => {
+        const user = row.original;
+        const searchValue = value.toLowerCase();
+        return (
+          user.name?.toLowerCase().includes(searchValue) ||
+          user.email.toLowerCase().includes(searchValue) ||
+          user.username?.toLowerCase().includes(searchValue) ||
+          false
+        );
+      },
     },
-    meta: {
-      label: "User",
-      placeholder: "Search users...",
-      variant: "text",
-      icon: User,
-    },
-    enableColumnFilter: true,
-    filterFn: (row, id, value) => {
-      const user = row.original;
-      const searchValue = value.toLowerCase();
-      return (
-        user.name?.toLowerCase().includes(searchValue) ||
-        user.email.toLowerCase().includes(searchValue) ||
-        user.username?.toLowerCase().includes(searchValue) ||
-        false
-      );
-    },
-  },
-  {
-    id: "username",
-    accessorKey: "username",
-    header: ({ column }) => (
-      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Username
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const username = row.getValue("username") as string | undefined;
+    {
+      id: "username",
+      accessorKey: "username",
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Username
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const username = row.getValue("username") as string | undefined;
 
-      if (!username) {
-        return <span className="text-muted-foreground text-sm">—</span>;
-      }
+        if (!username) {
+          return <span className="text-muted-foreground text-sm">—</span>;
+        }
 
-      return (
-        <div className="font-mono text-sm">
-          <div className="text-slate-900 dark:text-slate-100">
-            @{username}
+        return (
+          <div className="font-mono text-sm">
+            <div className="text-slate-900 dark:text-slate-100">
+              @{username}
+            </div>
           </div>
-        </div>
-      );
+        );
+      },
     },
-  },
-  {
-    id: "role",
-    accessorKey: "role",
-    header: ({ column }) => (
-      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Role
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const role = (row.getValue("role") as string || "user").toLowerCase();
-      
-      let variant: "default" | "secondary" | "destructive" | "outline" | "info" | "warning" | "success" | "primary" | "neutral" = "primary";
-      let Icon = User;
+    {
+      id: "role",
+      accessorKey: "role",
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Role
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const role = (row.getValue("role") as string || "user").toLowerCase();
 
-      switch (role) {
-        case "owner":
-          variant = "info";
-          Icon = Crown;
-          break;
-        case "admin":
-          variant = "primary";
-          Icon = Shield;
-          break;
-        case "manager":
-          variant = "warning";
-          Icon = Briefcase;
-          break;
-        case "user":
-        default:
-          variant = "success";
-          Icon = User;
-          break;
-      }
-      return (
-        <Badge
-          variant={variant}
-          appearance="outline"
-          className="capitalize"
-        >
-          <Icon className="h-3 w-3 mr-1" />
-          {role}
-        </Badge>
-      );
+        let variant: "default" | "secondary" | "destructive" | "outline" | "info" | "warning" | "success" | "primary" | "neutral" = "primary";
+        let Icon = User;
+
+        switch (role) {
+          case "owner":
+            variant = "info";
+            Icon = Crown;
+            break;
+          case "admin":
+            variant = "primary";
+            Icon = Shield;
+            break;
+          case "manager":
+            variant = "warning";
+            Icon = Briefcase;
+            break;
+          case "user":
+          default:
+            variant = "success";
+            Icon = User;
+            break;
+        }
+        return (
+          <Badge
+            variant={variant}
+            appearance="outline"
+            className="capitalize"
+          >
+            <Icon className="h-3 w-3 mr-1" />
+            {role}
+          </Badge>
+        );
+      },
+      meta: {
+        label: "Role",
+        variant: "select",
+        icon: Shield,
+        options: [
+          { label: "User", value: "user", icon: User },
+          { label: "Manager", value: "manager", icon: Briefcase },
+          { label: "Admin", value: "admin", icon: Shield },
+          { label: "Owner", value: "owner", icon: Crown },
+        ],
+      },
+      enableColumnFilter: true,
+      filterFn: (row, id, value) => {
+        const role = row.getValue(id) as string | undefined;
+        return value.includes(role || "user");
+      },
     },
-    meta: {
-      label: "Role",
-      variant: "select",
-      icon: Shield,
-      options: [
-        { label: "User", value: "user", icon: User },
-        { label: "Manager", value: "manager", icon: Briefcase },
-        { label: "Admin", value: "admin", icon: Shield },
-        { label: "Owner", value: "owner", icon: Crown },
-      ],
+    {
+      id: "status",
+      accessorKey: "banned",
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Status
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const banned = row.getValue("status") as boolean | undefined;
+        return (
+          <Badge
+            variant={banned ? "destructive" : "success"}
+            appearance="outline"
+          >
+            {banned ? "Banned" : "Active"}
+          </Badge>
+        );
+      },
+      meta: {
+        label: "Status",
+        variant: "select",
+        options: [
+          { label: "Active", value: "active", icon: CheckCircle2 },
+          { label: "Banned", value: "banned", icon: Ban },
+        ],
+      },
+      enableColumnFilter: true,
+      filterFn: (row, id, value) => {
+        const banned = row.original.banned;
+        const status = banned ? "banned" : "active";
+        return value.includes(status);
+      },
     },
-    enableColumnFilter: true,
-    filterFn: (row, id, value) => {
-      const role = row.getValue(id) as string | undefined;
-      return value.includes(role || "user");
+    {
+      id: "lastLoginAt",
+      accessorKey: "lastLoginAt",
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Last Login
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const lastLoginAt = row.getValue("lastLoginAt") as Date | null;
+        return (
+          <span className="text-sm text-slate-700 dark:text-slate-300">
+            {lastLoginAt ? formatRelativeTime(lastLoginAt) : "Never"}
+          </span>
+        );
+      },
     },
-  },
-  {
-    id: "status",
-    accessorKey: "banned",
-    header: ({ column }) => (
-      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Status
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const banned = row.getValue("status") as boolean | undefined;
-      return (
-        <Badge
-          variant={banned ? "destructive" : "success"}
-          appearance="outline"
-        >
-          {banned ? "Banned" : "Active"}
-        </Badge>
-      );
+    {
+      id: "createdAt",
+      accessorKey: "createdAt",
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Created
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const createdAt = row.getValue("createdAt") as Date;
+        return (
+          <span className="text-sm text-slate-700 dark:text-slate-300">
+            {formatDisplayDate(createdAt)}
+          </span>
+        );
+      },
     },
-    meta: {
-      label: "Status",
-      variant: "select",
-      options: [
-        { label: "Active", value: "active", icon: CheckCircle2 },
-        { label: "Banned", value: "banned", icon: Ban },
-      ],
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        return (
+          <RowActions
+            user={row.original}
+            currentUserId={currentUser?.id}
+            onView={onView}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onToggleBan={onToggleBan}
+            canUpdate={canUpdate}
+            canDelete={canDelete}
+            canBan={canBan}
+          />
+        );
+      },
     },
-    enableColumnFilter: true,
-    filterFn: (row, id, value) => {
-      const banned = row.original.banned;
-      const status = banned ? "banned" : "active";
-      return value.includes(status);
-    },
-  },
-  {
-    id: "lastLoginAt",
-    accessorKey: "lastLoginAt",
-    header: ({ column }) => (
-      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Last Login
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const lastLoginAt = row.getValue("lastLoginAt") as Date | null;
-      return (
-        <span className="text-sm text-slate-700 dark:text-slate-300">
-          {lastLoginAt ? formatRelativeTime(lastLoginAt) : "Never"}
-        </span>
-      );
-    },
-  },
-  {
-    id: "createdAt",
-    accessorKey: "createdAt",
-    header: ({ column }) => (
-      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Created
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const createdAt = row.getValue("createdAt") as Date;
-      return (
-        <span className="text-sm text-slate-700 dark:text-slate-300">
-          {formatDisplayDate(createdAt)}
-        </span>
-      );
-    },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      return (
-        <RowActions
-          user={row.original}
-          currentUserId={currentUser?.id}
-          onView={onView}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onToggleBan={onToggleBan}
-          canUpdate={canUpdate}
-          canDelete={canDelete}
-          canBan={canBan}
-        />
-      );
-    },
-  },
-];
+  ];

@@ -164,7 +164,7 @@ const DeleteJournalDialog = ({
                 onDelete(journal);
                 setIsOpen(false);
               }}
-              className={cn(buttonVariants({ variant: "destructive" }))}
+              variant="destructive"
             >
               Delete
             </AlertDialogAction>
@@ -208,7 +208,7 @@ const VoidJournalDialog = ({
               onVoid(journal);
               setIsOpen(false);
             }}
-            className={cn(buttonVariants({ variant: "destructive" }))}
+            variant="destructive"
           >
             Void Entry
           </AlertDialogAction>

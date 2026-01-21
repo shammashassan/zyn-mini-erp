@@ -280,7 +280,7 @@ const RowActions = ({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            className={cn(buttonVariants({ variant: "destructive" }))}
+            variant="destructive"
             onClick={() => {
               onDelete(String(purchase._id));
               setIsDeleteOpen(false);

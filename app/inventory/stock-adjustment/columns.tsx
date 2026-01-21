@@ -68,7 +68,7 @@ const RowActions = ({ adjustment, onDelete, permissions }: RowActionsProps) => {
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem 
+          <DropdownMenuItem
             className="text-destructive cursor-pointer"
             onSelect={(e) => {
               e.preventDefault();
@@ -95,7 +95,7 @@ const RowActions = ({ adjustment, onDelete, permissions }: RowActionsProps) => {
               onDelete(adjustment);
               setIsDeleteOpen(false);
             }}
-            className={cn(buttonVariants({ variant: "destructive" }))}
+            variant="destructive"
           >
             Delete
           </AlertDialogAction>

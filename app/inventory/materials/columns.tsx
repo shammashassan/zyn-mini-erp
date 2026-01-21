@@ -59,18 +59,18 @@ const RowActions = ({ material, onEdit, onDelete, permissions }: RowActionsProps
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          
+
           {canUpdate && (
             <DropdownMenuItem onClick={() => onEdit(material)}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </DropdownMenuItem>
           )}
-          
+
           {canDelete && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 className="text-destructive"
                 onSelect={(e) => {
                   e.preventDefault();
@@ -94,7 +94,7 @@ const RowActions = ({ material, onEdit, onDelete, permissions }: RowActionsProps
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            className={cn(buttonVariants({ variant: "destructive" }))}
+            variant="destructive"
             onClick={() => {
               onDelete(String(material._id));
               setIsDeleteOpen(false);

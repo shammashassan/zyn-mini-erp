@@ -462,7 +462,7 @@ export const getColumns = (
                       <p>
                         Are you sure you want to delete expense {expense.referenceNumber}?
                       </p>
-                      {expense.status === "approved" && ( 
+                      {expense.status === "approved" && (
                         <div className="space-y-3 p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
                           <p className="text-sm font-medium text-orange-900 dark:text-orange-100">
                             ⚠️ This expense has been approved
@@ -477,10 +477,7 @@ export const getColumns = (
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    className={cn(buttonVariants({ variant: "destructive" }))}
-                    onClick={() => onDelete(expense._id)}
-                  >
+                  <AlertDialogAction variant="destructive">
                     Delete
                   </AlertDialogAction>
                 </AlertDialogFooter>

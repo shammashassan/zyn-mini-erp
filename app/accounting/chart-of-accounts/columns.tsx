@@ -74,7 +74,7 @@ const DeleteCOADialog = ({
               onDelete(account);
               setIsOpen(false);
             }}
-            className={cn(buttonVariants({ variant: "destructive" }))}
+            variant="destructive"
           >
             Delete
           </AlertDialogAction>

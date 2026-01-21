@@ -235,8 +235,8 @@ export function TrashPage<T extends { _id: string; deletedAt?: Date | string; de
                                   Deleted{" "}
                                   {item.deletedAt
                                     ? formatDistanceToNow(new Date(item.deletedAt), {
-                                        addSuffix: true,
-                                      })
+                                      addSuffix: true,
+                                    })
                                     : "at unknown time"}
                                 </span>
                                 {item.deletedBy && (
@@ -309,7 +309,7 @@ export function TrashPage<T extends { _id: string; deletedAt?: Date | string; de
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => selectedItem && handlePermanentDelete(selectedItem)}
-              className={cn(buttonVariants({ variant: "destructive" }))}
+              variant="destructive"
             >
               Delete Forever
             </AlertDialogAction>
@@ -337,7 +337,7 @@ export function TrashPage<T extends { _id: string; deletedAt?: Date | string; de
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleEmptyTrash}
-              className={cn(buttonVariants({ variant: "destructive" }))}
+              variant="destructive"
             >
               Empty Trash
             </AlertDialogAction>
