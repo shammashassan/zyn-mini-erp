@@ -75,6 +75,7 @@ export interface ConnectedCreditNote {
 export interface Payment {
     _id: string;
     invoiceNumber: string;
+    customerName?: string;
     supplierName?: string;
     payeeName?: string;
     vendorName?: string;
@@ -247,10 +248,18 @@ export const getColumns = (
         },
         {
             id: "partyName",
-            accessorFn: (row) => row.supplierName || row.payeeName || row.vendorName || "",
+            accessorFn: (row) => row.customerName || row.supplierName || row.payeeName || row.vendorName || "",
             header: "Party",
             cell: ({ row }) => {
                 const payment = row.original;
+
+                if (payment.customerName) {
+                    return (
+                        <Badge variant="primary" appearance="outline" className="gap-1">
+                            {payment.customerName}
+                        </Badge>
+                    );
+                }
 
                 if (payment.supplierName) {
                     return (
@@ -270,7 +279,7 @@ export const getColumns = (
 
                 if (payment.vendorName) {
                     return (
-                        <Badge variant="secondary" appearance="outline" className="gap-1">
+                        <Badge variant="neutral" appearance="outline" className="gap-1">
                             {payment.vendorName}
                         </Badge>
                     );

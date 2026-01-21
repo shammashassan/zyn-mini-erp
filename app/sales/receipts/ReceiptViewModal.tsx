@@ -59,8 +59,14 @@ const getPartyInfo = (receipt: any) => {
     if (receipt.customerName) {
         return { name: receipt.customerName, type: 'Customer', icon: User };
     }
+    if (receipt.supplierName) {
+        return { name: receipt.supplierName, type: 'Supplier', icon: User };
+    }
     if (receipt.payeeName) {
         return { name: receipt.payeeName, type: 'Payee', icon: User };
+    }
+    if (receipt.vendorName) {
+        return { name: receipt.vendorName, type: 'Vendor', icon: User };
     }
     return null;
 };

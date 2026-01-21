@@ -152,25 +152,34 @@ export async function DELETE(request: Request, context: RequestContext) {
           const invoice = await Invoice.findById(allocation.documentId);
 
           if (invoice && !invoice.isDeleted) {
-            // ✅ RECEIPT VOUCHER
             if (voucher.voucherType === 'receipt') {
               console.log(`💰 Deallocating ${formatCurrency(allocation.amount)} from invoice ${invoice.invoiceNumber}`);
 
               if (typeof invoice.deallocateReceipt === 'function') {
+                // 📊 Get current total BEFORE deallocation
+                const oldTotal = invoice.getTotalAllocated();
+
                 const removedAmount = invoice.deallocateReceipt(voucher._id);
 
+                // 📊 Calculate new total AFTER deallocation
+                const newTotal = oldTotal - removedAmount;
+
+                // ✅ Add audit entry showing cumulative progression
                 invoice.addAuditEntry(
                   'Receipt Voucher Deleted',
                   user.id,
                   user.username || user.name,
                   [{
-                    field: 'Deallocated Amount',
-                    oldValue: formatCurrency(removedAmount),
-                    newValue: formatCurrency(0)
+                    field: 'Total Received',
+                    oldValue: formatCurrency(oldTotal),
+                    newValue: formatCurrency(newTotal)
                   }]
                 );
               } else {
                 console.log('⚠️ Using fallback deallocation (old model)');
+
+                // 📊 Get current total BEFORE deallocation
+                const oldTotal = invoice.paidAmount || 0;
 
                 if (invoice.receiptAllocations) {
                   const index = invoice.receiptAllocations.findIndex(
@@ -191,10 +200,19 @@ export async function DELETE(request: Request, context: RequestContext) {
                   invoice.paidAmount = 0;
                 }
 
+                // 📊 Calculate new total AFTER deallocation
+                const newTotal = invoice.paidAmount;
+
+                // ✅ Add audit entry showing cumulative progression
                 invoice.addAuditEntry(
                   'Receipt Voucher Deleted',
                   user.id,
-                  user.username || user.name
+                  user.username || user.name,
+                  [{
+                    field: 'Total Received',
+                    oldValue: formatCurrency(oldTotal),
+                    newValue: formatCurrency(newTotal)
+                  }]
                 );
               }
 
@@ -217,20 +235,30 @@ export async function DELETE(request: Request, context: RequestContext) {
             console.log(`💰 Deallocating ${formatCurrency(allocation.amount)} from purchase ${purchase.referenceNumber}`);
 
             if (typeof purchase.deallocatePayment === 'function') {
+              // 📊 Get current total BEFORE deallocation
+              const oldTotal = purchase.getTotalAllocated();
+
               const removedAmount = purchase.deallocatePayment(voucher._id);
 
+              // 📊 Calculate new total AFTER deallocation
+              const newTotal = oldTotal - removedAmount;
+
+              // ✅ Add audit entry showing cumulative progression
               purchase.addAuditEntry(
                 'Payment Voucher Deleted',
                 user.id,
                 user.username || user.name,
                 [{
-                  field: 'Deallocated Amount',
-                  oldValue: formatCurrency(removedAmount),
-                  newValue: formatCurrency(0)
+                  field: 'Total Paid',
+                  oldValue: formatCurrency(oldTotal),
+                  newValue: formatCurrency(newTotal)
                 }]
               );
             } else {
               console.log('⚠️ Using fallback deallocation (old model)');
+
+              // 📊 Get current total BEFORE deallocation
+              const oldTotal = purchase.paidAmount || 0;
 
               if (purchase.paymentAllocations) {
                 const index = purchase.paymentAllocations.findIndex(
@@ -251,10 +279,19 @@ export async function DELETE(request: Request, context: RequestContext) {
                 purchase.paidAmount = 0;
               }
 
+              // 📊 Calculate new total AFTER deallocation
+              const newTotal = purchase.paidAmount;
+
+              // ✅ Add audit entry showing cumulative progression
               purchase.addAuditEntry(
                 'Payment Voucher Deleted',
                 user.id,
-                user.username || user.name
+                user.username || user.name,
+                [{
+                  field: 'Total Paid',
+                  oldValue: formatCurrency(oldTotal),
+                  newValue: formatCurrency(newTotal)
+                }]
               );
             }
 
@@ -276,20 +313,30 @@ export async function DELETE(request: Request, context: RequestContext) {
             console.log(`💰 Deallocating ${formatCurrency(allocation.amount)} from expense ${expense.referenceNumber}`);
 
             if (typeof expense.deallocatePayment === 'function') {
+              // 📊 Get current total BEFORE deallocation
+              const oldTotal = expense.getTotalAllocated();
+
               const removedAmount = expense.deallocatePayment(voucher._id);
 
+              // 📊 Calculate new total AFTER deallocation
+              const newTotal = oldTotal - removedAmount;
+
+              // ✅ Add audit entry showing cumulative progression
               expense.addAuditEntry(
                 'Payment Voucher Deleted',
                 user.id,
                 user.username || user.name,
                 [{
-                  field: 'Deallocated Amount',
-                  oldValue: formatCurrency(removedAmount),
-                  newValue: formatCurrency(0)
+                  field: 'Total Paid',
+                  oldValue: formatCurrency(oldTotal),
+                  newValue: formatCurrency(newTotal)
                 }]
               );
             } else {
               console.log('⚠️ Using fallback deallocation (old model)');
+
+              // 📊 Get current total BEFORE deallocation
+              const oldTotal = expense.paidAmount || 0;
 
               if (expense.paymentAllocations) {
                 const index = expense.paymentAllocations.findIndex(
@@ -310,10 +357,19 @@ export async function DELETE(request: Request, context: RequestContext) {
                 expense.paidAmount = 0;
               }
 
+              // 📊 Calculate new total AFTER deallocation
+              const newTotal = expense.paidAmount;
+
+              // ✅ Add audit entry showing cumulative progression
               expense.addAuditEntry(
                 'Payment Voucher Deleted',
                 user.id,
-                user.username || user.name
+                user.username || user.name,
+                [{
+                  field: 'Total Paid',
+                  oldValue: formatCurrency(oldTotal),
+                  newValue: formatCurrency(newTotal)
+                }]
               );
             }
 
@@ -336,20 +392,30 @@ export async function DELETE(request: Request, context: RequestContext) {
             console.log(`💰 Deallocating ${formatCurrency(allocation.amount)} from debit note ${debitNote.debitNoteNumber}`);
 
             if (typeof debitNote.deallocateReceipt === 'function') {
+              // 📊 Get current total BEFORE deallocation
+              const oldTotal = debitNote.getTotalAllocated();
+
               const removedAmount = debitNote.deallocateReceipt(voucher._id);
 
+              // 📊 Calculate new total AFTER deallocation
+              const newTotal = oldTotal - removedAmount;
+
+              // ✅ Add audit entry showing cumulative progression
               debitNote.addAuditEntry(
                 'Receipt Voucher Deleted',
                 user.id,
                 user.username || user.name,
                 [{
-                  field: 'Deallocated Amount',
-                  oldValue: formatCurrency(removedAmount),
-                  newValue: formatCurrency(0)
+                  field: 'Total Received',
+                  oldValue: formatCurrency(oldTotal),
+                  newValue: formatCurrency(newTotal)
                 }]
               );
             } else {
               console.log('⚠️ Using fallback deallocation (old model)');
+
+              // 📊 Get current total BEFORE deallocation
+              const oldTotal = debitNote.receivedAmount || 0;
 
               if (debitNote.receiptAllocations) {
                 const index = debitNote.receiptAllocations.findIndex(
@@ -370,10 +436,19 @@ export async function DELETE(request: Request, context: RequestContext) {
                 debitNote.receivedAmount = 0;
               }
 
+              // 📊 Calculate new total AFTER deallocation
+              const newTotal = debitNote.receivedAmount;
+
+              // ✅ Add audit entry showing cumulative progression
               debitNote.addAuditEntry(
                 'Receipt Voucher Deleted',
                 user.id,
-                user.username || user.name
+                user.username || user.name,
+                [{
+                  field: 'Total Received',
+                  oldValue: formatCurrency(oldTotal),
+                  newValue: formatCurrency(newTotal)
+                }]
               );
             }
 
@@ -396,20 +471,30 @@ export async function DELETE(request: Request, context: RequestContext) {
             console.log(`💰 Deallocating ${formatCurrency(allocation.amount)} from credit note ${creditNote.creditNoteNumber}`);
 
             if (typeof creditNote.deallocatePayment === 'function') {
+              // 📊 Get current total BEFORE deallocation
+              const oldTotal = creditNote.getTotalAllocated();
+
               const removedAmount = creditNote.deallocatePayment(voucher._id);
 
+              // 📊 Calculate new total AFTER deallocation
+              const newTotal = oldTotal - removedAmount;
+
+              // ✅ Add audit entry showing cumulative progression
               creditNote.addAuditEntry(
                 'Payment Voucher Deleted',
                 user.id,
                 user.username || user.name,
                 [{
-                  field: 'Deallocated Amount',
-                  oldValue: formatCurrency(removedAmount),
-                  newValue: formatCurrency(0)
+                  field: 'Total Paid',
+                  oldValue: formatCurrency(oldTotal),
+                  newValue: formatCurrency(newTotal)
                 }]
               );
             } else {
               console.log('⚠️ Using fallback deallocation (old model)');
+
+              // 📊 Get current total BEFORE deallocation
+              const oldTotal = creditNote.paidAmount || 0;
 
               if (creditNote.paymentAllocations) {
                 const index = creditNote.paymentAllocations.findIndex(
@@ -430,10 +515,19 @@ export async function DELETE(request: Request, context: RequestContext) {
                 creditNote.paidAmount = 0;
               }
 
+              // 📊 Calculate new total AFTER deallocation
+              const newTotal = creditNote.paidAmount;
+
+              // ✅ Add audit entry showing cumulative progression
               creditNote.addAuditEntry(
                 'Payment Voucher Deleted',
                 user.id,
-                user.username || user.name
+                user.username || user.name,
+                [{
+                  field: 'Total Paid',
+                  oldValue: formatCurrency(oldTotal),
+                  newValue: formatCurrency(newTotal)
+                }]
               );
             }
 
@@ -678,7 +772,7 @@ export async function DELETE(request: Request, context: RequestContext) {
             );
 
             await creditNote.save();
-            console.log(`✅ Credit Note ${ creditNote.creditNoteNumber } updated - paidAmount: ${ formatCurrency(newPaidAmount) }`);
+            console.log(`✅ Credit Note ${creditNote.creditNoteNumber} updated - paidAmount: ${formatCurrency(newPaidAmount)}`);
           }
         }
       }

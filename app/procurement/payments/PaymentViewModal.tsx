@@ -56,6 +56,9 @@ const getCreatorUsername = (payment: any): string | null => {
 };
 
 const getPartyInfo = (payment: any) => {
+    if (payment.customerName) {
+        return { name: payment.customerName, type: 'Customer', icon: User };
+    }
     if (payment.supplierName) {
         return { name: payment.supplierName, type: 'Supplier', icon: User };
     }

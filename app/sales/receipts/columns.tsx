@@ -57,7 +57,9 @@ export interface Receipt {
     _id: string;
     invoiceNumber: string;
     customerName?: string;
+    supplierName?: string;
     payeeName?: string;
+    vendorName?: string;
     customerPhone?: string;
     customerEmail?: string;
     grandTotal: number;
@@ -229,7 +231,7 @@ export const getColumns = (
         },
         {
             id: "partyName",
-            accessorFn: (row) => row.customerName || row.payeeName || "",
+            accessorFn: (row) => row.customerName || row.supplierName || row.payeeName || row.vendorName || "",
             header: "Party",
             cell: ({ row }) => {
                 const receipt = row.original;
@@ -242,10 +244,26 @@ export const getColumns = (
                     );
                 }
 
+                if (receipt.supplierName) {
+                    return (
+                        <Badge variant="warning" appearance="outline" className="gap-1">
+                            {receipt.supplierName}
+                        </Badge>
+                    );
+                }
+
                 if (receipt.payeeName) {
                     return (
                         <Badge variant="cyan" appearance="outline" className="gap-1">
                             {receipt.payeeName}
+                        </Badge>
+                    );
+                }
+
+                if (receipt.vendorName) {
+                    return (
+                        <Badge variant="neutral" appearance="outline" className="gap-1">
+                            {receipt.vendorName}
                         </Badge>
                     );
                 }

@@ -52,7 +52,6 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   // Sales
   "Quotations": { invoice: ["read"] },
   "Invoices": { invoice: ["read"] },
-  "Vouchers": { voucher: ["read"] },
   "Receipts": { voucher: ["read"] },
   "Debit Notes": { debitNote: ["read"] },
   "Delivery notes": { deliveryNote: ["read"] },
@@ -120,7 +119,6 @@ const staticData = {
       items: [
         { title: "Quotations", url: "/sales/quotations" },
         { title: "Invoices", url: "/sales/invoices" },
-        { title: "Vouchers", url: "/sales/vouchers" },
         { title: "Receipts", url: "/sales/receipts" },
         { title: "Delivery notes", url: "/sales/delivery-notes" },
         { title: "Sales Returns", url: "/sales/sales-returns" },

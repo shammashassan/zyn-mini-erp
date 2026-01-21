@@ -540,9 +540,9 @@ export function ReceiptForm({ isOpen, onClose, onSubmit }: ReceiptFormProps) {
                                                                     <Check className={cn("mr-2 h-4 w-4", selectedParty === party.name ? "opacity-100" : "opacity-0")} />
                                                                     <div className="flex-1">
                                                                         <span>{party.name}</span>
-                                                                        {partyType === 'customer' && (party as any).email && (
+                                                                        {partyType === 'customer' && ((party as any).email || (party as any).phone) && (
                                                                             <div className="text-xs text-muted-foreground">
-                                                                                {(party as any).email}
+                                                                                {(party as any).email || (party as any).phone}
                                                                             </div>
                                                                         )}
                                                                         {partyType === 'supplier' && (party as any).city && (party as any).district && (

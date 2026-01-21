@@ -285,7 +285,13 @@ export async function POST(request: Request) {
 
             // ✅ RECEIPT
             if (restoredVoucher.voucherType === 'receipt') {
+              // 📊 Get current total BEFORE allocation
+              const oldTotal = invoice.getTotalAllocated();
+
               invoice.allocateReceipt(restoredVoucher._id, allocation.amount);
+
+              // 📊 Calculate new total AFTER allocation
+              const newTotal = oldTotal + allocation.amount;
 
               const currentReceiptIds = invoice.connectedDocuments?.receiptIds || [];
               if (!currentReceiptIds.some((rid: any) => rid.toString() === id)) {
@@ -294,10 +300,16 @@ export async function POST(request: Request) {
                 invoice.connectedDocuments.receiptIds = currentReceiptIds;
               }
 
+              // ✅ Add audit entry showing cumulative progression
               invoice.addAuditEntry(
-                `Receipt voucher ${restoredVoucher.invoiceNumber} restored - allocated: ${formatCurrency(allocation.amount)}`,
+                `Receipt voucher restored`,
                 user?.id || null,
-                user?.username || 'System'
+                user?.username || 'System',
+                [{
+                  field: 'Total Received',
+                  oldValue: formatCurrency(oldTotal),
+                  newValue: formatCurrency(newTotal)
+                }]
               );
 
               await invoice.save();
@@ -319,7 +331,13 @@ export async function POST(request: Request) {
               continue;
             }
 
+            // 📊 Get current total BEFORE allocation
+            const oldTotal = purchase.getTotalAllocated();
+
             purchase.allocatePayment(restoredVoucher._id, allocation.amount);
+
+            // 📊 Calculate new total AFTER allocation
+            const newTotal = oldTotal + allocation.amount;
 
             const currentPaymentIds = purchase.connectedDocuments?.paymentIds || [];
             if (!currentPaymentIds.some((pid: any) => pid.toString() === id)) {
@@ -328,10 +346,16 @@ export async function POST(request: Request) {
               purchase.connectedDocuments.paymentIds = currentPaymentIds;
             }
 
+            // ✅ Add audit entry showing cumulative progression
             purchase.addAuditEntry(
-              `Payment voucher ${restoredVoucher.invoiceNumber} restored - allocated: ${formatCurrency(allocation.amount)}`,
+              `Payment voucher restored`,
               user?.id || null,
-              user?.username || 'System'
+              user?.username || 'System',
+              [{
+                field: 'Total Paid',
+                oldValue: formatCurrency(oldTotal),
+                newValue: formatCurrency(newTotal)
+              }]
             );
 
             await purchase.save();
@@ -351,7 +375,13 @@ export async function POST(request: Request) {
               continue;
             }
 
+            // 📊 Get current total BEFORE allocation
+            const oldTotal = expense.getTotalAllocated();
+
             expense.allocatePayment(restoredVoucher._id, allocation.amount);
+
+            // 📊 Calculate new total AFTER allocation
+            const newTotal = oldTotal + allocation.amount;
 
             const currentPaymentIds = expense.connectedDocuments?.paymentIds || [];
             if (!currentPaymentIds.some((pid: any) => pid.toString() === id)) {
@@ -360,10 +390,16 @@ export async function POST(request: Request) {
               expense.connectedDocuments.paymentIds = currentPaymentIds;
             }
 
+            // ✅ Add audit entry showing cumulative progression
             expense.addAuditEntry(
-              `Payment voucher ${restoredVoucher.invoiceNumber} restored - allocated: ${formatCurrency(allocation.amount)}`,
+              `Payment voucher restored`,
               user?.id || null,
-              user?.username || 'System'
+              user?.username || 'System',
+              [{
+                field: 'Total Paid',
+                oldValue: formatCurrency(oldTotal),
+                newValue: formatCurrency(newTotal)
+              }]
             );
 
             await expense.save();
@@ -383,7 +419,13 @@ export async function POST(request: Request) {
               continue;
             }
 
+            // 📊 Get current total BEFORE allocation
+            const oldTotal = debitNote.getTotalAllocated();
+
             debitNote.allocateReceipt(restoredVoucher._id, allocation.amount);
+
+            // 📊 Calculate new total AFTER allocation
+            const newTotal = oldTotal + allocation.amount;
 
             const currentReceiptIds = debitNote.connectedDocuments?.receiptIds || [];
             if (!currentReceiptIds.some((rid: any) => rid.toString() === id)) {
@@ -392,10 +434,16 @@ export async function POST(request: Request) {
               debitNote.connectedDocuments.receiptIds = currentReceiptIds;
             }
 
+            // ✅ Add audit entry showing cumulative progression
             debitNote.addAuditEntry(
-              `Receipt voucher ${restoredVoucher.invoiceNumber} restored - allocated: ${formatCurrency(allocation.amount)}`,
+              `Receipt voucher restored`,
               user?.id || null,
-              user?.username || 'System'
+              user?.username || 'System',
+              [{
+                field: 'Total Received',
+                oldValue: formatCurrency(oldTotal),
+                newValue: formatCurrency(newTotal)
+              }]
             );
 
             await debitNote.save();
@@ -415,7 +463,13 @@ export async function POST(request: Request) {
               continue;
             }
 
+            // 📊 Get current total BEFORE allocation
+            const oldTotal = creditNote.getTotalAllocated();
+
             creditNote.allocatePayment(restoredVoucher._id, allocation.amount);
+
+            // 📊 Calculate new total AFTER allocation
+            const newTotal = oldTotal + allocation.amount;
 
             const currentPaymentIds = creditNote.connectedDocuments?.paymentIds || [];
             if (!currentPaymentIds.some((pid: any) => pid.toString() === id)) {
@@ -424,10 +478,16 @@ export async function POST(request: Request) {
               creditNote.connectedDocuments.paymentIds = currentPaymentIds;
             }
 
+            // ✅ Add audit entry showing cumulative progression
             creditNote.addAuditEntry(
-              `Payment voucher ${restoredVoucher.invoiceNumber} restored - allocated: ${formatCurrency(allocation.amount)}`,
+              `Payment voucher restored`,
               user?.id || null,
-              user?.username || 'System'
+              user?.username || 'System',
+              [{
+                field: 'Total Paid',
+                oldValue: formatCurrency(oldTotal),
+                newValue: formatCurrency(newTotal)
+              }]
             );
 
             await creditNote.save();

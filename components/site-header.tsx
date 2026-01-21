@@ -36,7 +36,6 @@ const routeGroups: Record<string, { label: string; path: string }[]> = {
   sales: [
     { label: "Invoices", path: "/sales/invoices" },
     { label: "Quotations", path: "/sales/quotations" },
-    { label: "Vouchers", path: "/sales/vouchers" },
     { label: "Receipts", path: "/sales/receipts" },
     { label: "Delivery Notes", path: "/sales/delivery-notes" },
     { label: "Sales Returns", path: "/sales/sales-returns" },

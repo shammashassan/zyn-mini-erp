@@ -413,11 +413,11 @@ export async function POST(request: Request) {
             let remaining = finalGrandTotal;
             const totalRemaining = purchases.reduce((sum, p) => sum + (p.grandTotal - p.getTotalAllocated()), 0);
             if (totalRemaining >= finalGrandTotal) {
-              for(let i=0; i<purchases.length; i++){
+              for (let i = 0; i < purchases.length; i++) {
                 const p = purchases[i];
                 const pRem = p.grandTotal - p.getTotalAllocated();
                 let amt = (i === purchases.length - 1) ? remaining : Math.min(Math.round(finalGrandTotal * (pRem / totalRemaining) * 100) / 100, pRem, remaining);
-                if(amt > 0) {
+                if (amt > 0) {
                   allocations.push({ documentId: p._id, documentType: 'purchase', amount: amt, createdAt: new Date() });
                   remaining -= amt;
                 }
@@ -432,7 +432,7 @@ export async function POST(request: Request) {
     // ✅ PAYMENT: Handle Expense allocations
     if (voucherType === 'payment' && connectedDocuments?.expenseIds) {
       const expenseIds = connectedDocuments.expenseIds;
-      if(expenseIds.length > 0) {
+      if (expenseIds.length > 0) {
         const expenses = await Expense.find({ _id: { $in: expenseIds }, isDeleted: false });
         if (expenses.length === expenseIds.length) {
           if (expenseIds.length === 1) {
@@ -444,11 +444,11 @@ export async function POST(request: Request) {
             let remaining = finalGrandTotal;
             const totalRemaining = expenses.reduce((sum, e) => sum + (e.amount - e.getTotalAllocated()), 0);
             if (totalRemaining >= finalGrandTotal) {
-              for(let i=0; i<expenses.length; i++){
+              for (let i = 0; i < expenses.length; i++) {
                 const e = expenses[i];
                 const eRem = e.amount - e.getTotalAllocated();
                 let amt = (i === expenses.length - 1) ? remaining : Math.min(Math.round(finalGrandTotal * (eRem / totalRemaining) * 100) / 100, eRem, remaining);
-                if(amt > 0) {
+                if (amt > 0) {
                   allocations.push({ documentId: e._id, documentType: 'expense', amount: amt, createdAt: new Date() });
                   remaining -= amt;
                 }
@@ -540,26 +540,32 @@ export async function POST(request: Request) {
         await newVoucher.save();
       }
 
-      // ✅ UPDATED: Apply Allocations to Invoices with audit entry
+      // ✅ UPDATED: Apply Allocations with CUMULATIVE audit tracking
       if (voucherType === 'receipt' && allocations.length > 0) {
         for (const allocation of allocations) {
           if (allocation.documentType === 'invoice') {
             const invoice = await Invoice.findById(allocation.documentId);
             if (invoice && !invoice.isDeleted) {
+              // 📊 Get current total BEFORE allocation
+              const oldTotal = invoice.getTotalAllocated();
+
               invoice.allocateReceipt(newVoucher._id, allocation.amount);
-              
-              // ✅ Add audit entry for receipt voucher creation
+
+              // 📊 Calculate new total AFTER allocation
+              const newTotal = oldTotal + allocation.amount;
+
+              // ✅ Add audit entry showing cumulative progression
               invoice.addAuditEntry(
                 'Receipt Voucher Created',
                 user.id,
                 user.username || user.name,
                 [{
-                  field: 'Allocated Amount',
-                  oldValue: formatCurrency(0),
-                  newValue: formatCurrency(allocation.amount)
+                  field: 'Total Received',
+                  oldValue: formatCurrency(oldTotal),
+                  newValue: formatCurrency(newTotal)
                 }]
               );
-              
+
               const currentReceiptIds = invoice.connectedDocuments?.receiptIds || [];
               if (!currentReceiptIds.some((rid: any) => rid.toString() === newVoucher._id.toString())) {
                 currentReceiptIds.push(newVoucher._id);
@@ -572,20 +578,26 @@ export async function POST(request: Request) {
           else if (allocation.documentType === 'debitNote') {
             const debitNote = await DebitNote.findById(allocation.documentId);
             if (debitNote && !debitNote.isDeleted) {
+              // 📊 Get current total BEFORE allocation
+              const oldTotal = debitNote.getTotalAllocated();
+
               debitNote.allocateReceipt(newVoucher._id, allocation.amount);
-              
-              // ✅ Add audit entry for receipt voucher creation
+
+              // 📊 Calculate new total AFTER allocation
+              const newTotal = oldTotal + allocation.amount;
+
+              // ✅ Add audit entry showing cumulative progression
               debitNote.addAuditEntry(
                 'Receipt Voucher Created',
                 user.id,
                 user.username || user.name,
                 [{
-                  field: 'Allocated Amount',
-                  oldValue: formatCurrency(0),
-                  newValue: formatCurrency(allocation.amount)
+                  field: 'Total Received',
+                  oldValue: formatCurrency(oldTotal),
+                  newValue: formatCurrency(newTotal)
                 }]
               );
-              
+
               const currentReceiptIds = debitNote.connectedDocuments?.receiptIds || [];
               if (!currentReceiptIds.some((rid: any) => rid.toString() === newVoucher._id.toString())) {
                 currentReceiptIds.push(newVoucher._id);
@@ -598,26 +610,32 @@ export async function POST(request: Request) {
         }
       }
 
-      // ✅ UPDATED: Apply allocations to Purchases, Expenses, and Credit Notes with audit entries
+      // ✅ UPDATED: Apply allocations to Purchases, Expenses, and Credit Notes with CUMULATIVE audit
       if (voucherType === 'payment' && allocations.length > 0) {
         for (const allocation of allocations) {
           if (allocation.documentType === 'purchase') {
             const purchase = await Purchase.findById(allocation.documentId);
             if (purchase && !purchase.isDeleted) {
+              // 📊 Get current total BEFORE allocation
+              const oldTotal = purchase.getTotalAllocated();
+
               purchase.allocatePayment(newVoucher._id, allocation.amount);
-              
-              // ✅ Add audit entry for payment voucher creation
+
+              // 📊 Calculate new total AFTER allocation
+              const newTotal = oldTotal + allocation.amount;
+
+              // ✅ Add audit entry showing cumulative progression
               purchase.addAuditEntry(
                 'Payment Voucher Created',
                 user.id,
                 user.username || user.name,
                 [{
-                  field: 'Allocated Amount',
-                  oldValue: formatCurrency(0),
-                  newValue: formatCurrency(allocation.amount)
+                  field: 'Total Paid',
+                  oldValue: formatCurrency(oldTotal),
+                  newValue: formatCurrency(newTotal)
                 }]
               );
-              
+
               const currentPaymentIds = purchase.connectedDocuments?.paymentIds || [];
               if (!currentPaymentIds.some((pid: any) => pid.toString() === newVoucher._id.toString())) {
                 currentPaymentIds.push(newVoucher._id);
@@ -629,20 +647,26 @@ export async function POST(request: Request) {
           } else if (allocation.documentType === 'expense') {
             const expense = await Expense.findById(allocation.documentId);
             if (expense && !expense.isDeleted) {
+              // 📊 Get current total BEFORE allocation
+              const oldTotal = expense.getTotalAllocated();
+
               expense.allocatePayment(newVoucher._id, allocation.amount);
-              
-              // ✅ Add audit entry for payment voucher creation
+
+              // 📊 Calculate new total AFTER allocation
+              const newTotal = oldTotal + allocation.amount;
+
+              // ✅ Add audit entry showing cumulative progression
               expense.addAuditEntry(
                 'Payment Voucher Created',
                 user.id,
                 user.username || user.name,
                 [{
-                  field: 'Allocated Amount',
-                  oldValue: formatCurrency(0),
-                  newValue: formatCurrency(allocation.amount)
+                  field: 'Total Paid',
+                  oldValue: formatCurrency(oldTotal),
+                  newValue: formatCurrency(newTotal)
                 }]
               );
-              
+
               const currentIds = expense.connectedDocuments?.paymentIds || [];
               if (!currentIds.some((id: any) => id.toString() === newVoucher._id.toString())) {
                 currentIds.push(newVoucher._id);
@@ -655,20 +679,26 @@ export async function POST(request: Request) {
           else if (allocation.documentType === 'creditNote') {
             const creditNote = await CreditNote.findById(allocation.documentId);
             if (creditNote && !creditNote.isDeleted) {
+              // 📊 Get current total BEFORE allocation
+              const oldTotal = creditNote.getTotalAllocated();
+
               creditNote.allocatePayment(newVoucher._id, allocation.amount);
-              
-              // ✅ Add audit entry for payment voucher creation
+
+              // 📊 Calculate new total AFTER allocation
+              const newTotal = oldTotal + allocation.amount;
+
+              // ✅ Add audit entry showing cumulative progression
               creditNote.addAuditEntry(
                 'Payment Voucher Created',
                 user.id,
                 user.username || user.name,
                 [{
-                  field: 'Allocated Amount',
-                  oldValue: formatCurrency(0),
-                  newValue: formatCurrency(allocation.amount)
+                  field: 'Total Paid',
+                  oldValue: formatCurrency(oldTotal),
+                  newValue: formatCurrency(newTotal)
                 }]
               );
-              
+
               const currentPaymentIds = creditNote.connectedDocuments?.paymentIds || [];
               if (!currentPaymentIds.some((pid: any) => pid.toString() === newVoucher._id.toString())) {
                 currentPaymentIds.push(newVoucher._id);
