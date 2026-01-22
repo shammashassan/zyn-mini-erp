@@ -54,9 +54,7 @@ const HELP_RESOURCES: HelpResource[] = [
     title: "Documentation",
     description: "Browse our comprehensive documentation and guides",
     icon: BookOpen,
-    action: () => toast.info("Documentation is currently under development.", {
-      description: "Please check back later for updates."
-    }),
+    href: "/help/documentation",
   },
   {
     id: "video-tutorials",

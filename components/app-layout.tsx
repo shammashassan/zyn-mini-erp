@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/sidebar";
 import { SiteFooter } from "./site-footer";
 
-const NO_LAYOUT_ROUTES = ["/login"];
+const NO_LAYOUT_ROUTES = ["/login", "/help/documentation"];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
