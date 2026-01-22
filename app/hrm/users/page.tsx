@@ -102,6 +102,17 @@ function UsersPageContent() {
     }
   }, [session]);
 
+  // ✅ SYNC: Keep selectedUser in sync with users list
+  // This ensures that when a user is updated/banned, the modal usage of selectedUser is not stale
+  useEffect(() => {
+    if (selectedUser) {
+      const updatedUser = users.find(u => u.id === selectedUser.id);
+      if (updatedUser && updatedUser !== selectedUser) {
+        setSelectedUser(updatedUser);
+      }
+    }
+  }, [users, selectedUser]);
+
   /**
    * Fetches the list of users from Better Auth Admin API.
    * ✅ UPDATED: Added 'background' param for silent refreshes
@@ -196,20 +207,20 @@ function UsersPageContent() {
   const canManageUser = (targetRole?: string) => {
     const currentRole = (session?.user as any)?.role || "user";
     const target = targetRole || "user";
-    
+
     // Owner can manage everyone
     if (currentRole === "owner") return true;
-    
+
     // Admin cannot manage owner or other admins
     if (currentRole === "admin") {
       return target !== "owner" && target !== "admin";
     }
-    
+
     // Manager can only view users
     if (currentRole === "manager") {
       return false;
     }
-    
+
     // Regular users can't manage anyone
     return false;
   };
@@ -282,7 +293,7 @@ function UsersPageContent() {
   /**
    * Handles updating an existing user by an admin.
    */
-  const handleUserUpdate = async (data: any, avatarBlob: Blob | null, wasAvatarRemoved: boolean) =>{
+  const handleUserUpdate = async (data: any, avatarBlob: Blob | null, wasAvatarRemoved: boolean) => {
     if (!selectedUser) return;
 
     if (!canUpdate) {

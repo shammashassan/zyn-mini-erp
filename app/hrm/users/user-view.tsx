@@ -9,18 +9,12 @@ import {
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Shield, 
-  Mail, 
-  User, 
+import {
+  Shield,
+  Mail,
+  User,
   Calendar,
   Clock,
   Crown,       // Added
@@ -28,7 +22,8 @@ import {
   UserX,
   UserCheck,
   Fingerprint,
-  AtSign
+  AtSign,
+  LogIn
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { BetterAuthUser, AdminRole } from "@/lib/types";
@@ -45,51 +40,35 @@ interface UserViewProps {
   currentUserRole?: string;
 }
 
-export function UserViewModal({ 
-  isOpen, 
-  onClose, 
-  onToggleBan, 
-  onSetRole, 
+export function UserViewModal({
+  isOpen,
+  onClose,
+  onToggleBan,
+  onSetRole,
   user,
   canBan,
   canSetRole,
   currentUserRole
 }: UserViewProps) {
-  const [selectedRole, setSelectedRole] = React.useState<AdminRole>("user");
+  const [isBanned, setIsBanned] = React.useState(false);
 
   React.useEffect(() => {
     if (user) {
-      setSelectedRole((user.role as AdminRole) || "user");
+      setIsBanned(user.banned || false);
     }
   }, [user]);
 
+  const handleToggleBan = () => {
+    setIsBanned((prev) => !prev);
+    onToggleBan();
+  };
+
   if (!user) return null;
-  
+
   const displayName = user.name || user.email;
-  const fallback = user.name 
+  const fallback = user.name
     ? user.name.substring(0, 2).toUpperCase()
     : user.email.substring(0, 2).toUpperCase();
-
-  const handleRoleChange = (newRole: AdminRole) => {
-    if (newRole !== (user.role || "user")) {
-      onSetRole(newRole);
-      setSelectedRole(newRole);
-    }
-  };
-
-  // Check if current user can assign a specific role
-  const canAssignRole = (role: string) => {
-    // Owner can assign any role
-    if (currentUserRole === "owner") return true;
-    
-    // Admin cannot assign owner or admin roles
-    if (currentUserRole === "admin") {
-      return role !== "owner" && role !== "admin";
-    }
-    
-    // Others can't assign any roles
-    return false;
-  };
 
   // Determine Badge Styling & Icon
   const getRoleBadge = (role?: string) => {
@@ -133,16 +112,16 @@ export function UserViewModal({
                   <div>
                     <h2 className="text-2xl font-bold">{displayName}</h2>
                     <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
-                      <Badge 
-                        variant={roleConfig.variant as any} 
+                      <Badge
+                        variant={roleConfig.variant as any}
                         appearance="outline"
                         className="capitalize"
                       >
                         <RoleIcon className="h-3 w-3 mr-1" />
                         {user.role || "user"}
                       </Badge>
-                      <Badge 
-                        variant={user.banned ? "destructive" : "success"} 
+                      <Badge
+                        variant={user.banned ? "destructive" : "success"}
                         appearance="outline"
                       >
                         {user.banned ? "Banned" : "Active"}
@@ -176,6 +155,70 @@ export function UserViewModal({
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Role Section */}
+                <div className="flex items-start gap-3">
+                  <RoleIcon className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div className="w-full">
+                    <div className="text-sm text-muted-foreground mb-1">
+                      Role
+                    </div>
+                    <div>
+                      <Badge
+                        variant={roleConfig.variant as any}
+                        appearance="outline"
+                        className="capitalize"
+                      >
+                        <RoleIcon className="h-3 w-3 mr-1" />
+                        {user.role || "user"}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Section */}
+                <div className="flex items-start gap-3">
+                  <div className="h-5 w-5 flex items-center justify-center">
+                    <Shield className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div className="w-full">
+                    <div className="text-sm text-muted-foreground mb-1">
+                      Account Status
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {canBan && (
+                        <Switch
+                          id="ban-mode"
+                          checked={!isBanned}
+                          onCheckedChange={handleToggleBan}
+                          className={
+                            isBanned
+                              ? "data-[state=unchecked]:bg-slate-200 dark:data-[state=unchecked]:bg-slate-800"
+                              : "data-[state=checked]:bg-green-500"
+                          }
+                        />
+                      )}
+
+                      <Badge
+                        variant={isBanned ? "destructive" : "success"}
+                        appearance="outline"
+                      >
+                        {isBanned ? "Banned" : "Active"}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Last Login */}
+                <div className="flex items-start gap-3">
+                  <LogIn className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div className="w-full">
+                    <div className="text-sm text-muted-foreground mb-1">Last Login</div>
+                    <div className="font-medium text-sm">
+                      {user.lastLoginAt ? formatDateTime(user.lastLoginAt) : "Never"}
+                    </div>
+                  </div>
+                </div>
+
                 {/* User ID */}
                 <div className="flex items-start gap-3">
                   <Fingerprint className="h-5 w-5 text-muted-foreground mt-0.5" />
@@ -186,45 +229,6 @@ export function UserViewModal({
                     </div>
                   </div>
                 </div>
-
-                {/* Role Selector - Only show if user has permission */}
-                {canSetRole ? (
-                  <div className="flex items-start gap-3">
-                    <RoleIcon className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div className="w-full">
-                      <div className="text-sm text-muted-foreground mb-1">Role Permission</div>
-                      <Select value={selectedRole} onValueChange={handleRoleChange}>
-                        <SelectTrigger className="h-8 w-full md:w-40">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="user">User</SelectItem>
-                          <SelectItem value="manager">Manager</SelectItem>
-                          <SelectItem 
-                            value="admin" 
-                            disabled={!canAssignRole("admin")}
-                          >
-                            Admin
-                          </SelectItem>
-                          <SelectItem 
-                            value="owner" 
-                            disabled={!canAssignRole("owner")}
-                          >
-                            Owner
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-start gap-3">
-                    <RoleIcon className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <div className="text-sm text-muted-foreground">Role Permission</div>
-                      <div className="font-medium capitalize">{user.role || "user"}</div>
-                    </div>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -254,7 +258,7 @@ export function UserViewModal({
 
                 {user.banned && user.banExpires && (
                   <div className="flex items-start gap-3 md:col-span-2 pt-2 border-t">
-                     <Calendar className="h-5 w-5 text-destructive mt-0.5" />
+                    <Calendar className="h-5 w-5 text-destructive mt-0.5" />
                     <div>
                       <div className="text-sm text-muted-foreground">Ban Expires</div>
                       <div className="font-medium text-destructive">
@@ -267,28 +271,7 @@ export function UserViewModal({
             </CardContent>
           </Card>
 
-          {/* Ban/Unban Button - Only show if user has permission */}
-          {canBan && (
-            <div className="flex gap-2 pt-4 border-t">
-              <Button
-                variant={user.banned ? "default" : "destructive"}
-                onClick={onToggleBan}
-                className="w-full"
-              >
-                {user.banned ? (
-                  <>
-                    <UserCheck className="h-4 w-4 mr-2" />
-                    Unban User
-                  </>
-                ) : (
-                  <>
-                    <UserX className="h-4 w-4 mr-2" />
-                    Ban User
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
+          {/* Ban/Unban Button - Removed as requested */}
         </div>
       </DialogContent>
     </Dialog>
