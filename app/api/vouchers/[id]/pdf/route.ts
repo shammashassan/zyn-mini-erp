@@ -5,9 +5,11 @@ import { renderToStream } from "@react-pdf/renderer";
 import dbConnect from "@/lib/dbConnect";
 import Voucher from "@/models/Voucher";
 import CompanyDetails from "@/models/CompanyDetails";
-// 👇 Register both models so populate works
-import "@/models/Invoice"; 
-import "@/models/Purchase"; 
+import "@/models/Invoice";
+import "@/models/Purchase";
+import "@/models/Expense";
+import "@/models/DebitNote";
+import "@/models/CreditNote";
 
 import { VoucherDocument } from "@/components/VoucherDocument";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
@@ -45,7 +47,7 @@ export async function GET(
       .populate({
         path: 'connectedDocuments.invoiceIds',
         model: 'Invoice',
-        select: 'invoiceNumber' 
+        select: 'invoiceNumber'
       })
       .populate({
         path: 'connectedDocuments.purchaseIds',
@@ -53,14 +55,19 @@ export async function GET(
         select: 'referenceNumber' // ✅ Using referenceNumber as per your Purchase model
       })
       .populate({
+        path: 'connectedDocuments.expenseIds',
+        model: 'Expense',
+        select: 'referenceNumber'
+      })
+      .populate({
         path: 'connectedDocuments.debitNoteIds',
         model: 'DebitNote',
-        select: 'debitNoteNumber' 
+        select: 'debitNoteNumber'
       })
       .populate({
         path: 'connectedDocuments.creditNoteIds',
         model: 'CreditNote',
-        select: 'creditNoteNumber' 
+        select: 'creditNoteNumber'
       })
       .setOptions({ includeDeleted: true });
 

@@ -15,7 +15,8 @@ import {
   UserCog,
   ArrowUpDown,
   Crown,
-  Briefcase
+  Briefcase,
+  Edit
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -112,7 +113,7 @@ function RowActions({
           {!isCurrentUser && canUpdate && (
             <>
               <DropdownMenuItem onClick={() => onEdit(user)}>
-                <Pencil className="mr-2 h-4 w-4" />
+                <Edit className="mr-2 h-4 w-4" />
                 Edit User
               </DropdownMenuItem>
             </>

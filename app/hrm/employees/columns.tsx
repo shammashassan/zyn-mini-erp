@@ -4,7 +4,7 @@
 
 import * as React from "react";
 import { ColumnDef } from "@tanstack/react-table";
-import { FileText, MoreHorizontal, Trash2, Pencil, Eye, ArrowUpDown } from "lucide-react";
+import { FileText, MoreHorizontal, Trash2, Pencil, Eye, ArrowUpDown, Edit } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -55,12 +55,12 @@ function RowActions({ employee, onView, onEdit, onDelete, canUpdate, canDelete }
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
           <DropdownMenuItem onClick={() => onView(employee)}>
             <Eye className="mr-2 h-4 w-4" />
-            View
+            View Details
           </DropdownMenuItem>
           {canUpdate && (
             <>
               <DropdownMenuItem onClick={() => onEdit(employee)}>
-                <Pencil className="mr-2 h-4 w-4" />
+                <Edit className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
             </>
