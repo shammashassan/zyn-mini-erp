@@ -3,7 +3,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, ExternalLink, Banknote, Receipt } from "lucide-react";
+import { ShoppingCart, ExternalLink, Banknote, Receipt, FileText } from "lucide-react";
 
 interface ConnectedPurchase {
     _id: string;
@@ -178,7 +178,7 @@ export function ConnectedDocumentsBadges({
                     className="font-mono cursor-pointer hover:opacity-70 transition-opacity gap-1 w-fit"
                     onClick={() => handleCreditNoteBadgeClick(creditNote)}
                 >
-                    <Receipt className="h-3 w-3" />
+                    <FileText className="h-3 w-3" />
                     {creditNote.creditNoteNumber}
                     <ExternalLink className="h-3 w-3 ml-1" />
                 </Badge>

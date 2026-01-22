@@ -3,7 +3,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Receipt, ExternalLink, RotateCcw } from "lucide-react";
+import { Receipt, ExternalLink, RotateCcw, Ticket } from "lucide-react";
 
 interface ConnectedReceipt {
   _id: string;
@@ -31,10 +31,10 @@ interface ConnectedDocumentsBadgesProps {
   onViewReturnNotePdf?: (returnNote: any) => void;
 }
 
-export function ConnectedDocumentsBadges({ 
-  debitNote, 
+export function ConnectedDocumentsBadges({
+  debitNote,
   onViewReceiptPdf,
-  onViewReturnNotePdf 
+  onViewReturnNotePdf
 }: ConnectedDocumentsBadgesProps) {
   const receiptIds = debitNote.connectedDocuments?.receiptIds || [];
   const returnNoteId = debitNote.connectedDocuments?.returnNoteId;
@@ -92,7 +92,7 @@ export function ConnectedDocumentsBadges({
             handleViewReceipt(receipt);
           }}
         >
-          <Receipt className="h-3 w-3" />
+          <Ticket className="h-3 w-3" />
           {receipt.invoiceNumber}
           <ExternalLink className="h-3 w-3 ml-1" />
         </Badge>

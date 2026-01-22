@@ -155,7 +155,7 @@ export function ConnectedDocumentsBadges({
                     className="font-mono cursor-pointer hover:opacity-70 transition-opacity gap-1 w-fit"
                     onClick={() => handleCreditNoteBadgeClick(creditNote)}
                 >
-                    <Receipt className="h-3 w-3" />
+                    <FileText className="h-3 w-3" />
                     {creditNote.creditNoteNumber}
                     <ExternalLink className="h-3 w-3 ml-1" />
                 </Badge>
@@ -169,7 +169,7 @@ export function ConnectedDocumentsBadges({
                     className="font-mono cursor-pointer hover:opacity-70 transition-opacity gap-1 w-fit"
                     onClick={() => handleDebitNoteBadgeClick(debitNote)}
                 >
-                    <CreditCard className="h-3 w-3" />
+                    <FileText className="h-3 w-3" />
                     {debitNote.debitNoteNumber}
                     <ExternalLink className="h-3 w-3 ml-1" />
                 </Badge>

@@ -1,4 +1,4 @@
-// app/sales/invoices/CreateReceiptModal.tsx
+// app/sales/invoices/CreateReceiptModal.tsx - UPDATED: Auto notes generation
 
 "use client";
 
@@ -85,6 +85,11 @@ export function CreateReceiptModal({
 
       console.log(`Creating receipt voucher for ${formatCurrency(amount)} via ${paymentMethod}`);
 
+      // Generate notes - use custom notes if provided, otherwise auto-generate
+      const receiptNotes = notes.trim()
+        ? notes
+        : `Payment received for invoice ${invoice.invoiceNumber} - ${formatCurrency(amount)} via ${paymentMethod}`;
+
       // Create receipt voucher - backend handles invoice sync automatically
       const receiptRes = await fetch("/api/vouchers", {
         method: "POST",
@@ -94,7 +99,7 @@ export function CreateReceiptModal({
           customerName: invoice.customerName,
           paymentMethod: paymentMethod,
           items: [],
-          notes: notes || `Payment received for invoice ${invoice.invoiceNumber} - ${formatCurrency(amount)} via ${paymentMethod}`,
+          notes: receiptNotes,
           connectedDocuments: {
             invoiceIds: [invoice._id],
           },
@@ -273,11 +278,14 @@ export function CreateReceiptModal({
             <Label htmlFor="notes">Notes (Optional)</Label>
             <Textarea
               id="notes"
-              placeholder="Add payment notes..."
+              placeholder={`Add payment notes... (Default: "Payment received for invoice ${invoice.invoiceNumber} - ${formatCurrency(isPartialPayment ? parseFloat(paymentAmount) || remainingAmount : remainingAmount)} via ${paymentMethod}")`}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
             />
+            <p className="text-xs text-muted-foreground">
+              💡 If left empty, a default note will be generated automatically
+            </p>
           </div>
         </div>
 

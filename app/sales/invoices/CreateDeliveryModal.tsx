@@ -121,8 +121,8 @@ export function CreateDeliveryModal({
       console.log("Creating new delivery note from invoice");
 
       // Generate notes - use custom notes if provided, otherwise auto-generate
-      const deliveryNotes = notes.trim() 
-        ? notes 
+      const deliveryNotes = notes.trim()
+        ? notes
         : `Delivery note for invoice ${invoice.invoiceNumber}`;
 
       const deliveryRes = await fetch("/api/delivery-notes", {
@@ -174,10 +174,10 @@ export function CreateDeliveryModal({
           },
         }
       );
-      
+
       onClose();
       onRefresh();
-      
+
       // Reset form
       setNotes("");
     } catch (error) {
@@ -236,7 +236,7 @@ export function CreateDeliveryModal({
               <Package className="h-4 w-4" />
               Items to Ship
             </Label>
-            
+
             {/* Desktop View (Table) */}
             <div className="hidden md:block overflow-x-auto rounded-md border bg-background">
               <table className="w-full">
@@ -308,27 +308,27 @@ export function CreateDeliveryModal({
             </div>
           </div>
 
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes (Optional)</Label>
-            <Textarea
-              id="notes"
-              placeholder={`Add delivery notes... (Default: "Delivery note for invoice ${invoice.invoiceNumber}")`}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-            />
-            <p className="text-xs text-muted-foreground">
-              💡 If left empty, a default note will be generated automatically
-            </p>
-          </div>
-
           {/* Info Message */}
           <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
             <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
               This will create a delivery note with {invoice.items.length} item(s) for shipment tracking
             </p>
           </div>
+        </div>
+
+        {/* Notes */}
+        <div className="space-y-2">
+          <Label htmlFor="notes">Notes (Optional)</Label>
+          <Textarea
+            id="notes"
+            placeholder={`Add delivery notes... (Default: "Delivery note for invoice ${invoice.invoiceNumber}")`}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+          />
+          <p className="text-xs text-muted-foreground">
+            💡 If left empty, a default note will be generated automatically
+          </p>
         </div>
 
         <DialogFooter>

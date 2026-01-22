@@ -386,15 +386,15 @@ function DashboardContent() {
                             className="cursor-pointer transition-all hover:bg-muted/50"
                           >
                             <button
-                              onClick={() => router.push('/sales/vouchers')}
+                              onClick={() => router.push('/sales/receipts')}
                               className="w-full text-left"
                             >
                               <ItemMedia variant="icon">
                                 <Ticket className="h-5 w-5" />
                               </ItemMedia>
                               <ItemContent>
-                                <ItemTitle>Create Voucher</ItemTitle>
-                                <ItemDescription>Issue payment or receipt vouchers</ItemDescription>
+                                <ItemTitle>Create Receipt</ItemTitle>
+                                <ItemDescription>Issue receipt vouchers</ItemDescription>
                               </ItemContent>
                               <div className="ml-auto">
                                 <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -408,15 +408,15 @@ function DashboardContent() {
                             className="cursor-pointer transition-all hover:bg-muted/50"
                           >
                             <button
-                              onClick={() => router.push('/sales/delivery-notes')}
+                              onClick={() => router.push('/procurement/payments')}
                               className="w-full text-left"
                             >
                               <ItemMedia variant="icon">
                                 <Truck className="h-5 w-5" />
                               </ItemMedia>
                               <ItemContent>
-                                <ItemTitle>Create Delivery Note</ItemTitle>
-                                <ItemDescription>Track product deliveries to customers</ItemDescription>
+                                <ItemTitle>Create Payment</ItemTitle>
+                                <ItemDescription>Issue payment vouchers</ItemDescription>
                               </ItemContent>
                               <div className="ml-auto">
                                 <ChevronRight className="h-5 w-5 text-muted-foreground" />

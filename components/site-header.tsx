@@ -27,15 +27,15 @@ import { Home, ChevronDown } from "lucide-react";
 const routeGroups: Record<string, { label: string; path: string }[]> = {
   accounting: [
     { label: "Chart of Accounts", path: "/accounting/chart-of-accounts" },
-    { label: "Financial Statements", path: "/accounting/financial-statements" },
     { label: "Journal", path: "/accounting/journal" },
     { label: "Ledger", path: "/accounting/ledger" },
-    { label: "Profit & Loss", path: "/accounting/profit-loss" },
     { label: "Trial Balance", path: "/accounting/trial-balance" },
+    { label: "Profit & Loss", path: "/accounting/profit-loss" },
+    { label: "Financial Statements", path: "/accounting/financial-statements" },
   ],
   sales: [
-    { label: "Invoices", path: "/sales/invoices" },
     { label: "Quotations", path: "/sales/quotations" },
+    { label: "Invoices", path: "/sales/invoices" },
     { label: "Receipts", path: "/sales/receipts" },
     { label: "Delivery Notes", path: "/sales/delivery-notes" },
     { label: "Sales Returns", path: "/sales/sales-returns" },
@@ -51,8 +51,8 @@ const routeGroups: Record<string, { label: string; path: string }[]> = {
     { label: "Company Details", path: "/settings/company-details" },
   ],
   inventory: [
-    { label: "Materials", path: "/inventory/materials" },
     { label: "Products", path: "/inventory/products" },
+    { label: "Materials", path: "/inventory/materials" },
     { label: "Stock Adjustment", path: "/inventory/stock-adjustment" },
   ],
   people: [
@@ -68,12 +68,12 @@ const routeGroups: Record<string, { label: string; path: string }[]> = {
     { label: "Credit Notes", path: "/procurement/credit-notes" },
   ],
   reports: [
-    { label: "Expense Report", path: "/reports/expense-report" },
-    { label: "Inventory Report", path: "/reports/inventory-report" },
-    { label: "Payments Report", path: "/reports/payments-report" },
-    { label: "Purchase Report", path: "/reports/purchase-report" },
     { label: "Sales Report", path: "/reports/sales-report" },
+    { label: "Purchase Report", path: "/reports/purchase-report" },
+    { label: "Expense Report", path: "/reports/expense-report" },
+    { label: "Payments Report", path: "/reports/payments-report" },
     { label: "Tax Report", path: "/reports/tax-report" },
+    { label: "Inventory Report", path: "/reports/inventory-report" },
   ],
 };
 

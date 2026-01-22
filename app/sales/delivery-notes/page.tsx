@@ -244,7 +244,7 @@ function DeliveryNotesPageContent() {
 
       // ✅ FIXED: Properly format the payload
       let payload;
-      
+
       if (id) {
         // Edit mode - just send the updates
         payload = data;
@@ -257,7 +257,7 @@ function DeliveryNotesPageContent() {
             invoiceId: data.connectedDocuments?.invoiceId || null
           }
         };
-        
+
         console.log('📤 Submitting delivery note with payload:', JSON.stringify(payload, null, 2));
       }
 
@@ -286,12 +286,12 @@ function DeliveryNotesPageContent() {
 
       toast.success(`Delivery Note ${deliveryNoteNumber} ${id ? 'updated' : 'created'} successfully!`);
 
-      // Show view modal
-      setDeliveryNoteToView(savedDeliveryNote);
-      setViewModalOpen(true);
-
-      // Auto-open PDF viewer if it's a new delivery note
-      if (!id) {
+      if (id) {
+        // Edit mode: Show view modal
+        setDeliveryNoteToView(savedDeliveryNote);
+        setViewModalOpen(true);
+      } else {
+        // Create mode: Only show PDF viewer
         setSelectedPdfUrl(`/api/delivery-notes/${savedDeliveryNote._id}/pdf`);
         setSelectedPdfTitle(deliveryNoteNumber || "Delivery Note");
         setIsModalOpen(true);
@@ -402,7 +402,7 @@ function DeliveryNotesPageContent() {
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <div className="flex flex-col lg:flex-row lg:justify-between px-4 lg:px-6 gap-4">
-              
+
               <div className="flex items-center gap-3 self-start lg:self-center">
                 <div className="p-3 bg-primary/10 rounded-full">
                   <Truck className="h-8 w-8 text-primary" />
@@ -423,7 +423,7 @@ function DeliveryNotesPageContent() {
               </div>
 
               <div className="flex flex-col gap-3 w-full lg:w-auto lg:items-end">
-                
+
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                   {canViewTrash && (
                     <Link href="./delivery-notes/trash" className="w-full sm:w-auto">

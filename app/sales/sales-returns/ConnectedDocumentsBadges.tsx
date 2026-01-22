@@ -3,7 +3,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Receipt, ExternalLink, CreditCard } from "lucide-react";
+import { Receipt, ExternalLink, CreditCard, FileText } from "lucide-react";
 
 interface ConnectedInvoice {
   _id: string;
@@ -31,15 +31,15 @@ interface ConnectedDocumentsBadgesProps {
   onViewCreditNotePdf?: (creditNote: any) => void;
 }
 
-export function ConnectedDocumentsBadges({ 
-  salesReturn, 
+export function ConnectedDocumentsBadges({
+  salesReturn,
   onViewInvoicePdf,
   onViewCreditNotePdf
 }: ConnectedDocumentsBadgesProps) {
   const invoiceId = salesReturn.connectedDocuments?.invoiceId;
   const creditNoteId = salesReturn.connectedDocuments?.creditNoteId;
 
-  const invoice = (typeof invoiceId === 'object' && invoiceId !== null) 
+  const invoice = (typeof invoiceId === 'object' && invoiceId !== null)
     ? invoiceId as ConnectedInvoice
     : null;
 
@@ -83,7 +83,7 @@ export function ConnectedDocumentsBadges({
             handleViewInvoice();
           }}
         >
-          <Receipt className="h-3 w-3" />
+          <FileText className="h-3 w-3" />
           {invoice.invoiceNumber}
           <ExternalLink className="h-3 w-3 ml-1" />
         </Badge>
@@ -99,7 +99,7 @@ export function ConnectedDocumentsBadges({
             handleViewCreditNote();
           }}
         >
-          <CreditCard className="h-3 w-3" />
+          <FileText className="h-3 w-3" />
           {creditNote.creditNoteNumber}
           <ExternalLink className="h-3 w-3 ml-1" />
         </Badge>

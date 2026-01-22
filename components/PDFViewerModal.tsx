@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +9,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { XIcon, DownloadIcon, PrinterIcon } from "lucide-react";
+import { XIcon, DownloadIcon, PrinterIcon, ExternalLinkIcon, FileTextIcon } from "lucide-react";
 
 interface PDFViewerModalProps {
   isOpen: boolean;
@@ -18,6 +19,24 @@ interface PDFViewerModalProps {
 }
 
 export function PDFViewerModal({ isOpen, onClose, pdfUrl, title }: PDFViewerModalProps) {
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+
+  useEffect(() => {
+    // Detect if device cannot render PDFs inline (mobile devices, tablets)
+    const checkMobileDevice = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+
+      // Check for mobile devices (iOS, Android, Windows Phone)
+      const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(
+        userAgent.toLowerCase()
+      );
+
+      setIsMobileDevice(isMobile);
+    };
+
+    checkMobileDevice();
+  }, []);
+
   if (!isOpen) {
     return null;
   }
@@ -31,9 +50,56 @@ export function PDFViewerModal({ isOpen, onClose, pdfUrl, title }: PDFViewerModa
     }
   };
 
+  const handleOpenInNewTab = () => {
+    window.open(pdfUrl, '_blank');
+  };
+
+  // Compact mobile modal
+  if (isMobileDevice) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileTextIcon className="h-5 w-5 text-primary" />
+              {title}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-4">
+            <p className="text-sm text-muted-foreground text-center">
+              PDF preview is not available on this device. Use the buttons below to view or download the document.
+            </p>
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={handleOpenInNewTab}
+                className="w-full"
+                size="lg"
+              >
+                <ExternalLinkIcon className="h-4 w-4 mr-2" />
+                Open PDF
+              </Button>
+              <Button
+                variant="outline"
+                asChild
+                className="w-full"
+                size="lg"
+              >
+                <a href={pdfUrl} download={`${title}.pdf`}>
+                  <DownloadIcon className="h-4 w-4 mr-2" />
+                  Download PDF
+                </a>
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Desktop full-screen modal with iframe
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent 
+      <DialogContent
         style={{
           width: '95vw',
           maxWidth: '95vw',
@@ -41,7 +107,6 @@ export function PDFViewerModal({ isOpen, onClose, pdfUrl, title }: PDFViewerModa
         }}
         className="flex flex-col p-0 gap-0 [&>button]:hidden"
       >
-        {/* --- FIX: Corrected flexbox layout for proper alignment --- */}
         <DialogHeader className="px-4 py-2 border-b flex flex-row items-center justify-between">
           <DialogTitle>{title}</DialogTitle>
           <div className="flex items-center gap-2">
@@ -51,9 +116,9 @@ export function PDFViewerModal({ isOpen, onClose, pdfUrl, title }: PDFViewerModa
                 Download
               </a>
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handlePrint}
               className="focus-visible:ring-0 focus-visible:ring-offset-0"
             >
