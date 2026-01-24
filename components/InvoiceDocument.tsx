@@ -29,6 +29,7 @@ const styles = StyleSheet.create({
     color: pdfColors.textMain,
     marginBottom: 2,
   },
+  customerDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
   dateInfo: {
     alignItems: 'flex-end',
   },
@@ -45,7 +46,7 @@ const styles = StyleSheet.create({
 
   summaryContainer: { marginTop: 20 },
   summaryRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 15 },
-  
+
   totalsBox: {
     width: '42%',
     backgroundColor: pdfColors.white,
@@ -64,7 +65,7 @@ const styles = StyleSheet.create({
     backgroundColor: pdfColors.primary,
     padding: '8 10',
     borderBottomWidth: 0,
-    flexDirection: 'row', 
+    flexDirection: 'row',
     justifyContent: 'space-between',
   },
   totalLabel: { fontSize: 8.5, color: pdfColors.textDark },
@@ -130,7 +131,7 @@ interface InvoiceDocumentProps {
 
 export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, companyDetails }) => {
   registerPdfFonts();
-  
+
   const grossTotal = bill.totalAmount || 0;
   const vatAmount = bill.vatAmount || 0;
   const subtotal = grossTotal - bill.discount;
@@ -142,7 +143,7 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, co
     <Document>
       <Page size="A4" style={commonStyles.page}>
         <Text style={commonStyles.watermark}>INVOICE</Text>
-        
+
         <PDFHeader companyDetails={companyDetails} />
 
         <View style={commonStyles.titleSection}>
@@ -154,6 +155,8 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, co
           <View style={{ flex: 1 }}>
             <Text style={commonStyles.sectionLabel}>Billed To:</Text>
             <Text style={styles.customerName}>{bill.customerName}</Text>
+            {bill.customerPhone && <Text style={styles.customerDetail}>{bill.customerPhone}</Text>}
+            {bill.customerEmail && <Text style={styles.customerDetail}>{bill.customerEmail}</Text>}
           </View>
           <View style={styles.dateInfo}>
             <Text style={styles.dateLabel}>Invoice Date</Text>

@@ -91,7 +91,7 @@ export default function CreateBillPage() {
     }
   }, [isMounted, canCreate]);
 
-  const updateItem = (index: number, field: keyof Item, value: string | number) => {
+  const updateItem = (index: number, field: keyof Item, value: string | number | boolean) => {
     setPayload(prev => {
       const updatedItems = [...prev.items];
       const currentItem = { ...updatedItems[index] };
@@ -114,6 +114,9 @@ export default function CreateBillPage() {
             const numValue = parseFloat(strValue);
             currentItem[field] = isNaN(numValue) ? 0 : numValue;
           }
+          break;
+        case "shouldCreateProduct":
+          currentItem.shouldCreateProduct = Boolean(value);
           break;
       }
 
@@ -255,6 +258,53 @@ export default function CreateBillPage() {
     setIsLoading(true);
 
     try {
+      // Create products for items marked for creation (only for non-voucher documents)
+      const isVoucherDoc = payload.documentType === 'receipt' || payload.documentType === 'payment';
+      if (!isVoucherDoc) {
+        const itemsWithProductCreation = await Promise.all(
+          payload.items.map(async (item) => {
+            if (item.shouldCreateProduct && item.description.trim()) {
+              try {
+                const productPayload = {
+                  name: item.description.trim(),
+                  type: "General",
+                  price: Number(item.rate) || 0,
+                };
+
+                const response = await fetch("/api/products", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(productPayload),
+                });
+
+                if (response.ok) {
+                  const newProduct = await response.json();
+                  toast.success(`Product "${item.description}" created`);
+                  return {
+                    ...item,
+                    shouldCreateProduct: false,
+                  };
+                } else {
+                  const error = await response.json();
+                  toast.error(`Failed to create product "${item.description}"`, {
+                    description: error.error || "Continuing with custom item"
+                  });
+                  return { ...item, shouldCreateProduct: false };
+                }
+              } catch (error) {
+                console.error("Error creating product:", error);
+                toast.error(`Failed to create product "${item.description}"`);
+                return { ...item, shouldCreateProduct: false };
+              }
+            }
+            return item;
+          })
+        );
+
+        // Update payload.items with the processed items
+        payload.items = itemsWithProductCreation;
+      }
+
       let endpoint = "";
       let payloadToSend: any = { ...payload };
       let responseKey = "";

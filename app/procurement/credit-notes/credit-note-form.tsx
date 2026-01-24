@@ -39,7 +39,7 @@ import {
   CommandList
 } from "@/components/ui/command";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarIcon, ChevronsUpDown, Check, Plus, X, FileText, AlertCircle, Users, Building2, User, Store, List, Calculator } from "lucide-react";
+import { CalendarIcon, ChevronsUpDown, Check, Plus, PlusCircle, X, FileText, AlertCircle, Users, Building2, User, Store, List, Calculator } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -61,6 +61,7 @@ type CreditNoteItem = {
   quantity: number;
   price: number;
   total: number;
+  shouldCreateProduct?: boolean; // Flag to indicate if product should be created on submit
 };
 
 type CreditNoteFormData = {
@@ -138,6 +139,7 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
   const [partySearchQuery, setPartySearchQuery] = useState("");
   const [returnNotePopoverOpen, setReturnNotePopoverOpen] = useState(false);
   const [productPopovers, setProductPopovers] = useState<Record<number, boolean>>({});
+  const [productSearchQueries, setProductSearchQueries] = useState<Record<number, string>>({});
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
 
@@ -385,7 +387,25 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
       setValue(`items.${index}.total`, quantity * product.price, { shouldDirty: true });
 
       setProductPopovers(prev => ({ ...prev, [index]: false }));
+      setProductSearchQueries(prev => ({ ...prev, [index]: "" }));
     }
+  };
+
+  const handleCreateCustomProduct = (index: number, productName: string) => {
+    setValue(`items.${index}.productId`, "");
+    setValue(`items.${index}.description`, productName.trim());
+    setValue(`items.${index}.shouldCreateProduct`, false);
+    setProductPopovers(prev => ({ ...prev, [index]: false }));
+    setProductSearchQueries(prev => ({ ...prev, [index]: "" }));
+  };
+
+  const handleMarkForProductCreation = (index: number, productName: string) => {
+    setValue(`items.${index}.productId`, "");
+    setValue(`items.${index}.description`, productName.trim());
+    setValue(`items.${index}.shouldCreateProduct`, true);
+    setProductPopovers(prev => ({ ...prev, [index]: false }));
+    setProductSearchQueries(prev => ({ ...prev, [index]: "" }));
+    toast.info("Product will be created when credit note is submitted");
   };
 
   const handleQuantityChange = (index: number, value: string) => {
@@ -454,7 +474,8 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
       }];
       itemsGrossTotal = data.manualAmount;
     } else {
-      validItems = data.items.filter(item => item.productId);
+      // Allow items with either productId OR description (for deferred product creation)
+      validItems = data.items.filter(item => item.productId || (item.description && item.description.trim()));
       if (validItems.length === 0) {
         toast.error("Please add at least one product");
         return;
@@ -955,60 +976,95 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                                 <Controller
                                   name={`items.${index}.productId`}
                                   control={control}
-                                  render={({ field }) => (
-                                    <Popover
-                                      open={productPopovers[index]}
-                                      onOpenChange={(open) => setProductPopovers(prev => ({ ...prev, [index]: open }))}
-                                    >
-                                      <PopoverTrigger asChild>
-                                        <Button
-                                          ref={field.ref}
-                                          type="button"
-                                          variant="outline"
-                                          role="combobox"
-                                          className="w-full justify-between h-10"
-                                          disabled={isFromReturnNote || !!selectedReturnNoteId}
-                                        >
-                                          <span className="truncate">{product?.name || "Select product..."}</span>
-                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                                        <Command>
-                                          <CommandInput
-                                            placeholder="Search products..."
-                                            value={watchedItems[index]?.description || ""}
-                                            onValueChange={(val) => setValue(`items.${index}.description`, val)}
-                                          />
-                                          <CommandList
-                                            className="max-h-[200px] overflow-y-auto"
-                                            onWheel={(e) => e.stopPropagation()}
-                                            onTouchStart={(e) => e.stopPropagation()}
-                                            onTouchMove={(e) => e.stopPropagation()}
+                                  render={({ field }) => {
+                                    const searchQuery = productSearchQueries[index] || "";
+                                    const filteredProducts = products.filter(p =>
+                                      p.name.toLowerCase().includes(searchQuery.toLowerCase())
+                                    );
+                                    const isNewProduct = searchQuery.trim() && !filteredProducts.some(p =>
+                                      p.name.toLowerCase() === searchQuery.toLowerCase()
+                                    );
+
+                                    return (
+                                      <Popover
+                                        open={productPopovers[index]}
+                                        onOpenChange={(open) => setProductPopovers(prev => ({ ...prev, [index]: open }))}
+                                      >
+                                        <PopoverTrigger asChild>
+                                          <Button
+                                            ref={field.ref}
+                                            type="button"
+                                            variant="outline"
+                                            role="combobox"
+                                            className="w-full justify-between h-10"
+                                            disabled={isFromReturnNote || !!selectedReturnNoteId}
                                           >
-                                            <CommandEmpty>No product found.</CommandEmpty>
-                                            <CommandGroup>
-                                              {products.map((prod) => (
-                                                <CommandItem
-                                                  key={prod._id}
-                                                  value={prod.name}
-                                                  onSelect={() => handleProductSelect(index, prod._id)}
-                                                >
-                                                  <Check className={cn("mr-2 h-4 w-4", field.value === prod._id ? "opacity-100" : "opacity-0")} />
-                                                  <div className="flex-1">
-                                                    <div>{prod.name}</div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                      {prod.type} • {formatCurrency(prod.price)}
-                                                    </div>
-                                                  </div>
-                                                </CommandItem>
-                                              ))}
-                                            </CommandGroup>
-                                          </CommandList>
-                                        </Command>
-                                      </PopoverContent>
-                                    </Popover>
-                                  )}
+                                            <span className="truncate">{product?.name || watchedItems[index]?.description || "Select product..."}</span>
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                          </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[400px] p-0" align="start">
+                                          <Command shouldFilter={false}>
+                                            <CommandInput
+                                              placeholder="Search or type product name..."
+                                              value={searchQuery}
+                                              onValueChange={(val) => setProductSearchQueries(prev => ({ ...prev, [index]: val }))}
+                                            />
+                                            <CommandList
+                                              className="max-h-[250px] overflow-y-auto"
+                                              onWheel={(e) => e.stopPropagation()}
+                                              onTouchStart={(e) => e.stopPropagation()}
+                                              onTouchMove={(e) => e.stopPropagation()}
+                                            >
+                                              {!searchQuery.trim() && (
+                                                <CommandEmpty>Start typing to search...</CommandEmpty>
+                                              )}
+                                              {searchQuery.trim() && filteredProducts.length === 0 && !isNewProduct && (
+                                                <CommandEmpty>No products found.</CommandEmpty>
+                                              )}
+                                              {filteredProducts.length > 0 && (
+                                                <CommandGroup heading="Existing Products">
+                                                  {filteredProducts.map((prod) => (
+                                                    <CommandItem
+                                                      key={prod._id}
+                                                      value={prod.name}
+                                                      onSelect={() => handleProductSelect(index, prod._id)}
+                                                    >
+                                                      <Check className={cn("mr-2 h-4 w-4", field.value === prod._id ? "opacity-100" : "opacity-0")} />
+                                                      <div className="flex-1">
+                                                        <div>{prod.name}</div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                          {prod.type} • {formatCurrency(prod.price)}
+                                                        </div>
+                                                      </div>
+                                                    </CommandItem>
+                                                  ))}
+                                                </CommandGroup>
+                                              )}
+                                              {isNewProduct && (
+                                                <CommandGroup heading="Add Custom Item">
+                                                  <CommandItem
+                                                    onSelect={() => handleCreateCustomProduct(index, searchQuery)}
+                                                    className="text-primary"
+                                                  >
+                                                    <Plus className="mr-2 h-4 w-4" />
+                                                    Use "{searchQuery}"
+                                                  </CommandItem>
+                                                  <CommandItem
+                                                    onSelect={() => handleMarkForProductCreation(index, searchQuery)}
+                                                    className="text-green-600"
+                                                  >
+                                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                                    Create "{searchQuery}"
+                                                  </CommandItem>
+                                                </CommandGroup>
+                                              )}
+                                            </CommandList>
+                                          </Command>
+                                        </PopoverContent>
+                                      </Popover>
+                                    );
+                                  }}
                                 />
                               </td>
                               <td className="p-3">
@@ -1103,60 +1159,95 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                               <Controller
                                 name={`items.${index}.productId`}
                                 control={control}
-                                render={({ field }) => (
-                                  <Popover
-                                    open={productPopovers[index]}
-                                    onOpenChange={(open) => setProductPopovers(prev => ({ ...prev, [index]: open }))}
-                                  >
-                                    <PopoverTrigger asChild>
-                                      <Button
-                                        ref={field.ref}
-                                        type="button"
-                                        variant="outline"
-                                        role="combobox"
-                                        className="w-full justify-between h-9 text-sm"
-                                        disabled={isFromReturnNote || !!selectedReturnNoteId}
-                                      >
-                                        <span className="truncate">{product?.name || "Select product..."}</span>
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[300px] p-0" align="start">
-                                      <Command>
-                                        <CommandInput
-                                          placeholder="Search products..."
-                                          value={watchedItems[index]?.description || ""}
-                                          onValueChange={(val) => setValue(`items.${index}.description`, val)}
-                                        />
-                                        <CommandList
-                                          className="max-h-[200px] overflow-y-auto"
-                                          onWheel={(e) => e.stopPropagation()}
-                                          onTouchStart={(e) => e.stopPropagation()}
-                                          onTouchMove={(e) => e.stopPropagation()}
+                                render={({ field }) => {
+                                  const searchQuery = productSearchQueries[index] || "";
+                                  const filteredProducts = products.filter(p =>
+                                    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+                                  );
+                                  const isNewProduct = searchQuery.trim() && !filteredProducts.some(p =>
+                                    p.name.toLowerCase() === searchQuery.toLowerCase()
+                                  );
+
+                                  return (
+                                    <Popover
+                                      open={productPopovers[index]}
+                                      onOpenChange={(open) => setProductPopovers(prev => ({ ...prev, [index]: open }))}
+                                    >
+                                      <PopoverTrigger asChild>
+                                        <Button
+                                          ref={field.ref}
+                                          type="button"
+                                          variant="outline"
+                                          role="combobox"
+                                          className="w-full justify-between h-9 text-sm"
+                                          disabled={isFromReturnNote || !!selectedReturnNoteId}
                                         >
-                                          <CommandEmpty>No product found.</CommandEmpty>
-                                          <CommandGroup>
-                                            {products.map((prod) => (
-                                              <CommandItem
-                                                key={prod._id}
-                                                value={prod.name}
-                                                onSelect={() => handleProductSelect(index, prod._id)}
-                                              >
-                                                <Check className={cn("mr-2 h-4 w-4", field.value === prod._id ? "opacity-100" : "opacity-0")} />
-                                                <div className="flex-1 min-w-0">
-                                                  <div className="truncate">{prod.name}</div>
-                                                  <div className="text-xs text-muted-foreground truncate">
-                                                    {prod.type} • {formatCurrency(prod.price)}
-                                                  </div>
-                                                </div>
-                                              </CommandItem>
-                                            ))}
-                                          </CommandGroup>
-                                        </CommandList>
-                                      </Command>
-                                    </PopoverContent>
-                                  </Popover>
-                                )}
+                                          <span className="truncate">{product?.name || watchedItems[index]?.description || "Select product..."}</span>
+                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-[300px] p-0" align="start">
+                                        <Command shouldFilter={false}>
+                                          <CommandInput
+                                            placeholder="Search or type product name..."
+                                            value={searchQuery}
+                                            onValueChange={(val) => setProductSearchQueries(prev => ({ ...prev, [index]: val }))}
+                                          />
+                                          <CommandList
+                                            className="max-h-[200px] overflow-y-auto"
+                                            onWheel={(e) => e.stopPropagation()}
+                                            onTouchStart={(e) => e.stopPropagation()}
+                                            onTouchMove={(e) => e.stopPropagation()}
+                                          >
+                                            {!searchQuery.trim() && (
+                                              <CommandEmpty>Start typing to search...</CommandEmpty>
+                                            )}
+                                            {searchQuery.trim() && filteredProducts.length === 0 && !isNewProduct && (
+                                              <CommandEmpty>No products found.</CommandEmpty>
+                                            )}
+                                            {filteredProducts.length > 0 && (
+                                              <CommandGroup heading="Existing Products">
+                                                {filteredProducts.map((prod) => (
+                                                  <CommandItem
+                                                    key={prod._id}
+                                                    value={prod.name}
+                                                    onSelect={() => handleProductSelect(index, prod._id)}
+                                                  >
+                                                    <Check className={cn("mr-2 h-4 w-4", field.value === prod._id ? "opacity-100" : "opacity-0")} />
+                                                    <div className="flex-1 min-w-0">
+                                                      <div className="truncate">{prod.name}</div>
+                                                      <div className="text-xs text-muted-foreground truncate">
+                                                        {prod.type} • {formatCurrency(prod.price)}
+                                                      </div>
+                                                    </div>
+                                                  </CommandItem>
+                                                ))}
+                                              </CommandGroup>
+                                            )}
+                                            {isNewProduct && (
+                                              <CommandGroup heading="Add Custom Item">
+                                                <CommandItem
+                                                  onSelect={() => handleCreateCustomProduct(index, searchQuery)}
+                                                  className="text-primary"
+                                                >
+                                                  <Plus className="mr-2 h-4 w-4" />
+                                                  Use "{searchQuery}"
+                                                </CommandItem>
+                                                <CommandItem
+                                                  onSelect={() => handleMarkForProductCreation(index, searchQuery)}
+                                                  className="text-green-600"
+                                                >
+                                                  <PlusCircle className="mr-2 h-4 w-4" />
+                                                  Create "{searchQuery}"
+                                                </CommandItem>
+                                              </CommandGroup>
+                                            )}
+                                          </CommandList>
+                                        </Command>
+                                      </PopoverContent>
+                                    </Popover>
+                                  );
+                                }}
                               />
                             </div>
                             <div className="grid grid-cols-2 gap-3">

@@ -216,6 +216,47 @@ function CreditNotesPageContent() {
     const method = id ? "PUT" : "POST";
 
     try {
+      // Create products for items marked with shouldCreateProduct (only for new credit notes)
+      if (!id && data.items) {
+        const itemsWithProductIds = await Promise.all(
+          data.items.map(async (item: any) => {
+            if (item.shouldCreateProduct && item.description) {
+              try {
+                const productPayload = {
+                  name: item.description.trim(),
+                  type: "General",
+                  price: Number(item.price) || 0,
+                };
+
+                const response = await fetch("/api/products", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(productPayload),
+                });
+
+                if (response.ok) {
+                  const newProduct = await response.json();
+                  toast.success(`Product "${item.description}" created`);
+                  return { ...item, productId: newProduct._id, shouldCreateProduct: false };
+                } else {
+                  toast.error(`Failed to create product "${item.description}"`);
+                  return item;
+                }
+              } catch (error) {
+                console.error(`Error creating product "${item.description}":`, error);
+                return item;
+              }
+            }
+            return item;
+          })
+        );
+
+        data.items = itemsWithProductIds;
+
+        // Refresh products after creating new ones
+        window.dispatchEvent(new Event("refreshProducts"));
+      }
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },

@@ -5,6 +5,7 @@ export interface Item {
   quantity: number | string;
   rate: number | string;
   total: number;
+  shouldCreateProduct?: boolean; // Flag to indicate if product should be created on submit
 }
 
 export interface ConnectedDocuments {
@@ -42,12 +43,12 @@ export interface BillPayload {
   items: Item[];
   connectedDocuments?: ConnectedDocuments;
   voucherAmount?: number;
-  
+
   // Date fields for documents
   invoiceDate?: Date;
   quotationDate?: Date;
   voucherDate?: Date;
-  
+
   // Audit fields (readonly - managed by backend)
   createdBy?: string | null;
   updatedBy?: string | null;
@@ -60,12 +61,12 @@ export interface Bill extends BillPayload {
   totalAmount: number;
   vatAmount: number;
   grandTotal: number;
-  
+
   // Soft delete fields
   isDeleted: boolean;
   deletedAt: Date | null;
   deletedBy: string | null;
-  
+
   // Timestamps
   createdAt: Date;
   updatedAt: Date;

@@ -12,8 +12,9 @@ import { PDFFooter } from './pdf/Footer';
 
 const styles = StyleSheet.create({
   content: { padding: '15 25 25 25', flexGrow: 1 },
-  
+
   entityName: { fontSize: 11, fontWeight: 'bold', color: pdfColors.textMain, marginBottom: 2 },
+  entityDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
   dateInfo: { alignItems: 'flex-end' },
   dateLabel: { fontSize: 7, color: pdfColors.textMuted, marginBottom: 2 },
   dateValue: { fontSize: 10, fontWeight: 'bold', color: pdfColors.primary },
@@ -27,11 +28,11 @@ const styles = StyleSheet.create({
   col4_25: { width: '25%', textAlign: 'center' },
   col4_25_left: { width: '25%', textAlign: 'left' },
   col4_25_right: { width: '25%', textAlign: 'right' },
-  
+
   // Specific styling for readability
   headerText: { fontWeight: 'bold', color: pdfColors.white },
   headerTextAccent: { fontWeight: 'bold', color: pdfColors.accent },
-  
+
   textBold: { fontWeight: 'bold', color: pdfColors.primary },
 
   // Reason Box (Blue Style)
@@ -46,9 +47,9 @@ const styles = StyleSheet.create({
   reasonText: { fontSize: 8.5, color: pdfColors.textDark, lineHeight: 1.4 },
 
   // Layout for Bottom Section (Terms left, Totals right)
-  summaryContainer: { 
-    marginTop: 20, 
-    flexDirection: 'row', 
+  summaryContainer: {
+    marginTop: 20,
+    flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 20,
   },
@@ -57,7 +58,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     gap: 10,
   },
-  
+
   // Totals Box
   totalsBox: {
     width: '40%',
@@ -90,41 +91,41 @@ const styles = StyleSheet.create({
   grandTotalValue: { fontSize: 11, fontWeight: 'bold', color: pdfColors.accent },
 
   // Terms & Notes Styling
-  termsBox: { 
-    backgroundColor: pdfColors.warning, 
-    border: `1 solid ${pdfColors.warningBorder}`, 
-    borderRadius: 4, 
+  termsBox: {
+    backgroundColor: pdfColors.warning,
+    border: `1 solid ${pdfColors.warningBorder}`,
+    borderRadius: 4,
     padding: 10,
   },
-  boxTitle: { 
-    fontSize: 9, 
-    fontWeight: 'bold', 
-    color: pdfColors.primary, 
-    marginBottom: 6, 
-    textTransform: 'uppercase' 
+  boxTitle: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: pdfColors.primary,
+    marginBottom: 6,
+    textTransform: 'uppercase'
   },
-  boxContent: { 
-    fontSize: 8, 
-    color: pdfColors.textDark, 
-    lineHeight: 1.4 
+  boxContent: {
+    fontSize: 8,
+    color: pdfColors.textDark,
+    lineHeight: 1.4
   },
-  notesBox: { 
-    backgroundColor: '#f5f5f5', 
-    border: `1 solid ${pdfColors.border}`, 
-    borderRadius: 4, 
-    padding: 10 
+  notesBox: {
+    backgroundColor: '#f5f5f5',
+    border: `1 solid ${pdfColors.border}`,
+    borderRadius: 4,
+    padding: 10
   },
-  notesTitle: { 
-    fontSize: 9, 
-    fontWeight: 'bold', 
-    color: pdfColors.primary, 
-    marginBottom: 6, 
-    textTransform: 'uppercase' 
+  notesTitle: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: pdfColors.primary,
+    marginBottom: 6,
+    textTransform: 'uppercase'
   },
-  notesText: { 
-    fontSize: 8, 
-    color: pdfColors.textDark, 
-    lineHeight: 1.4 
+  notesText: {
+    fontSize: 8,
+    color: pdfColors.textDark,
+    lineHeight: 1.4
   },
 
   // Signatures (Stick to bottom)
@@ -133,26 +134,26 @@ const styles = StyleSheet.create({
     bottom: 80,
     left: 25,
     right: 25,
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     gap: 15,
   },
   signatureBox: {
-    flex: 1, 
-    backgroundColor: '#f5f5f5', 
-    border: `1.5 solid ${pdfColors.primary}`, 
-    borderRadius: 4, 
-    height: 80, 
-    padding: 10, 
-    flexDirection: 'column', 
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    border: `1.5 solid ${pdfColors.primary}`,
+    borderRadius: 4,
+    height: 80,
+    padding: 10,
+    flexDirection: 'column',
     justifyContent: 'flex-end',
   },
-  signatureLabel: { 
-    fontSize: 7, 
-    color: pdfColors.primary, 
-    fontWeight: 'bold', 
-    textAlign: 'center', 
-    textTransform: 'uppercase' 
+  signatureLabel: {
+    fontSize: 7,
+    color: pdfColors.primary,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    textTransform: 'uppercase'
   },
 });
 
@@ -161,6 +162,10 @@ interface PopulatedInvoice { _id: string; invoiceNumber: string; customerName?: 
 
 interface ReturnNoteDocumentProps {
   returnNote: IReturnNote & {
+    supplierPhone?: string;
+    supplierEmail?: string;
+    customerPhone?: string;
+    customerEmail?: string;
     connectedDocuments?: {
       purchaseId?: PopulatedPurchase | string;
       invoiceId?: PopulatedInvoice | string;
@@ -174,7 +179,7 @@ export const ReturnNoteDocument: React.FC<ReturnNoteDocumentProps> = ({ returnNo
 
   const totalItemsCount = returnNote.items.length;
   const totalReturnedQty = returnNote.items.reduce((sum, item) => sum + item.returnQuantity, 0);
-  
+
   // Calculate Grand Total safely (use stored value or calculate on fly for older records)
   const calculateTotal = () => {
     if (returnNote.grandTotal !== undefined && returnNote.grandTotal !== null) {
@@ -206,17 +211,17 @@ export const ReturnNoteDocument: React.FC<ReturnNoteDocumentProps> = ({ returnNo
 
   if (isSalesReturn) {
     termsList = [
-        "Goods are subject to inspection and approval.",
-        "Credit Note issued upon successful verification.",
-        "Items must be in original packaging."
+      "Goods are subject to inspection and approval.",
+      "Credit Note issued upon successful verification.",
+      "Items must be in original packaging."
     ];
     leftSigLabel = "Returned By (Customer)\n(Name, Signature & Date)";
     rightSigLabel = "Received By (Authorized)\n(Name, Signature & Date)";
   } else if (isPurchaseReturn) {
-     termsList = [
-        "Goods returned to supplier for credit/replacement.",
-        "Debit Note issued against this return.",
-        "Subject to supplier acceptance."
+    termsList = [
+      "Goods returned to supplier for credit/replacement.",
+      "Debit Note issued against this return.",
+      "Subject to supplier acceptance."
     ];
     leftSigLabel = "Returned By (Authorized)\n(Name, Signature & Date)";
     rightSigLabel = "Received By (Supplier)\n(Name, Signature & Date)";
@@ -240,6 +245,10 @@ export const ReturnNoteDocument: React.FC<ReturnNoteDocumentProps> = ({ returnNo
           <View style={{ flex: 1 }}>
             <Text style={commonStyles.sectionLabel}>{entityLabel}:</Text>
             <Text style={styles.entityName}>{entityName}</Text>
+            {isPurchaseReturn && returnNote.supplierPhone && <Text style={styles.entityDetail}>{returnNote.supplierPhone}</Text>}
+            {isPurchaseReturn && returnNote.supplierEmail && <Text style={styles.entityDetail}>{returnNote.supplierEmail}</Text>}
+            {isSalesReturn && returnNote.customerPhone && <Text style={styles.entityDetail}>{returnNote.customerPhone}</Text>}
+            {isSalesReturn && returnNote.customerEmail && <Text style={styles.entityDetail}>{returnNote.customerEmail}</Text>}
           </View>
           <View style={styles.dateInfo}>
             <Text style={styles.dateLabel}>Return Date</Text>
@@ -254,7 +263,7 @@ export const ReturnNoteDocument: React.FC<ReturnNoteDocumentProps> = ({ returnNo
         </View>
 
         <View style={styles.content}>
-          
+
           {/* Reason Box */}
           {returnNote.reason && (
             <View style={styles.reasonBox}>
@@ -307,7 +316,7 @@ export const ReturnNoteDocument: React.FC<ReturnNoteDocumentProps> = ({ returnNo
 
           {/* New Horizontal Layout for Terms & Totals */}
           <View style={styles.summaryContainer}>
-            
+
             {/* Left Column: Terms & Notes */}
             <View style={styles.leftColumn}>
               <View style={styles.termsBox}>
@@ -331,12 +340,12 @@ export const ReturnNoteDocument: React.FC<ReturnNoteDocumentProps> = ({ returnNo
                 <Text style={styles.totalLabel}>Total Items</Text>
                 <Text style={styles.totalValue}>{totalItemsCount}</Text>
               </View>
-              
+
               <View style={styles.totalRow}>
                 <Text style={styles.totalLabel}>Total Amount</Text>
                 <Text style={styles.totalValue}>{formatCurrency(grandTotal)}</Text>
               </View>
-              
+
               {/* Spacer ensures the grand total row is pushed to bottom */}
               <View style={{ flex: 1 }} />
 

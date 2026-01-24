@@ -35,11 +35,40 @@ export async function GET(
     if (error) return error;
 
     await dbConnect();
-    
-    const creditNote = await CreditNote.findById(id).setOptions({ includeDeleted: true });
+
+    // Allow finding soft-deleted credit notes for PDF generation
+    const creditNote = await CreditNote.findById(id)
+      .setOptions({ includeDeleted: true })
+      .populate('connectedDocuments.returnNoteId', 'returnNumber');
 
     if (!creditNote) {
       return NextResponse.json({ message: "Credit Note not found" }, { status: 404 });
+    }
+
+    // Fetch party contact details based on party type
+    let creditNoteWithDetails = creditNote.toObject();
+
+    if (creditNote.customerName) {
+      const Customer = (await import('@/models/Customer')).default;
+      const customer = await Customer.findOne({ name: creditNote.customerName });
+      if (customer) {
+        creditNoteWithDetails.customerPhone = customer.phone || '';
+        creditNoteWithDetails.customerEmail = customer.email || '';
+      }
+    } else if (creditNote.supplierName) {
+      const Supplier = (await import('@/models/Supplier')).default;
+      const supplier = await Supplier.findOne({ name: creditNote.supplierName });
+      if (supplier) {
+        creditNoteWithDetails.supplierPhone = supplier.contactNumbers?.[0] || '';
+        creditNoteWithDetails.supplierEmail = supplier.email || '';
+      }
+    } else if (creditNote.payeeName) {
+      const Payee = (await import('@/models/Payee')).default;
+      const payee = await Payee.findOne({ name: creditNote.payeeName });
+      if (payee) {
+        creditNoteWithDetails.payeePhone = payee.phone || '';
+        creditNoteWithDetails.payeeEmail = payee.email || '';
+      }
     }
 
     let companyDetails = await CompanyDetails.findOne();
@@ -54,7 +83,7 @@ export async function GET(
     }
 
     const documentElement = React.createElement(CreditNoteDocument, {
-      creditNote,
+      creditNote: creditNoteWithDetails,
       companyDetails,
     });
 

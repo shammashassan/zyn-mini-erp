@@ -151,7 +151,7 @@ function QuotationsPageContent() {
     };
 
     window.addEventListener("focus", onFocus);
-    
+
     return () => {
       window.removeEventListener("focus", onFocus);
     };
@@ -238,10 +238,57 @@ function QuotationsPageContent() {
 
     isSubmittingRef.current = true;
 
-    const url = id ? `/api/quotations/${id}` : "/api/quotations";
-    const method = id ? "PUT" : "POST";
-
     try {
+      // Create products for items marked for creation (only for new quotations)
+      if (!id && data.items) {
+        const itemsWithProductIds = await Promise.all(
+          data.items.map(async (item: any) => {
+            if (item.shouldCreateProduct && item.description && !item.productId) {
+              try {
+                const productPayload = {
+                  name: item.description.trim(),
+                  type: "General",
+                  price: Number(item.rate) || 0,
+                };
+
+                const response = await fetch("/api/products", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(productPayload),
+                });
+
+                if (response.ok) {
+                  const newProduct = await response.json();
+                  toast.success(`Product "${item.description}" created`);
+                  return {
+                    ...item,
+                    productId: newProduct._id,
+                    shouldCreateProduct: false,
+                  };
+                } else {
+                  const error = await response.json();
+                  toast.error(`Failed to create product "${item.description}"`, {
+                    description: error.error || "Continuing with custom item"
+                  });
+                  return { ...item, shouldCreateProduct: false };
+                }
+              } catch (error) {
+                console.error("Error creating product:", error);
+                toast.error(`Failed to create product "${item.description}"`);
+                return { ...item, shouldCreateProduct: false };
+              }
+            }
+            return item;
+          })
+        );
+
+        // Update data.items with the processed items
+        data.items = itemsWithProductIds;
+      }
+
+      const url = id ? `/api/quotations/${id}` : "/api/quotations";
+      const method = id ? "PUT" : "POST";
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -256,7 +303,7 @@ function QuotationsPageContent() {
         setIsQuotationFormOpen(false);
         setSelectedQuotation(null);
         fetchQuotations();
-        
+
         setSelectedPdfUrl(`/api/quotations/${quotation._id}/pdf`);
         setSelectedPdfTitle(quotation.invoiceNumber || "Quotation");
         setIsModalOpen(true);
@@ -323,7 +370,7 @@ function QuotationsPageContent() {
   const { table } = useDataTable<Quotation>({
     data: quotations,
     columns,
-    pageCount, 
+    pageCount,
     initialState: {
       sorting: urlState.sort,
       pagination: {
@@ -368,7 +415,7 @@ function QuotationsPageContent() {
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <div className="flex flex-col lg:flex-row lg:justify-between px-4 lg:px-6 gap-4">
-              
+
               <div className="flex items-center gap-3 self-start lg:self-center">
                 <div className="p-3 bg-primary/10 rounded-full">
                   <FileClock className="h-8 w-8 text-primary" />
@@ -389,7 +436,7 @@ function QuotationsPageContent() {
               </div>
 
               <div className="flex flex-col gap-3 w-full lg:w-auto lg:items-end">
-                
+
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                   {canViewTrash && (
                     <Link href="./quotations/trash" className="w-full sm:w-auto">

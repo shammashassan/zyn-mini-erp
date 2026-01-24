@@ -13,11 +13,13 @@ import type { Item } from "@/lib/types";
 import type { IProduct } from "@/models/Product";
 import { Check, ChevronsUpDown, Plus, PlusCircle, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { formatCurrency } from "@/utils/formatters/currency";
 
 interface ItemsTableProps {
   items: Item[];
   products: IProduct[];
-  updateItem: (index: number, field: keyof Item, value: string | number) => void;
+  updateItem: (index: number, field: keyof Item, value: string | number | boolean) => void;
   addItem: () => void;
   removeItem: (index: number) => void;
 }
@@ -44,9 +46,20 @@ function ItemRow({ item, index, products, updateItem, removeItem }: { item: Item
   const handleCreateNew = () => {
     if (searchQuery.trim()) {
       updateItem(index, "description", searchQuery.trim());
+      updateItem(index, "shouldCreateProduct", false);
       // Don't auto-set rate for custom items, let user decide
       setOpen(false);
       setSearchQuery("");
+    }
+  };
+
+  const handleMarkForCreation = () => {
+    if (searchQuery.trim()) {
+      updateItem(index, "description", searchQuery.trim());
+      updateItem(index, "shouldCreateProduct", true);
+      setOpen(false);
+      setSearchQuery("");
+      toast.info(`"${searchQuery}" will be created as a product when bill is submitted`);
     }
   };
 
@@ -80,7 +93,7 @@ function ItemRow({ item, index, products, updateItem, removeItem }: { item: Item
                 onWheel={(e) => e.stopPropagation()}
               >
                 <CommandEmpty>No product found.</CommandEmpty>
-                
+
                 {/* Existing Products */}
                 {products.length > 0 && (
                   <CommandGroup heading="Existing Products">
@@ -91,13 +104,18 @@ function ItemRow({ item, index, products, updateItem, removeItem }: { item: Item
                         onSelect={() => handleProductSelect(product)}
                       >
                         <Check className={cn("mr-2 h-4 w-4", item.description === product.name ? "opacity-100" : "opacity-0")} />
-                        {product.name}
+                        <div>
+                          <div>{product.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatCurrency(product.price)}
+                          </div>
+                        </div>
                       </CommandItem>
                     ))}
                   </CommandGroup>
                 )}
 
-                {/* Create New Item */}
+                {/* Create Custom Item or New Product */}
                 {searchQuery.trim() && !doesProductExist && (
                   <CommandGroup heading="Add Custom Item">
                     <CommandItem
@@ -107,6 +125,14 @@ function ItemRow({ item, index, products, updateItem, removeItem }: { item: Item
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Use "{searchQuery}"
+                    </CommandItem>
+                    <CommandItem
+                      onSelect={handleMarkForCreation}
+                      className="text-green-600 dark:text-green-400"
+                      value={`create-${searchQuery}`}
+                    >
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Create "{searchQuery}"
                     </CommandItem>
                   </CommandGroup>
                 )}

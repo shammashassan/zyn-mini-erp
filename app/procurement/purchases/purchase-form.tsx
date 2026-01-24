@@ -37,7 +37,7 @@ import {
   CommandList
 } from "@/components/ui/command";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarIcon, ChevronsUpDown, Check, Plus, X, ShoppingCart } from "lucide-react";
+import { CalendarIcon, ChevronsUpDown, Check, Plus, PlusCircle, X, ShoppingCart } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -54,6 +54,7 @@ type PurchaseItem = {
   quantity: number;
   unitCost: number;
   total: number;
+  shouldCreateMaterial?: boolean;
 };
 
 type PurchaseFormData = {
@@ -103,6 +104,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
   const [supplierPopoverOpen, setSupplierPopoverOpen] = useState(false);
   const [supplierSearchQuery, setSupplierSearchQuery] = useState("");
   const [materialPopovers, setMaterialPopovers] = useState<Record<number, boolean>>({});
+  const [materialSearchQueries, setMaterialSearchQueries] = useState<Record<number, string>>({});
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   const [isDesktop, setIsDesktop] = useState(true);
@@ -183,13 +185,41 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
       setValue(`items.${index}.total`, quantity * material.unitCost, { shouldDirty: true });
 
       setMaterialPopovers(prev => ({ ...prev, [index]: false }));
+      setMaterialSearchQueries(prev => ({ ...prev, [index]: "" }));
     }
+  };
+
+  const handleCreateCustomMaterial = (index: number, materialName: string) => {
+    setValue(`items.${index}.materialId`, "");
+    setValue(`items.${index}.materialName`, materialName.trim());
+    setValue(`items.${index}.shouldCreateMaterial`, false);
+    setMaterialPopovers(prev => ({ ...prev, [index]: false }));
+    setMaterialSearchQueries(prev => ({ ...prev, [index]: "" }));
+  };
+
+  const handleMarkForMaterialCreation = (index: number, materialName: string) => {
+    setValue(`items.${index}.materialId`, "");
+    setValue(`items.${index}.materialName`, materialName.trim());
+    setValue(`items.${index}.shouldCreateMaterial`, true);
+    setMaterialPopovers(prev => ({ ...prev, [index]: false }));
+    setMaterialSearchQueries(prev => ({ ...prev, [index]: "" }));
+    toast.info("Material will be created when purchase is submitted");
   };
 
   const handleQuantityChange = (index: number, value: string) => {
     const quantity = parseFloat(value);
     const unitCost = Number(watchedItems[index].unitCost) || 0;
     if (!isNaN(quantity)) {
+      setValue(`items.${index}.total`, quantity * unitCost, { shouldDirty: true });
+    } else {
+      setValue(`items.${index}.total`, 0, { shouldDirty: true });
+    }
+  };
+
+  const handleUnitCostChange = (index: number, value: string) => {
+    const unitCost = parseFloat(value);
+    const quantity = Number(watchedItems[index].quantity) || 0;
+    if (!isNaN(unitCost)) {
       setValue(`items.${index}.total`, quantity * unitCost, { shouldDirty: true });
     } else {
       setValue(`items.${index}.total`, 0, { shouldDirty: true });
@@ -207,7 +237,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
       return;
     }
 
-    const validItems = data.items.filter(item => item.materialId);
+    const validItems = data.items.filter(item => item.materialId || (item.materialName && item.materialName.trim()));
     if (validItems.length === 0) {
       toast.error("Please add at least one material");
       return;
@@ -463,7 +493,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                           Material <span className="text-destructive">*</span>
                         </th>
                         <th className="text-left p-3 font-medium text-sm w-[100px]">Quantity</th>
-                        <th className="text-right p-3 font-medium text-sm w-[100px]">Unit Cost</th>
+                        <th className="text-left p-3 font-medium text-sm w-[100px]">Unit Cost</th>
                         <th className="text-right p-3 font-medium text-sm w-[100px]">Total</th>
                         <th className="text-center p-3 font-medium text-sm w-[60px]">Actions</th>
                       </tr>
@@ -479,61 +509,89 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                               <Controller
                                 name={`items.${index}.materialId`}
                                 control={control}
-                                render={({ field }) => (
-                                  <div className="flex flex-col gap-1">
-                                    <Popover
-                                      open={materialPopovers[index]}
-                                      onOpenChange={(open) => setMaterialPopovers(prev => ({ ...prev, [index]: open }))}
-                                    >
-                                      <PopoverTrigger asChild>
-                                        <Button
-                                          ref={field.ref}
-                                          type="button"
-                                          variant="outline"
-                                          role="combobox"
-                                          className="w-full justify-between h-10"
-                                        >
-                                          <span className="truncate">{material?.name || "Select material..."}</span>
-                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                                        <Command>
-                                          <CommandInput
-                                            placeholder="Search materials..."
-                                            value={watchedItems[index]?.materialName || ""}
-                                            onValueChange={(val) => setValue(`items.${index}.materialName`, val)}
-                                          />
-                                          <CommandList
-                                            className="max-h-[200px] overflow-y-auto"
-                                            onWheel={(e) => e.stopPropagation()}
-                                            onTouchStart={(e) => e.stopPropagation()}
-                                            onTouchMove={(e) => e.stopPropagation()}
+                                render={({ field }) => {
+                                  const searchQuery = materialSearchQueries[index] || "";
+                                  const filteredMaterials = materials.filter(m =>
+                                    m.name.toLowerCase().includes(searchQuery.toLowerCase())
+                                  );
+                                  const isNewMaterial = searchQuery.trim() && !filteredMaterials.some(m =>
+                                    m.name.toLowerCase() === searchQuery.toLowerCase()
+                                  );
+
+                                  return (
+                                    <div className="flex flex-col gap-1">
+                                      <Popover
+                                        open={materialPopovers[index]}
+                                        onOpenChange={(open) => setMaterialPopovers(prev => ({ ...prev, [index]: open }))}
+                                      >
+                                        <PopoverTrigger asChild>
+                                          <Button
+                                            ref={field.ref}
+                                            type="button"
+                                            variant="outline"
+                                            role="combobox"
+                                            className="w-full justify-between h-10"
                                           >
-                                            <CommandEmpty>No material found.</CommandEmpty>
-                                            <CommandGroup>
-                                              {materials.map((mat) => (
-                                                <CommandItem
-                                                  key={mat._id}
-                                                  value={mat.name}
-                                                  onSelect={() => handleMaterialSelect(index, mat._id)}
-                                                >
-                                                  <Check className={cn("mr-2 h-4 w-4", field.value === mat._id ? "opacity-100" : "opacity-0")} />
-                                                  <div className="flex-1">
-                                                    <div>{mat.name}</div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                      {mat.type} • {mat.unitCost}/{mat.unit}
-                                                    </div>
-                                                  </div>
-                                                </CommandItem>
-                                              ))}
-                                            </CommandGroup>
-                                          </CommandList>
-                                        </Command>
-                                      </PopoverContent>
-                                    </Popover>
-                                  </div>
-                                )}
+                                            <span className="truncate">{material?.name || watchedItems[index]?.materialName || "Select material..."}</span>
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                          </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[400px] p-0" align="start">
+                                          <Command shouldFilter={false}>
+                                            <CommandInput
+                                              placeholder="Search or type material name..."
+                                              value={searchQuery}
+                                              onValueChange={(val) => setMaterialSearchQueries(prev => ({ ...prev, [index]: val }))}
+                                            />
+                                            <CommandList
+                                              className="max-h-[250px] overflow-y-auto"
+                                              onWheel={(e) => e.stopPropagation()}
+                                              onTouchStart={(e) => e.stopPropagation()}
+                                              onTouchMove={(e) => e.stopPropagation()}
+                                            >
+                                              {!searchQuery.trim() && (
+                                                <CommandEmpty>Start typing to search...</CommandEmpty>
+                                              )}
+                                              {searchQuery.trim() && filteredMaterials.length === 0 && !isNewMaterial && (
+                                                <CommandEmpty>No materials found.</CommandEmpty>
+                                              )}
+                                              {filteredMaterials.length > 0 && (
+                                                <CommandGroup heading="Existing Materials">
+                                                  {filteredMaterials.map((mat) => (
+                                                    <CommandItem
+                                                      key={mat._id}
+                                                      value={mat.name}
+                                                      onSelect={() => handleMaterialSelect(index, mat._id)}
+                                                    >
+                                                      <Check className={cn("mr-2 h-4 w-4", field.value === mat._id ? "opacity-100" : "opacity-0")} />
+                                                      <div className="flex-1">
+                                                        <div>{mat.name}</div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                          {mat.type} • {mat.unitCost}/{mat.unit}
+                                                        </div>
+                                                      </div>
+                                                    </CommandItem>
+                                                  ))}
+                                                </CommandGroup>
+                                              )}
+                                              {isNewMaterial && (
+                                                <CommandGroup heading="Create New Material">
+                                                  <CommandItem
+                                                    onSelect={() => handleMarkForMaterialCreation(index, searchQuery)}
+                                                    className="text-primary"
+                                                  >
+                                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                                    Create "{searchQuery}"
+                                                  </CommandItem>
+                                                </CommandGroup>
+                                              )}
+                                            </CommandList>
+                                          </Command>
+                                        </PopoverContent>
+                                      </Popover>
+                                    </div>
+                                  );
+                                }}
                               />
                             </td>
                             <td className="p-3">
@@ -547,8 +605,16 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                                 })}
                               />
                             </td>
-                            <td className="p-3 text-right text-sm tabular-nums font-medium">
-                              {material ? formatCurrency(material.unitCost) : formatCurrency(0)}
+                            <td className="p-3">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="h-10 text-left"
+                                {...register(`items.${index}.unitCost`, {
+                                  onChange: (e) => handleUnitCostChange(index, e.target.value)
+                                })}
+                              />
                             </td>
                             <td className="p-3 text-right font-semibold tabular-nums">
                               {formatCurrency(watchedItems[index]?.total || 0)}
@@ -603,61 +669,89 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                             <Controller
                               name={`items.${index}.materialId`}
                               control={control}
-                              render={({ field }) => (
-                                <>
-                                  <Popover
-                                    open={materialPopovers[index]}
-                                    onOpenChange={(open) => setMaterialPopovers(prev => ({ ...prev, [index]: open }))}
-                                  >
-                                    <PopoverTrigger asChild>
-                                      <Button
-                                        ref={field.ref}
-                                        type="button"
-                                        variant="outline"
-                                        role="combobox"
-                                        className="w-full justify-between h-9 text-sm"
-                                      >
-                                        <span className="truncate">{material?.name || "Select material..."}</span>
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[300px] p-0" align="start">
-                                      <Command>
-                                        <CommandInput
-                                          placeholder="Search materials..."
-                                          value={watchedItems[index]?.materialName || ""}
-                                          onValueChange={(val) => setValue(`items.${index}.materialName`, val)}
-                                        />
-                                        <CommandList
-                                          className="max-h-[200px] overflow-y-auto"
-                                          onWheel={(e) => e.stopPropagation()}
-                                          onTouchStart={(e) => e.stopPropagation()}
-                                          onTouchMove={(e) => e.stopPropagation()}
+                              render={({ field }) => {
+                                const searchQuery = materialSearchQueries[index] || "";
+                                const filteredMaterials = materials.filter(m =>
+                                  m.name.toLowerCase().includes(searchQuery.toLowerCase())
+                                );
+                                const isNewMaterial = searchQuery.trim() && !filteredMaterials.some(m =>
+                                  m.name.toLowerCase() === searchQuery.toLowerCase()
+                                );
+
+                                return (
+                                  <>
+                                    <Popover
+                                      open={materialPopovers[index]}
+                                      onOpenChange={(open) => setMaterialPopovers(prev => ({ ...prev, [index]: open }))}
+                                    >
+                                      <PopoverTrigger asChild>
+                                        <Button
+                                          ref={field.ref}
+                                          type="button"
+                                          variant="outline"
+                                          role="combobox"
+                                          className="w-full justify-between h-9 text-sm"
                                         >
-                                          <CommandEmpty>No material found.</CommandEmpty>
-                                          <CommandGroup>
-                                            {materials.map((mat) => (
-                                              <CommandItem
-                                                key={mat._id}
-                                                value={mat.name}
-                                                onSelect={() => handleMaterialSelect(index, mat._id)}
-                                              >
-                                                <Check className={cn("mr-2 h-4 w-4", field.value === mat._id ? "opacity-100" : "opacity-0")} />
-                                                <div className="flex-1 min-w-0">
-                                                  <div className="truncate">{mat.name}</div>
-                                                  <div className="text-xs text-muted-foreground truncate">
-                                                    {mat.type} • {mat.unitCost}/{mat.unit}
-                                                  </div>
-                                                </div>
-                                              </CommandItem>
-                                            ))}
-                                          </CommandGroup>
-                                        </CommandList>
-                                      </Command>
-                                    </PopoverContent>
-                                  </Popover>
-                                </>
-                              )}
+                                          <span className="truncate">{material?.name || watchedItems[index]?.materialName || "Select material..."}</span>
+                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-[300px] p-0" align="start">
+                                        <Command shouldFilter={false}>
+                                          <CommandInput
+                                            placeholder="Search or type material name..."
+                                            value={searchQuery}
+                                            onValueChange={(val) => setMaterialSearchQueries(prev => ({ ...prev, [index]: val }))}
+                                          />
+                                          <CommandList
+                                            className="max-h-[200px] overflow-y-auto"
+                                            onWheel={(e) => e.stopPropagation()}
+                                            onTouchStart={(e) => e.stopPropagation()}
+                                            onTouchMove={(e) => e.stopPropagation()}
+                                          >
+                                            {!searchQuery.trim() && (
+                                              <CommandEmpty>Start typing to search...</CommandEmpty>
+                                            )}
+                                            {searchQuery.trim() && filteredMaterials.length === 0 && !isNewMaterial && (
+                                              <CommandEmpty>No materials found.</CommandEmpty>
+                                            )}
+                                            {filteredMaterials.length > 0 && (
+                                              <CommandGroup heading="Existing Materials">
+                                                {filteredMaterials.map((mat) => (
+                                                  <CommandItem
+                                                    key={mat._id}
+                                                    value={mat.name}
+                                                    onSelect={() => handleMaterialSelect(index, mat._id)}
+                                                  >
+                                                    <Check className={cn("mr-2 h-4 w-4", field.value === mat._id ? "opacity-100" : "opacity-0")} />
+                                                    <div className="flex-1 min-w-0">
+                                                      <div className="truncate">{mat.name}</div>
+                                                      <div className="text-xs text-muted-foreground truncate">
+                                                        {mat.type} • {mat.unitCost}/{mat.unit}
+                                                      </div>
+                                                    </div>
+                                                  </CommandItem>
+                                                ))}
+                                              </CommandGroup>
+                                            )}
+                                            {isNewMaterial && (
+                                              <CommandGroup heading="Create New Material">
+                                                <CommandItem
+                                                  onSelect={() => handleMarkForMaterialCreation(index, searchQuery)}
+                                                  className="text-primary"
+                                                >
+                                                  <PlusCircle className="mr-2 h-4 w-4" />
+                                                  Create "{searchQuery}"
+                                                </CommandItem>
+                                              </CommandGroup>
+                                            )}
+                                          </CommandList>
+                                        </Command>
+                                      </PopoverContent>
+                                    </Popover>
+                                  </>
+                                );
+                              }}
                             />
                           </div>
                           <div className="grid grid-cols-2 gap-3">
@@ -675,9 +769,15 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                             </div>
                             <div className="space-y-1.5">
                               <Label className="text-xs text-muted-foreground">Unit Cost</Label>
-                              <div className="h-9 flex items-center justify-end px-3 border rounded-md bg-muted/50 text-sm">
-                                {material ? formatCurrency(material.unitCost) : formatCurrency(0)}
-                              </div>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="h-9"
+                                {...register(`items.${index}.unitCost`, {
+                                  onChange: (e) => handleUnitCostChange(index, e.target.value)
+                                })}
+                              />
                             </div>
                           </div>
                           <div className="flex justify-between items-center pt-2 border-t">

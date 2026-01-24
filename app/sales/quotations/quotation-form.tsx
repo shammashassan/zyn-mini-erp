@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronsUpDown, Check, Plus, X, FileText, CalendarIcon } from "lucide-react";
+import { ChevronsUpDown, Check, Plus, PlusCircle, X, FileText, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -53,6 +53,7 @@ type QuotationItem = {
   quantity: number;
   rate: number;
   total: number;
+  shouldCreateProduct?: boolean; // Flag to indicate if product should be created on submit
 };
 
 type QuotationFormData = {
@@ -102,6 +103,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [productPopovers, setProductPopovers] = useState<Record<number, boolean>>({});
+  const [productSearchQueries, setProductSearchQueries] = useState<Record<number, string>>({});
   const [searchQuery, setSearchQuery] = useState("");
 
   // Responsive check
@@ -199,6 +201,28 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
     setValue(`items.${index}.total`, quantity * product.price, { shouldDirty: true });
 
     setProductPopovers(prev => ({ ...prev, [index]: false }));
+    setProductSearchQueries(prev => ({ ...prev, [index]: "" }));
+  };
+
+  const handleCreateCustomProduct = (index: number) => {
+    const searchQuery = productSearchQueries[index] || "";
+    if (searchQuery.trim()) {
+      setValue(`items.${index}.description`, searchQuery.trim(), { shouldDirty: true });
+      setValue(`items.${index}.shouldCreateProduct`, false, { shouldDirty: true });
+      setProductPopovers(prev => ({ ...prev, [index]: false }));
+      setProductSearchQueries(prev => ({ ...prev, [index]: "" }));
+    }
+  };
+
+  const handleMarkForProductCreation = (index: number) => {
+    const searchQuery = productSearchQueries[index] || "";
+    if (searchQuery.trim()) {
+      setValue(`items.${index}.description`, searchQuery.trim(), { shouldDirty: true });
+      setValue(`items.${index}.shouldCreateProduct`, true, { shouldDirty: true });
+      setProductPopovers(prev => ({ ...prev, [index]: false }));
+      setProductSearchQueries(prev => ({ ...prev, [index]: "" }));
+      toast.info(`"${searchQuery}" will be created as a product when quotation is submitted`);
+    }
   };
 
   const handleQuantityChange = (index: number, value: string) => {
@@ -207,6 +231,18 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
     if (!isNaN(quantity)) {
       setValue(`items.${index}.total`, quantity * rate, { shouldDirty: true });
     } else {
+      setValue(`items.${index}.total`, 0, { shouldDirty: true });
+    }
+  };
+
+  const handleRateChange = (index: number, value: string) => {
+    const rate = parseFloat(value);
+    const quantity = Number(watchedItems[index].quantity) || 0;
+    if (!isNaN(rate)) {
+      setValue(`items.${index}.rate`, rate, { shouldDirty: true });
+      setValue(`items.${index}.total`, quantity * rate, { shouldDirty: true });
+    } else {
+      setValue(`items.${index}.rate`, 0, { shouldDirty: true });
       setValue(`items.${index}.total`, 0, { shouldDirty: true });
     }
   };
@@ -474,7 +510,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                         <th className="text-left p-3 font-medium text-sm w-[40px]">#</th>
                         <th className="text-left p-3 font-medium text-sm min-w-[250px]">Description</th>
                         <th className="text-left p-3 font-medium text-sm w-[100px]">Qty</th>
-                        <th className="text-right p-3 font-medium text-sm w-[100px]">Rate</th>
+                        <th className="text-left p-3 font-medium text-sm w-[100px]">Rate</th>
                         <th className="text-right p-3 font-medium text-sm w-[100px]">Total</th>
                         <th className="text-center p-3 font-medium text-sm w-[60px]">Actions</th>
                       </tr>
@@ -499,8 +535,12 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                                     </Button>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                                    <Command>
-                                      <CommandInput placeholder="Search products..." value={field.value} onValueChange={field.onChange} />
+                                    <Command shouldFilter={false}>
+                                      <CommandInput
+                                        placeholder="Search products..."
+                                        value={productSearchQueries[index] || ""}
+                                        onValueChange={(value) => setProductSearchQueries(prev => ({ ...prev, [index]: value }))}
+                                      />
                                       <CommandList
                                         className="max-h-[200px] overflow-y-auto"
                                         onWheel={(e) => e.stopPropagation()}
@@ -508,17 +548,52 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                                         onTouchMove={(e) => e.stopPropagation()}
                                       >
                                         <CommandEmpty>No product found.</CommandEmpty>
-                                        <CommandGroup>
-                                          {products.map((product) => (
-                                            <CommandItem key={String(product._id)} value={product.name} onSelect={() => handleProductSelect(index, product)}>
-                                              <Check className={cn("mr-2 h-4 w-4", field.value === product.name ? "opacity-100" : "opacity-0")} />
-                                              <div>
-                                                <div>{product.name}</div>
-                                                <div className="text-xs text-muted-foreground">{formatCurrency(product.price)}</div>
-                                              </div>
-                                            </CommandItem>
-                                          ))}
-                                        </CommandGroup>
+
+                                        {/* Existing Products */}
+                                        {products.filter(p =>
+                                          !productSearchQueries[index] ||
+                                          p.name.toLowerCase().includes((productSearchQueries[index] || "").toLowerCase())
+                                        ).length > 0 && (
+                                            <CommandGroup heading="Existing Products">
+                                              {products
+                                                .filter(p =>
+                                                  !productSearchQueries[index] ||
+                                                  p.name.toLowerCase().includes((productSearchQueries[index] || "").toLowerCase())
+                                                )
+                                                .map((product) => (
+                                                  <CommandItem key={String(product._id)} value={product.name} onSelect={() => handleProductSelect(index, product)}>
+                                                    <Check className={cn("mr-2 h-4 w-4", field.value === product.name ? "opacity-100" : "opacity-0")} />
+                                                    <div>
+                                                      <div>{product.name}</div>
+                                                      <div className="text-xs text-muted-foreground">{formatCurrency(product.price)}</div>
+                                                    </div>
+                                                  </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                          )}
+
+                                        {/* Use/Create Custom Item */}
+                                        {productSearchQueries[index]?.trim() &&
+                                          !products.some(p => p.name.toLowerCase() === (productSearchQueries[index] || "").toLowerCase()) && (
+                                            <CommandGroup heading="Add Custom Item">
+                                              <CommandItem
+                                                onSelect={() => handleCreateCustomProduct(index)}
+                                                className="text-primary"
+                                                value={productSearchQueries[index]}
+                                              >
+                                                <Plus className="mr-2 h-4 w-4" />
+                                                Use "{productSearchQueries[index]}"
+                                              </CommandItem>
+                                              <CommandItem
+                                                onSelect={() => handleMarkForProductCreation(index)}
+                                                className="text-green-600 dark:text-green-400"
+                                                value={`create-${productSearchQueries[index]}`}
+                                              >
+                                                <PlusCircle className="mr-2 h-4 w-4" />
+                                                Create "{productSearchQueries[index]}"
+                                              </CommandItem>
+                                            </CommandGroup>
+                                          )}
                                       </CommandList>
                                     </Command>
                                   </PopoverContent>
@@ -537,8 +612,16 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                               })}
                             />
                           </td>
-                          <td className="p-3 text-right text-sm tabular-nums font-medium">
-                            {formatCurrency(watchedItems[index]?.rate || 0)}
+                          <td className="p-3">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="h-10 text-left"
+                              {...register(`items.${index}.rate`, {
+                                onChange: (e) => handleRateChange(index, e.target.value)
+                              })}
+                            />
                           </td>
                           <td className="p-3 text-right font-semibold tabular-nums">
                             {formatCurrency(watchedItems[index]?.total || 0)}
@@ -587,8 +670,12 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                                   </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[300px] p-0" align="start">
-                                  <Command>
-                                    <CommandInput placeholder="Search..." value={field.value} onValueChange={field.onChange} />
+                                  <Command shouldFilter={false}>
+                                    <CommandInput
+                                      placeholder="Search..."
+                                      value={productSearchQueries[index] || ""}
+                                      onValueChange={(value) => setProductSearchQueries(prev => ({ ...prev, [index]: value }))}
+                                    />
                                     <CommandList
                                       className="max-h-[200px] overflow-y-auto"
                                       onWheel={(e) => e.stopPropagation()}
@@ -596,17 +683,50 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                                       onTouchMove={(e) => e.stopPropagation()}
                                     >
                                       <CommandEmpty>No product found.</CommandEmpty>
-                                      <CommandGroup>
-                                        {products.map((product) => (
-                                          <CommandItem key={String(product._id)} value={product.name} onSelect={() => handleProductSelect(index, product)}>
-                                            <Check className={cn("mr-2 h-4 w-4", field.value === product.name ? "opacity-100" : "opacity-0")} />
-                                            <div className="flex-1 min-w-0">
-                                              <div className="truncate">{product.name}</div>
-                                              <div className="text-xs text-muted-foreground">{formatCurrency(product.price)}</div>
-                                            </div>
-                                          </CommandItem>
-                                        ))}
-                                      </CommandGroup>
+
+                                      {products.filter(p =>
+                                        !productSearchQueries[index] ||
+                                        p.name.toLowerCase().includes((productSearchQueries[index] || "").toLowerCase())
+                                      ).length > 0 && (
+                                          <CommandGroup heading="Existing Products">
+                                            {products
+                                              .filter(p =>
+                                                !productSearchQueries[index] ||
+                                                p.name.toLowerCase().includes((productSearchQueries[index] || "").toLowerCase())
+                                              )
+                                              .map((product) => (
+                                                <CommandItem key={String(product._id)} value={product.name} onSelect={() => handleProductSelect(index, product)}>
+                                                  <Check className={cn("mr-2 h-4 w-4", field.value === product.name ? "opacity-100" : "opacity-0")} />
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="truncate">{product.name}</div>
+                                                    <div className="text-xs text-muted-foreground">{formatCurrency(product.price)}</div>
+                                                  </div>
+                                                </CommandItem>
+                                              ))}
+                                          </CommandGroup>
+                                        )}
+
+                                      {productSearchQueries[index]?.trim() &&
+                                        !products.some(p => p.name.toLowerCase() === (productSearchQueries[index] || "").toLowerCase()) && (
+                                          <CommandGroup heading="Add Custom Item">
+                                            <CommandItem
+                                              onSelect={() => handleCreateCustomProduct(index)}
+                                              className="text-primary"
+                                              value={productSearchQueries[index]}
+                                            >
+                                              <Plus className="mr-2 h-4 w-4" />
+                                              Use "{productSearchQueries[index]}"
+                                            </CommandItem>
+                                            <CommandItem
+                                              onSelect={() => handleMarkForProductCreation(index)}
+                                              className="text-green-600 dark:text-green-400"
+                                              value={`create-${productSearchQueries[index]}`}
+                                            >
+                                              <PlusCircle className="mr-2 h-4 w-4" />
+                                              Create "{productSearchQueries[index]}"
+                                            </CommandItem>
+                                          </CommandGroup>
+                                        )}
                                     </CommandList>
                                   </Command>
                                 </PopoverContent>
@@ -629,9 +749,15 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                           </div>
                           <div className="space-y-1.5">
                             <Label className="text-xs text-muted-foreground">Rate</Label>
-                            <div className="h-9 flex items-center justify-end px-3 border rounded-md bg-muted/50 text-sm">
-                              {formatCurrency(watchedItems[index]?.rate || 0)}
-                            </div>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="h-9 text-left"
+                              {...register(`items.${index}.rate`, {
+                                onChange: (e) => handleRateChange(index, e.target.value)
+                              })}
+                            />
                           </div>
                         </div>
                         <div className="flex justify-between items-center pt-2 border-t">

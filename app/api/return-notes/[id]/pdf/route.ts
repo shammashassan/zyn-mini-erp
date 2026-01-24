@@ -36,12 +36,36 @@ export async function GET(
     if (error) return error;
 
     await dbConnect();
-    
+
     // Allow finding soft-deleted return notes for PDF generation
-    const returnNote = await ReturnNote.findById(id).setOptions({ includeDeleted: true });
+    const returnNote = await ReturnNote.findById(id)
+      .setOptions({ includeDeleted: true })
+      .populate('connectedDocuments.purchaseId', 'referenceNumber')
+      .populate('connectedDocuments.invoiceId', 'invoiceNumber');
 
     if (!returnNote) {
       return NextResponse.json({ message: "Return Note not found" }, { status: 404 });
+    }
+
+    // Fetch party contact details based on return type
+    let returnNoteWithDetails = returnNote.toObject();
+
+    if (returnNote.returnType === 'purchaseReturn' && returnNote.supplierName) {
+      // Fetch supplier details
+      const Supplier = (await import('@/models/Supplier')).default;
+      const supplier = await Supplier.findOne({ name: returnNote.supplierName });
+      if (supplier) {
+        returnNoteWithDetails.supplierPhone = supplier.contactNumbers?.[0] || '';
+        returnNoteWithDetails.supplierEmail = supplier.email || '';
+      }
+    } else if (returnNote.returnType === 'salesReturn' && returnNote.customerName) {
+      // Fetch customer details
+      const Customer = (await import('@/models/Customer')).default;
+      const customer = await Customer.findOne({ name: returnNote.customerName });
+      if (customer) {
+        returnNoteWithDetails.customerPhone = customer.phone || '';
+        returnNoteWithDetails.customerEmail = customer.email || '';
+      }
     }
 
     // Fetch Company Details
@@ -57,7 +81,7 @@ export async function GET(
     }
 
     const documentElement = React.createElement(ReturnNoteDocument, {
-      returnNote,
+      returnNote: returnNoteWithDetails,
       companyDetails,
     });
 

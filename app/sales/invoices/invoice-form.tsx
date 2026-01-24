@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronsUpDown, Check, Plus, X, FileText, CalendarIcon } from "lucide-react";
+import { ChevronsUpDown, Check, Plus, PlusCircle, X, FileText, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -54,6 +54,7 @@ type InvoiceItem = {
   quantity: number;
   rate: number;
   total: number;
+  shouldCreateProduct?: boolean; // Flag to indicate if product should be created on submit
 };
 
 type InvoiceFormData = {
@@ -114,6 +115,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
   const [quotationPopoverOpen, setQuotationPopoverOpen] = useState(false);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [productPopovers, setProductPopovers] = useState<Record<number, boolean>>({});
+  const [productSearchQueries, setProductSearchQueries] = useState<Record<number, string>>({});
   const [loadingQuotations, setLoadingQuotations] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -253,12 +255,98 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     setValue(`items.${index}.total`, quantity * product.price, { shouldDirty: true });
 
     setProductPopovers(prev => ({ ...prev, [index]: false }));
+    setProductSearchQueries(prev => ({ ...prev, [index]: "" }));
+  };
+
+  const handleCreateCustomProduct = (index: number) => {
+    const searchQuery = productSearchQueries[index] || "";
+    if (searchQuery.trim()) {
+      setValue(`items.${index}.productId`, "", { shouldDirty: true });
+      setValue(`items.${index}.description`, searchQuery.trim(), { shouldDirty: true });
+      setValue(`items.${index}.shouldCreateProduct`, false, { shouldDirty: true });
+      // Don't auto-set rate for custom items, let user decide
+      setProductPopovers(prev => ({ ...prev, [index]: false }));
+      setProductSearchQueries(prev => ({ ...prev, [index]: "" }));
+    }
+  };
+
+  const handleMarkForProductCreation = (index: number) => {
+    const searchQuery = productSearchQueries[index] || "";
+    if (searchQuery.trim()) {
+      setValue(`items.${index}.productId`, "", { shouldDirty: true });
+      setValue(`items.${index}.description`, searchQuery.trim(), { shouldDirty: true });
+      setValue(`items.${index}.shouldCreateProduct`, true, { shouldDirty: true });
+      setProductPopovers(prev => ({ ...prev, [index]: false }));
+      setProductSearchQueries(prev => ({ ...prev, [index]: "" }));
+      toast.info(`"${searchQuery}" will be created as a product when invoice is submitted`);
+    }
+  };
+
+  const handleCreateNewProduct = async (index: number) => {
+    const searchQuery = productSearchQueries[index] || "";
+    if (!searchQuery.trim()) return;
+
+    try {
+      const productPayload = {
+        name: searchQuery.trim(),
+        type: "General", // Default type
+        price: 0, // Default price, user can adjust in the rate field
+      };
+
+      const response = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(productPayload),
+      });
+
+      if (response.ok) {
+        const newProduct = await response.json();
+        toast.success(`Product "${searchQuery}" created successfully`);
+
+        // Refresh products list
+        const productsRes = await fetch("/api/products");
+        if (productsRes.ok) {
+          const updatedProducts = await productsRes.json();
+          setProducts(updatedProducts);
+        }
+
+        // Set the newly created product in the form
+        setValue(`items.${index}.productId`, newProduct._id, { shouldDirty: true });
+        setValue(`items.${index}.description`, newProduct.name, { shouldDirty: true });
+        setValue(`items.${index}.rate`, newProduct.price, { shouldDirty: true });
+
+        const quantity = parseFloat(String(watchedItems[index].quantity)) || 1;
+        setValue(`items.${index}.total`, quantity * newProduct.price, { shouldDirty: true });
+      } else {
+        const error = await response.json();
+        toast.error("Failed to create product", {
+          description: error.error || "Please try again"
+        });
+      }
+    } catch (error) {
+      console.error("Error creating product:", error);
+      toast.error("Failed to create product");
+    } finally {
+      setProductPopovers(prev => ({ ...prev, [index]: false }));
+      setProductSearchQueries(prev => ({ ...prev, [index]: "" }));
+    }
   };
 
   const handleQuantityChange = (index: number, value: string) => {
     const quantity = parseFloat(value);
     const rate = Number(watchedItems[index].rate) || 0;
     if (!isNaN(quantity)) {
+      setValue(`items.${index}.total`, quantity * rate, { shouldDirty: true });
+    } else {
+      setValue(`items.${index}.total`, 0, { shouldDirty: true });
+    }
+  };
+
+  const handleRateChange = (index: number, value: string) => {
+    const rate = parseFloat(value);
+    const quantity = Number(watchedItems[index].quantity) || 0;
+    setValue(`items.${index}.rate`, isNaN(rate) ? 0 : rate, { shouldDirty: true });
+    if (!isNaN(rate)) {
       setValue(`items.${index}.total`, quantity * rate, { shouldDirty: true });
     } else {
       setValue(`items.${index}.total`, 0, { shouldDirty: true });
@@ -293,6 +381,64 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
         description: "Discount cannot exceed the gross total"
       });
       return;
+    }
+
+    // Create products for items marked for creation
+    const itemsWithProductIds = await Promise.all(
+      validItems.map(async (item) => {
+        if (item.shouldCreateProduct && item.description && !item.productId) {
+          try {
+            const productPayload = {
+              name: item.description.trim(),
+              type: "General",
+              price: Number(item.rate) || 0,
+            };
+
+            const response = await fetch("/api/products", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(productPayload),
+            });
+
+            if (response.ok) {
+              const newProduct = await response.json();
+              toast.success(`Product "${item.description}" created`);
+              return {
+                ...item,
+                productId: newProduct._id,
+                shouldCreateProduct: false,
+              };
+            } else {
+              const error = await response.json();
+              toast.error(`Failed to create product "${item.description}"`, {
+                description: error.error || "Continuing with custom item"
+              });
+              return { ...item, shouldCreateProduct: false };
+            }
+          } catch (error) {
+            console.error("Error creating product:", error);
+            toast.error(`Failed to create product "${item.description}"`);
+            return { ...item, shouldCreateProduct: false };
+          }
+        }
+        return item;
+      })
+    );
+
+    // Refresh products list if any were created
+    const anyProductsCreated = itemsWithProductIds.some((item, index) =>
+      item.productId && validItems[index].shouldCreateProduct
+    );
+    if (anyProductsCreated) {
+      try {
+        const productsRes = await fetch("/api/products");
+        if (productsRes.ok) {
+          const updatedProducts = await productsRes.json();
+          setProducts(updatedProducts);
+        }
+      } catch (error) {
+        console.error("Failed to refresh products list:", error);
+      }
     }
 
     // Check if customer exists, if not create it
@@ -338,7 +484,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
       customerPhone: data.customerPhone.trim(),
       customerEmail: data.customerEmail.trim(),
       invoiceDate: data.invoiceDate, // ✅ UPDATED: Use invoiceDate
-      items: validItems.map(item => ({
+      items: itemsWithProductIds.map(item => ({
         productId: item.productId || '',  // ✅ Ensure productId is included
         description: item.description,
         quantity: Number(item.quantity) || 0,
@@ -590,7 +736,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                         <th className="text-left p-3 font-medium text-sm w-[40px]">#</th>
                         <th className="text-left p-3 font-medium text-sm min-w-[250px]">Description</th>
                         <th className="text-left p-3 font-medium text-sm w-[100px]">Qty</th>
-                        <th className="text-right p-3 font-medium text-sm w-[100px]">Rate</th>
+                        <th className="text-left p-3 font-medium text-sm w-[100px]">Rate</th>
                         <th className="text-right p-3 font-medium text-sm w-[100px]">Total</th>
                         <th className="text-center p-3 font-medium text-sm w-[60px]">Actions</th>
                       </tr>
@@ -603,54 +749,104 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                             <Controller
                               name={`items.${index}.description`}
                               control={control}
-                              render={({ field }) => (
-                                <Popover
-                                  open={productPopovers[index]}
-                                  onOpenChange={(open) => setProductPopovers(prev => ({ ...prev, [index]: open }))}
-                                >
-                                  <PopoverTrigger asChild>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      role="combobox"
-                                      className="w-full justify-between h-10 font-normal"
-                                    >
-                                      <span className="truncate">{field.value || "Select or type product..."}</span>
-                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                                    <Command>
-                                      <CommandInput placeholder="Search products..." value={field.value} onValueChange={field.onChange} />
-                                      <CommandList
-                                        className="max-h-[200px] overflow-y-auto"
-                                        onWheel={(e) => e.stopPropagation()}
-                                        onTouchStart={(e) => e.stopPropagation()}
-                                        onTouchMove={(e) => e.stopPropagation()}
+                              render={({ field }) => {
+                                const searchQuery = productSearchQueries[index] || "";
+                                const doesProductExist = products.some(
+                                  (p) => p.name.toLowerCase() === searchQuery.trim().toLowerCase()
+                                );
+
+                                return (
+                                  <Popover
+                                    open={productPopovers[index]}
+                                    onOpenChange={(open) => {
+                                      setProductPopovers(prev => ({ ...prev, [index]: open }));
+                                      if (open) {
+                                        setProductSearchQueries(prev => ({ ...prev, [index]: field.value || "" }));
+                                      }
+                                    }}
+                                  >
+                                    <PopoverTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        role="combobox"
+                                        className="w-full justify-between h-10 font-normal"
                                       >
-                                        <CommandEmpty>No product found.</CommandEmpty>
-                                        <CommandGroup>
-                                          {products.map((product) => (
-                                            <CommandItem
-                                              key={String(product._id)}
-                                              value={product.name}
-                                              onSelect={() => handleProductSelect(index, product)}
-                                            >
-                                              <Check className={cn("mr-2 h-4 w-4", field.value === product.name ? "opacity-100" : "opacity-0")} />
-                                              <div>
-                                                <div>{product.name}</div>
-                                                <div className="text-xs text-muted-foreground">
-                                                  {formatCurrency(product.price)}
-                                                </div>
-                                              </div>
-                                            </CommandItem>
-                                          ))}
-                                        </CommandGroup>
-                                      </CommandList>
-                                    </Command>
-                                  </PopoverContent>
-                                </Popover>
-                              )}
+                                        <span className="truncate">{field.value || "Select or type product..."}</span>
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
+                                      <Command shouldFilter={false}>
+                                        <CommandInput
+                                          placeholder="Search or type new product..."
+                                          value={searchQuery}
+                                          onValueChange={(value) => {
+                                            setProductSearchQueries(prev => ({ ...prev, [index]: value }));
+                                            field.onChange(value);
+                                          }}
+                                        />
+                                        <CommandList
+                                          className="max-h-[200px] overflow-y-auto"
+                                          onWheel={(e) => e.stopPropagation()}
+                                          onTouchStart={(e) => e.stopPropagation()}
+                                          onTouchMove={(e) => e.stopPropagation()}
+                                        >
+                                          <CommandEmpty>No product found.</CommandEmpty>
+
+                                          {products.filter(product =>
+                                            !searchQuery || product.name.toLowerCase().includes(searchQuery.toLowerCase())
+                                          ).length > 0 && (
+                                              <CommandGroup heading="Existing Products">
+                                                {products
+                                                  .filter(product =>
+                                                    !searchQuery || product.name.toLowerCase().includes(searchQuery.toLowerCase())
+                                                  )
+                                                  .map((product) => (
+                                                    <CommandItem
+                                                      key={String(product._id)}
+                                                      value={product.name}
+                                                      onSelect={() => handleProductSelect(index, product)}
+                                                    >
+                                                      <Check className={cn("mr-2 h-4 w-4", field.value === product.name ? "opacity-100" : "opacity-0")} />
+                                                      <div>
+                                                        <div>{product.name}</div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                          {formatCurrency(product.price)}
+                                                        </div>
+                                                      </div>
+                                                    </CommandItem>
+                                                  ))
+                                                }
+                                              </CommandGroup>
+                                            )}
+
+                                          {searchQuery.trim() && !doesProductExist && (
+                                            <CommandGroup heading="Add Custom Item">
+                                              <CommandItem
+                                                onSelect={() => handleCreateCustomProduct(index)}
+                                                className="text-primary"
+                                                value={searchQuery}
+                                              >
+                                                <Plus className="mr-2 h-4 w-4" />
+                                                Use "{searchQuery}"
+                                              </CommandItem>
+                                              <CommandItem
+                                                onSelect={() => handleMarkForProductCreation(index)}
+                                                className="text-green-600 dark:text-green-400"
+                                                value={`create-${searchQuery}`}
+                                              >
+                                                <PlusCircle className="mr-2 h-4 w-4" />
+                                                Create "{searchQuery}"
+                                              </CommandItem>
+                                            </CommandGroup>
+                                          )}
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                );
+                              }}
                             />
                           </td>
                           <td className="p-3">
@@ -664,8 +860,16 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                               })}
                             />
                           </td>
-                          <td className="p-3 text-right text-sm tabular-nums font-medium">
-                            {formatCurrency(watchedItems[index]?.rate || 0)}
+                          <td className="p-3">
+                            <Input
+                              type="number"
+                              step="any"
+                              min="0"
+                              className="h-10 text-left"
+                              {...register(`items.${index}.rate`, {
+                                onChange: (e) => handleRateChange(index, e.target.value)
+                              })}
+                            />
                           </td>
                           <td className="p-3 text-right font-semibold tabular-nums">
                             {formatCurrency(watchedItems[index]?.total || 0)}
@@ -714,47 +918,97 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                           <Controller
                             name={`items.${index}.description`}
                             control={control}
-                            render={({ field }) => (
-                              <Popover
-                                open={productPopovers[index]}
-                                onOpenChange={(open) => setProductPopovers(prev => ({ ...prev, [index]: open }))}
-                              >
-                                <PopoverTrigger asChild>
-                                  <Button type="button" variant="outline" role="combobox" className="w-full justify-between h-9 text-sm font-normal">
-                                    <span className="truncate">{field.value || "Select..."}</span>
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[300px] p-0" align="start">
-                                  <Command>
-                                    <CommandInput placeholder="Search products..." value={field.value} onValueChange={field.onChange} />
-                                    <CommandList
-                                      className="max-h-[200px] overflow-y-auto"
-                                      onWheel={(e) => e.stopPropagation()}
-                                      onTouchStart={(e) => e.stopPropagation()}
-                                      onTouchMove={(e) => e.stopPropagation()}
-                                    >
-                                      <CommandEmpty>No product found.</CommandEmpty>
-                                      <CommandGroup>
-                                        {products.map((product) => (
-                                          <CommandItem
-                                            key={String(product._id)}
-                                            value={product.name}
-                                            onSelect={() => handleProductSelect(index, product)}
-                                          >
-                                            <Check className={cn("mr-2 h-4 w-4", field.value === product.name ? "opacity-100" : "opacity-0")} />
-                                            <div className="flex-1 min-w-0">
-                                              <div className="truncate">{product.name}</div>
-                                              <div className="text-xs text-muted-foreground">{formatCurrency(product.price)}</div>
-                                            </div>
-                                          </CommandItem>
-                                        ))}
-                                      </CommandGroup>
-                                    </CommandList>
-                                  </Command>
-                                </PopoverContent>
-                              </Popover>
-                            )}
+                            render={({ field }) => {
+                              const searchQuery = productSearchQueries[index] || "";
+                              const doesProductExist = products.some(
+                                (p) => p.name.toLowerCase() === searchQuery.trim().toLowerCase()
+                              );
+
+                              return (
+                                <Popover
+                                  open={productPopovers[index]}
+                                  onOpenChange={(open) => {
+                                    setProductPopovers(prev => ({ ...prev, [index]: open }));
+                                    if (open) {
+                                      setProductSearchQueries(prev => ({ ...prev, [index]: field.value || "" }));
+                                    }
+                                  }}
+                                >
+                                  <PopoverTrigger asChild>
+                                    <Button type="button" variant="outline" role="combobox" className="w-full justify-between h-9 text-sm font-normal">
+                                      <span className="truncate">{field.value || "Select or type product..."}</span>
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[300px] p-0" align="start">
+                                    <Command shouldFilter={false}>
+                                      <CommandInput
+                                        placeholder="Search or type new product..."
+                                        value={searchQuery}
+                                        onValueChange={(value) => {
+                                          setProductSearchQueries(prev => ({ ...prev, [index]: value }));
+                                          field.onChange(value);
+                                        }}
+                                      />
+                                      <CommandList
+                                        className="max-h-[200px] overflow-y-auto"
+                                        onWheel={(e) => e.stopPropagation()}
+                                        onTouchStart={(e) => e.stopPropagation()}
+                                        onTouchMove={(e) => e.stopPropagation()}
+                                      >
+                                        <CommandEmpty>No product found.</CommandEmpty>
+
+                                        {products.filter(product =>
+                                          !searchQuery || product.name.toLowerCase().includes(searchQuery.toLowerCase())
+                                        ).length > 0 && (
+                                            <CommandGroup heading="Existing Products">
+                                              {products
+                                                .filter(product =>
+                                                  !searchQuery || product.name.toLowerCase().includes(searchQuery.toLowerCase())
+                                                )
+                                                .map((product) => (
+                                                  <CommandItem
+                                                    key={String(product._id)}
+                                                    value={product.name}
+                                                    onSelect={() => handleProductSelect(index, product)}
+                                                  >
+                                                    <Check className={cn("mr-2 h-4 w-4", field.value === product.name ? "opacity-100" : "opacity-0")} />
+                                                    <div className="flex-1 min-w-0">
+                                                      <div className="truncate">{product.name}</div>
+                                                      <div className="text-xs text-muted-foreground">{formatCurrency(product.price)}</div>
+                                                    </div>
+                                                  </CommandItem>
+                                                ))
+                                              }
+                                            </CommandGroup>
+                                          )}
+
+                                        {searchQuery.trim() && !doesProductExist && (
+                                          <CommandGroup heading="Add Custom Item">
+                                            <CommandItem
+                                              onSelect={() => handleCreateCustomProduct(index)}
+                                              className="text-primary"
+                                              value={searchQuery}
+                                            >
+                                              <Plus className="mr-2 h-4 w-4" />
+                                              Use "{searchQuery}"
+                                            </CommandItem>
+                                            <CommandItem
+                                              onSelect={() => handleMarkForProductCreation(index)}
+                                              className="text-green-600 dark:text-green-400"
+                                              value={`create-${searchQuery}`}
+                                            >
+                                              <PlusCircle className="mr-2 h-4 w-4" />
+                                              Create "{searchQuery}"
+                                            </CommandItem>
+                                          </CommandGroup>
+                                        )}
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
+                              );
+                            }}
                           />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
@@ -772,9 +1026,15 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                           </div>
                           <div className="space-y-1.5">
                             <Label className="text-xs text-muted-foreground">Rate</Label>
-                            <div className="h-9 flex items-center justify-end px-3 border rounded-md bg-muted/50 text-sm">
-                              {formatCurrency(watchedItems[index]?.rate || 0)}
-                            </div>
+                            <Input
+                              type="number"
+                              step="any"
+                              min="0"
+                              className="h-9 text-right"
+                              {...register(`items.${index}.rate`, {
+                                onChange: (e) => handleRateChange(index, e.target.value)
+                              })}
+                            />
                           </div>
                         </div>
                         <div className="flex justify-between items-center pt-2 border-t">

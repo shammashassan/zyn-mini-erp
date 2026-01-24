@@ -21,7 +21,7 @@ const styles = StyleSheet.create({
   customerName: {
     fontSize: 11, fontWeight: 'bold', color: pdfColors.textMain, marginBottom: 2,
   },
-  detailText: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
+  partyDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
   dateInfo: { alignItems: 'flex-end' },
   dateLabel: { fontSize: 7, color: pdfColors.textMuted, marginBottom: 2 },
   dateValue: { fontSize: 10, fontWeight: 'bold', color: pdfColors.primary },
@@ -68,13 +68,13 @@ const styles = StyleSheet.create({
   amountWordsText: {
     fontSize: 8, color: pdfColors.textDark, backgroundColor: pdfColors.white, padding: '5 8', borderRadius: 3, border: `0.5 solid ${pdfColors.border}`,
   },
-  
+
   bottomSection: { flexDirection: 'row', gap: 15, marginBottom: 10 },
   bankBox: { flex: 1, backgroundColor: '#f5f5f5', border: `1 solid ${pdfColors.border}`, borderRadius: 4, padding: 10 },
   termsBox: { flex: 1, backgroundColor: pdfColors.warning, border: `1 solid ${pdfColors.warningBorder}`, borderRadius: 4, padding: 10 },
   boxTitle: { fontSize: 9, fontWeight: 'bold', color: pdfColors.primary, marginBottom: 6, textTransform: 'uppercase' },
   boxContent: { fontSize: 8, color: pdfColors.textDark, lineHeight: 1.4 },
-  
+
   notesBox: {
     backgroundColor: pdfColors.warning, border: `1 solid ${pdfColors.warningBorder}`, borderRadius: 4, padding: 10, marginBottom: 10,
   },
@@ -82,25 +82,47 @@ const styles = StyleSheet.create({
   notesContent: { fontSize: 8, color: pdfColors.textDark, lineHeight: 1.4 },
 });
 
+interface PopulatedReturnNote { _id: string; returnNumber: string; }
+
 interface CreditNoteDocumentProps {
-  creditNote: ICreditNote;
+  creditNote: ICreditNote & {
+    customerPhone?: string;
+    customerEmail?: string;
+    supplierPhone?: string;
+    supplierEmail?: string;
+    payeePhone?: string;
+    payeeEmail?: string;
+    connectedDocuments?: {
+      returnNoteId?: PopulatedReturnNote | string;
+    };
+  };
   companyDetails: ICompanyDetails | null;
 }
 
 export const CreditNoteDocument: React.FC<CreditNoteDocumentProps> = ({ creditNote, companyDetails }) => {
   registerPdfFonts();
-  
+
+  // Extract connected return note info
+  const returnNote = typeof creditNote.connectedDocuments?.returnNoteId === 'object'
+    ? creditNote.connectedDocuments.returnNoteId as PopulatedReturnNote
+    : null;
+
+  const returnNoteNumber = returnNote?.returnNumber;
+
   const grossTotal = creditNote.totalAmount || 0;
   const vatAmount = creditNote.vatAmount || 0;
   const subtotal = grossTotal - creditNote.discount;
   const discount = creditNote.discount || 0;
   const grandTotal = creditNote.grandTotal || 0;
-  
+
   const partyName = creditNote.customerName || creditNote.supplierName || creditNote.payeeName || creditNote.vendorName;
   let partyLabel = "Customer";
   if (creditNote.supplierName) partyLabel = "Supplier";
   if (creditNote.payeeName) partyLabel = "Payee";
   if (creditNote.vendorName) partyLabel = "Vendor";
+
+
+  const isManualEntry = creditNote.items?.length === 1 && !creditNote.items[0].productId;
 
   return (
     <Document>
@@ -118,37 +140,62 @@ export const CreditNoteDocument: React.FC<CreditNoteDocumentProps> = ({ creditNo
           <View style={{ flex: 1 }}>
             <Text style={commonStyles.sectionLabel}>{partyLabel}:</Text>
             <Text style={styles.customerName}>{partyName}</Text>
+            {creditNote.customerName && creditNote.customerPhone && <Text style={styles.partyDetail}>{creditNote.customerPhone}</Text>}
+            {creditNote.customerName && creditNote.customerEmail && <Text style={styles.partyDetail}>{creditNote.customerEmail}</Text>}
+            {creditNote.supplierName && creditNote.supplierPhone && <Text style={styles.partyDetail}>{creditNote.supplierPhone}</Text>}
+            {creditNote.supplierName && creditNote.supplierEmail && <Text style={styles.partyDetail}>{creditNote.supplierEmail}</Text>}
+            {creditNote.payeeName && creditNote.payeePhone && <Text style={styles.partyDetail}>{creditNote.payeePhone}</Text>}
+            {creditNote.payeeName && creditNote.payeeEmail && <Text style={styles.partyDetail}>{creditNote.payeeEmail}</Text>}
           </View>
           <View style={styles.dateInfo}>
             <Text style={styles.dateLabel}>Credit Note Date</Text>
             <Text style={styles.dateValue}>{formatDisplayDate(creditNote.creditDate)}</Text>
+            {returnNoteNumber && (
+              <>
+                <Text style={[styles.dateLabel, { marginTop: 8 }]}>Against Sales Return</Text>
+                <Text style={styles.dateValue}>{returnNoteNumber}</Text>
+              </>
+            )}
           </View>
         </View>
 
         <View style={styles.content}>
-          {creditNote.reason && (
+
+          {(creditNote.reason || isManualEntry) && (
             <View style={styles.reasonBox}>
-              <Text style={styles.reasonLabel}>Reason:</Text>
-              <Text style={styles.reasonText}>{creditNote.reason}</Text>
+              {isManualEntry && (
+                <View style={{ marginBottom: creditNote.reason ? 10 : 0 }}>
+                  <Text style={styles.reasonLabel}>Description:</Text>
+                  <Text style={styles.reasonText}>{creditNote.items[0].description}</Text>
+                </View>
+              )}
+              {creditNote.reason && (
+                <View>
+                  <Text style={styles.reasonLabel}>Reason:</Text>
+                  <Text style={styles.reasonText}>{creditNote.reason}</Text>
+                </View>
+              )}
             </View>
           )}
 
-          <View style={commonStyles.table}>
-            <View style={commonStyles.tableHeader}>
-              <Text style={[commonStyles.tableHeaderText, styles.descCol]}>Product</Text>
-              <Text style={[commonStyles.tableHeaderText, styles.qtyCol]}>Qty</Text>
-              <Text style={[commonStyles.tableHeaderText, styles.rateCol]}>Unit Price</Text>
-              <Text style={[commonStyles.tableHeaderText, styles.totalCol]}>Total</Text>
-            </View>
-            {creditNote.items.map((item, index) => (
-              <View style={commonStyles.tableRow} key={index}>
-                <Text style={[commonStyles.tableCell, styles.descCol]}>{item.description}</Text>
-                <Text style={[commonStyles.tableCell, styles.qtyCol]}>{item.quantity}</Text>
-                <Text style={[commonStyles.tableCell, styles.rateCol]}>{formatCurrency(item.price || 0)}</Text>
-                <Text style={[commonStyles.tableCell, styles.totalCol]}>{formatCurrency(item.total || 0)}</Text>
+          {!isManualEntry && creditNote.items && creditNote.items.length > 0 && (
+            <View style={commonStyles.table}>
+              <View style={commonStyles.tableHeader}>
+                <Text style={[commonStyles.tableHeaderText, styles.descCol]}>Product</Text>
+                <Text style={[commonStyles.tableHeaderText, styles.qtyCol]}>Qty</Text>
+                <Text style={[commonStyles.tableHeaderText, styles.rateCol]}>Unit Price</Text>
+                <Text style={[commonStyles.tableHeaderText, styles.totalCol]}>Total</Text>
               </View>
-            ))}
-          </View>
+              {creditNote.items.map((item, index) => (
+                <View style={commonStyles.tableRow} key={index}>
+                  <Text style={[commonStyles.tableCell, styles.descCol]}>{item.description}</Text>
+                  <Text style={[commonStyles.tableCell, styles.qtyCol]}>{item.quantity}</Text>
+                  <Text style={[commonStyles.tableCell, styles.rateCol]}>{formatCurrency(item.price || 0)}</Text>
+                  <Text style={[commonStyles.tableCell, styles.totalCol]}>{formatCurrency(item.total || 0)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View style={styles.summaryContainer}>
             <View style={styles.summaryRow}>
@@ -200,11 +247,11 @@ export const CreditNoteDocument: React.FC<CreditNoteDocumentProps> = ({ creditNo
               )}
               <View style={styles.termsBox}>
                 <Text style={styles.boxTitle}>Terms & Conditions</Text>
-                 <Text style={styles.boxContent}>
-                    • These examples are for illustrative purposes only.{'\n'}
-                    • Consulting a legal professional is recommended.{'\n'}
-                    • Terms should remain clear, concise, and transparent.
-                  </Text>
+                <Text style={styles.boxContent}>
+                  • These examples are for illustrative purposes only.{'\n'}
+                  • Consulting a legal professional is recommended.{'\n'}
+                  • Terms should remain clear, concise, and transparent.
+                </Text>
               </View>
             </View>
 
