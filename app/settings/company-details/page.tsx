@@ -168,16 +168,98 @@ export default function CompanyDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 space-y-4">
-        <Skeleton className="h-8 w-1/4" />
-        <Skeleton className="h-4 w-1/2" />
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-1/3" />
+      <div className="container mx-auto max-w-5xl p-4 md:p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-14 w-14 rounded-lg" />
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+          </div>
+        </div>
+
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-4 border-b bg-muted/20">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Skeleton className="h-5 w-5 rounded-full" />
+              <Skeleton className="h-6 w-48" />
+            </CardTitle>
+            <div className="space-y-1 pt-1">
+              <Skeleton className="h-4 w-full max-w-md" />
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-40 w-full" />
+
+          <CardContent className="p-0">
+            <div className="flex flex-col lg:flex-row border-b">
+              {/* --- LEFT COLUMN: Visual Identity Skeleton --- */}
+              <div className="w-full lg:w-1/3 border-b lg:border-b-0 lg:border-r bg-muted/10 p-8 flex flex-col items-center justify-start gap-6">
+                <Skeleton className="h-48 w-48 rounded-xl" />
+                <div className="text-center w-full px-4 space-y-2 flex flex-col items-center">
+                  <Skeleton className="h-6 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              </div>
+
+              {/* --- RIGHT COLUMN: Edit Form Skeleton --- */}
+              <div className="flex-1 p-8 space-y-8">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t">
+                  <Skeleton className="h-5 w-40" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* --- BOTTOM SECTION: Address & Legal Skeleton --- */}
+            <div className="p-8 space-y-8">
+              <Skeleton className="h-5 w-40" />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-3 w-3" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                  <Skeleton className="h-[100px] w-full" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-[100px] w-full" />
+                </div>
+              </div>
+            </div>
           </CardContent>
+          <div className="border-t px-6 py-4 flex justify-between items-center bg-muted/30">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-10 w-32" />
+          </div>
         </Card>
       </div>
     );
