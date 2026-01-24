@@ -15,7 +15,7 @@ import type { ISupplier } from "@/models/Supplier";
 interface BillingFormProps {
   payload: BillPayload;
   setPayload: Dispatch<SetStateAction<BillPayload>>;
-  updateItem: (index: number, field: keyof Item, value: string | number) => void;
+  updateItem: (index: number, field: keyof Item, value: string | number | boolean) => void;
   addItem: () => void;
   removeItem: (index: number) => void;
   handleSubmit: () => void;
