@@ -49,7 +49,8 @@ export interface PurchaseReturn {
 
   purchaseId?: string | any;
   purchaseReference?: string;
-  supplierName?: string;
+  partyId: any;
+  partySnapshot?: any;
 
   items: Array<{
     materialName?: string;
@@ -322,23 +323,22 @@ export const getColumns = (
       enableColumnFilter: true,
     },
     {
-      id: "supplierName",
-      accessorKey: "supplierName",
-      header: "Supplier",
+      id: "partyName",
+      accessorKey: "partyId",
+      header: "Party",
       cell: ({ row }) => {
-        const supplierName = row.original.supplierName;
-
-        return supplierName ? (
+        const partySnapshot = row.original.partySnapshot as any;
+        const party = row.original.partyId as any;
+        const name = partySnapshot?.displayName || (party?.name || party?.company) || "Unknown";
+        return (
           <Badge variant="warning" appearance="outline">
-            {supplierName}
+            {name}
           </Badge>
-        ) : (
-          <span className="text-muted-foreground">-</span>
         );
       },
       meta: {
-        label: "Supplier",
-        placeholder: "Search supplier...",
+        label: "Party",
+        placeholder: "Search party...",
         variant: "text",
       },
       enableColumnFilter: true,

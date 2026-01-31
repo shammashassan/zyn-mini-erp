@@ -1,4 +1,4 @@
-// app/procurement/credit-notes/credit-note-form.tsx - UPDATED: Return Note Selection
+// app/procurement/credit-notes/credit-note-form.tsx - FINAL: Using PartyContactSelector, no legacy fields
 
 "use client";
 
@@ -39,20 +39,28 @@ import {
   CommandList
 } from "@/components/ui/command";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarIcon, ChevronsUpDown, Check, Plus, PlusCircle, X, FileText, AlertCircle, Users, Building2, User, Store, List, Calculator } from "lucide-react";
+import {
+  CalendarIcon,
+  ChevronsUpDown,
+  Check,
+  Plus,
+  X,
+  FileText,
+  AlertCircle,
+  List,
+  Calculator,
+  PlusCircle
+} from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { CreditNote } from "./columns";
 import type { IProduct } from "@/models/Product";
-import type { ICustomer } from "@/models/Customer";
-import type { ISupplier } from "@/models/Supplier";
-import type { IPayee } from "@/models/Payee";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 import { Spinner } from "@/components/ui/spinner";
+import { PartyContactSelector } from "@/components/PartyContactSelector";
 
-type PartyType = 'customer' | 'supplier' | 'payee' | 'vendor';
 type CreditNoteMode = 'items' | 'manual';
 
 type CreditNoteItem = {
@@ -65,9 +73,8 @@ type CreditNoteItem = {
 };
 
 type CreditNoteFormData = {
-  partyType: PartyType;
-  partyName: string;
-  vendorName?: string;
+  partyId: string;
+  contactId?: string;
   returnNoteId?: string;
   items: CreditNoteItem[];
   creditDate: Date;
@@ -90,19 +97,6 @@ interface CreditNoteFormProps {
   returnNoteData?: any;
 }
 
-const getPartyTypeIcon = (type: PartyType) => {
-  switch (type) {
-    case 'customer': return Users;
-    case 'supplier': return Building2;
-    case 'payee': return User;
-    case 'vendor': return Store;
-  }
-};
-
-const getPartyTypeLabel = (type: PartyType) => {
-  return type.charAt(0).toUpperCase() + type.slice(1);
-};
-
 export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, returnNoteData }: CreditNoteFormProps) {
   const {
     register,
@@ -114,7 +108,6 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
     formState: { isSubmitting, isDirty }
   } = useForm<CreditNoteFormData>({
     defaultValues: {
-      partyType: 'customer',
       items: [{ productId: '', description: '', quantity: 1, price: 0, total: 0 }],
       discount: 0,
       isTaxPayable: true,
@@ -131,12 +124,7 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
   });
 
   const [products, setProducts] = useState<IProduct[]>([]);
-  const [customers, setCustomers] = useState<ICustomer[]>([]);
-  const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
-  const [payees, setPayees] = useState<IPayee[]>([]);
   const [returnNotes, setReturnNotes] = useState<any[]>([]);
-  const [partyPopoverOpen, setPartyPopoverOpen] = useState(false);
-  const [partySearchQuery, setPartySearchQuery] = useState("");
   const [returnNotePopoverOpen, setReturnNotePopoverOpen] = useState(false);
   const [productPopovers, setProductPopovers] = useState<Record<number, boolean>>({});
   const [productSearchQueries, setProductSearchQueries] = useState<Record<number, string>>({});
@@ -153,7 +141,7 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
   const watchedItems = watch("items");
   const discount = watch("discount") || 0;
   const isTaxPayable = watch("isTaxPayable");
-  const partyType = watch("partyType");
+  const partyId = watch("partyId");
   const creditMode = watch("creditMode");
   const manualAmount = watch("manualAmount") || 0;
   const selectedReturnNoteId = watch("returnNoteId");
@@ -173,17 +161,11 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [productsRes, customersRes, suppliersRes, payeesRes] = await Promise.all([
-          fetch("/api/products"),
-          fetch("/api/customers"),
-          fetch("/api/suppliers"),
-          fetch("/api/payees")
+        const [productsRes] = await Promise.all([
+          fetch("/api/products")
         ]);
 
         if (productsRes.ok) setProducts(await productsRes.json());
-        if (customersRes.ok) setCustomers(await customersRes.json());
-        if (suppliersRes.ok) setSuppliers(await suppliersRes.json());
-        if (payeesRes.ok) setPayees(await payeesRes.json());
       } catch (error) {
         console.error("Failed to fetch data:", error);
       }
@@ -191,27 +173,35 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
     fetchData();
   }, []);
 
-  // Fetch approved sales return notes when customer is selected
+  // ✅ FIX: Fetch approved sales return notes based on partyId
   useEffect(() => {
     const fetchReturnNotes = async () => {
-      if (partyType !== 'customer' || !partySearchQuery) {
+      if (!partyId) {
         setReturnNotes([]);
         return;
       }
 
       try {
-        const res = await fetch('/api/return-notes?populate=true');
+        const params = new URLSearchParams({
+          returnType: 'salesReturn',
+          partyId: partyId,
+          status: 'approved',
+          excludeLinked: 'true'
+        });
+
+        if (defaultValues?.connectedDocuments?.returnNoteId) {
+          const rawId = defaultValues.connectedDocuments.returnNoteId;
+          const returnNoteId = typeof rawId === 'object' && rawId !== null && '_id' in rawId
+            ? (rawId as any)._id.toString()
+            : rawId.toString();
+
+          params.append('includeId', returnNoteId);
+        }
+
+        const res = await fetch(`/api/return-notes?${params.toString()}`);
         if (res.ok) {
-          const allReturnNotes = await res.json();
-          const eligibleReturnNotes = allReturnNotes.filter(
-            (rn: any) =>
-              rn.returnType === 'salesReturn' &&
-              rn.customerName === partySearchQuery &&
-              rn.status === 'approved' &&
-              !rn.connectedDocuments?.creditNoteId &&
-              !rn.isDeleted
-          );
-          setReturnNotes(eligibleReturnNotes);
+          const data = await res.json();
+          setReturnNotes(data);
         }
       } catch (error) {
         console.error("Failed to fetch return notes:", error);
@@ -219,38 +209,32 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
     };
 
     fetchReturnNotes();
-  }, [partyType, partySearchQuery]);
+  }, [partyId, defaultValues]);
 
   useEffect(() => {
     if (isOpen) {
       if (returnNoteData) {
+        // Creating from return note
         const itemsFromReturn = returnNoteData.items.map((item: any) => {
-          // Try ID matching first, fall back to name matching
-          let matchedProduct = products.find(p => p._id === item.productId);
-
-          if (!matchedProduct) {
-            const productName = item.productName || item.description;
-            matchedProduct = products.find(p =>
-              p.name.toLowerCase().trim() === productName?.toLowerCase().trim()
-            );
-          }
-
-          const productName = item.productName || item.description;
-          const price = item.rate || matchedProduct?.price || 0;
-          const total = item.total || (item.returnQuantity * price);
-
+          const product = products.find(p => p._id === item.productId);
+          const price = item.rate || product?.price || 0;
           return {
-            productId: item.productId || matchedProduct?._id || '',
-            description: productName || '',
-            quantity: item.returnQuantity || 0,
+            productId: item.productId,
+            description: item.productName,
+            quantity: item.returnQuantity,
             price: price,
-            total: total,
+            total: item.returnQuantity * price,
           };
         });
 
+        // Extract party/contact IDs from return note
+        const partyIdValue = typeof returnNoteData.partyId === 'object'
+          ? returnNoteData.partyId._id
+          : returnNoteData.partyId;
+
         reset({
-          partyType: 'customer',
-          partyName: returnNoteData.customerName || "",
+          partyId: partyIdValue || "",
+          contactId: returnNoteData.contactId?.toString() || undefined,
           items: itemsFromReturn.length > 0 ? itemsFromReturn : [{ productId: '', description: '', quantity: 1, price: 0, total: 0 }],
           creditDate: new Date(),
           reason: `Return Note: ${returnNoteData.returnNumber} - ${returnNoteData.reason}`,
@@ -261,31 +245,19 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
           creditType: 'return',
           creditMode: 'items',
         });
-        setPartySearchQuery(returnNoteData.customerName || "");
       } else if (defaultValues) {
-        let detectedPartyType: PartyType = 'customer';
-        let partyNameValue = '';
-
-        if (defaultValues.customerName) {
-          detectedPartyType = 'customer';
-          partyNameValue = defaultValues.customerName;
-        } else if (defaultValues.supplierName) {
-          detectedPartyType = 'supplier';
-          partyNameValue = defaultValues.supplierName;
-        } else if (defaultValues.payeeName) {
-          detectedPartyType = 'payee';
-          partyNameValue = defaultValues.payeeName;
-        } else if (defaultValues.vendorName) {
-          detectedPartyType = 'vendor';
-          partyNameValue = defaultValues.vendorName;
-        }
-
+        // Editing existing credit note
         const isManualEntry = defaultValues.items?.length === 1 && !(defaultValues.items[0] as any).productId;
         const detectedMode: CreditNoteMode = isManualEntry ? 'manual' : 'items';
 
+        // Extract party/contact IDs
+        const partyIdValue = typeof defaultValues.partyId === 'object'
+          ? (defaultValues.partyId as any)._id
+          : defaultValues.partyId;
+
         reset({
-          partyType: detectedPartyType,
-          partyName: partyNameValue,
+          partyId: partyIdValue || "",
+          contactId: defaultValues.contactId?.toString() || undefined,
           items: defaultValues.items || [{ productId: '', description: '', quantity: 1, price: 0, total: 0 }],
           creditDate: defaultValues.creditDate ? new Date(defaultValues.creditDate) : new Date(),
           reason: defaultValues.reason || "",
@@ -297,12 +269,17 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
           creditMode: detectedMode,
           manualAmount: isManualEntry ? defaultValues.items[0].total : 0,
           manualDescription: isManualEntry ? defaultValues.items[0].description : '',
+          returnNoteId: defaultValues.connectedDocuments?.returnNoteId
+            ? (typeof defaultValues.connectedDocuments.returnNoteId === 'object'
+              ? (defaultValues.connectedDocuments.returnNoteId as any)._id
+              : defaultValues.connectedDocuments.returnNoteId)
+            : undefined,
         });
-        setPartySearchQuery(partyNameValue);
       } else {
+        // Creating new credit note
         reset({
-          partyType: 'customer',
-          partyName: "",
+          partyId: "",
+          contactId: undefined,
           items: [{ productId: '', description: '', quantity: 1, price: 0, total: 0 }],
           creditDate: new Date(),
           reason: "",
@@ -314,34 +291,11 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
           creditMode: 'items',
           manualAmount: 0,
         });
-        setPartySearchQuery("");
       }
     }
   }, [isOpen, defaultValues, returnNoteData, products, reset]);
 
-  const getPartyList = () => {
-    switch (partyType) {
-      case 'customer': return customers;
-      case 'supplier': return suppliers;
-      case 'payee': return payees;
-      case 'vendor': return [];
-      default: return [];
-    }
-  };
-
-  const handlePartySelect = (party: ICustomer | ISupplier | IPayee) => {
-    setValue("partyName", party.name, { shouldDirty: true });
-    setPartySearchQuery(party.name);
-    setPartyPopoverOpen(false);
-  };
-
-  const handleCreateNew = () => {
-    if (partySearchQuery.trim()) {
-      setValue("partyName", partySearchQuery.trim(), { shouldDirty: true });
-      setPartyPopoverOpen(false);
-    }
-  };
-
+  // Handle return note select - keeping simplified
   const handleReturnNoteSelect = (returnNote: any) => {
     setValue("returnNoteId", returnNote._id, { shouldDirty: true });
     setReturnNotePopoverOpen(false);
@@ -429,16 +383,10 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
   };
 
   const handleFormSubmit = async (data: CreditNoteFormData) => {
-    if (partyType === 'vendor') {
-      if (!data.vendorName || !data.vendorName.trim()) {
-        toast.error("Please enter a vendor name");
-        return;
-      }
-    } else {
-      if (!data.partyName || !data.partyName.trim()) {
-        toast.error(`Please select or enter a ${partyType}`);
-        return;
-      }
+    // ✅ Validation
+    if (!data.partyId) {
+      toast.error("Please select a party");
+      return;
     }
 
     if (!data.creditDate) {
@@ -507,6 +455,8 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
     const calculatedGrandTotal = calculatedSubtotal + calculatedVatAmount;
 
     const submitData: any = {
+      partyId: data.partyId,
+      contactId: data.contactId,
       items: validItems.map(item => ({
         ...item,
         quantity: Number(item.quantity) || 0,
@@ -524,21 +474,7 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
       creditType: data.creditType,
     };
 
-    switch (partyType) {
-      case 'customer':
-        submitData.customerName = data.partyName.trim();
-        break;
-      case 'supplier':
-        submitData.supplierName = data.partyName.trim();
-        break;
-      case 'payee':
-        submitData.payeeName = data.partyName.trim();
-        break;
-      case 'vendor':
-        submitData.vendorName = data.vendorName?.trim() || data.partyName?.trim();
-        break;
-    }
-
+    // Add return note if selected
     if (data.returnNoteId) {
       const selectedReturnNote = returnNotes.find(rn => rn._id === data.returnNoteId);
       if (selectedReturnNote) {
@@ -556,12 +492,6 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
     await onSubmit(submitData, submissionId);
   };
 
-  const partyList = getPartyList();
-  const doesPartyExist = partyList.some(
-    (p) => p.name.toLowerCase() === partySearchQuery.trim().toLowerCase()
-  );
-
-  const PartyIcon = getPartyTypeIcon(partyType);
   const selectedReturnNote = returnNotes.find(rn => rn._id === selectedReturnNoteId);
 
   return (
@@ -593,144 +523,30 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
             </div>
           )}
 
-          {/* Top Row: Party Type, Party Name, Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {!isFromReturnNote && (
-              <>
-                <div className="space-y-2">
-                  <Label>Party Type</Label>
-                  <Select
-                    value={partyType}
-                    onValueChange={(value: PartyType) => {
-                      setValue('partyType', value);
-                      setValue('partyName', '');
-                      setValue('returnNoteId', '');
-                      setPartySearchQuery('');
+          {/* Top Row: Party and Date */}
+          <div className={cn("grid grid-cols-1 gap-4", isEditMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
+            {/* ✅ Party Field - PartyContactSelector */}
+            <div>
+              <Controller
+                name="partyId"
+                control={control}
+                render={({ field }) => (
+                  <PartyContactSelector
+                    value={{ partyId: field.value, contactId: watch('contactId') }}
+                    onChange={(val) => {
+                      field.onChange(val.partyId);
+                      setValue('contactId', val.contactId);
                     }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue>
-                        <div className="flex items-center gap-2">
-                          <PartyIcon className="h-4 w-4" />
-                          {getPartyTypeLabel(partyType)}
-                        </div>
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(['customer', 'supplier', 'payee', 'vendor'] as PartyType[]).map((type) => {
-                        const Icon = getPartyTypeIcon(type);
-                        return (
-                          <SelectItem key={type} value={type}>
-                            <div className="flex items-center gap-2">
-                              <Icon className="h-4 w-4" />
-                              {getPartyTypeLabel(type)}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    allowedRoles={['customer', 'supplier']}
+                    showCreateButton={true}
+                    className="w-full"
+                    layout="vertical"
+                  />
+                )}
+              />
+            </div>
 
-                <div className="space-y-2">
-                  <Label>
-                    {getPartyTypeLabel(partyType)} Name <span className="text-destructive">*</span>
-                  </Label>
-                  {partyType === 'vendor' ? (
-                    <Input
-                      placeholder="Enter vendor name..."
-                      {...register("vendorName")}
-                      disabled={isFromReturnNote}
-                    />
-                  ) : (
-                    <Controller
-                      name="partyName"
-                      control={control}
-                      render={({ field }) => (
-                        <Popover
-                          open={partyPopoverOpen}
-                          onOpenChange={(isOpen) => {
-                            setPartyPopoverOpen(isOpen);
-                            if (isOpen) setPartySearchQuery(field.value);
-                          }}
-                        >
-                          <PopoverTrigger asChild>
-                            <Button
-                              ref={field.ref}
-                              type="button"
-                              variant="outline"
-                              role="combobox"
-                              className="w-full justify-between"
-                              disabled={isFromReturnNote}
-                            >
-                              <div className="truncate">
-                                {field.value || `Select or type ${partyType}...`}
-                              </div>
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                            <Command shouldFilter={false}>
-                              <CommandInput
-                                placeholder={`Search ${partyType}...`}
-                                value={partySearchQuery}
-                                onValueChange={setPartySearchQuery}
-                              />
-                              <CommandList
-                                className="max-h-[200px] overflow-y-auto"
-                                onWheel={(e) => e.stopPropagation()}
-                                onTouchStart={(e) => e.stopPropagation()}
-                                onTouchMove={(e) => e.stopPropagation()}
-                              >
-                                <CommandEmpty>
-                                  {partySearchQuery.trim() ? `No ${partyType} found.` : "Start typing to search..."}
-                                </CommandEmpty>
-
-                                <CommandGroup heading={`Existing ${getPartyTypeLabel(partyType)}s`}>
-                                  {partyList
-                                    .filter(p => !partySearchQuery || p.name.toLowerCase().includes(partySearchQuery.toLowerCase()))
-                                    .map((party) => (
-                                      <CommandItem
-                                        key={party._id}
-                                        value={party.name}
-                                        onSelect={() => handlePartySelect(party)}
-                                      >
-                                        <Check className={cn("mr-2 h-4 w-4", field.value === party.name ? "opacity-100" : "opacity-0")} />
-                                        <div className="flex-1">
-                                          <span>{party.name}</span>
-                                          {partyType === 'customer' && (party as any).email && (
-                                            <div className="text-xs text-muted-foreground">
-                                              {(party as any).email}
-                                            </div>
-                                          )}
-                                        </div>
-                                      </CommandItem>
-                                    ))}
-                                </CommandGroup>
-
-                                {partySearchQuery.trim() && !doesPartyExist && (
-                                  <CommandGroup heading={`Create New`}>
-                                    <CommandItem
-                                      onSelect={handleCreateNew}
-                                      className="text-primary"
-                                      value={partySearchQuery}
-                                    >
-                                      <Plus className="mr-2 h-4 w-4" />
-                                      Create "{partySearchQuery}"
-                                    </CommandItem>
-                                  </CommandGroup>
-                                )}
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                      )}
-                    />
-                  )}
-                </div>
-              </>
-            )}
-
+            {/* Credit Date */}
             <div className="space-y-2">
               <Label>Credit Date</Label>
               <Controller
@@ -739,7 +555,12 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                 render={({ field }) => (
                   <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
                     <PopoverTrigger asChild>
-                      <Button ref={field.ref} type="button" variant="outline" className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
+                      <Button
+                        ref={field.ref}
+                        type="button"
+                        variant="outline"
+                        className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                      >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {field.value ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
                       </Button>
@@ -760,10 +581,33 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                 )}
               />
             </div>
+
+            {/* Status Field (only in edit mode) */}
+            {isEditMode && (
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Controller
+                  name="status"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            )}
           </div>
 
-          {/* Return Note Selection */}
-          {!isFromReturnNote && partyType === 'customer' && returnNotes.length > 0 && (
+          {/* Return Note Selection (Only shows when party selected and return notes available) */}
+          {!isFromReturnNote && returnNotes.length > 0 && (
             <div className="space-y-2">
               <Label>Link to Return Note (Optional)</Label>
               <Controller
@@ -828,31 +672,6 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Status Field */}
-          {isEditMode && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Controller
-                  name="status"
-                  control={control}
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="approved">Approved</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
             </div>
           )}
 
@@ -1054,7 +873,7 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                                                     onSelect={() => handleMarkForProductCreation(index, searchQuery)}
                                                     className="text-green-600"
                                                   >
-                                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                                    <Plus className="mr-2 h-4 w-4" />
                                                     Create "{searchQuery}"
                                                   </CommandItem>
                                                 </CommandGroup>
@@ -1237,7 +1056,7 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                                                   onSelect={() => handleMarkForProductCreation(index, searchQuery)}
                                                   className="text-green-600"
                                                 >
-                                                  <PlusCircle className="mr-2 h-4 w-4" />
+                                                  <Plus className="mr-2 h-4 w-4" />
                                                   Create "{searchQuery}"
                                                 </CommandItem>
                                               </CommandGroup>

@@ -1,11 +1,11 @@
-// app/procurement/payments/columns.tsx
+// app/procurement/payments/columns.tsx - Updated for Party/Contact system
 
 "use client"
 
 import * as React from "react"
 import { ColumnDef } from "@tanstack/react-table"
 import { MoreHorizontal, ArrowUpDown, FileText, Trash2, DollarSign, CreditCard, Landmark, Wallet, Eye } from "lucide-react"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -30,55 +30,10 @@ import { ConnectedDocumentsBadges } from "./ConnectedDocumentsBadges"
 import { formatCurrency } from "@/utils/formatters/currency"
 import { formatDisplayDate, formatTime } from "@/utils/formatters/date"
 
-// EXPORTED INTERFACES
-export interface ConnectedPurchase {
-    _id: string;
-    referenceNumber: string;
-    supplierName?: string;
-    totalAmount: number;
-    date: Date;
-    status: string;
-    paymentStatus: string;
-    items: any[];
-    connectedDocuments?: any;
-    paidAmount?: number;
-    remainingAmount?: number;
-    createdAt: Date;
-    updatedAt: Date;
-    createdBy?: string | null;
-    updatedBy?: string | null;
-    actionHistory?: any[];
-}
-
-export interface ConnectedExpense {
-    _id: string;
-    referenceNumber: string;
-    description: string;
-    amount: number;
-    category: string;
-    type: 'single' | 'period';
-    date: Date;
-    status: 'pending' | 'approved' | 'cancelled';
-    paymentStatus: 'Pending' | 'Paid' | 'Partially Paid';
-    vendor?: string;
-    connectedDocuments?: any;
-}
-
-export interface ConnectedCreditNote {
-    _id: string;
-    creditNoteNumber: string;
-    grandTotal: number;
-    status: string;
-    paymentStatus: string;
-}
-
 export interface Payment {
     _id: string;
     invoiceNumber: string;
-    customerName?: string;
-    supplierName?: string;
-    payeeName?: string;
-    vendorName?: string;
+    partyId: any;
     grandTotal: number;
     voucherType: "payment";
     items: Array<{
@@ -89,10 +44,9 @@ export interface Payment {
     }>;
     paymentMethod: string;
     connectedDocuments?: {
-        purchaseId?: string | ConnectedPurchase;
-        purchaseIds?: (string | ConnectedPurchase)[];
-        expenseIds?: (string | ConnectedExpense)[];
-        creditNoteIds?: (string | ConnectedCreditNote)[];
+        purchaseIds?: any[];
+        expenseIds?: any[];
+        creditNoteIds?: any[];
     };
     voucherDate: string;
     createdAt: string;
@@ -103,16 +57,16 @@ interface PaymentPermissions {
     canDelete: boolean;
 }
 
-interface RowActionsProps {
-    payment: Payment;
-    onViewPdf: (payment: Payment) => void;
-    onView?: (payment: Payment) => void;
-    onDelete?: (id: string) => void;
-    onRefresh: () => void;
-    permissions: PaymentPermissions;
-}
+const getPaymentMethodIcon = (method: string) => {
+    const normalizedMethod = method?.toLowerCase() || '';
+    if (normalizedMethod.includes('cash')) return DollarSign;
+    if (normalizedMethod.includes('bank')) return Landmark;
+    if (normalizedMethod.includes('cheque') || normalizedMethod.includes('check')) return FileText;
+    if (normalizedMethod.includes('card')) return CreditCard;
+    return Wallet;
+};
 
-const RowActions = ({ payment, onDelete, onViewPdf, onView, permissions }: RowActionsProps) => {
+const RowActions = ({ payment, onDelete, onViewPdf, onView, permissions }: any) => {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
     const { canDelete } = permissions;
 
@@ -128,12 +82,10 @@ const RowActions = ({ payment, onDelete, onViewPdf, onView, permissions }: RowAc
                 <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
                     {onView && (
-                        <>
-                            <DropdownMenuItem onSelect={() => onView(payment)}>
-                                <Eye className="mr-2 w-4 h-4" />
-                                View Details
-                            </DropdownMenuItem>
-                        </>
+                        <DropdownMenuItem onSelect={() => onView(payment)}>
+                            <Eye className="mr-2 w-4 h-4" />
+                            View Details
+                        </DropdownMenuItem>
                     )}
                     <DropdownMenuItem onSelect={() => onViewPdf(payment)}>
                         <FileText className="mr-2 w-4 h-4" />
@@ -159,8 +111,7 @@ const RowActions = ({ payment, onDelete, onViewPdf, onView, permissions }: RowAc
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the
-                            payment "{payment.invoiceNumber}".
+                            This will permanently delete payment "{payment.invoiceNumber}".
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -180,15 +131,6 @@ const RowActions = ({ payment, onDelete, onViewPdf, onView, permissions }: RowAc
         </>
     )
 }
-
-const getPaymentMethodIcon = (method: string) => {
-    const normalizedMethod = method?.toLowerCase() || '';
-    if (normalizedMethod.includes('cash')) return DollarSign;
-    if (normalizedMethod.includes('bank')) return Landmark;
-    if (normalizedMethod.includes('cheque') || normalizedMethod.includes('check')) return FileText;
-    if (normalizedMethod.includes('card')) return CreditCard;
-    return Wallet;
-};
 
 export const getColumns = (
     onViewPdf: (payment: Payment) => void,
@@ -248,39 +190,40 @@ export const getColumns = (
         },
         {
             id: "partyName",
-            accessorFn: (row) => row.customerName || row.supplierName || row.payeeName || row.vendorName || "",
+            accessorKey: "partyId",
             header: "Party",
             cell: ({ row }) => {
                 const payment = row.original;
+                const party = payment.partyId as any;
 
-                if (payment.customerName) {
+                if (party && (party.name || party.company)) {
+                    const name = party.name || party.company;
+                    const roles = party.roles || {};
+
+                    let variant = "secondary";
+                    if (roles.supplier) variant = "warning";
+                    else if (roles.customer) variant = "primary";
+
                     return (
-                        <Badge variant="primary" appearance="outline" className="gap-1">
-                            {payment.customerName}
+                        <Badge variant={variant as any} appearance="outline" className="gap-1">
+                            {name}
                         </Badge>
                     );
                 }
 
-                if (payment.supplierName) {
-                    return (
-                        <Badge variant="warning" appearance="outline" className="gap-1">
-                            {payment.supplierName}
-                        </Badge>
-                    );
-                }
-
-                if (payment.payeeName) {
+                // Fallback to special fields
+                if ((payment as any).payeeName) {
                     return (
                         <Badge variant="cyan" appearance="outline" className="gap-1">
-                            {payment.payeeName}
+                            {(payment as any).payeeName}
                         </Badge>
                     );
                 }
 
-                if (payment.vendorName) {
+                if ((payment as any).vendorName) {
                     return (
                         <Badge variant="neutral" appearance="outline" className="gap-1">
-                            {payment.vendorName}
+                            {(payment as any).vendorName}
                         </Badge>
                     );
                 }
@@ -289,7 +232,7 @@ export const getColumns = (
             },
             meta: {
                 label: "Party",
-                placeholder: "Search party name...",
+                placeholder: "Search party...",
                 variant: "text",
             },
             enableColumnFilter: true,

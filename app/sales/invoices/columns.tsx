@@ -1,4 +1,4 @@
-// app/sales/invoices/columns.tsx
+// app/sales/invoices/columns.tsx - FINAL: Using partySnapshot for display
 
 "use client";
 
@@ -14,14 +14,13 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  RotateCcw,
   DollarSign,
   CreditCard,
   AlertCircle,
   Edit,
   Eye
 } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -62,9 +61,33 @@ export interface ConnectedDocument {
 export interface Invoice {
   _id: string;
   invoiceNumber: string;
-  customerName: string;
-  customerPhone?: string;
-  customerEmail?: string;
+
+  // ✅ Party & Contact References (Dynamic - Current Truth)
+  partyId: any;
+  contactId?: string;
+
+  // ✅ Snapshots (Frozen - Legal Truth) - Optional for backward compatibility
+  partySnapshot?: {
+    displayName: string;
+    address?: {
+      street?: string;
+      city?: string;
+      district?: string;
+      state?: string;
+      country?: string;
+      postalCode?: string;
+    };
+    taxIdentifiers?: {
+      vatNumber?: string;
+    };
+  };
+  contactSnapshot?: {
+    name: string;
+    phone?: string;
+    email?: string;
+    designation?: string;
+  };
+
   grandTotal: number;
   status: "pending" | "approved" | "cancelled";
   items: Array<{
@@ -78,6 +101,7 @@ export interface Invoice {
     receiptIds?: (string | ConnectedDocument)[];
     deliveryId?: string | ConnectedDocument;
     quotationId?: string | ConnectedDocument;
+    returnNoteIds?: (string | ConnectedDocument)[];
   };
   paymentStatus: 'Paid' | 'Pending' | 'Partially Paid';
   paidAmount: number;
@@ -408,22 +432,24 @@ export const getColumns = (
       enableColumnFilter: true,
     },
     {
-      id: "customerName",
-      accessorKey: "customerName",
+      id: "partyName",
+      accessorKey: "partySnapshot.displayName",
       header: "Customer",
       cell: ({ row }) => {
-        const customerName = row.original.customerName;
-        return customerName ? (
+        // ✅ Use snapshot as primary, fallback to populated party
+        const name = row.original.partySnapshot?.displayName
+          || row.original.partyId?.company
+          || row.original.partyId?.name
+          || "Unknown";
+        return (
           <Badge variant="primary" appearance="outline">
-            {customerName}
+            {name}
           </Badge>
-        ) : (
-          <span className="text-muted-foreground">-</span>
         );
       },
       meta: {
-        label: "Customer",
-        placeholder: "Search customer...",
+        label: "Party",
+        placeholder: "Search party...",
         variant: "text",
       },
       enableColumnFilter: true,

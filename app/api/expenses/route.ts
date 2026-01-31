@@ -4,13 +4,13 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Expense from "@/models/Expense";
 import Payee from "@/models/Payee";
-import Supplier from "@/models/Supplier";
 import Voucher from "@/models/Voucher";
 import { getActive } from "@/utils/softDelete";
 import { getUserInfo } from "@/lib/auth-helpers";
 import { createJournalForExpense } from '@/utils/journalAutoCreate';
 import generateInvoiceNumber from '@/utils/invoiceNumber';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
+import { createPayeeSnapshot } from "@/utils/partySnapshot";
 
 /**
  * GET all active expenses with manual server-side pagination and date filtering
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
     await dbConnect();
 
-    const _ensureModels = [Payee, Supplier, Voucher];
+    const _ensureModels = [Payee, Voucher];
 
     const { searchParams } = new URL(request.url);
 
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     const type = searchParams.get('type');
     const sortParam = searchParams.get('sort');
     const filtersParam = searchParams.get('filters');
-    
+
     // Extract date params (support both naming conventions)
     const startDateParam = searchParams.get('startDate') || searchParams.get('from');
     const endDateParam = searchParams.get('endDate') || searchParams.get('to');
@@ -72,9 +72,9 @@ export async function GET(request: Request) {
               // Regex search for string fields
               if (['referenceNumber', 'vendor', 'category', 'description', 'status', 'paymentStatus'].includes(filter.id)) {
                 if (Array.isArray(filter.value)) {
-                   query[filter.id] = { $in: filter.value };
+                  query[filter.id] = { $in: filter.value };
                 } else {
-                   query[filter.id] = { $regex: filter.value, $options: 'i' };
+                  query[filter.id] = { $regex: filter.value, $options: 'i' };
                 }
               }
             }
@@ -108,24 +108,20 @@ export async function GET(request: Request) {
 
     // 6. Execute Count & Find
     const totalCount = await Expense.countDocuments(query);
-    
+
     let expensesQuery = Expense.find(query)
       .sort(sortQuery)
       .skip(skip)
       .limit(pageSize);
 
-    // Always populate payee and supplier references
+    // Always populate party references
     expensesQuery = expensesQuery
+
       .populate({
         path: 'payeeId',
         model: 'Payee',
         select: 'name type email phone'
       })
-      .populate({
-        path: 'supplierId',
-        model: 'Supplier',
-        select: 'name email city'
-      });
 
     // 7. Handle Connected Documents Population
     if (populate) {
@@ -149,15 +145,15 @@ export async function GET(request: Request) {
 
   } catch (error: any) {
     console.error("Failed to fetch expenses:", error);
-    return NextResponse.json({ 
-      error: "Server error", 
-      details: error.message 
+    return NextResponse.json({
+      error: "Server error",
+      details: error.message
     }, { status: 500 });
   }
 }
 
 /**
- * POST - Create a new expense with auto-creation of payees/suppliers based on party type
+ * POST - Create a new expense with payee snapshot support
  */
 export async function POST(request: Request) {
   try {
@@ -205,52 +201,29 @@ export async function POST(request: Request) {
       );
 
       body.payeeId = payee._id;
-      delete body.payeeName;
       delete body.vendor;
-      delete body.supplierId;
-      delete body.supplierName;
-    }
-    // ✅ AUTO-CREATE SUPPLIER if supplierName is provided
-    else if (body.supplierName && body.supplierName.trim()) {
-      const supplier = await Supplier.findOneAndUpdate(
-        { name: body.supplierName.trim() },
-        {
-          $setOnInsert: {
-            name: body.supplierName.trim(),
-            email: '',
-            vatNumber: '',
-            district: '',
-            city: '',
-            street: '',
-            buildingNo: '',
-            postalCode: '',
-            contactNumbers: [],
-            isDeleted: false,
-            createdBy: user.id,
-          }
-        },
-        { upsert: true, new: true }
-      );
-
-      body.supplierId = supplier._id;
-      delete body.supplierName;
-      delete body.vendor;
-      delete body.payeeId;
       delete body.payeeName;
     }
-    // Manual vendor - keep as is, clean up other fields
+    // Manual vendor - just a string, no relation
     else if (body.vendor) {
       delete body.payeeId;
       delete body.payeeName;
-      delete body.supplierId;
-      delete body.supplierName;
+    } else {
+      // If absolutely nothing provided
+      return NextResponse.json({ error: "Payee Name or Vendor Name is required" }, { status: 400 });
     }
 
-    // ✅ UPDATED: Validate expenseDate
+    // ✅ Validate expenseDate
     if (!body.expenseDate) {
       return NextResponse.json({
         error: 'Expense date is required'
       }, { status: 400 });
+    }
+
+    // ✅ Create immutable snapshot of payee (if payeeId exists)
+    let payeeSnapshot = null;
+    if (body.payeeId) {
+      payeeSnapshot = await createPayeeSnapshot(body.payeeId);
     }
 
     const referenceNumber = await generateInvoiceNumber('expense');
@@ -267,12 +240,16 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    // ✅ UPDATED: Set both date and expenseDate for backward compatibility
+    // ✅ Set both date and expenseDate for backward compatibility
     const newExpense = new Expense({
       ...body,
       referenceNumber,
       expenseDate: new Date(body.expenseDate),
       date: new Date(body.expenseDate), // Sync legacy field
+
+      // ✅ Add snapshot (legal/historical truth)
+      payeeSnapshot,
+
       isDeleted: false,
       deletedAt: null,
       deletedBy: null,
@@ -285,6 +262,11 @@ export async function POST(request: Request) {
     await newExpense.save();
 
     console.log(`✅ Successfully created expense: ${newExpense.referenceNumber}`);
+    if (payeeSnapshot) {
+      console.log(`   Payee: ${payeeSnapshot.name}`);
+    } else if (body.vendor) {
+      console.log(`   Vendor: ${body.vendor}`);
+    }
 
     // Conditional journal entry creation - only for APPROVED expenses
     if (newExpense.status === 'approved') {

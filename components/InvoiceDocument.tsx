@@ -1,3 +1,5 @@
+// components/InvoiceDocument.tsx - FINAL: Using party snapshots for PDF generation
+
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
 import type { IInvoice } from '@/models/Invoice';
@@ -23,13 +25,15 @@ const styles = StyleSheet.create({
   rateCol: { width: '20%', textAlign: 'right' },
   totalCol: { width: '25%', textAlign: 'right', fontWeight: 'bold' },
 
-  customerName: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: pdfColors.textMain,
-    marginBottom: 2,
-  },
-  customerDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
+  entityName: { fontSize: 11, fontWeight: 'bold', color: pdfColors.textMain, marginBottom: 2 },
+  entityDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
+  labelRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 },
+  inlineLabel: { fontSize: 9, color: pdfColors.primary, marginRight: 6, fontWeight: 'bold' },
+
+  // New Styles for label-only layout
+  labelOnly: { marginBottom: 4 },
+  standAloneLabel: { fontSize: 9, color: pdfColors.primary, fontWeight: 'bold' },
+
   dateInfo: {
     alignItems: 'flex-end',
   },
@@ -139,6 +143,21 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, co
   const grandTotal = bill.grandTotal || 0;
   const documentTitle = type.toUpperCase().replace(/_/g, ' ');
 
+  // Use snapshots for PDF (immutable legal truth)
+  const partyName = bill.partySnapshot.displayName;
+  const partyAddress = bill.partySnapshot.address;
+  // const partyVAT = bill.partySnapshot.taxIdentifiers?.vatNumber;
+
+  const contactName = bill.contactSnapshot?.name;
+  const contactPhone = bill.contactSnapshot?.phone;
+  const contactEmail = bill.contactSnapshot?.email;
+  const contactDesignation = bill.contactSnapshot?.designation;
+
+  // Check if there's any additional info beyond party name
+  const hasAdditionalInfo = contactName || contactPhone || contactEmail ||
+    (partyAddress && (partyAddress.street || partyAddress.city || partyAddress.state ||
+      partyAddress.postalCode || partyAddress.country));
+
   return (
     <Document>
       <Page size="A4" style={commonStyles.page}>
@@ -153,11 +172,43 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, co
 
         <View style={commonStyles.infoBar}>
           <View style={{ flex: 1 }}>
-            <Text style={commonStyles.sectionLabel}>Billed To:</Text>
-            <Text style={styles.customerName}>{bill.customerName}</Text>
-            {bill.customerPhone && <Text style={styles.customerDetail}>{bill.customerPhone}</Text>}
-            {bill.customerEmail && <Text style={styles.customerDetail}>{bill.customerEmail}</Text>}
+            {hasAdditionalInfo ? (
+              /* Has Contact Info or Address */
+              <>
+                <View style={styles.labelRow}>
+                  <Text style={styles.inlineLabel}>Billed To:</Text>
+                  <Text style={styles.entityName}>{partyName}</Text>
+                </View>
+                {contactName && (
+                  <Text style={styles.entityDetail}>
+                    {contactName}{contactDesignation && ` (${contactDesignation})`}
+                  </Text>
+                )}
+                {contactPhone && <Text style={styles.entityDetail}>{contactPhone}</Text>}
+                {contactEmail && <Text style={styles.entityDetail}>{contactEmail}</Text>}
+                {partyAddress && (
+                  <Text style={styles.entityDetail}>
+                    {[
+                      partyAddress.street,
+                      partyAddress.city,
+                      partyAddress.state,
+                      partyAddress.postalCode,
+                      partyAddress.country
+                    ].filter(Boolean).join(', ')}
+                  </Text>
+                )}
+              </>
+            ) : (
+              /* No Contact Info - Just Party */
+              <>
+                <View style={styles.labelOnly}>
+                  <Text style={styles.standAloneLabel}>Billed To:</Text>
+                </View>
+                <Text style={styles.entityName}>{partyName}</Text>
+              </>
+            )}
           </View>
+
           <View style={styles.dateInfo}>
             <Text style={styles.dateLabel}>Invoice Date</Text>
             <Text style={styles.dateValue}>{formatDisplayDate(bill.invoiceDate)}</Text>

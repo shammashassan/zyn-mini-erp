@@ -50,6 +50,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency } from "@/utils/formatters/currency";
+import { PartyContactSelector } from "@/components/PartyContactSelector";
 
 type ReturnItem = {
   productId?: string;
@@ -61,7 +62,6 @@ type ReturnItem = {
 
 type SalesReturnFormData = {
   returnType: 'salesReturn';
-  customerName: string;
   invoiceId: string;
   items: ReturnItem[];
   reason: string;
@@ -112,20 +112,18 @@ export function SalesReturnForm({
     }
   });
 
-  const [customers, setCustomers] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
 
-  const [selectedCustomer, setSelectedCustomer] = useState<string>("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  const [selectedContactId, setSelectedContactId] = useState<string | undefined>(undefined);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
 
-  const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [invoicePopoverOpen, setInvoicePopoverOpen] = useState(false);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [returnQuantities, setReturnQuantities] = useState<Record<string, number>>({});
 
-  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [isDesktop, setIsDesktop] = useState(true);
   const [initialState, setInitialState] = useState<any>(null);
   const [isLoadingInvoice, setIsLoadingInvoice] = useState(false);
@@ -162,37 +160,32 @@ export function SalesReturnForm({
   }, []);
 
   useEffect(() => {
-    const fetchCustomers = async () => {
-      if (!isOpen) return;
-
-      try {
-        const res = await fetch('/api/customers');
-        if (res.ok) setCustomers(await res.json());
-      } catch (error) {
-        console.error("Failed to fetch customers:", error);
-      }
-    };
-
-    fetchCustomers();
-  }, [isOpen]);
-
-  useEffect(() => {
     const fetchInvoices = async () => {
-      if (!selectedCustomer) {
+      if (!selectedCustomerId) {
         setInvoices([]);
         return;
       }
 
       try {
-        const res = await fetch('/api/invoices?populate=true');
+        // ✅ Filter invoices by partyId and status at the API level
+        const res = await fetch(`/api/invoices?partyId=${selectedCustomerId}&status=approved&populate=true`);
         if (res.ok) {
-          const allInvoices = await res.json();
-          const eligible = allInvoices.filter(
-            (inv: any) =>
-              inv.customerName === selectedCustomer &&
-              inv.status === 'approved' &&
-              !inv.isDeleted
-          );
+          const invoices = await res.json();
+
+          // ✅ Further filter to only include invoices with returnable items
+          const eligible = invoices.filter((inv: any) => {
+            if (inv.isDeleted) return false;
+
+            // Check if invoice has items with returnable quantity
+            const hasReturnableItems = inv.items?.some((item: any) => {
+              const invoicedQty = item.quantity || 0;
+              const returnedQty = item.returnedQuantity || 0;
+              return invoicedQty > returnedQty;
+            });
+
+            return hasReturnableItems;
+          });
+
           setInvoices(eligible);
         }
       } catch (error) {
@@ -201,7 +194,7 @@ export function SalesReturnForm({
     };
 
     fetchInvoices();
-  }, [selectedCustomer]);
+  }, [selectedCustomerId]);
 
   useEffect(() => {
     const loadEditMode = async () => {
@@ -213,9 +206,12 @@ export function SalesReturnForm({
           returnDate: defaultValues.returnDate ? new Date(defaultValues.returnDate) : new Date()
         });
 
-        if (defaultValues.customerName) {
-          setSelectedCustomer(defaultValues.customerName);
-          setCustomerSearchQuery(defaultValues.customerName);
+        // Extract partyId and contactId from defaultValues
+        if (defaultValues.partyId) {
+          setSelectedCustomerId(defaultValues.partyId);
+        }
+        if (defaultValues.contactId) {
+          setSelectedContactId(defaultValues.contactId);
         }
 
         if (defaultValues.connectedDocuments?.invoiceId) {
@@ -271,8 +267,7 @@ export function SalesReturnForm({
           returnDate: new Date(),
           status: 'pending'
         });
-        setSelectedCustomer("");
-        setCustomerSearchQuery("");
+        setSelectedCustomerId("");
         setSelectedInvoice(null);
         setSelectedItems(new Set());
         setReturnQuantities({});
@@ -283,19 +278,6 @@ export function SalesReturnForm({
     loadEditMode();
   }, [isOpen, defaultValues, reset, setValue]);
 
-  const handleCustomerSelect = (customer: any) => {
-    setSelectedCustomer(customer.name);
-    setCustomerSearchQuery(customer.name);
-    setValue('customerName', customer.name);
-    setCustomerPopoverOpen(false);
-    
-    if (!isEditMode) {
-      setSelectedInvoice(null);
-      setValue('invoiceId', '');
-      setSelectedItems(new Set());
-      setReturnQuantities({});
-    }
-  };
 
   const handleInvoiceSelect = (invoice: any) => {
     setSelectedInvoice(invoice);
@@ -358,7 +340,7 @@ export function SalesReturnForm({
   }, 0);
 
   const handleFormSubmit = async (data: SalesReturnFormData) => {
-    if (!selectedCustomer) {
+    if (!selectedCustomerId) {
       toast.error('Please select a customer');
       return;
     }
@@ -401,7 +383,8 @@ export function SalesReturnForm({
     const submitData: any = {
       returnType: 'salesReturn',
       invoiceId: selectedInvoice._id,
-      customerName: selectedCustomer,
+      partyId: selectedCustomerId,
+      contactId: selectedContactId,
       items: returnItems,
       reason: data.reason.trim(),
       notes: data.notes?.trim() || '',
@@ -436,72 +419,28 @@ export function SalesReturnForm({
 
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>
-                Customer <span className="text-destructive">*</span>
-              </Label>
-              <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between"
-                    disabled={isEditMode}
-                  >
-                    <div className="truncate">
-                      {selectedCustomer || "Select customer..."}
-                    </div>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                  <Command shouldFilter={false}>
-                    <CommandInput
-                      placeholder="Search customers..."
-                      value={customerSearchQuery}
-                      onValueChange={setCustomerSearchQuery}
-                    />
-                    <CommandList
-                      className="max-h-[200px] overflow-y-auto"
-                      onWheel={(e) => e.stopPropagation()}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onTouchMove={(e) => e.stopPropagation()}
-                    >
-                      <CommandEmpty>No customer found.</CommandEmpty>
-                      <CommandGroup>
-                        {customers
-                          .filter(customer =>
-                            !customerSearchQuery ||
-                            customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase())
-                          )
-                          .map((customer) => (
-                            <CommandItem
-                              key={customer._id}
-                              value={customer.name}
-                              onSelect={() => handleCustomerSelect(customer)}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  selectedCustomer === customer.name ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              <div className="flex-1">
-                                <span>{customer.name}</span>
-                                {(customer.email || customer.phone) && (
-                                  <div className="text-xs text-muted-foreground">
-                                    {customer.email || customer.phone}
-                                  </div>
-                                )}
-                              </div>
-                            </CommandItem>
-                          ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+            <div>
+              <PartyContactSelector
+                allowedRoles={['customer']}
+                value={{ partyId: selectedCustomerId, contactId: selectedContactId }}
+                onChange={(val, party) => {
+                  const isPartyChange = val.partyId !== selectedCustomerId;
+
+                  setSelectedCustomerId(val.partyId ?? "");
+                  setSelectedContactId(val.contactId);
+
+                  // Only reset invoice when party changes, not when just contact changes
+                  if (!isEditMode && isPartyChange) {
+                    setSelectedInvoice(null);
+                    setValue('invoiceId', '');
+                    setSelectedItems(new Set());
+                    setReturnQuantities({});
+                  }
+                }}
+                disabled={isEditMode}
+                className="w-full"
+                layout="vertical"
+              />
             </div>
 
             <div className="space-y-2">
@@ -515,14 +454,14 @@ export function SalesReturnForm({
                     variant="outline"
                     role="combobox"
                     className="w-full justify-between"
-                    disabled={isEditMode || !selectedCustomer || invoices.length === 0 || isLoadingInvoice}
+                    disabled={isEditMode || !selectedCustomerId || invoices.length === 0 || isLoadingInvoice}
                   >
                     <div className="truncate">
                       {isLoadingInvoice ? (
                         "Loading..."
                       ) : selectedInvoice ? (
                         selectedInvoice.invoiceNumber
-                      ) : !selectedCustomer ? (
+                      ) : !selectedCustomerId ? (
                         "Select customer first..."
                       ) : invoices.length === 0 ? (
                         "No eligible invoices"

@@ -1,16 +1,15 @@
-// app/billing/billing-form.tsx - UPDATED: Added grossTotal prop
+// app/billing/billing-form.tsx - UPDATED: Imports BillPayload from page.tsx
 
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import type { BillPayload, Item } from "@/lib/types";
-import { CustomerDetailsCard } from "./customer-details-card";
+import type { Item } from "@/lib/types";
+import type { BillPayload } from "./page";
+import { PartyDetailsCard } from "./party-details-card";
 import { DocumentDetailsCard } from "./document-details-card";
 import { ItemsTable } from "./items-table";
 import { SummaryActions } from "./summary-actions";
-import type { ICustomer } from "@/models/Customer";
 import type { IProduct } from "@/models/Product";
-import type { ISupplier } from "@/models/Supplier";
 
 interface BillingFormProps {
   payload: BillPayload;
@@ -26,8 +25,6 @@ interface BillingFormProps {
   vatAmount: number;
   grandTotal: number;
   vatPercentage: number;
-  customers: ICustomer[];
-  suppliers: ISupplier[];
   products: IProduct[];
 }
 
@@ -45,8 +42,6 @@ export function BillingForm({
   vatAmount,
   grandTotal,
   vatPercentage,
-  customers,
-  suppliers,
   products,
 }: BillingFormProps) {
   const handleFieldChange = (field: keyof BillPayload, value: string | number | Date | null) => {
@@ -63,11 +58,9 @@ export function BillingForm({
          This prevents squishing on 1040px screens
       */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <CustomerDetailsCard
+        <PartyDetailsCard
           payload={payload}
           onFieldChange={handleFieldChange}
-          customers={customers}
-          suppliers={suppliers}
         />
         <DocumentDetailsCard payload={payload} onFieldChange={handleFieldChange} />
       </div>

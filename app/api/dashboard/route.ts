@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Invoice from "@/models/Invoice";
 import Journal from "@/models/Journal";
+import Party from "@/models/Party";
 import ChartOfAccount from "@/models/ChartOfAccount";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { startOfMonth, endOfMonth, subMonths, eachDayOfInterval, format } from 'date-fns';
@@ -18,7 +19,29 @@ interface DailySummary {
 interface RecentSaleDocument {
   _id: unknown;
   invoiceNumber: string;
-  customerName?: string;
+
+  // ✅ Party Snapshot
+  partySnapshot?: {
+    displayName: string;
+    address?: {
+      street?: string;
+      city?: string;
+      district?: string;
+      state?: string;
+      country?: string;
+      postalCode?: string;
+    };
+    taxIdentifiers?: {
+      vatNumber?: string;
+    };
+  };
+
+  // ✅ Fallback to populated party
+  partyId?: {
+    name?: string;
+    company?: string;
+  };
+
   grandTotal: number;
   createdAt: Date;
   status?: string;
@@ -39,8 +62,10 @@ export async function GET() {
       dashboard: ["read"],
     });
     if (error) return error;
-    
+
     await dbConnect();
+
+    const _ensuremodel = [Invoice, Journal, Party, ChartOfAccount];
 
     const now = new Date();
     // Set 'now' to end of day to include today's transactions
@@ -63,11 +88,11 @@ export async function GET() {
     const incomeCodes = accounts
       .filter(a => a.groupName === 'Income' && a.accountCode)
       .map(a => a.accountCode);
-      
+
     const expenseCodes = accounts
       .filter(a => a.groupName === 'Expenses' && a.accountCode)
       .map(a => a.accountCode);
-      
+
     const inventoryCode = 'A1200';
     const vatPayableCode = 'L1002';
 
@@ -217,9 +242,9 @@ export async function GET() {
     const chartData: DailySummary[] = days.map(day => {
       const dateKey = format(day, 'yyyy-MM-dd');
       const data = dailyMap.get(dateKey) || { revenue: 0, expenses: 0, purchases: 0, netTax: 0 };
-      
-      const sales = data.revenue + data.netTax; 
-      const expenses = data.expenses + data.purchases + data.netTax; 
+
+      const sales = data.revenue + data.netTax;
+      const expenses = data.expenses + data.purchases + data.netTax;
 
       return {
         date: dateKey,
@@ -228,13 +253,16 @@ export async function GET() {
       };
     });
 
-    // 5. Fetch Recent Invoices
-    // Note: Ensure Invoice model is properly registered in your codebase
+    // 5. Fetch Recent Invoices with Party Snapshots
     const recentInvoices = await Invoice.find({
       isDeleted: false,
       status: "approved"
     })
-      .select("invoiceNumber customerName grandTotal createdAt status")
+      .select("invoiceNumber partySnapshot partyId grandTotal createdAt status")
+      .populate({
+        path: 'partyId',
+        select: 'name company type'
+      })
       .sort({ createdAt: -1 })
       .limit(10)
       .lean<RecentSaleDocument[]>();
@@ -266,7 +294,8 @@ export async function GET() {
       recentSales: recentInvoices.map(sale => ({
         _id: String(sale._id),
         invoiceNumber: sale.invoiceNumber,
-        customerName: sale.customerName || "Walk-in Customer",
+        partySnapshot: sale.partySnapshot,
+        partyId: sale.partyId,
         grandTotal: sale.grandTotal,
         createdAt: sale.createdAt,
         documentType: "invoice",
@@ -287,7 +316,7 @@ function calculateTrend(current: number, previous: number) {
   if (previous === 0) {
     return { trend: current >= 0 ? "up" : "down", change: 0 };
   }
-  
+
   const percentChange = ((current - previous) / previous) * 100;
   return {
     trend: percentChange >= 0 ? "up" : "down",

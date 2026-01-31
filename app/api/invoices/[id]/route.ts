@@ -1,4 +1,4 @@
-// app/api/invoices/[id]/route.ts - UPDATED: Store previous quotation status and revert on delete
+// app/api/invoices/[id]/route.ts - FINAL: Using snapshots, removed legacy fields
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -11,6 +11,7 @@ import { voidJournalsForReference } from '@/utils/journalManager';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 import { getUserInfo } from "@/lib/auth-helpers";
+import { createPartySnapshot } from "@/utils/partySnapshot";
 
 interface RequestContext {
   params: Promise<{
@@ -111,6 +112,33 @@ export async function PUT(request: Request, context: RequestContext) {
       }, { status: 400 });
     }
 
+    // ✅ Handle party/contact changes - update snapshots
+    if (body.partyId && body.partyId !== currentInvoice.partyId.toString()) {
+      console.log(`🔄 Party changed for invoice ${id}, updating snapshots`);
+
+      const { partySnapshot, contactSnapshot } = await createPartySnapshot(
+        body.partyId,
+        body.contactId
+      );
+
+      body.partySnapshot = partySnapshot;
+      body.contactSnapshot = contactSnapshot;
+
+      console.log(`   Old Party: ${currentInvoice.partySnapshot.displayName}`);
+      console.log(`   New Party: ${partySnapshot.displayName}`);
+    }
+    // ✅ If only contact changed (same party)
+    else if (body.contactId && body.contactId !== currentInvoice.contactId?.toString()) {
+      console.log(`🔄 Contact changed for invoice ${id}, updating contact snapshot`);
+
+      const { contactSnapshot } = await createPartySnapshot(
+        currentInvoice.partyId.toString(),
+        body.contactId
+      );
+
+      body.contactSnapshot = contactSnapshot;
+    }
+
     const oldStatus = currentInvoice.status;
 
     const items = body.items || currentInvoice.items;
@@ -193,28 +221,22 @@ export async function DELETE(request: Request, context: RequestContext) {
 
     console.log(`🔴 DELETE /api/invoices/${id}`);
 
-    // ✅ NEW: Handle quotation status reversion
+    // ✅ Handle quotation status reversion
     if (invoice.connectedDocuments?.quotationId) {
       try {
         const quotation = await Quotation.findById(invoice.connectedDocuments.quotationId);
-        
+
         if (quotation && quotation.status === 'converted') {
-          // Store the previous status in the invoice for restoration later
-          if (!invoice.metadata) {
-            invoice.metadata = {};
-          }
-          invoice.metadata.previousQuotationStatus = 'approved'; // Default to approved
-          
           // Revert quotation status to approved
           quotation.status = 'approved';
-          
+
           // Remove invoice from quotation's connected documents
           if (quotation.connectedDocuments?.invoiceIds) {
             quotation.connectedDocuments.invoiceIds = quotation.connectedDocuments.invoiceIds.filter(
               (invId: any) => invId.toString() !== id
             );
           }
-          
+
           quotation.addAuditEntry(
             'Status reverted (connected invoice deleted)',
             user.id,
@@ -225,7 +247,7 @@ export async function DELETE(request: Request, context: RequestContext) {
               newValue: 'approved'
             }]
           );
-          
+
           await quotation.save();
           console.log(`✅ Reverted quotation ${quotation.invoiceNumber} status to 'approved'`);
         }

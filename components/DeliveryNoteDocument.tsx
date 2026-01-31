@@ -1,3 +1,5 @@
+// components/DeliveryNoteDocument.tsx - FINAL: Using snapshots for PDF generation
+
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
 import type { IDeliveryNote } from '@/models/DeliveryNote';
@@ -13,15 +15,22 @@ import { TruckIcon } from './pdf/Icons';
 
 const styles = StyleSheet.create({
   content: { padding: '15 25', flexGrow: 1 },
-  
+
   // Column Widths (Standardized)
   colDesc: { width: '40%' },
   colQty: { width: '20%', textAlign: 'center' },
   colRate: { width: '20%', textAlign: 'right' },
   colTotal: { width: '20%', textAlign: 'right', fontWeight: 'bold' },
 
-  customerName: { fontSize: 11, fontWeight: 'bold', color: pdfColors.textMain, marginBottom: 2 },
-  customerDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
+  entityName: { fontSize: 11, fontWeight: 'bold', color: pdfColors.textMain, marginBottom: 2 },
+  entityDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
+  labelRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 },
+  inlineLabel: { fontSize: 9, color: pdfColors.primary, marginRight: 6, fontWeight: 'bold' },
+
+  // New Styles for label-only layout
+  labelOnly: { marginBottom: 4 },
+  standAloneLabel: { fontSize: 9, color: pdfColors.primary, fontWeight: 'bold' },
+
   dateSection: { alignItems: 'flex-end' },
   dateLabel: { fontSize: 7, color: pdfColors.textMuted, marginBottom: 2 },
   dateValue: { fontSize: 10, fontWeight: 'bold', color: pdfColors.primary },
@@ -112,11 +121,27 @@ interface DeliveryNoteProps {
 export const DeliveryNoteDocument: React.FC<DeliveryNoteProps> = ({ bill, companyDetails }) => {
   registerPdfFonts();
 
+  // Use snapshots for PDF (immutable legal truth)
+  const partyName = bill.partySnapshot.displayName;
+  const partyAddress = bill.partySnapshot.address;
+  // const partyVAT = bill.partySnapshot.taxIdentifiers?.vatNumber;
+
+  const contactName = bill.contactSnapshot?.name;
+  const contactPhone = bill.contactSnapshot?.phone;
+  const contactEmail = bill.contactSnapshot?.email;
+  const contactDesignation = bill.contactSnapshot?.designation;
+
+  // Extract invoice number from populated connectedDocuments
   const invoiceIds = bill.connectedDocuments?.invoiceIds;
   const firstInvoice = (Array.isArray(invoiceIds) && invoiceIds.length > 0) ? invoiceIds[0] : null;
   const invoiceNumber = (typeof firstInvoice === 'object' && firstInvoice !== null && 'invoiceNumber' in firstInvoice)
     ? (firstInvoice as any).invoiceNumber
     : null;
+
+  // Check if there's any additional info beyond party name
+  const hasAdditionalInfo = contactName || contactPhone || contactEmail ||
+    (partyAddress && (partyAddress.street || partyAddress.city || partyAddress.state ||
+      partyAddress.postalCode || partyAddress.country));
 
   return (
     <Document>
@@ -135,11 +160,43 @@ export const DeliveryNoteDocument: React.FC<DeliveryNoteProps> = ({ bill, compan
 
         <View style={commonStyles.infoBar}>
           <View style={{ flex: 1 }}>
-            <Text style={commonStyles.sectionLabel}>Delivered To:</Text>
-            <Text style={styles.customerName}>{bill.customerName}</Text>
-            {bill.customerPhone && <Text style={styles.customerDetail}>{bill.customerPhone}</Text>}
-            {bill.customerEmail && <Text style={styles.customerDetail}>{bill.customerEmail}</Text>}
+            {hasAdditionalInfo ? (
+              /* Has Contact Info or Address */
+              <>
+                <View style={styles.labelRow}>
+                  <Text style={styles.inlineLabel}>Delivered To:</Text>
+                  <Text style={styles.entityName}>{partyName}</Text>
+                </View>
+                {contactName && (
+                  <Text style={styles.entityDetail}>
+                    {contactName}{contactDesignation && ` (${contactDesignation})`}
+                  </Text>
+                )}
+                {contactPhone && <Text style={styles.entityDetail}>{contactPhone}</Text>}
+                {contactEmail && <Text style={styles.entityDetail}>{contactEmail}</Text>}
+                {partyAddress && (
+                  <Text style={styles.entityDetail}>
+                    {[
+                      partyAddress.street,
+                      partyAddress.city,
+                      partyAddress.state,
+                      partyAddress.postalCode,
+                      partyAddress.country
+                    ].filter(Boolean).join(', ')}
+                  </Text>
+                )}
+              </>
+            ) : (
+              /* No Contact Info - Just Party */
+              <>
+                <View style={styles.labelOnly}>
+                  <Text style={styles.standAloneLabel}>Delivered To:</Text>
+                </View>
+                <Text style={styles.entityName}>{partyName}</Text>
+              </>
+            )}
           </View>
+
           <View style={styles.dateSection}>
             <Text style={styles.dateLabel}>Delivery Date</Text>
             <Text style={styles.dateValue}>{formatDisplayDate(bill.deliveryDate)}</Text>

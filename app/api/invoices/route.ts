@@ -1,18 +1,19 @@
-// app/api/invoices/route.ts
+// app/api/invoices/route.ts - FINAL: Using party snapshots, removed legacy fields
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Invoice from "@/models/Invoice";
-import Customer from "@/models/Customer";
 import Quotation from "@/models/Quotation";
 import DeliveryNote from "@/models/DeliveryNote";
 import ReturnNote from "@/models/ReturnNote";
 import Voucher from "@/models/Voucher";
+import Party from "@/models/Party";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { createJournalForInvoice } from '@/utils/journalAutoCreate';
 import { UAE_VAT_PERCENTAGE } from '@/utils/constants';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
+import { createPartySnapshot } from "@/utils/partySnapshot";
 
 /**
  * GET - Fetch invoices with optional server-side pagination, sorting, and filtering
@@ -26,14 +27,14 @@ export async function GET(request: Request) {
     if (error) return error;
 
     await dbConnect();
-    
-    const ensureModels = [Invoice, Customer, Quotation, DeliveryNote, ReturnNote, Voucher];
+
+    const ensureModels = [Invoice, Quotation, DeliveryNote, ReturnNote, Voucher, Party];
 
     const { searchParams } = new URL(request.url);
-    
+
     // Check if this is a server-side request (has page/pageSize params)
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
-    
+
     // Extract date params (support both naming conventions)
     const startDateParam = searchParams.get('startDate') || searchParams.get('from');
     const endDateParam = searchParams.get('endDate') || searchParams.get('to');
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
     if (isServerSide) {
       // 🚀 SERVER-SIDE MODE: Handle pagination, sorting, and filtering
       const { page, pageSize, sorting, filters } = extractTableParams(searchParams);
-      
+
       // Base filter (always exclude deleted items)
       const baseFilter: any = { isDeleted: false };
 
@@ -56,6 +57,11 @@ export async function GET(request: Request) {
           end.setHours(23, 59, 59, 999);
           baseFilter.invoiceDate.$lte = end;
         }
+      }
+
+      const partyId = searchParams.get('partyId');
+      if (partyId) {
+        baseFilter.partyId = partyId;
       }
 
       // Check for populate flag
@@ -82,6 +88,10 @@ export async function GET(request: Request) {
           select: 'returnNumber returnType status isDeleted',
           match: { isDeleted: false }
         },
+        {
+          path: 'partyId',
+          select: 'name company type roles',
+        }
       ] : undefined;
 
       // Execute paginated query
@@ -112,13 +122,13 @@ export async function GET(request: Request) {
       // 📋 CLIENT-SIDE MODE: Return all invoices (for backward compatibility)
       const status = searchParams.get('status');
       const limit = searchParams.get('limit');
-      const customerName = searchParams.get('customerName');
+      const partyId = searchParams.get('partyId');
       const overdue = searchParams.get('overdue') === 'true';
       const populate = searchParams.get('populate') === 'true';
 
       const filter: any = { isDeleted: false };
       if (status) filter.status = status;
-      if (customerName) filter.customerName = customerName;
+      if (partyId) filter.partyId = partyId;
 
       if (overdue) {
         filter.status = 'overdue';
@@ -158,6 +168,11 @@ export async function GET(request: Request) {
             path: 'connectedDocuments.quotationId',
             select: 'invoiceNumber status isDeleted',
             match: { isDeleted: false }
+
+          })
+          .populate({
+            path: 'partyId',
+            select: 'name company type roles'
           });
       }
 
@@ -184,12 +199,12 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST - Create new invoice
+ * POST - Create new invoice with party snapshots
  */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    
+
     // Check permission
     const { error, session } = await requireAuthAndPermission({
       invoice: ["create"],
@@ -200,30 +215,29 @@ export async function POST(request: Request) {
     const user = session.user;
 
     const {
-      customerName,
-      customerPhone,
-      customerEmail,
       items,
       discount = 0,
       notes,
       status,
       invoiceDate,
+      partyId,
+      contactId,
       connectedDocuments,
       vatAmount: customVatAmount,
       totalAmount: customTotalAmount,
       grandTotal: customGrandTotal,
     } = body;
 
-    // Validation
-    if (!customerName) {
+    // ✅ Validation: Party is required
+    if (!partyId) {
       return NextResponse.json({
-        error: 'Customer name is required'
+        error: 'Party is required'
       }, { status: 400 });
     }
 
     if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ 
-        error: 'Items are required for invoices' 
+      return NextResponse.json({
+        error: 'Items are required for invoices'
       }, { status: 400 });
     }
 
@@ -233,17 +247,8 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Upsert customer
-    await Customer.findOneAndUpdate(
-      { name: customerName },
-      {
-        $set: {
-          phone: customerPhone,
-          email: customerEmail
-        }
-      },
-      { upsert: true, new: true }
-    );
+    // ✅ Create immutable snapshots of party and contact
+    const { partySnapshot, contactSnapshot } = await createPartySnapshot(partyId, contactId);
 
     // Calculate totals
     const grossTotal = items.reduce((sum: number, item: { total: number }) => sum + item.total, 0);
@@ -276,9 +281,15 @@ export async function POST(request: Request) {
     // Build invoice data
     const invoiceData: any = {
       invoiceNumber,
-      customerName,
-      customerPhone,
-      customerEmail,
+
+      // ✅ Party & Contact References
+      partyId,
+      contactId,
+
+      // ✅ Immutable Snapshots (legal/historical truth)
+      partySnapshot,
+      contactSnapshot,
+
       items,
       discount,
       notes,
@@ -311,6 +322,7 @@ export async function POST(request: Request) {
       await newInvoice.save();
 
       console.log(`✅ Successfully created invoice: ${newInvoice.invoiceNumber}`);
+      console.log(`   Party: ${partySnapshot.displayName}`);
 
       // Conditional journal entry creation - only for APPROVED invoices
       if (newInvoice.status === 'approved') {

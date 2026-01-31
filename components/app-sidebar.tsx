@@ -45,8 +45,8 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Stock Adjustment": { stockAdjustment: ["read"] },
 
   // People
-  "Customers": { customer: ["read"] },
-  "Suppliers": { supplier: ["read"] },
+  "Parties": { party: ["read"] },
+  "Contacts": { contact: ["read"] },
   "Payees": { payee: ["read"] },
 
   // Sales
@@ -107,8 +107,8 @@ const staticData = {
       url: "#",
       icon: Users,
       items: [
-        { title: "Customers", url: "/people/customers" },
-        { title: "Suppliers", url: "/people/suppliers" },
+        { title: "Parties", url: "/people/parties" },
+        { title: "Contacts", url: "/people/contacts" },
         { title: "Payees", url: "/people/payees" },
       ],
     },

@@ -56,12 +56,9 @@ export interface ConnectedDebitNote {
 export interface Receipt {
     _id: string;
     invoiceNumber: string;
-    customerName?: string;
-    supplierName?: string;
+    partyId: any;
     payeeName?: string;
     vendorName?: string;
-    customerPhone?: string;
-    customerEmail?: string;
     grandTotal: number;
     voucherType: "receipt";
     items: Array<{
@@ -231,27 +228,29 @@ export const getColumns = (
         },
         {
             id: "partyName",
-            accessorFn: (row) => row.customerName || row.supplierName || row.payeeName || row.vendorName || "",
+            accessorKey: "partyId",
             header: "Party",
             cell: ({ row }) => {
                 const receipt = row.original;
+                const party = receipt.partyId as any;
 
-                if (receipt.customerName) {
+                // If partyId is populated
+                if (party && (party.name || party.company)) {
+                    const name = party.name || party.company;
+                    const roles = party.roles || {};
+
+                    let variant = "secondary";
+                    if (roles.customer) variant = "primary";
+                    else if (roles.supplier) variant = "warning";
+
                     return (
-                        <Badge variant="primary" appearance="outline" className="gap-1">
-                            {receipt.customerName}
+                        <Badge variant={variant as any} appearance="outline" className="gap-1">
+                            {name}
                         </Badge>
                     );
                 }
 
-                if (receipt.supplierName) {
-                    return (
-                        <Badge variant="warning" appearance="outline" className="gap-1">
-                            {receipt.supplierName}
-                        </Badge>
-                    );
-                }
-
+                // Fallback to special fields
                 if (receipt.payeeName) {
                     return (
                         <Badge variant="cyan" appearance="outline" className="gap-1">
@@ -272,7 +271,7 @@ export const getColumns = (
             },
             meta: {
                 label: "Party",
-                placeholder: "Search party name...",
+                placeholder: "Search party...",
                 variant: "text",
             },
             enableColumnFilter: true,

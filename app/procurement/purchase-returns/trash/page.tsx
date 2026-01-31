@@ -13,7 +13,7 @@ interface DeletedPurchaseReturn {
   _id: string;
   returnNumber?: string;
   purchaseReference?: string;
-  supplierName?: string;
+  partyId?: any; // Populated
   items?: Array<{
     returnQuantity: number;
   }>;
@@ -67,8 +67,11 @@ export default function PurchaseReturnsTrashPage() {
           item.items?.reduce((sum, i) => sum + (i.returnQuantity || 0), 0) || 0;
         const deleteAction = item.actionHistory?.find((a) => a.action === "Soft Deleted");
         const deletedByUsername = deleteAction?.username || item.deletedBy || "Unknown";
-        
-        return `${item.purchaseReference || "N/A"} • ${item.supplierName || "Unknown Supplier"} • ${totalQuantity.toFixed(2)} units • ${item.reason || "No reason"} • Deleted by @${deletedByUsername}`;
+
+        const party = item.partyId;
+        const name = party?.name || party?.company || 'Unknown Party';
+
+        return `${item.purchaseReference || "N/A"} • ${name} • ${totalQuantity.toFixed(2)} units • ${item.reason || "No reason"} • Deleted by @${deletedByUsername}`;
       }}
     />
   );

@@ -1,11 +1,11 @@
-// app/sales/quotations/columns.tsx - UPDATED: Using quotationDate instead of createdAt
+// app/sales/quotations/columns.tsx - FINAL: Using partySnapshot for display
 
 "use client";
 
 import * as React from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { MoreHorizontal, ArrowUpDown, FileText, Trash2, Eye, CheckCircle, Clock, XCircle, Send, FileCheck, AlertCircle, RefreshCw, Edit } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -43,9 +43,26 @@ export interface ConnectedDocument {
 export interface Quotation {
   _id: string;
   invoiceNumber: string;
-  customerName: string;
-  customerPhone?: string;
-  customerEmail?: string;
+
+  // Party & Contact (References)
+  partyId: any;
+  contactId?: string;
+
+  // Snapshots
+  partySnapshot: {
+    displayName: string;
+    address?: any;
+    taxIdentifiers?: {
+      vatNumber?: string;
+    };
+  };
+  contactSnapshot?: {
+    name: string;
+    phone?: string;
+    email?: string;
+    designation?: string;
+  };
+
   grandTotal: number;
   status: "pending" | "approved" | "sent" | "cancelled" | "converted";
   documentType: "quotation";
@@ -60,7 +77,7 @@ export interface Quotation {
   connectedDocuments?: {
     invoiceIds?: (string | ConnectedDocument)[];
   };
-  quotationDate: string; // ✅ UPDATED: Changed from createdAt to quotationDate
+  quotationDate: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -81,8 +98,8 @@ const getStatusVariant = (status: string) => {
     case 'pending': return 'warning';
     default: return 'secondary';
   }
-
 };
+
 const getStatusIcon = (status: string) => {
   switch (status) {
     case 'approved': return CheckCircle;
@@ -174,7 +191,7 @@ const StatusBadgeButton = ({ quotation, onRefresh, canUpdateStatus }: { quotatio
 interface RowActionsProps {
   quotation: Quotation;
   onViewPdf: (quotation: Quotation) => void;
-  onView?: (quotation: Quotation) => void; // ✅ NEW: View details option
+  onView?: (quotation: Quotation) => void;
   onEdit: (quotation: Quotation) => void;
   onDelete: (id: string) => void;
   permissions: QuotationPermissions;
@@ -269,17 +286,16 @@ const RowActions = ({ quotation, onViewPdf, onView, onEdit, onDelete, permission
   );
 };
 
-// ✅ UPDATED: Added onView parameter
 export const getColumns = (
   onViewPdf: (quotation: Quotation) => void,
   onEdit: (quotation: Quotation) => void,
   onDelete: (id: string) => void,
   permissions: QuotationPermissions,
   onRefresh?: () => void,
-  onView?: (quotation: Quotation) => void // ✅ NEW
+  onView?: (quotation: Quotation) => void
 ): ColumnDef<Quotation>[] => [
     {
-      accessorKey: "quotationDate", // ✅ UPDATED: Changed from createdAt to quotationDate
+      accessorKey: "quotationDate",
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -291,7 +307,7 @@ export const getColumns = (
         </Button>
       ),
       cell: ({ row }) => {
-        const date = new Date(row.original.quotationDate); // ✅ UPDATED
+        const date = new Date(row.original.quotationDate);
         return (
           <div className="text-left font-medium">
             <div>{formatDisplayDate(date)}</div>
@@ -302,8 +318,8 @@ export const getColumns = (
         );
       },
       sortingFn: (rowA, rowB) => {
-        const dateA = new Date(rowA.original.quotationDate); // ✅ UPDATED
-        const dateB = new Date(rowB.original.quotationDate); // ✅ UPDATED
+        const dateA = new Date(rowA.original.quotationDate);
+        const dateB = new Date(rowB.original.quotationDate);
         return dateB.getTime() - dateA.getTime();
       },
     },
@@ -323,17 +339,19 @@ export const getColumns = (
       enableColumnFilter: true,
     },
     {
-      id: "customerName",
-      accessorKey: "customerName",
+      id: "partyName",
+      accessorKey: "partySnapshot.displayName",
       header: "Customer",
       cell: ({ row }) => {
-        const customerName = row.original.customerName;
-        return customerName ? (
+        // Use snapshot as primary, fallback to populated party
+        const name = row.original.partySnapshot?.displayName
+          || row.original.partyId?.company
+          || row.original.partyId?.name
+          || "Unknown";
+        return (
           <Badge variant="primary" appearance="outline">
-            {customerName}
+            {name}
           </Badge>
-        ) : (
-          <span className="text-muted-foreground">-</span>
         );
       },
       meta: {
@@ -421,7 +439,7 @@ export const getColumns = (
           <RowActions
             quotation={row.original}
             onViewPdf={onViewPdf}
-            onView={onView} // ✅ NEW: Pass onView
+            onView={onView}
             onEdit={onEdit}
             onDelete={onDelete}
             permissions={permissions}

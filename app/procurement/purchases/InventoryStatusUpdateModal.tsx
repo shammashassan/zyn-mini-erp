@@ -24,7 +24,6 @@ import { Spinner } from "@/components/ui/spinner";
 interface Purchase {
   _id: string;
   inventoryStatus: 'pending' | 'received' | 'partially received';
-  supplierName?: string;
   totalAmount: number;
   grandTotal?: number;
   vatAmount?: number;
@@ -36,6 +35,7 @@ interface Purchase {
     total: number;
     receivedQuantity?: number;
   }>;
+  partyId?: any; // Unified Party Reference
 }
 
 interface InventoryStatusUpdateModalProps {
@@ -54,11 +54,11 @@ const getInventoryStatusColor = (status: string) => {
   }
 };
 
-export function InventoryStatusUpdateModal({ 
-  isOpen, 
-  onClose, 
-  purchase, 
-  onRefresh 
+export function InventoryStatusUpdateModal({
+  isOpen,
+  onClose,
+  purchase,
+  onRefresh
 }: InventoryStatusUpdateModalProps) {
   const [initialStatus, setInitialStatus] = useState(purchase.inventoryStatus);
   const [newStatus, setNewStatus] = useState(purchase.inventoryStatus);
@@ -147,14 +147,14 @@ export function InventoryStatusUpdateModal({
 
       if (allFullyReceived) {
         toast.info("All items fully received. Changing status to 'received'.");
-        
+
         // ✅ FIXED: Include items with receivedQuantity set to full quantity
         const itemsWithFullReceived = purchase.items.map(item => ({
           ...item,
           receivedQuantity: item.quantity
         }));
 
-        const updateData: any = { 
+        const updateData: any = {
           inventoryStatus: 'received',
           items: itemsWithFullReceived
         };
@@ -343,10 +343,12 @@ export function InventoryStatusUpdateModal({
           {/* Purchase Info */}
           <div className="rounded-lg border p-3 bg-muted/50 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Supplier:</span>
-              <span className="font-medium">{purchase.supplierName || 'N/A'}</span>
+              <span className="text-muted-foreground">Party:</span>
+              <span className="font-medium">
+                {purchase.partyId?.name || purchase.partyId?.company || 'Unknown Party'}
+              </span>
             </div>
-             <div className="flex justify-between mt-1">
+            <div className="flex justify-between mt-1">
               <span className="text-muted-foreground">Total:</span>
               <span className="font-medium">{formatCurrency(displayTotal)}</span>
             </div>
@@ -496,7 +498,7 @@ export function InventoryStatusUpdateModal({
                 </div>
               </>
             )}
-             {newStatus === initialStatus && (
+            {newStatus === initialStatus && (
               <div>
                 <span className="text-muted-foreground">New:</span>
                 <Badge
@@ -507,7 +509,7 @@ export function InventoryStatusUpdateModal({
                   {newStatus}
                 </Badge>
               </div>
-             )}
+            )}
           </div>
 
           {/* Stock Impact Warning */}

@@ -11,9 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarIcon, Banknote, Info, ChevronsUpDown, Check, Store, Users, Building2, Briefcase, Plane, Megaphone, Zap, Code, Cpu, Utensils, Home, DollarSign, Shield, Film, Boxes, Plus } from "lucide-react";
+import { CalendarIcon, Banknote, Info, Users, Briefcase, Plane, Megaphone, Zap, Code, Cpu, Utensils, Home, DollarSign, Shield, Film, Boxes } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { format } from "date-fns";
@@ -22,6 +21,7 @@ import type { IExpense } from "@/models/Expense";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
+import { PartyContactSelector } from "@/components/PartyContactSelector";
 
 type ExpenseFormData = {
   description: string;
@@ -29,10 +29,7 @@ type ExpenseFormData = {
   category: string;
   type: 'single' | 'period';
   expenseDate: Date; // ✅ UPDATED: Changed from date to expenseDate
-  vendor?: string;
-  payeeName?: string;
-  supplierName?: string;
-  partyType: 'manual' | 'payee' | 'supplier';
+  partyType: 'vendor' | 'payee';
   notes?: string;
   status?: 'pending' | 'approved' | 'cancelled';
 };
@@ -71,80 +68,37 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
     formState: { isSubmitting, isDirty }
   } = useForm<ExpenseFormData>();
 
-  const [payees, setPayees] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [payeePopoverOpen, setPayeePopoverOpen] = useState(false);
-  const [supplierPopoverOpen, setSupplierPopoverOpen] = useState(false);
+  const [selectedPartyId, setSelectedPartyId] = useState("");
+  const [selectedParty, setSelectedParty] = useState("");
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
-  const [payeeSearchQuery, setPayeeSearchQuery] = useState("");
-  const [supplierSearchQuery, setSupplierSearchQuery] = useState("");
 
   const watchedType = watch('type');
   const watchedAmount = watch('amount');
-  const watchedVendor = watch('vendor');
-  const watchedPayeeName = watch('payeeName');
-  const watchedSupplierName = watch('supplierName');
   const watchedPartyType = watch('partyType');
   const watchedCategory = watch('category');
 
   const selectedCategoryIcon = EXPENSE_CATEGORIES.find(c => c.value === watchedCategory)?.icon || Briefcase;
   const CategoryIcon = selectedCategoryIcon;
 
-  // Get display name based on party type
-  const displayPartyName = watchedPartyType === 'manual'
-    ? watchedVendor
-    : watchedPartyType === 'payee'
-      ? watchedPayeeName
-      : watchedSupplierName;
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [payeesRes, suppliersRes] = await Promise.all([
-          fetch("/api/payees"),
-          fetch("/api/suppliers")
-        ]);
-
-        if (payeesRes.ok) setPayees(await payeesRes.json());
-        if (suppliersRes.ok) setSuppliers(await suppliersRes.json());
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
-      }
-    };
-    fetchData();
-  }, []);
 
   useEffect(() => {
     if (isOpen) {
-      let initialPartyType: 'manual' | 'payee' | 'supplier' = 'manual';
+      let initialPartyType: 'vendor' | 'payee' = 'vendor';
+      let initialPartyId = '';
       let initialPartyName = '';
 
       if (defaultValues?.payeeId) {
         initialPartyType = 'payee';
         const pVal = defaultValues.payeeId as any;
-
-        if (pVal && typeof pVal === 'object' && pVal.name) {
-          initialPartyName = pVal.name;
-        } else {
-          const idToMatch = typeof pVal === 'object' ? pVal._id : pVal;
-          const payee = payees.find(p => String(p._id) === String(idToMatch));
-          initialPartyName = payee?.name || '';
+        if (typeof pVal === 'string') {
+          initialPartyId = pVal;
+        } else if (pVal?._id) {
+          initialPartyId = pVal._id;
+          initialPartyName = pVal.name || '';
         }
-
-      } else if (defaultValues?.supplierId) {
-        initialPartyType = 'supplier';
-        const sVal = defaultValues.supplierId as any;
-
-        if (sVal && typeof sVal === 'object' && sVal.name) {
-          initialPartyName = sVal.name;
-        } else {
-          const idToMatch = typeof sVal === 'object' ? sVal._id : sVal;
-          const supplier = suppliers.find(s => String(s._id) === String(idToMatch));
-          initialPartyName = supplier?.name || '';
-        }
-
       } else if (defaultValues?.vendor) {
-        initialPartyType = 'manual';
+        initialPartyType = 'vendor';
         initialPartyName = defaultValues.vendor;
       }
 
@@ -153,48 +107,25 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
         amount: defaultValues?.amount || undefined,
         category: defaultValues?.category || "",
         type: defaultValues?.type || 'single',
-        expenseDate: defaultValues?.expenseDate ? new Date(defaultValues.expenseDate) : new Date(), // ✅ UPDATED
-        vendor: initialPartyType === 'manual' ? initialPartyName : "",
-        payeeName: initialPartyType === 'payee' ? initialPartyName : "",
-        supplierName: initialPartyType === 'supplier' ? initialPartyName : "",
+        expenseDate: defaultValues?.expenseDate ? new Date(defaultValues.expenseDate) : new Date(),
         partyType: initialPartyType,
         notes: defaultValues?.notes || "",
         status: defaultValues?.status || 'pending',
       });
 
-      setPayeeSearchQuery(initialPartyType === 'payee' ? initialPartyName : "");
-      setSupplierSearchQuery(initialPartyType === 'supplier' ? initialPartyName : "");
+      setSelectedPartyId(initialPartyId);
+      setSelectedParty(initialPartyName);
     }
-  }, [isOpen, defaultValues, reset, payees, suppliers]);
-
-  const handlePayeeSelect = (payeeName: string) => {
-    setValue('payeeName', payeeName, { shouldDirty: true });
-    setPayeePopoverOpen(false);
-    setPayeeSearchQuery(payeeName);
-  };
-
-  const handleSupplierSelect = (supplierName: string) => {
-    setValue('supplierName', supplierName, { shouldDirty: true });
-    setSupplierPopoverOpen(false);
-    setSupplierSearchQuery(supplierName);
-  };
+  }, [isOpen, defaultValues, reset]);
 
   const handleFormSubmit: SubmitHandler<ExpenseFormData> = async (data) => {
-    // Manual Validation
-    if (data.partyType === 'manual' && (!data.vendor || !data.vendor.trim())) {
-      toast.error("Please enter a vendor name");
-      return;
-    }
-    if (data.partyType === 'payee' && !data.payeeName) {
-      toast.error("Please select a payee");
-      return;
-    }
-    if (data.partyType === 'supplier' && !data.supplierName) {
-      toast.error("Please select a supplier");
+    // Validate party selection
+    if (!selectedParty && !selectedPartyId) {
+      toast.error("Please select a party");
       return;
     }
 
-    if (!data.expenseDate) { // ✅ UPDATED
+    if (!data.expenseDate) {
       toast.error("Please select an expense date");
       return;
     }
@@ -216,22 +147,17 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
 
     const submitData: any = { ...data };
 
-    // Transform based on party type
-    if (data.partyType === "payee") {
-      submitData.payeeName = data.payeeName;
-      delete submitData.supplierId;
-      delete submitData.supplierName;
-      delete submitData.vendor;
-    } else if (data.partyType === "supplier") {
-      submitData.supplierName = data.supplierName;
-      delete submitData.payeeId;
-      delete submitData.payeeName;
-      delete submitData.vendor;
-    } else {
-      delete submitData.payeeId;
-      delete submitData.payeeName;
-      delete submitData.supplierId;
-      delete submitData.supplierName;
+    // Set party data based on party type
+    if (selectedParty) {
+      switch (data.partyType) {
+        case 'payee':
+          submitData.payeeName = selectedParty;
+          if (selectedPartyId) submitData.payeeId = selectedPartyId;
+          break;
+        case 'vendor':
+          submitData.vendor = selectedParty;
+          break;
+      }
     }
 
     delete submitData.partyType;
@@ -252,236 +178,42 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
 
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 sm:space-y-6">
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {/* Party Type Dropdown */}
+          {/* Main Top Grid */}
+          <div className={cn("grid grid-cols-1 gap-4", defaultValues ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
+            {/* Party Selection */}
             <div className="space-y-2">
-              <Label className="text-xs sm:text-sm">Party Type</Label>
-              <Controller
-                name="partyType"
-                control={control}
-                defaultValue="manual"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger className="w-full h-9 sm:h-10 text-sm">
-                      <SelectValue placeholder="Select party type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manual">
-                        <div className="flex items-center gap-2">
-                          <Store className="h-4 w-4" />
-                          Manual Entry
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="payee">
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4" />
-                          Payee
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="supplier">
-                        <div className="flex items-center gap-2">
-                          <Building2 className="h-4 w-4" />
-                          Supplier
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
+              <PartyContactSelector
+                allowedRoles={['vendor', 'payee']}
+                value={{
+                  partyId: selectedPartyId,
+                  partyType: watchedPartyType,
+                  partyName: selectedParty
+                }}
+                onChange={(val, party) => {
+                  setSelectedPartyId(val.partyId ?? "");
+
+                  // Update partyType from component
+                  if (val.partyType) {
+                    setValue('partyType', val.partyType as 'vendor' | 'payee');
+                  }
+
+                  // Set party name (from API or manual input)
+                  if (val.partyName) {
+                    setSelectedParty(val.partyName);
+                  } else if (party) {
+                    setSelectedParty(party.company || party.name || "");
+                  }
+                }}
+                layout="vertical"
+                showContactSelector={false}
+                showCreateButton={true}
+                className="w-full"
               />
             </div>
 
-            {/* Party Selection/Input based on type */}
+            {/* Expense Date */}
             <div className="space-y-2">
-              <Label className="text-xs sm:text-sm">Party *</Label>
-
-              {/* Manual Entry */}
-              {watchedPartyType === 'manual' && (
-                <div className="relative">
-                  <Input
-                    placeholder="Enter vendor name..."
-                    className="pl-9 w-full h-9 sm:h-10 text-sm"
-                    {...register("vendor")}
-                  />
-                  <Store className="absolute left-3 top-2 sm:top-2.5 h-4 w-4 text-muted-foreground" />
-                </div>
-              )}
-
-              {/* Payee Selector */}
-              {watchedPartyType === 'payee' && (
-                <Controller
-                  name="payeeName"
-                  control={control}
-                  render={({ field }) => (
-                    <>
-                      <Popover
-                        open={payeePopoverOpen}
-                        onOpenChange={(isOpen) => {
-                          setPayeePopoverOpen(isOpen);
-                          if (isOpen) setPayeeSearchQuery(field.value || "");
-                        }}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            role="combobox"
-                            className="w-full justify-between h-9 sm:h-10 text-sm"
-                          >
-                            <span className="truncate">
-                              {field.value || "Select or type payee..."}
-                            </span>
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[400px] p-0" align="start">
-                          <Command shouldFilter={false}>
-                            <CommandInput
-                              placeholder="Search payee..."
-                              value={payeeSearchQuery}
-                              onValueChange={setPayeeSearchQuery}
-                            />
-                            <CommandList
-                              className="max-h-[200px] overflow-y-auto"
-                              onWheel={(e) => e.stopPropagation()}
-                              onTouchStart={(e) => e.stopPropagation()}
-                              onTouchMove={(e) => e.stopPropagation()}
-                            >
-                              <CommandEmpty>
-                                {payeeSearchQuery.trim() ? "No payee found." : "Start typing to search..."}
-                              </CommandEmpty>
-
-                              <CommandGroup heading="Existing Payees">
-                                {payees
-                                  .filter(p => !payeeSearchQuery || p.name.toLowerCase().includes(payeeSearchQuery.toLowerCase()))
-                                  .map((payee) => (
-                                    <CommandItem
-                                      key={payee._id}
-                                      value={payee.name}
-                                      onSelect={() => handlePayeeSelect(payee.name)}
-                                    >
-                                      <Check className={cn("mr-2 h-4 w-4", field.value === payee.name ? "opacity-100" : "opacity-0")} />
-                                      <div className="flex-1 min-w-0">
-                                        <div className="truncate">{payee.name}</div>
-                                        <div className="text-xs text-muted-foreground">
-                                          {payee.type?.replace(/_/g, ' ')}
-                                        </div>
-                                      </div>
-                                    </CommandItem>
-                                  ))}
-                              </CommandGroup>
-
-                              {payeeSearchQuery.trim() && !payees.some(p => p.name.toLowerCase() === payeeSearchQuery.trim().toLowerCase()) && (
-                                <CommandGroup heading="New Payee">
-                                  <CommandItem
-                                    onSelect={() => handlePayeeSelect(payeeSearchQuery.trim())}
-                                    className="text-primary"
-                                    value={payeeSearchQuery}
-                                  >
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Create "{payeeSearchQuery}"
-                                  </CommandItem>
-                                </CommandGroup>
-                              )}
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </>
-                  )}
-                />
-              )}
-
-              {/* Supplier Selector */}
-              {watchedPartyType === 'supplier' && (
-                <Controller
-                  name="supplierName"
-                  control={control}
-                  render={({ field }) => (
-                    <>
-                      <Popover
-                        open={supplierPopoverOpen}
-                        onOpenChange={(isOpen) => {
-                          setSupplierPopoverOpen(isOpen);
-                          if (isOpen) setSupplierSearchQuery(field.value || "");
-                        }}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            role="combobox"
-                            className="w-full justify-between h-9 sm:h-10 text-sm"
-                          >
-                            <span className="truncate">
-                              {field.value || "Select or type supplier..."}
-                            </span>
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[400px] p-0" align="start">
-                          <Command shouldFilter={false}>
-                            <CommandInput
-                              placeholder="Search supplier..."
-                              value={supplierSearchQuery}
-                              onValueChange={setSupplierSearchQuery}
-                            />
-                            <CommandList
-                              className="max-h-[200px] overflow-y-auto"
-                              onWheel={(e) => e.stopPropagation()}
-                              onTouchStart={(e) => e.stopPropagation()}
-                              onTouchMove={(e) => e.stopPropagation()}
-                            >
-                              <CommandEmpty>
-                                {supplierSearchQuery.trim() ? "No supplier found." : "Start typing to search..."}
-                              </CommandEmpty>
-
-                              <CommandGroup heading="Existing Suppliers">
-                                {suppliers
-                                  .filter(s => !supplierSearchQuery || s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase()))
-                                  .map((supplier) => (
-                                    <CommandItem
-                                      key={supplier._id}
-                                      value={supplier.name}
-                                      onSelect={() => handleSupplierSelect(supplier.name)}
-                                    >
-                                      <Check className={cn("mr-2 h-4 w-4", field.value === supplier.name ? "opacity-100" : "opacity-0")} />
-                                      <div className="flex-1 min-w-0">
-                                        <div className="truncate">{supplier.name}</div>
-                                        {supplier.city && (
-                                          <div className="text-xs text-muted-foreground truncate">
-                                            {supplier.city}, {supplier.district}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </CommandItem>
-                                  ))}
-                              </CommandGroup>
-
-                              {supplierSearchQuery.trim() && !suppliers.some(s => s.name.toLowerCase() === supplierSearchQuery.trim().toLowerCase()) && (
-                                <CommandGroup heading="New Supplier">
-                                  <CommandItem
-                                    onSelect={() => handleSupplierSelect(supplierSearchQuery.trim())}
-                                    className="text-primary"
-                                    value={supplierSearchQuery}
-                                  >
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Create "{supplierSearchQuery}"
-                                  </CommandItem>
-                                </CommandGroup>
-                              )}
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </>
-                  )}
-                />
-              )}
-            </div>
-
-            {/* Date Picker - ✅ UPDATED: Using expenseDate */}
-            <div className="space-y-2">
-              <Label className="text-xs sm:text-sm">Expense Date *</Label>
+              <Label>Expense Date <span className="text-destructive">*</span></Label>
               <Controller
                 name="expenseDate"
                 control={control}
@@ -489,15 +221,16 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
                   <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button
+                        ref={field.ref}
                         type="button"
                         variant="outline"
                         className={cn(
-                          "w-full justify-start text-left font-normal h-9 sm:h-10 text-sm",
+                          "w-full justify-start text-left font-normal h-10",
                           !field.value && "text-muted-foreground"
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {field.value ? format(new Date(field.value), "PPP") : "Pick a date"}
+                        {field.value ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -516,6 +249,29 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
                 )}
               />
             </div>
+
+            {/* Status (Edit Mode Only) */}
+            {defaultValues && (
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Controller
+                  name="status"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value || "pending"} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-full h-10">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            )}
           </div>
 
           <Controller
@@ -579,7 +335,7 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
                     control={control}
                     render={({ field }) => (
                       <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger ref={field.ref} className="h-9 sm:h-10 text-sm">
+                        <SelectTrigger ref={field.ref} className="w-full h-9 sm:h-10 text-sm">
                           <SelectValue placeholder="Select category..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -612,28 +368,6 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
                     {...register("amount", { valueAsNumber: true })}
                   />
                 </div>
-
-                {defaultValues && (
-                  <div className="space-y-2">
-                    <Label htmlFor="status" className="text-xs sm:text-sm">Status</Label>
-                    <Controller
-                      name="status"
-                      control={control}
-                      render={({ field }) => (
-                        <Select value={field.value || "pending"} onValueChange={field.onChange}>
-                          <SelectTrigger className="h-9 sm:h-10 text-sm">
-                            <SelectValue placeholder="Select status..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="approved">Approved</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
-                )}
               </div>
 
               <div className="space-y-2">
@@ -670,10 +404,10 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
                   <span className="text-muted-foreground">Type:</span>
                   <span className="font-medium capitalize">{watchedType} Expense</span>
                 </div>
-                {displayPartyName && (
+                {selectedParty && (
                   <div className="flex justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Payee:</span>
-                    <span className="font-medium break-words text-right">{displayPartyName}</span>
+                    <span className="font-medium break-words text-right">{selectedParty}</span>
                   </div>
                 )}
                 {watchedCategory && (
@@ -713,6 +447,6 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>
+    </Dialog >
   );
 }

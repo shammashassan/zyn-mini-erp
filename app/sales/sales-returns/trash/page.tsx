@@ -14,7 +14,7 @@ interface DeletedSalesReturn {
   _id: string;
   returnNumber?: string;
   invoiceReference?: string;
-  customerName?: string;
+  partyId?: any; // Populated
   items?: Array<{
     returnQuantity: number;
   }>;
@@ -70,8 +70,11 @@ export default function SalesReturnsTrashPage() {
         const deleteAction = item.actionHistory?.find((a) => a.action === "Soft Deleted");
         const deletedByUsername = deleteAction?.username || item.deletedBy || "Unknown";
         const displayTotal = item.grandTotal || 0;
-        
-        return `${item.invoiceReference || "N/A"} • ${item.customerName || "Unknown Customer"} • ${totalQuantity.toFixed(2)} units • ${formatCurrency(displayTotal)} • ${item.reason || "No reason"} • Deleted by @${deletedByUsername}`;
+
+        const party = item.partyId;
+        const name = party?.name || party?.company || 'Unknown Party';
+
+        return `${item.invoiceReference || "N/A"} • ${name} • ${totalQuantity.toFixed(2)} units • ${formatCurrency(displayTotal)} • ${item.reason || "No reason"} • Deleted by @${deletedByUsername}`;
       }}
     />
   );

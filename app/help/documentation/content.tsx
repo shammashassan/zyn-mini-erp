@@ -43,8 +43,8 @@ import RolesPermissionsSection from "./components/sections/roles-permissions";
 import ProductsSection from "./components/sections/products";
 import MaterialsSection from "./components/sections/materials";
 import StockAdjustmentSection from "./components/sections/stock-adjustment";
-import CustomersSection from "./components/sections/customers";
-import SuppliersSection from "./components/sections/suppliers";
+import PartiesSection from "./components/sections/parties";
+import ContactsSection from "./components/sections/contacts";
 import PayeesSection from "./components/sections/payees";
 import QuotationsSection from "./components/sections/quotations";
 import InvoicesSection from "./components/sections/invoices";
@@ -121,20 +121,20 @@ export const DOC_SECTIONS: DocSection[] = [
 
     // --- People ---
     {
-        id: "customers",
+        id: "parties",
         group: "People",
-        title: "Customers",
+        title: "Parties",
         icon: Users,
-        description: "Client and accounts receivable master data management.",
-        content: <CustomersSection />,
+        description: "Unified management of Customers, Suppliers, and other business entities.",
+        content: <PartiesSection />,
     },
     {
-        id: "suppliers",
+        id: "contacts",
         group: "People",
-        title: "Suppliers",
-        icon: Building2,
-        description: "Vendor and accounts payable master data management.",
-        content: <SuppliersSection />,
+        title: "Contacts",
+        icon: BookUser,
+        description: "Individual points of contact associated with business parties.",
+        content: <ContactsSection />,
     },
     {
         id: "payees",

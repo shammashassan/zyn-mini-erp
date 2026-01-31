@@ -52,9 +52,25 @@ export function CreatePaymentModal({
   const [paymentMethod, setPaymentMethod] = useState("Bank Transfer");
   const [notes, setNotes] = useState("");
 
+  // Determine initial party
+  const initialPayee = expense.payeeId as any;
+  const initialPartyId = initialPayee?._id || "";
+  const initialRole = initialPayee ? 'payee' : 'vendor';
+
+  const [selectedPartyId, setSelectedPartyId] = useState<string>(initialPartyId);
+  const [selectedContactId, setSelectedContactId] = useState<string | undefined>(undefined);
+  const [selectedPartyName, setSelectedPartyName] = useState<string>(expense.vendor || (initialPayee?.name) || "");
+  const [partyType, setPartyType] = useState<any>(initialRole);
+
   const displayTotal = expense.amount;
   const alreadyPaid = expense.paidAmount || 0;
   const remainingAmount = Math.max(0, displayTotal - alreadyPaid);
+
+  // ✅ Use snapshot as primary source for display
+  const displayPayeeName = (expense as any).payeeSnapshot?.name
+    || (expense.payeeId as any)?.name
+    || expense.vendor
+    || "Unknown Party";
 
   const handleCreatePayment = async () => {
     setIsLoading(true);
@@ -83,7 +99,7 @@ export function CreatePaymentModal({
       }
 
       // ✅ FIXED: Party Mapping Logic
-      let payload: any = {
+      const payload: any = {
         paymentMethod: paymentMethod,
         voucherType: "payment",
         items: [],
@@ -102,24 +118,12 @@ export function CreatePaymentModal({
         skipAutoCreation: true,
       };
 
-      const payee = expense.payeeId as any;
-      const supplier = expense.supplierId as any;
-
-      if (supplier && typeof supplier === 'object' && supplier.name) {
-        // Case 1: Real Registered Supplier
-        payload.supplierName = supplier.name;
-        payload.supplierId = supplier._id;
-      } else if (payee && typeof payee === 'object' && payee.name) {
-        // Case 2: Registered Payee (Employee, etc.)
-        payload.payeeName = payee.name;
-        payload.payeeId = payee._id;
-      } else if (expense.vendor) {
-        // Case 3: Manual Vendor String
-        // ✅ FIX: Use vendorName for manual entries
-        payload.vendorName = expense.vendor;
+      if (partyType === 'payee' && selectedPartyId) {
+        payload.payeeId = selectedPartyId;
+        payload.payeeName = selectedPartyName;
       } else {
-        // Case 4: Fallback
-        payload.vendorName = "Unknown Vendor";
+        // Vendor or Fallback
+        payload.vendorName = selectedPartyName || expense.vendor || "Unknown Vendor";
       }
 
       const paymentRes = await fetch("/api/vouchers", {
@@ -201,9 +205,18 @@ export function CreatePaymentModal({
 
         <div className="space-y-4">
           <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Vendor:</span>
-              <span className="text-sm font-medium">{expense.vendor || "N/A"}</span>
+            <div className="col-span-2 space-y-2">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-xs text-muted-foreground">
+                  {(expense as any).payeeSnapshot ? 'Payee' : 'Vendor'}
+                </Label>
+              </div>
+              <Input
+                value={displayPayeeName}
+                readOnly
+                disabled
+                className="bg-muted"
+              />
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Category:</span>

@@ -1,4 +1,4 @@
-// models/Expense.ts - UPDATED: Removed automatic paid amount audit tracking
+// models/Expense.ts - UPDATED: Added payee snapshot, removed supplier fields
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -20,6 +20,14 @@ export interface IAuditEntry {
   }[];
 }
 
+export interface IPayeeSnapshot {
+  name: string;
+  type?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+}
+
 export interface IExpense extends Document {
   _id: string;
   referenceNumber: string;
@@ -30,9 +38,12 @@ export interface IExpense extends Document {
   date: Date;
   expenseDate: Date;
 
-  vendor?: string;
-  payeeId?: mongoose.Types.ObjectId;
-  supplierId?: mongoose.Types.ObjectId;
+  // Party Reference (Dynamic - Current Truth)
+  vendor?: string;  // For manual entry
+  payeeId?: mongoose.Types.ObjectId;  // For payee reference
+
+  // Immutable Snapshot (Frozen - Legal Truth)
+  payeeSnapshot?: IPayeeSnapshot;
 
   notes?: string;
 
@@ -92,6 +103,14 @@ const AuditEntrySchema: Schema = new Schema({
   }],
 });
 
+const PayeeSnapshotSchema: Schema = new Schema({
+  name: { type: String, required: true },
+  type: { type: String },
+  email: { type: String },
+  phone: { type: String },
+  address: { type: String },
+}, { _id: false });
+
 const ExpenseSchema: Schema<IExpense> = new Schema({
   referenceNumber: {
     type: String,
@@ -137,6 +156,7 @@ const ExpenseSchema: Schema<IExpense> = new Schema({
     required: true
   },
 
+  // Party fields
   vendor: {
     type: String,
     trim: true,
@@ -145,11 +165,13 @@ const ExpenseSchema: Schema<IExpense> = new Schema({
   payeeId: {
     type: Schema.Types.ObjectId,
     ref: 'Payee',
-    required: false
+    required: false,
+    index: true
   },
-  supplierId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Supplier',
+
+  // Immutable Snapshot
+  payeeSnapshot: {
+    type: PayeeSnapshotSchema,
     required: false
   },
 
@@ -202,9 +224,8 @@ ExpenseSchema.index({ expenseDate: 1 });
 ExpenseSchema.index({ 'connectedDocuments.paymentIds': 1 });
 ExpenseSchema.index({ 'paymentAllocations.voucherId': 1 });
 ExpenseSchema.index({ payeeId: 1 });
-ExpenseSchema.index({ supplierId: 1 });
+ExpenseSchema.index({ 'payeeSnapshot.name': 'text' });
 
-// ✅ UPDATED: Removed automatic audit tracking for paid amount changes
 ExpenseSchema.pre('save', function (next) {
   if (!this.referenceNumber) {
     return next(new Error('Reference number is required'));

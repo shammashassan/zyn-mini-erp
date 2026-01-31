@@ -1,4 +1,4 @@
-// models/DebitNote.ts - UPDATED: Removed automatic received amount audit tracking
+// models/DebitNote.ts - COMPLETE MIGRATION: Party/Contact snapshots, no legacy fields
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -28,16 +28,40 @@ export interface IAuditEntry {
   }[];
 }
 
+export interface IPartySnapshot {
+  displayName: string;
+  address?: {
+    street?: string;
+    city?: string;
+    district?: string;
+    state?: string;
+    country?: string;
+    postalCode?: string;
+  };
+  taxIdentifiers?: {
+    vatNumber?: string;
+  };
+}
+
+export interface IContactSnapshot {
+  name: string;
+  phone?: string;
+  email?: string;
+  designation?: string;
+}
+
 export interface IDebitNote extends Document {
   _id: string;
   debitNoteNumber: string;
-  supplierName?: string;
-  supplierId?: mongoose.Types.ObjectId;
-  customerName?: string;
-  customerId?: mongoose.Types.ObjectId;
-  payeeName?: string;
-  payeeId?: mongoose.Types.ObjectId;
-  vendorName?: string;
+
+  // ✅ Party & Contact References (Dynamic - Current Truth)
+  partyId: mongoose.Types.ObjectId;
+  contactId?: mongoose.Types.ObjectId;
+
+  // ✅ Immutable Snapshots (Frozen - Legal Truth)
+  partySnapshot: IPartySnapshot;
+  contactSnapshot?: IContactSnapshot;
+
   items: IDebitNoteItem[];
   totalAmount: number;
   discount: number;
@@ -116,15 +140,55 @@ const AuditEntrySchema: Schema = new Schema({
   }],
 });
 
+const PartySnapshotSchema: Schema = new Schema({
+  displayName: { type: String, required: true },
+  address: {
+    street: { type: String },
+    city: { type: String },
+    district: { type: String },
+    state: { type: String },
+    country: { type: String },
+    postalCode: { type: String },
+  },
+  taxIdentifiers: {
+    vatNumber: { type: String },
+  },
+}, { _id: false });
+
+const ContactSnapshotSchema: Schema = new Schema({
+  name: { type: String, required: true },
+  phone: { type: String },
+  email: { type: String },
+  designation: { type: String },
+}, { _id: false });
+
 const DebitNoteSchema: Schema<IDebitNote> = new Schema({
   debitNoteNumber: { type: String, required: true, unique: true },
-  supplierName: { type: String, required: false },
-  supplierId: { type: Schema.Types.ObjectId, ref: 'Supplier', required: false },
-  customerName: { type: String, required: false },
-  customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: false },
-  payeeName: { type: String, required: false },
-  payeeId: { type: Schema.Types.ObjectId, ref: 'Payee', required: false },
-  vendorName: { type: String, required: false },
+
+  // ✅ Party & Contact References
+  partyId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Party',
+    required: true,
+    index: true
+  },
+  contactId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Contact',
+    required: false,
+    index: true
+  },
+
+  // ✅ Immutable Snapshots
+  partySnapshot: {
+    type: PartySnapshotSchema,
+    required: true
+  },
+  contactSnapshot: {
+    type: ContactSnapshotSchema,
+    required: false
+  },
+
   items: [DebitNoteItemSchema],
   totalAmount: { type: Number, required: true, min: 0 },
   discount: { type: Number, default: 0, min: 0 },
@@ -178,17 +242,12 @@ DebitNoteSchema.index({ isDeleted: 1, debitDate: -1 });
 DebitNoteSchema.index({ status: 1 });
 DebitNoteSchema.index({ paymentStatus: 1 });
 DebitNoteSchema.index({ 'connectedDocuments.returnNoteId': 1 });
-DebitNoteSchema.index({ supplierName: 1 });
-DebitNoteSchema.index({ supplierId: 1 });
-DebitNoteSchema.index({ customerName: 1 });
-DebitNoteSchema.index({ customerId: 1 });
-DebitNoteSchema.index({ payeeName: 1 });
-DebitNoteSchema.index({ payeeId: 1 });
-DebitNoteSchema.index({ vendorName: 1 });
 DebitNoteSchema.index({ 'connectedDocuments.receiptIds': 1 });
 DebitNoteSchema.index({ 'receiptAllocations.voucherId': 1 });
+DebitNoteSchema.index({ partyId: 1, debitDate: -1 });
+DebitNoteSchema.index({ 'partySnapshot.displayName': 'text' });
 
-// ✅ UPDATED: Removed automatic audit tracking for received amount changes
+// Pre-save hook
 DebitNoteSchema.pre('save', function (next) {
   // Calculate amounts
   const grossTotal = this.totalAmount;
@@ -212,7 +271,9 @@ DebitNoteSchema.pre('save', function (next) {
   this.remainingAmount = Math.max(0, this.grandTotal - this.receivedAmount);
 
   // Auto-calculate payment status
-  if (this.receivedAmount >= this.grandTotal) {
+  const EPSILON = 0.01;
+
+  if (this.receivedAmount >= this.grandTotal - EPSILON) {
     this.paymentStatus = 'paid';
   } else if (this.receivedAmount > 0) {
     this.paymentStatus = 'partially paid';

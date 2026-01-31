@@ -1,15 +1,16 @@
-// app/api/delivery-notes/route.ts - FIXED: Update invoice.connectedDocuments.deliveryId
+// app/api/delivery-notes/route.ts - FINAL: Using party snapshots, removed legacy fields
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import DeliveryNote from "@/models/DeliveryNote";
 import Quotation from "@/models/Quotation";
-import Invoice from "@/models/Invoice"; // ✅ ADDED
-import Customer from "@/models/Customer";
+import Invoice from "@/models/Invoice";
+import Party from "@/models/Party";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { UAE_VAT_PERCENTAGE } from '@/utils/constants';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
+import { createPartySnapshot } from "@/utils/partySnapshot";
 
 export async function GET(request: Request) {
   try {
@@ -23,16 +24,16 @@ export async function GET(request: Request) {
     const ensureModels = [DeliveryNote, Quotation, Invoice];
 
     const { searchParams } = new URL(request.url);
-    
+
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
-    
+
     const startDateParam = searchParams.get('startDate') || searchParams.get('from');
     const endDateParam = searchParams.get('endDate') || searchParams.get('to');
 
     if (isServerSide) {
       // 🚀 SERVER-SIDE MODE
       const { page, pageSize, sorting, filters } = extractTableParams(searchParams);
-      
+
       console.log('📊 Server-side delivery note request:', { page, pageSize, sorting, filters, startDateParam, endDateParam });
 
       const baseFilter: any = { isDeleted: false };
@@ -61,6 +62,10 @@ export async function GET(request: Request) {
           path: 'connectedDocuments.quotationId',
           select: 'invoiceNumber status isDeleted',
           match: { isDeleted: false }
+        },
+        {
+          path: 'partyId',
+          select: 'name company type roles',
         }
       ] : undefined;
 
@@ -85,12 +90,12 @@ export async function GET(request: Request) {
       // 📋 CLIENT-SIDE MODE (backward compatibility)
       const status = searchParams.get('status');
       const limit = searchParams.get('limit');
-      const customerName = searchParams.get('customerName');
+      const partyId = searchParams.get('partyId');
       const populate = searchParams.get('populate') === 'true';
 
       const filter: any = { isDeleted: false };
       if (status) filter.status = status;
-      if (customerName) filter.customerName = customerName;
+      if (partyId) filter.partyId = partyId;
 
       if (startDateParam || endDateParam) {
         filter.deliveryDate = {};
@@ -115,6 +120,10 @@ export async function GET(request: Request) {
             path: 'connectedDocuments.quotationId',
             select: 'invoiceNumber status isDeleted',
             match: { isDeleted: false }
+          })
+          .populate({
+            path: 'partyId',
+            select: 'name company type roles'
           });
       }
 
@@ -138,7 +147,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    
+
     const { error, session } = await requireAuthAndPermission({
       deliveryNote: ["create"],
     });
@@ -148,9 +157,6 @@ export async function POST(request: Request) {
     const user = session.user;
 
     const {
-      customerName,
-      customerPhone,
-      customerEmail,
       items,
       discount = 0,
       notes,
@@ -160,18 +166,20 @@ export async function POST(request: Request) {
       vatAmount: customVatAmount,
       totalAmount: customTotalAmount,
       grandTotal: customGrandTotal,
+      partyId,
+      contactId,
     } = body;
 
-    // Validation
-    if (!customerName) {
+    // ✅ Validation: Party is required
+    if (!partyId) {
       return NextResponse.json({
-        error: 'Customer name is required'
+        error: 'Party is required'
       }, { status: 400 });
     }
 
     if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ 
-        error: 'Items are required for delivery notes' 
+      return NextResponse.json({
+        error: 'Items are required for delivery notes'
       }, { status: 400 });
     }
 
@@ -184,24 +192,15 @@ export async function POST(request: Request) {
     // ✅ CRITICAL: Extract invoiceId from connectedDocuments
     const invoiceId = connectedDocuments?.invoiceId;
 
-    // Upsert customer
-    await Customer.findOneAndUpdate(
-      { name: customerName },
-      {
-        $set: {
-          phone: customerPhone,
-          email: customerEmail
-        }
-      },
-      { upsert: true, new: true }
-    );
+    // ✅ Create immutable snapshots of party and contact
+    const { partySnapshot, contactSnapshot } = await createPartySnapshot(partyId, contactId);
 
     // Calculate totals
     const subTotal = items.reduce((sum: number, item: { total: number }) => sum + item.total, 0);
     const discountedTotal = subTotal - discount;
 
     const finalVatAmount = customVatAmount !== undefined ? customVatAmount : (discountedTotal * (UAE_VAT_PERCENTAGE / 100));
-    const finalTotalAmount = customTotalAmount !== undefined ? customTotalAmount : discountedTotal;
+    const finalTotalAmount = customTotalAmount !== undefined ? customTotalAmount : subTotal;
     const finalGrandTotal = customGrandTotal !== undefined ? customGrandTotal : (discountedTotal + finalVatAmount);
 
     // Generate delivery note number
@@ -224,9 +223,15 @@ export async function POST(request: Request) {
     // Build delivery note data
     const deliveryNoteData: any = {
       invoiceNumber,
-      customerName,
-      customerPhone,
-      customerEmail,
+
+      // ✅ Party & Contact References
+      partyId,
+      contactId,
+
+      // ✅ Immutable Snapshots (legal/historical truth)
+      partySnapshot,
+      contactSnapshot,
+
       items,
       discount,
       notes,
@@ -259,12 +264,14 @@ export async function POST(request: Request) {
     try {
       await newDeliveryNote.save();
 
+      console.log(`✅ Successfully created delivery note: ${newDeliveryNote.invoiceNumber}`);
+      console.log(`   Party: ${partySnapshot.displayName}`);
+
       // ✅ NEW: Update the linked invoice's connectedDocuments.deliveryId
       if (invoiceId) {
         try {
-          
           const invoice = await Invoice.findById(invoiceId);
-          
+
           if (!invoice) {
             console.error(`❌ Invoice ${invoiceId} not found in database`);
           } else if (invoice.isDeleted) {
@@ -274,7 +281,7 @@ export async function POST(request: Request) {
             invoice.set({
               'connectedDocuments.deliveryId': newDeliveryNote._id
             });
-            
+
             invoice.addAuditEntry(
               'Delivery Note Linked',
               user.id,
@@ -285,7 +292,7 @@ export async function POST(request: Request) {
                 newValue: newDeliveryNote._id
               }]
             );
-            
+
             await invoice.save();
           }
         } catch (linkError) {

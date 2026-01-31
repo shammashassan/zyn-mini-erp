@@ -1,4 +1,5 @@
-// app/api/vouchers/[id]/pdf/route.ts
+// app/api/vouchers/[id]/pdf/route.ts - PDF generation using party/contact snapshots
+
 import { NextRequest, NextResponse } from "next/server";
 import React from "react";
 import { renderToStream } from "@react-pdf/renderer";
@@ -10,6 +11,7 @@ import "@/models/Purchase";
 import "@/models/Expense";
 import "@/models/DebitNote";
 import "@/models/CreditNote";
+import Party from "@/models/Party";
 
 import { VoucherDocument } from "@/components/VoucherDocument";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
@@ -42,7 +44,7 @@ export async function GET(
 
     await dbConnect();
 
-    // Fetch Voucher and POPULATE both Invoices and Purchases
+    // ✅ Fetch Voucher and POPULATE connected documents for display
     const voucher = await Voucher.findById(id)
       .populate({
         path: 'connectedDocuments.invoiceIds',
@@ -52,7 +54,7 @@ export async function GET(
       .populate({
         path: 'connectedDocuments.purchaseIds',
         model: 'Purchase',
-        select: 'referenceNumber' // ✅ Using referenceNumber as per your Purchase model
+        select: 'referenceNumber'
       })
       .populate({
         path: 'connectedDocuments.expenseIds',
@@ -69,10 +71,24 @@ export async function GET(
         model: 'CreditNote',
         select: 'creditNoteNumber'
       })
+      .populate('partyId')
       .setOptions({ includeDeleted: true });
 
     if (!voucher) {
       return NextResponse.json({ message: "Voucher not found" }, { status: 404 });
+    }
+
+    // ✅ Prepare voucher with details
+    let voucherWithDetails = voucher.toObject();
+
+    // ✅ IMPORTANT: For PDF, we use snapshots as primary source
+    // Only populate contact details from partyId if snapshots don't exist (backward compatibility)
+    if (!voucherWithDetails.partySnapshot && voucher.partyId) {
+      const party = voucher.partyId as any;
+      const pName = party.name || party.company;
+      voucherWithDetails.partyName = pName;
+      voucherWithDetails.payeeName = pName;
+      voucherWithDetails.vendorName = pName;
     }
 
     // Fetch Company Details
@@ -88,7 +104,7 @@ export async function GET(
     }
 
     const documentElement = React.createElement(VoucherDocument, {
-      bill: voucher,
+      bill: voucherWithDetails,
       companyDetails,
     });
 

@@ -1,4 +1,4 @@
-// app/sales/debit-notes/debit-note-form.tsx - MINIMAL CHANGES: Only add Return Note selection
+// app/sales/debit-notes/debit-note-form.tsx - FINAL: Using PartyContactSelector, no legacy fields
 
 "use client";
 
@@ -39,20 +39,27 @@ import {
   CommandList
 } from "@/components/ui/command";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarIcon, ChevronsUpDown, Check, Plus, X, FileText, AlertCircle, Users, Building2, User, Store, List, Calculator } from "lucide-react";
+import {
+  CalendarIcon,
+  ChevronsUpDown,
+  Check,
+  Plus,
+  X,
+  FileText,
+  AlertCircle,
+  List,
+  Calculator
+} from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { DebitNote } from "./columns";
 import type { IMaterial } from "@/models/Material";
-import type { ISupplier } from "@/models/Supplier";
-import type { ICustomer } from "@/models/Customer";
-import type { IPayee } from "@/models/Payee";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 import { Spinner } from "@/components/ui/spinner";
+import { PartyContactSelector } from "@/components/PartyContactSelector";
 
-type PartyType = 'customer' | 'supplier' | 'payee' | 'vendor';
 type DebitNoteMode = 'items' | 'manual';
 
 type DebitNoteItem = {
@@ -64,10 +71,9 @@ type DebitNoteItem = {
 };
 
 type DebitNoteFormData = {
-  partyType: PartyType;
-  partyName: string;
-  vendorName?: string;
-  returnNoteId?: string; // ✅ NEW: Optional return note selection
+  partyId: string;
+  contactId?: string;
+  returnNoteId?: string;
   items: DebitNoteItem[];
   debitDate: Date;
   reason: string;
@@ -89,20 +95,13 @@ interface DebitNoteFormProps {
   returnNoteData?: any;
 }
 
-const getPartyTypeIcon = (type: PartyType) => {
-  switch (type) {
-    case 'customer': return Users;
-    case 'supplier': return Building2;
-    case 'payee': return User;
-    case 'vendor': return Store;
-  }
-};
-
-const getPartyTypeLabel = (type: PartyType) => {
-  return type.charAt(0).toUpperCase() + type.slice(1);
-};
-
-export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, returnNoteData }: DebitNoteFormProps) {
+export function DebitNoteForm({
+  isOpen,
+  onClose,
+  onSubmit,
+  defaultValues,
+  returnNoteData
+}: DebitNoteFormProps) {
   const {
     register,
     handleSubmit,
@@ -113,7 +112,8 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
     formState: { isSubmitting, isDirty }
   } = useForm<DebitNoteFormData>({
     defaultValues: {
-      partyType: 'supplier',
+      partyId: "",
+      contactId: undefined,
       items: [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
       discount: 0,
       isTaxPayable: true,
@@ -130,13 +130,8 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
   });
 
   const [materials, setMaterials] = useState<IMaterial[]>([]);
-  const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
-  const [customers, setCustomers] = useState<ICustomer[]>([]);
-  const [payees, setPayees] = useState<IPayee[]>([]);
-  const [returnNotes, setReturnNotes] = useState<any[]>([]); // ✅ NEW
-  const [partyPopoverOpen, setPartyPopoverOpen] = useState(false);
-  const [partySearchQuery, setPartySearchQuery] = useState("");
-  const [returnNotePopoverOpen, setReturnNotePopoverOpen] = useState(false); // ✅ NEW
+  const [returnNotes, setReturnNotes] = useState<any[]>([]);
+  const [returnNotePopoverOpen, setReturnNotePopoverOpen] = useState(false);
   const [materialPopovers, setMaterialPopovers] = useState<Record<number, boolean>>({});
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
@@ -151,10 +146,10 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
   const watchedItems = watch("items");
   const discount = watch("discount") || 0;
   const isTaxPayable = watch("isTaxPayable");
-  const partyType = watch("partyType");
   const debitMode = watch("debitMode");
   const manualAmount = watch("manualAmount") || 0;
-  const selectedReturnNoteId = watch("returnNoteId"); // ✅ NEW
+  const selectedReturnNoteId = watch("returnNoteId");
+  const partyId = watch("partyId");
 
   const isEditMode = !!defaultValues?._id;
   const isFromReturnNote = !!returnNoteData;
@@ -171,45 +166,44 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [materialsRes, suppliersRes, customersRes, payeesRes] = await Promise.all([
-          fetch("/api/materials"),
-          fetch("/api/suppliers"),
-          fetch("/api/customers"),
-          fetch("/api/payees")
-        ]);
-
+        const materialsRes = await fetch("/api/materials");
         if (materialsRes.ok) setMaterials(await materialsRes.json());
-        if (suppliersRes.ok) setSuppliers(await suppliersRes.json());
-        if (customersRes.ok) setCustomers(await customersRes.json());
-        if (payeesRes.ok) setPayees(await payeesRes.json());
       } catch (error) {
-        console.error("Failed to fetch data:", error);
+        console.error("Failed to fetch materials:", error);
       }
     };
     fetchData();
   }, []);
 
-  // ✅ NEW: Fetch approved return notes when supplier is selected
+  // Fetch approved return notes when party is selected
   useEffect(() => {
     const fetchReturnNotes = async () => {
-      if (partyType !== 'supplier' || !partySearchQuery) {
+      if (!partyId) {
         setReturnNotes([]);
         return;
       }
 
       try {
-        const res = await fetch('/api/return-notes?populate=true');
+        const params = new URLSearchParams({
+          returnType: 'purchaseReturn',
+          partyId: partyId,
+          status: 'approved',
+          excludeLinked: 'true'
+        });
+
+        if (defaultValues?.connectedDocuments?.returnNoteId) {
+          const rawId = defaultValues.connectedDocuments.returnNoteId;
+          const returnNoteId = typeof rawId === 'object' && rawId !== null && '_id' in rawId
+            ? (rawId as any)._id.toString()
+            : rawId.toString();
+
+          params.append('includeId', returnNoteId);
+        }
+
+        const res = await fetch(`/api/return-notes?${params.toString()}`);
         if (res.ok) {
-          const allReturnNotes = await res.json();
-          // Filter to only show approved return notes from selected supplier that don't have a debit note yet
-          const eligibleReturnNotes = allReturnNotes.filter(
-            (rn: any) =>
-              rn.supplierName === partySearchQuery &&
-              rn.status === 'approved' &&
-              !rn.connectedDocuments?.debitNoteId &&
-              !rn.isDeleted
-          );
-          setReturnNotes(eligibleReturnNotes);
+          const data = await res.json();
+          setReturnNotes(data);
         }
       } catch (error) {
         console.error("Failed to fetch return notes:", error);
@@ -217,11 +211,12 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
     };
 
     fetchReturnNotes();
-  }, [partyType, partySearchQuery]);
+  }, [partyId, defaultValues]);
 
   useEffect(() => {
     if (isOpen) {
       if (returnNoteData) {
+        // Creating from return note
         const itemsFromReturn = returnNoteData.items.map((item: any) => {
           const material = materials.find(m => m._id === item.materialId);
           const unitCost = item.rate || material?.unitCost || 0;
@@ -234,9 +229,14 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
           };
         });
 
+        // Extract party/contact IDs from return note
+        const partyIdValue = typeof returnNoteData.partyId === 'object'
+          ? returnNoteData.partyId._id
+          : returnNoteData.partyId;
+
         reset({
-          partyType: 'supplier',
-          partyName: returnNoteData.supplierName || "",
+          partyId: partyIdValue || "",
+          contactId: returnNoteData.contactId?.toString() || undefined,
           items: itemsFromReturn.length > 0 ? itemsFromReturn : [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
           debitDate: new Date(),
           reason: `Return Note: ${returnNoteData.returnNumber} - ${returnNoteData.reason}`,
@@ -247,32 +247,19 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
           debitType: 'return',
           debitMode: 'items',
         });
-        setPartySearchQuery(returnNoteData.supplierName || "");
       } else if (defaultValues) {
-        let detectedPartyType: PartyType = 'supplier';
-        let partyNameValue = '';
-
-        if (defaultValues.customerName) {
-          detectedPartyType = 'customer';
-          partyNameValue = defaultValues.customerName;
-        } else if (defaultValues.payeeName) {
-          detectedPartyType = 'payee';
-          partyNameValue = defaultValues.payeeName;
-        } else if (defaultValues.vendorName) {
-          detectedPartyType = 'vendor';
-          partyNameValue = defaultValues.vendorName;
-        } else if (defaultValues.supplierName) {
-          detectedPartyType = 'supplier';
-          partyNameValue = defaultValues.supplierName;
-        }
-
-        // ✅ NEW: Detect if it's a manual entry or items-based debit note
+        // Editing existing debit note
         const isManualEntry = defaultValues.items?.length === 1 && !(defaultValues.items[0] as any).materialId;
         const detectedMode: DebitNoteMode = isManualEntry ? 'manual' : 'items';
 
+        // Extract party/contact IDs
+        const partyIdValue = typeof defaultValues.partyId === 'object'
+          ? (defaultValues.partyId as any)._id
+          : defaultValues.partyId;
+
         reset({
-          partyType: detectedPartyType,
-          partyName: partyNameValue,
+          partyId: partyIdValue || "",
+          contactId: defaultValues.contactId?.toString() || undefined,
           items: defaultValues.items || [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
           debitDate: defaultValues.debitDate ? new Date(defaultValues.debitDate) : new Date(),
           reason: defaultValues.reason || "",
@@ -281,15 +268,20 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
           discount: defaultValues.discount || 0,
           isTaxPayable: defaultValues.isTaxPayable !== undefined ? defaultValues.isTaxPayable : true,
           debitType: defaultValues.debitType || 'standalone',
-          debitMode: detectedMode, // ✅ NEW: Set detected mode
-          manualAmount: isManualEntry ? defaultValues.items[0].total : 0, // ✅ NEW: Set manual amount if applicable
-          manualDescription: isManualEntry ? defaultValues.items[0].materialName : '', // ✅ NEW: Set description if applicable
+          debitMode: detectedMode,
+          manualAmount: isManualEntry ? defaultValues.items[0].total : 0,
+          manualDescription: isManualEntry ? defaultValues.items[0].materialName : '',
+          returnNoteId: defaultValues.connectedDocuments?.returnNoteId
+            ? (typeof defaultValues.connectedDocuments.returnNoteId === 'object'
+              ? (defaultValues.connectedDocuments.returnNoteId as any)._id
+              : defaultValues.connectedDocuments.returnNoteId)
+            : undefined,
         });
-        setPartySearchQuery(partyNameValue);
       } else {
+        // Creating new debit note
         reset({
-          partyType: 'supplier',
-          partyName: "",
+          partyId: "",
+          contactId: undefined,
           items: [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
           debitDate: new Date(),
           reason: "",
@@ -301,40 +293,14 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
           debitMode: 'items',
           manualAmount: 0,
         });
-        setPartySearchQuery("");
       }
     }
   }, [isOpen, defaultValues, returnNoteData, materials, reset]);
 
-  const getPartyList = () => {
-    switch (partyType) {
-      case 'customer': return customers;
-      case 'supplier': return suppliers;
-      case 'payee': return payees;
-      case 'vendor': return [];
-      default: return [];
-    }
-  };
-
-  const handlePartySelect = (party: ICustomer | ISupplier | IPayee) => {
-    setValue("partyName", party.name, { shouldDirty: true });
-    setPartySearchQuery(party.name);
-    setPartyPopoverOpen(false);
-  };
-
-  const handleCreateNew = () => {
-    if (partySearchQuery.trim()) {
-      setValue("partyName", partySearchQuery.trim(), { shouldDirty: true });
-      setPartyPopoverOpen(false);
-    }
-  };
-
-  // ✅ NEW: Handle return note selection
   const handleReturnNoteSelect = (returnNote: any) => {
     setValue("returnNoteId", returnNote._id, { shouldDirty: true });
     setReturnNotePopoverOpen(false);
 
-    // Auto-fill items from return note
     const itemsFromReturn = returnNote.items.map((item: any) => {
       const material = materials.find(m => m._id === item.materialId);
       const unitCost = item.rate || material?.unitCost || 0;
@@ -388,17 +354,10 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
   };
 
   const handleFormSubmit = async (data: DebitNoteFormData) => {
-    // Validation for party
-    if (partyType === 'vendor') {
-      if (!data.vendorName || !data.vendorName.trim()) {
-        toast.error("Please enter a vendor name");
-        return;
-      }
-    } else {
-      if (!data.partyName || !data.partyName.trim()) {
-        toast.error(`Please select or enter a ${partyType}`);
-        return;
-      }
+    // ✅ Validation
+    if (!data.partyId) {
+      toast.error("Please select a party");
+      return;
     }
 
     if (!data.debitDate) {
@@ -466,6 +425,8 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
     const calculatedGrandTotal = calculatedSubtotal + calculatedVatAmount;
 
     const submitData: any = {
+      partyId: data.partyId,
+      contactId: data.contactId,
       items: validItems.map(item => ({
         ...item,
         quantity: Number(item.quantity) || 0,
@@ -483,33 +444,15 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
       debitType: data.debitType,
     };
 
-    // Set party name based on type
-    switch (partyType) {
-      case 'customer':
-        submitData.customerName = data.partyName.trim();
-        break;
-      case 'supplier':
-        submitData.supplierName = data.partyName.trim();
-        break;
-      case 'payee':
-        submitData.payeeName = data.partyName.trim();
-        break;
-      case 'vendor':
-        submitData.vendorName = data.vendorName?.trim() || data.partyName?.trim();
-        break;
-    }
-
-    // ✅ NEW: If return note selected, add it to submit data
+    // Add return note if selected
     if (data.returnNoteId) {
       const selectedReturnNote = returnNotes.find(rn => rn._id === data.returnNoteId);
       if (selectedReturnNote) {
         submitData.returnNoteId = selectedReturnNote._id;
-        submitData.returnNumber = selectedReturnNote.returnNumber;
         submitData.debitType = 'return';
       }
     } else if (returnNoteData && returnNoteData._id) {
       submitData.returnNoteId = returnNoteData._id;
-      submitData.returnNumber = returnNoteData.returnNumber;
       submitData.debitType = 'return';
     }
 
@@ -517,12 +460,6 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
     await onSubmit(submitData, submissionId);
   };
 
-  const partyList = getPartyList();
-  const doesPartyExist = partyList.some(
-    (p) => p.name.toLowerCase() === partySearchQuery.trim().toLowerCase()
-  );
-
-  const PartyIcon = getPartyTypeIcon(partyType);
   const selectedReturnNote = returnNotes.find(rn => rn._id === selectedReturnNoteId);
 
   return (
@@ -554,155 +491,28 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
             </div>
           )}
 
-          {/* Top Row: Party Type, Party Name, Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {!isFromReturnNote && (
-              <>
-                {/* Party Type Dropdown */}
-                <div className="space-y-2">
-                  <Label>Party Type</Label>
-                  <Select
-                    value={partyType}
-                    onValueChange={(value: PartyType) => {
-                      setValue('partyType', value);
-                      setValue('partyName', '');
-                      setValue('returnNoteId', ''); // ✅ Clear return note when party type changes
-                      setPartySearchQuery('');
+          {/* Top Row: Party and Date */}
+          <div className={cn("grid grid-cols-1 gap-4", isEditMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
+            {/* ✅ Party Field - PartyContactSelector */}
+            <div>
+              <Controller
+                name="partyId"
+                control={control}
+                render={({ field }) => (
+                  <PartyContactSelector
+                    value={{ partyId: field.value, contactId: watch('contactId') }}
+                    onChange={(val) => {
+                      field.onChange(val.partyId);
+                      setValue('contactId', val.contactId);
                     }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue>
-                        <div className="flex items-center gap-2">
-                          <PartyIcon className="h-4 w-4" />
-                          {getPartyTypeLabel(partyType)}
-                        </div>
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(['customer', 'supplier', 'payee', 'vendor'] as PartyType[]).map((type) => {
-                        const Icon = getPartyTypeIcon(type);
-                        return (
-                          <SelectItem key={type} value={type}>
-                            <div className="flex items-center gap-2">
-                              <Icon className="h-4 w-4" />
-                              {getPartyTypeLabel(type)}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Party Name */}
-                <div className="space-y-2">
-                  <Label>
-                    {getPartyTypeLabel(partyType)} Name <span className="text-destructive">*</span>
-                  </Label>
-                  {partyType === 'vendor' ? (
-                    <Input
-                      placeholder="Enter vendor name..."
-                      {...register("vendorName")}
-                      disabled={isFromReturnNote}
-                    />
-                  ) : (
-                    <Controller
-                      name="partyName"
-                      control={control}
-                      render={({ field }) => (
-                        <Popover
-                          open={partyPopoverOpen}
-                          onOpenChange={(isOpen) => {
-                            setPartyPopoverOpen(isOpen);
-                            if (isOpen) setPartySearchQuery(field.value);
-                          }}
-                        >
-                          <PopoverTrigger asChild>
-                            <Button
-                              ref={field.ref}
-                              type="button"
-                              variant="outline"
-                              role="combobox"
-                              className="w-full justify-between"
-                              disabled={isFromReturnNote}
-                            >
-                              <div className="truncate">
-                                {field.value || `Select or type ${partyType}...`}
-                              </div>
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                            <Command shouldFilter={false}>
-                              <CommandInput
-                                placeholder={`Search ${partyType}...`}
-                                value={partySearchQuery}
-                                onValueChange={setPartySearchQuery}
-                              />
-                              <CommandList
-                                className="max-h-[200px] overflow-y-auto"
-                                onWheel={(e) => e.stopPropagation()}
-                                onTouchStart={(e) => e.stopPropagation()}
-                                onTouchMove={(e) => e.stopPropagation()}
-                              >
-                                <CommandEmpty>
-                                  {partySearchQuery.trim() ? `No ${partyType} found.` : "Start typing to search..."}
-                                </CommandEmpty>
-
-                                <CommandGroup heading={`Existing ${getPartyTypeLabel(partyType)}s`}>
-                                  {partyList
-                                    .filter(p => !partySearchQuery || p.name.toLowerCase().includes(partySearchQuery.toLowerCase()))
-                                    .map((party) => (
-                                      <CommandItem
-                                        key={party._id}
-                                        value={party.name}
-                                        onSelect={() => handlePartySelect(party)}
-                                      >
-                                        <Check className={cn("mr-2 h-4 w-4", field.value === party.name ? "opacity-100" : "opacity-0")} />
-                                        <div className="flex-1">
-                                          <span>{party.name}</span>
-                                          {partyType === 'customer' && (party as any).email && (
-                                            <div className="text-xs text-muted-foreground">
-                                              {(party as any).email}
-                                            </div>
-                                          )}
-                                          {partyType === 'supplier' && (party as any).city && (party as any).district && (
-                                            <div className="text-xs text-muted-foreground">
-                                              {(party as any).city}, {(party as any).district}
-                                            </div>
-                                          )}
-                                          {partyType === 'payee' && (party as any).type && (
-                                            <div className="text-xs text-muted-foreground capitalize">
-                                              {(party as any).type}
-                                            </div>
-                                          )}
-                                        </div>
-                                      </CommandItem>
-                                    ))}
-                                </CommandGroup>
-
-                                {partySearchQuery.trim() && !doesPartyExist && (
-                                  <CommandGroup heading={`Create New`}>
-                                    <CommandItem
-                                      onSelect={handleCreateNew}
-                                      className="text-primary"
-                                      value={partySearchQuery}
-                                    >
-                                      <Plus className="mr-2 h-4 w-4" />
-                                      Create "{partySearchQuery}"
-                                    </CommandItem>
-                                  </CommandGroup>
-                                )}
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                      )}
-                    />
-                  )}
-                </div>
-              </>
-            )}
+                    allowedRoles={['customer', 'supplier']}
+                    showCreateButton={true}
+                    className="w-full"
+                    layout="vertical"
+                  />
+                )}
+              />
+            </div>
 
             {/* Debit Date */}
             <div className="space-y-2">
@@ -713,7 +523,12 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                 render={({ field }) => (
                   <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
                     <PopoverTrigger asChild>
-                      <Button ref={field.ref} type="button" variant="outline" className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
+                      <Button
+                        ref={field.ref}
+                        type="button"
+                        variant="outline"
+                        className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                      >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {field.value ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
                       </Button>
@@ -734,10 +549,33 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                 )}
               />
             </div>
+
+            {/* Status Field (only in edit mode) */}
+            {isEditMode && (
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Controller
+                  name="status"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            )}
           </div>
 
-          {/* ✅ NEW: Return Note Selection (Only shows when supplier selected and return notes available) */}
-          {!isFromReturnNote && partyType === 'supplier' && returnNotes.length > 0 && (
+          {/* Return Note Selection (Only shows when party selected and return notes available) */}
+          {!isFromReturnNote && returnNotes.length > 0 && (
             <div className="space-y-2">
               <Label>Link to Return Note (Optional)</Label>
               <Controller
@@ -776,7 +614,12 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                                 value={returnNote.returnNumber}
                                 onSelect={() => handleReturnNoteSelect(returnNote)}
                               >
-                                <Check className={cn("mr-2 h-4 w-4", field.value === returnNote._id ? "opacity-100" : "opacity-0")} />
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    field.value === returnNote._id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
                                 <div className="flex-1">
                                   <div className="font-medium">{returnNote.returnNumber}</div>
                                   <div className="text-xs text-muted-foreground">
@@ -805,31 +648,6 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
             </div>
           )}
 
-          {/* Status Field (only in edit mode) */}
-          {isEditMode && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Controller
-                  name="status"
-                  control={control}
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="approved">Approved</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
-            </div>
-          )}
-
           {/* Reason */}
           <div className="space-y-2">
             <Label htmlFor="reason">Reason <span className="text-destructive">*</span></Label>
@@ -854,7 +672,9 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                 {isTaxPayable ? "Tax Payable" : "Tax Free"}
               </p>
               <p className="text-muted-foreground text-sm">
-                {isTaxPayable ? `${UAE_VAT_PERCENTAGE}% VAT will be added to the subtotal` : 'No VAT will be applied to this debit note'}
+                {isTaxPayable
+                  ? `${UAE_VAT_PERCENTAGE}% VAT will be added to the subtotal`
+                  : 'No VAT will be applied to this debit note'}
               </p>
             </div>
             <Controller
@@ -903,7 +723,9 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
               {debitMode === 'manual' && (
                 <div className="space-y-4 animate-in fade-in-50 duration-300">
                   <div className="space-y-2">
-                    <Label htmlFor="manualDescription">Description <span className="text-destructive">*</span></Label>
+                    <Label htmlFor="manualDescription">
+                      Description <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="manualDescription"
                       placeholder="Enter description or reason..."
@@ -911,7 +733,9 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="manualAmount">Amount <span className="text-destructive">*</span></Label>
+                    <Label htmlFor="manualAmount">
+                      Amount <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="manualAmount"
                       type="number"
@@ -955,7 +779,9 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                                   render={({ field }) => (
                                     <Popover
                                       open={materialPopovers[index]}
-                                      onOpenChange={(open) => setMaterialPopovers(prev => ({ ...prev, [index]: open }))}
+                                      onOpenChange={(open) =>
+                                        setMaterialPopovers(prev => ({ ...prev, [index]: open }))
+                                      }
                                     >
                                       <PopoverTrigger asChild>
                                         <Button
@@ -966,7 +792,9 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                                           className="w-full justify-between h-10"
                                           disabled={isFromReturnNote || !!selectedReturnNoteId}
                                         >
-                                          <span className="truncate">{material?.name || "Select material..."}</span>
+                                          <span className="truncate">
+                                            {material?.name || "Select material..."}
+                                          </span>
                                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                         </Button>
                                       </PopoverTrigger>
@@ -975,7 +803,9 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                                           <CommandInput
                                             placeholder="Search materials..."
                                             value={watchedItems[index]?.materialName || ""}
-                                            onValueChange={(val) => setValue(`items.${index}.materialName`, val)}
+                                            onValueChange={(val) =>
+                                              setValue(`items.${index}.materialName`, val)
+                                            }
                                           />
                                           <CommandList
                                             className="max-h-[200px] overflow-y-auto"
@@ -991,7 +821,12 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                                                   value={mat.name}
                                                   onSelect={() => handleMaterialSelect(index, mat._id)}
                                                 >
-                                                  <Check className={cn("mr-2 h-4 w-4", field.value === mat._id ? "opacity-100" : "opacity-0")} />
+                                                  <Check
+                                                    className={cn(
+                                                      "mr-2 h-4 w-4",
+                                                      field.value === mat._id ? "opacity-100" : "opacity-0"
+                                                    )}
+                                                  />
                                                   <div className="flex-1">
                                                     <div>{mat.name}</div>
                                                     <div className="text-xs text-muted-foreground">
@@ -1058,7 +893,9 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => append({ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 })}
+                      onClick={() =>
+                        append({ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 })
+                      }
                       className="w-full gap-2"
                     >
                       <Plus className="h-4 w-4" />
@@ -1104,7 +941,9 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                                 render={({ field }) => (
                                   <Popover
                                     open={materialPopovers[index]}
-                                    onOpenChange={(open) => setMaterialPopovers(prev => ({ ...prev, [index]: open }))}
+                                    onOpenChange={(open) =>
+                                      setMaterialPopovers(prev => ({ ...prev, [index]: open }))
+                                    }
                                   >
                                     <PopoverTrigger asChild>
                                       <Button
@@ -1115,7 +954,9 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                                         className="w-full justify-between h-9 text-sm"
                                         disabled={isFromReturnNote || !!selectedReturnNoteId}
                                       >
-                                        <span className="truncate">{material?.name || "Select material..."}</span>
+                                        <span className="truncate">
+                                          {material?.name || "Select material..."}
+                                        </span>
                                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                       </Button>
                                     </PopoverTrigger>
@@ -1124,7 +965,9 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                                         <CommandInput
                                           placeholder="Search materials..."
                                           value={watchedItems[index]?.materialName || ""}
-                                          onValueChange={(val) => setValue(`items.${index}.materialName`, val)}
+                                          onValueChange={(val) =>
+                                            setValue(`items.${index}.materialName`, val)
+                                          }
                                         />
                                         <CommandList
                                           className="max-h-[200px] overflow-y-auto"
@@ -1140,7 +983,12 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                                                 value={mat.name}
                                                 onSelect={() => handleMaterialSelect(index, mat._id)}
                                               >
-                                                <Check className={cn("mr-2 h-4 w-4", field.value === mat._id ? "opacity-100" : "opacity-0")} />
+                                                <Check
+                                                  className={cn(
+                                                    "mr-2 h-4 w-4",
+                                                    field.value === mat._id ? "opacity-100" : "opacity-0"
+                                                  )}
+                                                />
                                                 <div className="flex-1 min-w-0">
                                                   <div className="truncate">{mat.name}</div>
                                                   <div className="text-xs text-muted-foreground truncate">
@@ -1185,7 +1033,9 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                             </div>
                             <div className="flex justify-between items-center pt-2 border-t">
                               <span className="text-xs font-medium">Total</span>
-                              <span className="text-sm font-bold">{formatCurrency(watchedItems[index]?.total || 0)}</span>
+                              <span className="text-sm font-bold">
+                                {formatCurrency(watchedItems[index]?.total || 0)}
+                              </span>
                             </div>
                           </CardContent>
                         </Card>
@@ -1197,7 +1047,9 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => append({ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 })}
+                      onClick={() =>
+                        append({ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 })
+                      }
                       className="w-full gap-2"
                     >
                       <Plus className="h-4 w-4" />
@@ -1249,7 +1101,9 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
                 {discount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Discount:</span>
-                    <span className="font-medium text-destructive">-{formatCurrency(discount)}</span>
+                    <span className="font-medium text-destructive">
+                      -{formatCurrency(discount)}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm pt-2">
@@ -1276,16 +1130,15 @@ export function DebitNoteForm({ isOpen, onClose, onSubmit, defaultValues, return
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || (isEditMode && !isDirty)}
-            >
+            <Button type="submit" disabled={isSubmitting || (isEditMode && !isDirty)}>
               {isSubmitting ? (
                 <>
                   <Spinner />
                   Saving...
                 </>
-              ) : (defaultValues ? "Update Debit Note" : "Create Debit Note")}
+              ) : (
+                defaultValues ? "Update Debit Note" : "Create Debit Note"
+              )}
             </Button>
           </DialogFooter>
         </form>

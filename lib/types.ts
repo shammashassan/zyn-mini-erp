@@ -1,4 +1,4 @@
-// lib/types.ts
+// lib/types.ts - UPDATED: Removed BillPayload interface
 
 export interface Item {
   description: string;
@@ -30,18 +30,37 @@ export interface AuditEntry {
   }[];
 }
 
-export interface BillPayload {
-  customerName: string;
-  supplierName?: string; // ✅ Added supplierName
-  customerPhone: string;
-  customerEmail: string;
-  paymentMethod: string;
+export interface Bill {
+  _id: string;
+  invoiceNumber: string;
+
+  // Party/Contact system
+  partyId?: string;
+  contactId?: string;
+
+  // Payee (for vouchers)
+  payeeName?: string;
+  payeeId?: string;
+
+  // Vendor (for vouchers - manual input)
+  vendorName?: string;
+
+  // Document details
+  documentType: 'quotation' | 'invoice' | 'receipt' | 'payment' | 'delivery';
+  paymentMethod?: string;
   notes: string;
   discount: number;
-  documentType: 'quotation' | 'invoice' | 'receipt' | 'payment' | 'delivery';
   status: 'pending' | 'paid' | 'partial' | 'overdue' | 'approved' | 'cancelled' | 'dispatched' | 'delivered';
   items: Item[];
+
+  totalAmount: number;
+  vatAmount: number;
+  grandTotal: number;
+
+  // Connected documents
   connectedDocuments?: ConnectedDocuments;
+
+  // Voucher-specific
   voucherAmount?: number;
 
   // Date fields for documents
@@ -49,23 +68,15 @@ export interface BillPayload {
   quotationDate?: Date;
   voucherDate?: Date;
 
-  // Audit fields (readonly - managed by backend)
-  createdBy?: string | null;
-  updatedBy?: string | null;
-  actionHistory?: AuditEntry[];
-}
-
-export interface Bill extends BillPayload {
-  _id: string;
-  invoiceNumber: string;
-  totalAmount: number;
-  vatAmount: number;
-  grandTotal: number;
-
   // Soft delete fields
   isDeleted: boolean;
   deletedAt: Date | null;
   deletedBy: string | null;
+
+  // Audit fields
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  actionHistory?: AuditEntry[];
 
   // Timestamps
   createdAt: Date;
@@ -149,62 +160,9 @@ export interface SessionWithDevice {
   userAgent?: string;
   createdAt: Date;
   updatedAt: Date;
-  // Parsed device info
   deviceName?: string;
   browser?: string;
   os?: string;
   deviceType?: 'desktop' | 'mobile' | 'tablet' | 'unknown';
   isCurrent?: boolean;
-}
-
-// NEW: User activity log
-export interface UserActivityLog {
-  id: string;
-  userId: string;
-  action: string;
-  description: string;
-  ipAddress?: string;
-  userAgent?: string;
-  metadata?: Record<string, any>;
-  createdAt: Date;
-}
-
-// NEW: Admin activity log
-export interface AdminActivityLog {
-  id: string;
-  adminId: string;
-  adminName: string;
-  action: string;
-  targetUserId?: string;
-  targetUserEmail?: string;
-  description: string;
-  ipAddress?: string;
-  metadata?: Record<string, any>;
-  createdAt: Date;
-}
-
-// NEW: User preferences
-export interface UserPreferences {
-  userId: string;
-  emailNotifications: {
-    security: boolean;
-    updates: boolean;
-    marketing: boolean;
-  };
-  privacySettings: {
-    profileVisibility: 'public' | 'private';
-    showEmail: boolean;
-  };
-  updatedAt: Date;
-}
-
-// NEW: Email change request
-export interface EmailChangeRequest {
-  id: string;
-  userId: string;
-  newEmail: string;
-  token: string;
-  expiresAt: Date;
-  createdAt: Date;
-  status: 'pending' | 'completed' | 'expired';
 }

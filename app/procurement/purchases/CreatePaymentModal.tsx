@@ -1,4 +1,4 @@
-// app/procurement/purchases/CreatePaymentModal.tsx - FIXED: Preserve returnNoteIds when updating
+// app/procurement/purchases/CreatePaymentModal.tsx - FINAL: Using party snapshots for display
 
 "use client";
 
@@ -26,7 +26,9 @@ import { Spinner } from "@/components/ui/spinner";
 interface Purchase {
   _id: string;
   referenceNumber: string;
-  supplierName?: string;
+  partySnapshot: {
+    displayName: string;
+  };
   totalAmount: number;
   isTaxPayable?: boolean;
   vatAmount?: number;
@@ -42,7 +44,7 @@ interface Purchase {
   }>;
   connectedDocuments?: {
     paymentIds?: string[];
-    returnNoteIds?: string[]; // ✅ Include returnNoteIds
+    returnNoteIds?: string[];
   };
 }
 
@@ -79,6 +81,9 @@ export function CreatePaymentModal({
   const remainingAmount = purchase.remainingAmount || (displayTotal - purchase.paidAmount);
   const alreadyPaid = purchase.paidAmount || 0;
 
+  // ✅ Use snapshot for display
+  const displayName = purchase.partySnapshot?.displayName || 'Unknown Supplier';
+
   const handleCreatePayment = async () => {
     setIsLoading(true);
 
@@ -109,17 +114,27 @@ export function CreatePaymentModal({
 
       console.log(`Creating NEW payment voucher for ${formatCurrency(amount)} via ${paymentMethod}`);
 
+      // Get partyId from purchase (may need to fetch if not available)
+      const partyId = (purchase as any).partyId;
+      const contactId = (purchase as any).contactId;
+
+      // Generate notes - use custom notes if provided, otherwise auto-generate
+      const paymentNotes = notes.trim()
+        ? notes
+        : `Payment for purchase ${purchase.referenceNumber || ''} - ${formatCurrency(amount)} via ${paymentMethod}`;
+
       // Create new payment voucher using /api/vouchers
       const paymentRes = await fetch("/api/vouchers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          supplierName: purchase.supplierName,
+          partyId: partyId,
+          contactId: contactId,
           paymentMethod: paymentMethod,
           voucherType: "payment",
           items: [],
           discount: 0,
-          notes: notes || `Payment for purchase ${purchase.referenceNumber || ''} - ${formatCurrency(amount)} via ${paymentMethod}`,
+          notes: paymentNotes,
           connectedDocuments: {
             purchaseIds: [purchase._id],
           },
@@ -139,9 +154,9 @@ export function CreatePaymentModal({
 
       console.log(`✅ Payment voucher created: ${newPaymentData.voucher.invoiceNumber}`);
 
-      // ✅ FIXED: Preserve existing returnNoteIds when updating
+      // ✅ Preserve existing returnNoteIds when updating
       const currentPaymentIds = purchase.connectedDocuments?.paymentIds || [];
-      const currentReturnNoteIds = purchase.connectedDocuments?.returnNoteIds || []; // ✅ Get existing return notes
+      const currentReturnNoteIds = purchase.connectedDocuments?.returnNoteIds || [];
       const newPaidAmount = alreadyPaid + amount;
 
       // Update purchase with new payment, preserving return notes
@@ -151,7 +166,7 @@ export function CreatePaymentModal({
         body: JSON.stringify({
           connectedDocuments: {
             paymentIds: [...currentPaymentIds, newPaymentData.voucher._id],
-            returnNoteIds: currentReturnNoteIds, // ✅ Preserve existing return notes
+            returnNoteIds: currentReturnNoteIds,
           },
           paidAmount: newPaidAmount,
           remainingAmount: displayTotal - newPaidAmount,
@@ -211,9 +226,14 @@ export function CreatePaymentModal({
         <div className="space-y-4">
           {/* Purchase Summary */}
           <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Supplier:</span>
-              <span className="text-sm font-medium">{purchase.supplierName || "N/A"}</span>
+            <div className="col-span-2">
+              <Label className="text-xs text-muted-foreground mb-1 block">Supplier</Label>
+              <Input
+                value={displayName}
+                readOnly
+                disabled
+                className="bg-muted"
+              />
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Total Amount:</span>

@@ -8,7 +8,6 @@ import { ShoppingCart, ExternalLink, FileText } from "lucide-react";
 interface ConnectedPurchase {
   _id: string;
   referenceNumber: string;
-  supplierName: string;
   inventoryStatus: string;
 }
 
@@ -31,15 +30,15 @@ interface ConnectedDocumentsBadgesProps {
   onViewDebitNotePdf?: (debitNote: any) => void;
 }
 
-export function ConnectedDocumentsBadges({ 
-  purchaseReturn, 
+export function ConnectedDocumentsBadges({
+  purchaseReturn,
   onViewPurchase,
   onViewDebitNotePdf
 }: ConnectedDocumentsBadgesProps) {
   const purchaseId = purchaseReturn.connectedDocuments?.purchaseId;
   const debitNoteId = purchaseReturn.connectedDocuments?.debitNoteId;
 
-  const purchase = (typeof purchaseId === 'object' && purchaseId !== null) 
+  const purchase = (typeof purchaseId === 'object' && purchaseId !== null)
     ? purchaseId as ConnectedPurchase
     : null;
 

@@ -1,4 +1,4 @@
-// app/sales/invoices/CreateDeliveryModal.tsx - UPDATED: Enhanced Responsive Items UI
+// app/sales/invoices/CreateDeliveryModal.tsx - FINAL: Using snapshots for display
 
 "use client";
 
@@ -20,6 +20,7 @@ import type { Invoice } from "./columns";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 interface CreateDeliveryModalProps {
   isOpen: boolean;
@@ -47,9 +48,10 @@ export function CreateDeliveryModal({
 
       // Step 1: Check if delivery note exists (even in trash)
       if (existingDeliveryId) {
-        console.log(`Checking for existing delivery: ${existingDeliveryId}`);
+        const deliveryId = typeof existingDeliveryId === 'object' ? (existingDeliveryId as any)._id : existingDeliveryId;
+        console.log(`Checking for existing delivery: ${deliveryId}`);
         try {
-          const deliveryCheck = await fetch(`/api/delivery-notes/${existingDeliveryId}`, {
+          const deliveryCheck = await fetch(`/api/delivery-notes/${deliveryId}`, {
             headers: { "X-Include-Deleted": "true" },
           });
 
@@ -57,16 +59,17 @@ export function CreateDeliveryModal({
             deliveryData = await deliveryCheck.json();
 
             if (deliveryData.isDeleted) {
-              console.log(`Delivery ${existingDeliveryId} found in trash, will restore`);
+              console.log(`Delivery ${deliveryId} found in trash, will restore`);
               deliveryInTrash = true;
+              existingDeliveryId = deliveryId;
             } else {
-              console.log(`Delivery ${existingDeliveryId} already exists and is active`);
+              console.log(`Delivery ${deliveryId} already exists and is active`);
               toast.error("This invoice already has an active delivery note");
               setIsLoading(false);
               return;
             }
           } else {
-            console.log(`Delivery ${existingDeliveryId} not found, will create new`);
+            console.log(`Delivery ${deliveryId} not found, will create new`);
             existingDeliveryId = undefined;
           }
         } catch (error) {
@@ -120,6 +123,10 @@ export function CreateDeliveryModal({
       // Step 3: Create new delivery note if none exists
       console.log("Creating new delivery note from invoice");
 
+      // ✅ Extract party/contact IDs (references for relationships)
+      const partyId = typeof invoice.partyId === 'object' ? invoice.partyId._id : invoice.partyId;
+      const contactId = invoice.contactId;
+
       // Generate notes - use custom notes if provided, otherwise auto-generate
       const deliveryNotes = notes.trim()
         ? notes
@@ -129,9 +136,10 @@ export function CreateDeliveryModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customerName: invoice.customerName,
-          customerPhone: invoice.customerPhone,
-          customerEmail: invoice.customerEmail,
+          // ✅ Party references for relationships
+          partyId: partyId,
+          contactId: contactId,
+
           status: "pending",
           items: invoice.items,
           discount: 0,
@@ -188,6 +196,26 @@ export function CreateDeliveryModal({
     }
   };
 
+  // ✅ Safe extraction of party display name with fallback chain
+  const getPartyDisplayName = () => {
+    // 1. Try snapshot (immutable legal truth)
+    if (invoice.partySnapshot?.displayName) {
+      return invoice.partySnapshot.displayName;
+    }
+
+    // 2. Try populated partyId
+    if (invoice.partyId) {
+      const party = invoice.partyId;
+      if (typeof party === 'object') {
+        return party.company || party.name || 'Unknown Customer';
+      }
+    }
+
+    return 'Unknown Customer';
+  };
+
+  const displayName = getPartyDisplayName();
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] lg:max-w-2xl max-h-[90vh] overflow-y-auto sidebar-scroll">
@@ -204,9 +232,14 @@ export function CreateDeliveryModal({
         <div className="space-y-6">
           {/* Invoice Summary */}
           <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Customer:</span>
-              <span className="text-sm font-medium">{invoice.customerName}</span>
+            <div className="col-span-2">
+              <Label className="text-xs text-muted-foreground mb-1 block">Customer</Label>
+              <Input
+                value={displayName}
+                readOnly
+                disabled
+                className="bg-muted"
+              />
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Invoice:</span>
@@ -219,7 +252,7 @@ export function CreateDeliveryModal({
             {/* Total Amount with muted note */}
             <div className="pt-2 border-t">
               <div className="flex justify-between">
-                <span className="text- font-semibold">Total Amount:</span>
+                <span className="text-sm font-semibold">Total Amount:</span>
                 <span className="text-lg font-bold text-green-600">
                   {formatCurrency(invoice.grandTotal)}
                 </span>

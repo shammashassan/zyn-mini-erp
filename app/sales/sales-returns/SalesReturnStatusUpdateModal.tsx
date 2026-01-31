@@ -20,12 +20,13 @@ interface SalesReturn {
   _id: string;
   returnNumber: string;
   status: 'pending' | 'approved' | 'cancelled';
-  customerName?: string;
   grandTotal?: number;
   items?: Array<{
     productName?: string;
     returnQuantity: number;
   }>;
+  partyId?: any;
+  partySnapshot?: any;
 }
 
 interface SalesReturnStatusUpdateModalProps {
@@ -53,11 +54,11 @@ const getStatusIcon = (status: string) => {
   }
 };
 
-export function SalesReturnStatusUpdateModal({ 
-  isOpen, 
-  onClose, 
-  salesReturn, 
-  onRefresh 
+export function SalesReturnStatusUpdateModal({
+  isOpen,
+  onClose,
+  salesReturn,
+  onRefresh
 }: SalesReturnStatusUpdateModalProps) {
   const [initialStatus, setInitialStatus] = useState(salesReturn.status);
   const [newStatus, setNewStatus] = useState(salesReturn.status);
@@ -74,9 +75,9 @@ export function SalesReturnStatusUpdateModal({
 
   const handleUpdateStatus = async () => {
     setIsLoading(true);
-    
+
     try {
-      const updateData = { 
+      const updateData = {
         status: newStatus
       };
 
@@ -88,13 +89,13 @@ export function SalesReturnStatusUpdateModal({
 
       if (res.ok) {
         let message = 'Sales return status updated successfully';
-        
+
         if (newStatus === 'approved' && initialStatus !== 'approved') {
           message = 'Sales return approved - Invoice updated';
         } else if (initialStatus === 'approved' && newStatus !== 'approved') {
           message = 'Sales return reversed - Invoice restored';
         }
-        
+
         toast.success(message);
         onClose();
         onRefresh();
@@ -128,12 +129,14 @@ export function SalesReturnStatusUpdateModal({
               <span className="text-muted-foreground">Return No:</span>
               <span className="font-medium font-mono">{salesReturn.returnNumber}</span>
             </div>
-            {salesReturn.customerName && (
+            {salesReturn.partySnapshot?.displayName || salesReturn.partyId?.name || salesReturn.partyId?.company ? (
               <div className="flex justify-between mt-1">
-                <span className="text-muted-foreground">Customer:</span>
-                <span className="font-medium">{salesReturn.customerName}</span>
+                <span className="text-muted-foreground">Party:</span>
+                <span className="font-medium">
+                  {salesReturn.partySnapshot?.displayName || salesReturn.partyId?.name || salesReturn.partyId?.company || 'Unknown Party'}
+                </span>
               </div>
-            )}
+            ) : null}
             {salesReturn.items && salesReturn.items.length > 0 && (
               <>
                 <div className="flex justify-between mt-1">

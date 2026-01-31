@@ -1,4 +1,4 @@
-// app/sales/quotations/quotation-form.tsx - UPDATED: Match invoice form structure with quotationDate and edit mode
+// app/sales/quotations/quotation-form.tsx - FINAL: No legacy fields, party snapshots only
 
 "use client";
 
@@ -41,29 +41,29 @@ import { ChevronsUpDown, Check, Plus, PlusCircle, X, FileText, CalendarIcon } fr
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import type { ICustomer } from "@/models/Customer";
 import type { IProduct } from "@/models/Product";
 import type { Quotation } from "./columns";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 import { Spinner } from "@/components/ui/spinner";
 
+import { PartyContactSelector, PartyContactValue } from "@/components/PartyContactSelector";
+
 type QuotationItem = {
   description: string;
   quantity: number;
   rate: number;
   total: number;
-  shouldCreateProduct?: boolean; // Flag to indicate if product should be created on submit
+  shouldCreateProduct?: boolean;
 };
 
 type QuotationFormData = {
-  customerName: string;
-  customerPhone: string;
-  customerEmail: string;
+  partyId: string;
+  contactId?: string;
   items: QuotationItem[];
   discount: number;
   notes: string;
-  quotationDate: Date; // ✅ UPDATED: Changed from no date to quotationDate
+  quotationDate: Date;
   status: 'pending' | 'approved' | 'sent' | 'cancelled' | 'converted';
 };
 
@@ -85,10 +85,12 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
     formState: { isSubmitting, isDirty }
   } = useForm<QuotationFormData>({
     defaultValues: {
+      partyId: '',
+      contactId: undefined,
       items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
       discount: 0,
       notes: "",
-      quotationDate: new Date(), // ✅ UPDATED: Added quotationDate
+      quotationDate: new Date(),
       status: 'pending',
     }
   });
@@ -98,13 +100,10 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
     name: "items"
   });
 
-  const [customers, setCustomers] = useState<ICustomer[]>([]);
   const [products, setProducts] = useState<IProduct[]>([]);
-  const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [productPopovers, setProductPopovers] = useState<Record<number, boolean>>({});
   const [productSearchQueries, setProductSearchQueries] = useState<Record<number, string>>({});
-  const [searchQuery, setSearchQuery] = useState("");
 
   // Responsive check
   const [isDesktop, setIsDesktop] = useState(true);
@@ -117,7 +116,6 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
   }, []);
 
   const watchedItems = watch("items");
-  const customerName = watch("customerName");
   const discount = watch("discount");
 
   const isEditMode = !!defaultValues?._id;
@@ -130,68 +128,42 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
   const totalItems = watchedItems.filter(item => item.description).length;
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchProducts = async () => {
       try {
-        const [customersRes, productsRes] = await Promise.all([
-          fetch("/api/customers"),
-          fetch("/api/products")
-        ]);
-
-        if (customersRes.ok) setCustomers(await customersRes.json());
+        const productsRes = await fetch("/api/products");
         if (productsRes.ok) setProducts(await productsRes.json());
       } catch (error) {
-        console.error("Failed to fetch data:", error);
+        console.error("Failed to fetch products:", error);
       }
     };
-    fetchData();
+    fetchProducts();
   }, []);
 
   useEffect(() => {
     if (isOpen) {
       if (defaultValues) {
         reset({
-          customerName: defaultValues.customerName || "",
-          customerPhone: defaultValues.customerPhone || "",
-          customerEmail: defaultValues.customerEmail || "",
+          partyId: (defaultValues as any).partyId?.toString() || "",
+          contactId: (defaultValues as any).contactId?.toString() || undefined,
           items: defaultValues.items || [{ description: "", quantity: 1, rate: 0, total: 0 }],
           discount: defaultValues.discount || 0,
           notes: defaultValues.notes || "",
-          quotationDate: defaultValues.quotationDate ? new Date(defaultValues.quotationDate) : new Date(), // ✅ UPDATED
+          quotationDate: defaultValues.quotationDate ? new Date(defaultValues.quotationDate) : new Date(),
           status: defaultValues.status || 'pending',
         });
-        setSearchQuery(defaultValues.customerName || "");
       } else {
         reset({
-          customerName: "",
-          customerPhone: "",
-          customerEmail: "",
+          partyId: "",
+          contactId: undefined,
           items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
           discount: 0,
           notes: "",
-          quotationDate: new Date(), // ✅ UPDATED
+          quotationDate: new Date(),
           status: 'pending',
         });
-        setSearchQuery("");
       }
     }
   }, [isOpen, defaultValues, reset]);
-
-  const handleCustomerSelect = (customer: ICustomer) => {
-    setValue("customerName", customer.name, { shouldDirty: true });
-    setValue("customerPhone", customer.phone || "", { shouldDirty: true });
-    setValue("customerEmail", customer.email || "", { shouldDirty: true });
-    setSearchQuery(customer.name);
-    setCustomerPopoverOpen(false);
-  };
-
-  const handleCreateNew = () => {
-    if (searchQuery.trim()) {
-      setValue("customerName", searchQuery.trim(), { shouldDirty: true });
-      setValue("customerPhone", "", { shouldDirty: true });
-      setValue("customerEmail", "", { shouldDirty: true });
-      setCustomerPopoverOpen(false);
-    }
-  };
 
   const handleProductSelect = (index: number, product: IProduct) => {
     setValue(`items.${index}.description`, product.name, { shouldDirty: true });
@@ -247,18 +219,14 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
     }
   };
 
-  const doesCustomerExist = customers.some(
-    (c) => c.name.toLowerCase() === searchQuery.trim().toLowerCase()
-  );
-
   const handleFormSubmit = async (data: QuotationFormData) => {
     // Validation
-    if (!data.customerName || !data.customerName.trim()) {
+    if (!data.partyId) {
       toast.error("Please select a customer");
       return;
     }
 
-    if (!data.quotationDate) { // ✅ UPDATED
+    if (!data.quotationDate) {
       toast.error("Please select a quotation date");
       return;
     }
@@ -271,55 +239,14 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
 
     const calculatedGrossTotal = validItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
     if (data.discount > calculatedGrossTotal) {
-      toast.error("Discount cannot exceed gross total", {
-        description: "Discount cannot exceed the gross total"
-      });
+      toast.error("Discount cannot exceed gross total");
       return;
     }
 
-    // Check if customer exists, if not create it
-    const customerExists = customers.some(
-      (c) => c.name.toLowerCase() === data.customerName.trim().toLowerCase()
-    );
-
-    if (!customerExists && !isEditMode) {
-      try {
-        const customerPayload = {
-          name: data.customerName.trim(),
-          phone: data.customerPhone.trim(),
-          email: data.customerEmail.trim(),
-        };
-
-        const customerRes = await fetch("/api/customers", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(customerPayload),
-        });
-
-        if (customerRes.ok) {
-          toast.success(`Customer "${data.customerName}" created successfully`);
-          // Refresh customers list
-          const customersRes = await fetch("/api/customers");
-          if (customersRes.ok) setCustomers(await customersRes.json());
-        } else {
-          const error = await customerRes.json();
-          toast.error("Failed to create customer", {
-            description: error.error || "Please try again"
-          });
-          return;
-        }
-      } catch (error) {
-        console.error("Error creating customer:", error);
-        toast.error("Failed to create customer");
-        return;
-      }
-    }
-
     const submitData = {
-      customerName: data.customerName.trim(),
-      customerPhone: data.customerPhone.trim(),
-      customerEmail: data.customerEmail.trim(),
-      quotationDate: data.quotationDate.toISOString(), // ✅ UPDATED: Use quotationDate
+      partyId: data.partyId,
+      contactId: data.contactId,
+      quotationDate: data.quotationDate.toISOString(),
       items: validItems.map(item => ({
         ...item,
         quantity: Number(item.quantity) || 0,
@@ -349,95 +276,29 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
           {/* Main Top Grid */}
           <div className={cn("grid grid-cols-1 gap-4", isEditMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
             {/* Customer Field */}
-            <div className="space-y-2">
-              <Label>Customer <span className="text-destructive">*</span></Label>
+            <div>
               <Controller
-                name="customerName"
+                name="partyId"
                 control={control}
                 render={({ field }) => (
-                  <Popover
-                    open={customerPopoverOpen}
-                    onOpenChange={(isOpen) => {
-                      setCustomerPopoverOpen(isOpen);
-                      if (isOpen) setSearchQuery(field.value);
+                  <PartyContactSelector
+                    value={{ partyId: field.value, contactId: watch('contactId') }}
+                    onChange={(val) => {
+                      field.onChange(val.partyId);
+                      setValue('contactId', val.contactId);
                     }}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        ref={field.ref}
-                        type="button"
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                      >
-                        {field.value || "Select or type customer..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                      <Command shouldFilter={false}>
-                        <CommandInput
-                          placeholder="Search customer..."
-                          value={searchQuery}
-                          onValueChange={setSearchQuery}
-                        />
-                        <CommandList
-                          className="max-h-[200px] overflow-y-auto"
-                          onWheel={(e) => e.stopPropagation()}
-                          onTouchStart={(e) => e.stopPropagation()}
-                          onTouchMove={(e) => e.stopPropagation()}
-                        >
-                          <CommandEmpty>
-                            {searchQuery.trim() ? "No customer found." : "Start typing to search..."}
-                          </CommandEmpty>
-
-                          <CommandGroup heading="Existing Customers">
-                            {customers
-                              .filter(customer =>
-                                !searchQuery || customer.name.toLowerCase().includes(searchQuery.toLowerCase())
-                              )
-                              .map((customer) => (
-                                <CommandItem
-                                  key={String(customer._id)}
-                                  value={customer.name}
-                                  onSelect={() => handleCustomerSelect(customer)}
-                                >
-                                  <Check className={cn("mr-2 h-4 w-4", field.value === customer.name ? "opacity-100" : "opacity-0")} />
-                                  <div className="flex-1">
-                                    <span>{customer.name}</span>
-                                    {customer.email && (
-                                      <div className="text-xs text-muted-foreground">
-                                        {customer.email}
-                                      </div>
-                                    )}
-                                  </div>
-                                </CommandItem>
-                              ))}
-                          </CommandGroup>
-
-                          {searchQuery.trim() && !doesCustomerExist && (
-                            <CommandGroup heading="New Customer">
-                              <CommandItem
-                                onSelect={handleCreateNew}
-                                className="text-primary"
-                                value={searchQuery}
-                              >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Create "{searchQuery}"
-                              </CommandItem>
-                            </CommandGroup>
-                          )}
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                    allowedRoles={['customer']}
+                    showCreateButton={true}
+                    className="w-full"
+                    layout="vertical"
+                  />
                 )}
               />
             </div>
 
-            {/* Date Field - ✅ UPDATED: Using quotationDate */}
+            {/* Date Field */}
             <div className="space-y-2">
-              <Label>Quotation Date</Label>
+              <Label>Quotation Date <span className="text-destructive">*</span></Label>
               <Controller
                 name="quotationDate"
                 control={control}

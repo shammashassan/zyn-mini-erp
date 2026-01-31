@@ -1,15 +1,15 @@
-// app/api/quotations/route.ts - UPDATED: Added quotationDate field and date range filtering
+// app/api/quotations/route.ts - UPDATED: Using party snapshots instead of legacy fields
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Quotation from "@/models/Quotation";
 import Invoice from "@/models/Invoice";
 import DeliveryNote from "@/models/DeliveryNote";
-import Customer from "@/models/Customer";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { UAE_VAT_PERCENTAGE } from '@/utils/constants';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
+import { createPartySnapshot } from "@/utils/partySnapshot";
 
 export async function GET(request: Request) {
   try {
@@ -23,23 +23,23 @@ export async function GET(request: Request) {
     const ensureModels = [Quotation, Invoice, DeliveryNote];
 
     const { searchParams } = new URL(request.url);
-    
+
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
-    
+
     // Extract date params (support both naming conventions)
     const startDateParam = searchParams.get('startDate') || searchParams.get('from');
     const endDateParam = searchParams.get('endDate') || searchParams.get('to');
 
     if (isServerSide) {
       const { page, pageSize, sorting, filters } = extractTableParams(searchParams);
-      
+
       console.log('📊 Server-side quotation request:', { page, pageSize, sorting, filters, startDateParam, endDateParam });
 
       const baseFilter: any = { isDeleted: false };
 
-      // ✅ UPDATED: Apply Date Range Filter using quotationDate
+      // Apply Date Range Filter using quotationDate
       if (startDateParam || endDateParam) {
-        baseFilter.quotationDate = {}; // Changed from createdAt to quotationDate
+        baseFilter.quotationDate = {};
         if (startDateParam) {
           baseFilter.quotationDate.$gte = new Date(startDateParam);
         }
@@ -62,17 +62,24 @@ export async function GET(request: Request) {
           path: 'connectedDocuments.deliveryId',
           select: 'invoiceNumber status isDeleted',
           match: { isDeleted: false }
+        },
+        {
+          path: 'partyId',
+          select: 'name company email phone vatNumber roles',
+        },
+        {
+          path: 'contactId',
+          select: 'name email phone designation',
         }
       ] : undefined;
 
-      // ✅ UPDATED: Default sort by quotationDate
       const result = await executePaginatedQuery(Quotation, {
         baseFilter,
         columnFilters: filters,
         sorting,
         page,
         pageSize,
-        defaultSort: { quotationDate: -1 }, // Changed from createdAt to quotationDate
+        defaultSort: { quotationDate: -1 },
         populate: populateOptions,
       });
 
@@ -87,16 +94,16 @@ export async function GET(request: Request) {
       // Client-side mode
       const status = searchParams.get('status');
       const limit = searchParams.get('limit');
-      const customerName = searchParams.get('customerName');
+      const partyId = searchParams.get('partyId');
       const populate = searchParams.get('populate') === 'true';
 
       const filter: any = { isDeleted: false };
       if (status) filter.status = status;
-      if (customerName) filter.customerName = customerName;
+      if (partyId) filter.partyId = partyId;
 
-      // ✅ UPDATED: Apply Date Range using quotationDate
+      // Apply Date Range using quotationDate
       if (startDateParam || endDateParam) {
-        filter.quotationDate = {}; // Changed from createdAt to quotationDate
+        filter.quotationDate = {};
         if (startDateParam) filter.quotationDate.$gte = new Date(startDateParam);
         if (endDateParam) {
           const toDate = new Date(endDateParam);
@@ -105,7 +112,7 @@ export async function GET(request: Request) {
         }
       }
 
-      let query = Quotation.find(filter).sort({ quotationDate: -1 }); // ✅ UPDATED
+      let query = Quotation.find(filter).sort({ quotationDate: -1 });
 
       if (populate) {
         query = query
@@ -118,6 +125,14 @@ export async function GET(request: Request) {
             path: 'connectedDocuments.deliveryId',
             select: 'invoiceNumber status isDeleted',
             match: { isDeleted: false }
+          })
+          .populate({
+            path: 'partyId',
+            select: 'name company type roles',
+          })
+          .populate({
+            path: 'contactId',
+            select: 'name email phone designation',
           });
       }
 
@@ -141,7 +156,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    
+
     const { error, session } = await requireAuthAndPermission({
       quotation: ["create"],
     });
@@ -151,50 +166,39 @@ export async function POST(request: Request) {
     const user = session.user;
 
     const {
-      customerName,
-      customerPhone,
-      customerEmail,
       items,
       discount = 0,
       notes,
       status,
-      quotationDate, // ✅ NEW: Quotation date field
+      quotationDate,
+      partyId,
+      contactId,
       createdAt,
       updatedAt,
       connectedDocuments,
     } = body;
 
-    // Validation
-    if (!customerName) {
+    // ✅ Validation: Party is required
+    if (!partyId) {
       return NextResponse.json({
-        error: 'Customer name is required'
+        error: 'Party is required'
       }, { status: 400 });
     }
 
     if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ 
-        error: 'Items are required for quotations' 
+      return NextResponse.json({
+        error: 'Items are required for quotations'
       }, { status: 400 });
     }
 
-    // ✅ NEW: Validate quotation date
     if (!quotationDate) {
       return NextResponse.json({
         error: 'Quotation date is required'
       }, { status: 400 });
     }
 
-    // Upsert customer
-    await Customer.findOneAndUpdate(
-      { name: customerName },
-      {
-        $set: {
-          phone: customerPhone,
-          email: customerEmail
-        }
-      },
-      { upsert: true, new: true }
-    );
+    // ✅ Create immutable snapshots of party and contact
+    const { partySnapshot, contactSnapshot } = await createPartySnapshot(partyId, contactId);
 
     // Calculate totals
     const grossTotal = items.reduce((sum: number, item: { total: number }) => sum + item.total, 0);
@@ -222,17 +226,26 @@ export async function POST(request: Request) {
     // Build quotation data
     const quotationData: any = {
       invoiceNumber,
-      customerName,
-      customerPhone,
-      customerEmail,
+
+      // ✅ Party & Contact References
+      partyId,
+      contactId,
+
+      // ✅ Immutable Snapshots (legal/historical truth)
+      partySnapshot,
+      contactSnapshot,
+
+      // Items & totals
       items,
       discount,
       notes,
-      quotationDate: new Date(quotationDate), // ✅ NEW: Set quotation date
+      quotationDate: new Date(quotationDate),
       totalAmount: grossTotal,
       vatAmount: vatAmount,
       grandTotal: grandTotal,
       status: status || 'pending',
+
+      // Metadata
       isDeleted: false,
       deletedAt: null,
       deletedBy: null,
@@ -269,6 +282,7 @@ export async function POST(request: Request) {
       }
 
       console.log(`✅ Successfully created quotation: ${newQuotation.invoiceNumber}`);
+      console.log(`   Party: ${partySnapshot.displayName}`);
       console.log(`   Gross Total: ${grossTotal}, VAT: ${vatAmount}, Subtotal: ${subtotal}, Discount: ${discount}, Grand Total: ${grandTotal}`);
 
       return NextResponse.json({

@@ -8,7 +8,6 @@ import { ShoppingCart, ExternalLink, Banknote, Receipt, FileText } from "lucide-
 interface ConnectedPurchase {
     _id: string;
     referenceNumber: string;
-    supplierName?: string;
     totalAmount: number;
     date: Date;
     status: string;

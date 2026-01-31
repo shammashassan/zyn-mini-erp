@@ -18,23 +18,22 @@ async function extractInvoicePartyAndItemInfo(invoice: any) {
   const result: {
     partyType?: 'Customer' | 'Supplier' | 'Payee' | 'Vendor';
     partyId?: string;
+    contactId?: string;
     partyName?: string;
     itemType?: 'Material' | 'Product';
     itemName?: string;
   } = {};
 
-  if (invoice.customerName) {
+  if (invoice.partyId) {
     result.partyType = 'Customer';
-    result.partyName = invoice.customerName;
-    
-    try {
-      const Customer = (await import('@/models/Customer')).default;
-      const customer = await Customer.findOne({ name: invoice.customerName, isDeleted: false });
-      if (customer) {
-        result.partyId = customer._id.toString();
-      }
-    } catch (error) {
-      console.error('Error looking up customer ID:', error);
+    result.partyId = invoice.partyId;
+    if (invoice.contactId) result.contactId = invoice.contactId;
+
+    // Extract party name from snapshot or populated object
+    if (invoice.partySnapshot?.displayName) {
+      result.partyName = invoice.partySnapshot.displayName;
+    } else if (typeof invoice.partyId === 'object') {
+      result.partyName = invoice.partyId.company || invoice.partyId.name || 'Unknown Customer';
     }
   }
 
@@ -49,6 +48,7 @@ async function extractInvoicePartyAndItemInfo(invoice: any) {
   return result;
 }
 
+
 /**
  * Helper: Extract party and item info from voucher
  */
@@ -56,61 +56,68 @@ async function extractVoucherPartyAndItemInfo(voucher: any) {
   const result: {
     partyType?: 'Customer' | 'Supplier' | 'Payee' | 'Vendor';
     partyId?: string;
+    contactId?: string;
     partyName?: string;
     itemType?: 'Material' | 'Product';
     itemName?: string;
   } = {};
 
-  if (voucher.customerName) {
-    result.partyType = 'Customer';
-    result.partyName = voucher.customerName;
-    
-    if (voucher.customerId) {
-       result.partyId = voucher.customerId.toString();
+  // Extract partyId and contactId first
+  if (voucher.partyId) result.partyId = voucher.partyId;
+  if (voucher.contactId) result.contactId = voucher.contactId;
+
+  // Determine partyType and partyName based on voucher type and available data
+  if (voucher.voucherType === 'receipt') {
+    // Check for explicit Vendor Name first (Manual Vendor)
+    if (voucher.vendorName) {
+      result.partyType = 'Vendor';
+      result.partyName = voucher.vendorName;
     } else {
-      try {
-        const Customer = (await import('@/models/Customer')).default;
-        const customer = await Customer.findOne({ name: voucher.customerName, isDeleted: false });
-        if (customer) {
-          result.partyId = customer._id.toString();
+      // Default to Customer, but check party roles if available
+      result.partyType = 'Customer';
+
+      if (voucher.partySnapshot) {
+        result.partyName = voucher.partySnapshot.displayName || voucher.partySnapshot.name;
+        // Check if this party is purely a vendor or supplier
+        if (voucher.partySnapshot.roles) {
+          if (voucher.partySnapshot.roles.includes('vendor') && !voucher.partySnapshot.roles.includes('customer')) {
+            result.partyType = 'Vendor';
+          } else if (voucher.partySnapshot.roles.includes('supplier') && !voucher.partySnapshot.roles.includes('customer')) {
+            result.partyType = 'Supplier';
+          }
         }
-      } catch (error) {
-        console.error('Error looking up customer ID:', error);
+      } else if (voucher.partyId && typeof voucher.partyId === 'object') {
+        // Populated Party object
+        const party = voucher.partyId;
+        result.partyName = party.company || party.name || 'Unknown Party';
+
+        if (party.roles) {
+          if (party.roles.includes('vendor') && !party.roles.includes('customer')) {
+            result.partyType = 'Vendor';
+          } else if (party.roles.includes('supplier') && !party.roles.includes('customer')) {
+            result.partyType = 'Supplier';
+          }
+        }
       }
     }
-  } 
-  else if (voucher.supplierName) {
-    result.partyName = voucher.supplierName;
-    
-    if (voucher.supplierId) {
+  } else if (voucher.voucherType === 'payment') {
+    // Payments are to Suppliers, Payees, or Vendors
+    if (voucher.payeeName || voucher.payeeId) {
+      result.partyType = 'Payee';
+      result.partyName = voucher.partySnapshot?.name || voucher.payeeName;
+      if (voucher.payeeId) {
+        result.partyId = voucher.payeeId.toString();
+      }
+    } else if (voucher.partySnapshot?.displayName && !voucher.vendorName) {
       result.partyType = 'Supplier';
-      result.partyId = voucher.supplierId.toString();
-    } else {
-      try {
-        const Supplier = (await import('@/models/Supplier')).default;
-        const supplier = await Supplier.findOne({ name: voucher.supplierName, isDeleted: false });
-        if (supplier) {
-          result.partyType = 'Supplier';
-          result.partyId = supplier._id.toString();
-        } else {
-          result.partyType = 'Vendor';
-        }
-      } catch (error) {
-        result.partyType = 'Vendor';
-      }
+      result.partyName = voucher.partySnapshot.displayName;
+    } else if (voucher.vendorName) {
+      result.partyType = 'Vendor';
+      result.partyName = voucher.vendorName;
+    } else if (voucher.partyId && typeof voucher.partyId === 'object') {
+      result.partyType = 'Supplier';
+      result.partyName = voucher.partyId.company || voucher.partyId.name || 'Unknown Supplier';
     }
-  } 
-  else if (voucher.payeeName) {
-    result.partyType = 'Payee';
-    result.partyName = voucher.payeeName;
-    
-    if (voucher.payeeId) {
-       result.partyId = voucher.payeeId.toString();
-    }
-  }
-  else if (voucher.vendorName) {
-    result.partyType = 'Vendor';
-    result.partyName = voucher.vendorName;
   }
 
   if (voucher.items && voucher.items.length > 0) {
@@ -138,9 +145,8 @@ export async function createJournalForInvoice(
     }
 
     const entries: JournalEntryData[] = [];
-    const narration = `Sales invoice for ${invoice.customerName}`;
-
-    const { partyType, partyId, partyName, itemType, itemName } = await extractInvoicePartyAndItemInfo(invoice);
+    const { partyType, partyId, contactId, partyName, itemType, itemName } = await extractInvoicePartyAndItemInfo(invoice);
+    const narration = `Sales invoice for ${partyName || 'Unknown Customer'}`;
 
     // Dr. Accounts Receivable = grandTotal
     entries.push({
@@ -189,13 +195,14 @@ export async function createJournalForInvoice(
       referenceType: 'Invoice',
       referenceId: invoice._id,
       referenceNumber: invoice.invoiceNumber,
-      
+
       partyType,
       partyId,
+      contactId,
       partyName,
       itemType,
       itemName,
-      
+
       narration,
       entries,
       totalDebit,
@@ -238,11 +245,11 @@ export async function createJournalForVoucher(
     let referenceType = 'Manual';
     const amountToRecord = voucher.grandTotal;
 
-    const { partyType, partyId, partyName, itemType, itemName } = await extractVoucherPartyAndItemInfo(voucher);
+    const { partyType, partyId, contactId, partyName, itemType, itemName } = await extractVoucherPartyAndItemInfo(voucher);
 
     if (voucher.voucherType === 'receipt') {
       referenceType = 'Receipt';
-      narration = `Payment received from ${partyName || voucher.customerName || 'Customer'} via ${voucher.paymentMethod}`;
+      narration = `Payment received from ${partyName || partyType || 'Customer'} via ${voucher.paymentMethod}`;
 
       const paymentAccount = voucher.paymentMethod === 'Cash' ? 'A1001' : 'A1002';
       const paymentAccountName = voucher.paymentMethod === 'Cash' ? 'Cash in Hand' : 'Cash at Bank';
@@ -263,8 +270,8 @@ export async function createJournalForVoucher(
     }
     else if (voucher.voucherType === 'payment') {
       referenceType = 'Payment';
-      
-      const paidTo = partyName || voucher.supplierName || voucher.payeeName || voucher.vendorName || 'Payee';
+
+      const paidTo = partyName || voucher.payeeName || voucher.vendorName || 'Payee';
       narration = `Payment made to ${paidTo} via ${voucher.paymentMethod}`;
 
       const paymentAccount = voucher.paymentMethod === 'Cash' ? 'A1001' : 'A1002';
@@ -297,13 +304,14 @@ export async function createJournalForVoucher(
       referenceType,
       referenceId: voucher._id,
       referenceNumber: voucher.invoiceNumber,
-      
+
       partyType,
       partyId,
+      contactId,
       partyName,
       itemType,
       itemName,
-      
+
       narration,
       entries,
       totalDebit: entries.reduce((sum, e) => sum + e.debit, 0),
@@ -363,24 +371,23 @@ async function extractPurchasePartyAndItemInfo(purchase: any) {
   const result: {
     partyType?: 'Customer' | 'Supplier' | 'Payee';
     partyId?: string;
+    contactId?: string;
     partyName?: string;
     itemType?: 'Material' | 'Product';
     itemName?: string;
   } = {};
 
-  if (purchase.supplierName) {
-    result.partyType = 'Supplier';
-    result.partyName = purchase.supplierName;
-    
-    try {
-      const Supplier = (await import('@/models/Supplier')).default;
-      const supplier = await Supplier.findOne({ name: purchase.supplierName, isDeleted: false });
-      if (supplier) {
-        result.partyId = supplier._id.toString();
-      }
-    } catch (error) {
-      console.error('Error looking up supplier ID:', error);
-    }
+  result.partyType = 'Supplier';
+
+  // Extract partyId and contactId
+  if (purchase.partyId) result.partyId = purchase.partyId;
+  if (purchase.contactId) result.contactId = purchase.contactId;
+
+  // Extract partyName - prioritize snapshot, then populated object
+  if (purchase.partySnapshot?.displayName) {
+    result.partyName = purchase.partySnapshot.displayName;
+  } else if (purchase.partyId && typeof purchase.partyId === 'object') {
+    result.partyName = purchase.partyId.company || purchase.partyId.name || 'Unknown Supplier';
   }
 
   if (purchase.items && purchase.items.length > 0) {
@@ -401,27 +408,25 @@ async function extractDebitNotePartyAndItemInfo(debitNote: any) {
   const result: {
     partyType?: 'Supplier' | 'Vendor';
     partyId?: string;
+    contactId?: string;
     partyName?: string;
     itemType?: 'Material';
     itemName?: string;
   } = {};
 
-  if (debitNote.supplierName) {
-    result.partyName = debitNote.supplierName;
-    
-    try {
-      const Supplier = (await import('@/models/Supplier')).default;
-      const supplier = await Supplier.findOne({ name: debitNote.supplierName, isDeleted: false });
-      if (supplier) {
-        result.partyType = 'Supplier';
-        result.partyId = supplier._id.toString();
-      } else {
-        result.partyType = 'Vendor';
-      }
-    } catch (error) {
-      result.partyType = 'Vendor';
-    }
+  // Extract partyId and contactId first
+  if (debitNote.partyId) result.partyId = debitNote.partyId;
+  if (debitNote.contactId) result.contactId = debitNote.contactId;
+
+  // Extract partyName - prioritize snapshot, then populated object
+  if (debitNote.partySnapshot?.displayName) {
+    result.partyName = debitNote.partySnapshot.displayName;
+  } else if (debitNote.partyId && typeof debitNote.partyId === 'object') {
+    result.partyName = debitNote.partyId.company || debitNote.partyId.name || 'Unknown Supplier';
   }
+
+  // Determine partyType based on partyId presence
+  result.partyType = result.partyId ? 'Supplier' : 'Vendor';
 
   if (debitNote.items && debitNote.items.length > 0) {
     const firstItem = debitNote.items[0];
@@ -449,7 +454,7 @@ export async function createJournalForDebitNote(
     }
 
     const entries: JournalEntryData[] = [];
-    const { partyType, partyId, partyName, itemType, itemName } = await extractDebitNotePartyAndItemInfo(debitNote);
+    const { partyType, partyId, contactId, partyName, itemType, itemName } = await extractDebitNotePartyAndItemInfo(debitNote);
 
     const grossTotal = Number(debitNote.totalAmount) || 0;
     const discount = Number(debitNote.discount) || 0;
@@ -499,7 +504,7 @@ export async function createJournalForDebitNote(
 
     const totalDebit = entries.reduce((sum, e) => sum + e.debit, 0);
     const totalCredit = entries.reduce((sum, e) => sum + e.credit, 0);
-    
+
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
       throw new Error(
         `Journal entry is not balanced! Debit: ${totalDebit.toFixed(2)}, Credit: ${totalCredit.toFixed(2)}`
@@ -514,13 +519,14 @@ export async function createJournalForDebitNote(
       referenceType: 'DebitNote',
       referenceId: debitNote._id,
       referenceNumber: debitNote.debitNoteNumber,
-      
+
       partyType,
       partyId,
+      contactId,
       partyName,
       itemType,
       itemName,
-      
+
       narration,
       entries,
       totalDebit,
@@ -592,45 +598,30 @@ async function extractCreditNotePartyAndItemInfo(creditNote: any) {
   const result: {
     partyType?: 'Customer' | 'Supplier' | 'Payee' | 'Vendor';
     partyId?: string;
+    contactId?: string;
     partyName?: string;
     itemType?: 'Material' | 'Product';
     itemName?: string;
   } = {};
 
-  if (creditNote.customerName) {
+  // Extract partyId and contactId first
+  if (creditNote.partyId) result.partyId = creditNote.partyId;
+  if (creditNote.contactId) result.contactId = creditNote.contactId;
+
+  if (creditNote.partySnapshot?.displayName) {
     result.partyType = 'Customer';
-    result.partyName = creditNote.customerName;
-    
-    try {
-      const Customer = (await import('@/models/Customer')).default;
-      const customer = await Customer.findOne({ name: creditNote.customerName, isDeleted: false });
-      if (customer) {
-        result.partyId = customer._id.toString();
-      }
-    } catch (error) {
-      console.error('Error looking up customer ID:', error);
-    }
-  } else if (creditNote.supplierName) {
-    result.partyName = creditNote.supplierName;
-    
-    try {
-      const Supplier = (await import('@/models/Supplier')).default;
-      const supplier = await Supplier.findOne({ name: creditNote.supplierName, isDeleted: false });
-      if (supplier) {
-        result.partyType = 'Supplier';
-        result.partyId = supplier._id.toString();
-      } else {
-        result.partyType = 'Vendor';
-      }
-    } catch (error) {
-      result.partyType = 'Vendor';
-    }
+
+    // Extract partyName - prioritize snapshot
+    result.partyName = creditNote.partySnapshot.displayName;
+  } else if (creditNote.partyId && typeof creditNote.partyId === 'object') {
+    result.partyType = 'Customer';
+    result.partyName = creditNote.partyId.company || creditNote.partyId.name || 'Unknown Customer';
   } else if (creditNote.payeeName) {
     result.partyType = 'Payee';
     result.partyName = creditNote.payeeName;
-    
+
     if (creditNote.payeeId) {
-       result.partyId = creditNote.payeeId.toString();
+      result.partyId = creditNote.payeeId.toString();
     }
   } else if (creditNote.vendorName) {
     result.partyType = 'Vendor';
@@ -663,7 +654,7 @@ export async function createJournalForCreditNote(
     }
 
     const entries: JournalEntryData[] = [];
-    const { partyType, partyId, partyName, itemType, itemName } = await extractCreditNotePartyAndItemInfo(creditNote);
+    const { partyType, partyId, contactId, partyName, itemType, itemName } = await extractCreditNotePartyAndItemInfo(creditNote);
 
     const grossTotal = Number(creditNote.totalAmount) || 0;
     const discount = Number(creditNote.discount) || 0;
@@ -713,7 +704,7 @@ export async function createJournalForCreditNote(
 
     const totalDebit = entries.reduce((sum, e) => sum + e.debit, 0);
     const totalCredit = entries.reduce((sum, e) => sum + e.credit, 0);
-    
+
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
       throw new Error(
         `Journal entry is not balanced! Debit: ${totalDebit.toFixed(2)}, Credit: ${totalCredit.toFixed(2)}`
@@ -728,13 +719,14 @@ export async function createJournalForCreditNote(
       referenceType: 'CreditNote',
       referenceId: creditNote._id,
       referenceNumber: creditNote.creditNoteNumber,
-      
+
       partyType,
       partyId,
+      contactId,
       partyName,
       itemType,
       itemName,
-      
+
       narration,
       entries,
       totalDebit,
@@ -820,22 +812,22 @@ export async function createJournalForPurchase(
     // Ensure discount is always a valid number
     const grossTotal = Number(purchase.totalAmount) || 0;
     const discount = Number(purchase.discount) || 0;
-    
+
     // Recalculate subtotal
     const subtotal = grossTotal - discount;
-    
+
     // Recalculate VAT based on subtotal
-    const vatAmount = purchase.isTaxPayable 
-      ? (subtotal * 0.05) 
+    const vatAmount = purchase.isTaxPayable
+      ? (subtotal * 0.05)
       : 0;
-    
+
     // Recalculate grand total
     const grandTotal = subtotal + vatAmount;
 
     // Validation
     const expectedGrandTotal = Number(purchase.grandTotal) || 0;
     const difference = Math.abs(grandTotal - expectedGrandTotal);
-    
+
     if (difference > 0.01) {
       console.warn(`⚠️ Purchase grand total mismatch detected!`);
       console.warn(`   Expected: ${expectedGrandTotal.toFixed(2)}`);
@@ -845,8 +837,8 @@ export async function createJournalForPurchase(
     }
 
     const narration = discount > 0
-      ? `Purchase from ${purchase.supplierName || 'Supplier'} - ${purchase.items.length} item(s) (Discount: ${discount.toFixed(2)})${purchase.isTaxPayable ? ' (Tax Payable)' : ' (Tax Free)'}`
-      : `Purchase from ${purchase.supplierName || 'Supplier'} - ${purchase.items.length} item(s)${purchase.isTaxPayable ? ' (Tax Payable)' : ' (Tax Free)'}`;
+      ? `Purchase from ${partyName || 'Supplier'} - ${purchase.items.length} item(s) (Discount: ${discount.toFixed(2)})${purchase.isTaxPayable ? ' (Tax Payable)' : ' (Tax Free)'}`
+      : `Purchase from ${partyName || 'Supplier'} - ${purchase.items.length} item(s)${purchase.isTaxPayable ? ' (Tax Payable)' : ' (Tax Free)'}`;
 
     // Dr. Inventory = Subtotal (after discount)
     entries.push({
@@ -900,20 +892,20 @@ export async function createJournalForPurchase(
     }
 
     const journalNumber = await generateInvoiceNumber('journal');
-    
+
     const journal = new Journal({
       journalNumber,
       entryDate: purchase.date || new Date(),
       referenceType: 'Purchase',
       referenceId: purchase._id,
       referenceNumber: purchase.referenceNumber || `Purchase-${purchase._id.toString().slice(-6)}`,
-      
+
       partyType,
       partyId,
       partyName,
       itemType,
       itemName,
-      
+
       narration,
       entries,
       totalDebit,
@@ -960,9 +952,9 @@ export async function handlePurchaseInventoryStatusChange(
     if (oldInventoryStatus === 'received' && newInventoryStatus !== 'received') {
       console.log('🔴 Voiding journal - inventory status changed from received');
       await voidJournalsForReference(
-        purchase._id, 
-        userId, 
-        username, 
+        purchase._id,
+        userId,
+        username,
         `Inventory status changed from ${oldInventoryStatus} to ${newInventoryStatus}`
       );
       return;
@@ -1010,42 +1002,9 @@ async function extractExpenseItemInfo(expense: any) {
       }
     }
   }
-  else if (expense.supplierId) {
-    if (typeof expense.supplierId === 'object' && expense.supplierId.name) {
-      result.partyType = 'Supplier';
-      result.partyId = expense.supplierId._id?.toString() || expense.supplierId.toString();
-      result.partyName = expense.supplierId.name;
-    } else {
-      try {
-        const Supplier = (await import('@/models/Supplier')).default;
-        const supplier = await Supplier.findById(expense.supplierId);
-        if (supplier) {
-          result.partyType = 'Supplier';
-          result.partyId = supplier._id.toString();
-          result.partyName = supplier.name;
-        }
-      } catch (error) {
-        console.error('Error looking up supplier:', error);
-      }
-    }
-  }
   else if (expense.vendor) {
-    try {
-      const Supplier = (await import('@/models/Supplier')).default;
-      const supplier = await Supplier.findOne({ name: expense.vendor, isDeleted: false });
-      if (supplier) {
-        result.partyType = 'Supplier';
-        result.partyId = supplier._id.toString();
-        result.partyName = supplier.name;
-      } else {
-        result.partyType = 'Vendor';
-        result.partyName = expense.vendor;
-      }
-    } catch (error) {
-      console.error('Error looking up supplier by vendor name:', error);
-      result.partyType = 'Vendor';
-      result.partyName = expense.vendor;
-    }
+    result.partyType = 'Vendor';
+    result.partyName = expense.vendor;
   }
 
   if (expense.description) {
@@ -1106,20 +1065,20 @@ export async function createJournalForExpense(
     });
 
     const journalNumber = await generateInvoiceNumber('journal');
-    
+
     const journal = new Journal({
       journalNumber,
       entryDate: expense.date || new Date(),
       referenceType: 'Expense',
       referenceId: expense._id,
       referenceNumber: expense.referenceNumber || `EXP-${expense._id.toString().slice(-6)}`,
-      
+
       partyType,
       partyId,
       partyName,
       itemType,
       itemName,
-      
+
       narration,
       entries,
       totalDebit: entries.reduce((sum, e) => sum + e.debit, 0),

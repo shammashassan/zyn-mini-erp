@@ -13,7 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 interface DeletedDeliveryNote {
   _id: string;
   invoiceNumber: string;
-  customerName?: string;
+  partyId?: any; // Populated
   grandTotal?: number;
   status?: string;
   deletedAt?: Date | string;
@@ -54,9 +54,11 @@ export default function DeliveryNotesTrashPage() {
       backUrl="../delivery-notes"
       backLabel="Back to Delivery Notes"
       getItemName={(item) => item.invoiceNumber || "Unnamed Delivery Note"}
-      getItemDescription={(item) =>
-        `${item.customerName || 'Unknown Customer'} • ${formatCurrency(item.grandTotal || 0.00)} • ${item.status || 'N/A'}`
-      }
+      getItemDescription={(item) => {
+        const party = item.partyId;
+        const name = party?.name || party?.company || 'Unknown Party';
+        return `${name} • ${formatCurrency(item.grandTotal || 0.00)} • ${item.status || 'N/A'}`;
+      }}
     />
   );
 }

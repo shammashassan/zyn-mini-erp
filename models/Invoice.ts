@@ -1,4 +1,4 @@
-// models/Invoice.ts - UPDATED: Removed automatic paid amount audit tracking
+// models/Invoice.ts - FINAL: Party/Contact snapshots only, no legacy fields
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -29,12 +29,40 @@ export interface IAuditEntry {
   }[];
 }
 
+export interface IPartySnapshot {
+  displayName: string;
+  address?: {
+    street?: string;
+    city?: string;
+    district?: string;
+    state?: string;
+    country?: string;
+    postalCode?: string;
+  };
+  taxIdentifiers?: {
+    vatNumber?: string;
+  };
+}
+
+export interface IContactSnapshot {
+  name: string;
+  phone?: string;
+  email?: string;
+  designation?: string;
+}
+
 export interface IInvoice extends Document {
   _id: string;
   invoiceNumber: string;
-  customerName: string;
-  customerPhone?: string;
-  customerEmail?: string;
+
+  // Party & Contact References (Dynamic - Current Truth)
+  partyId: mongoose.Types.ObjectId;
+  contactId?: mongoose.Types.ObjectId;
+
+  // Immutable Snapshots (Frozen - Legal Truth)
+  partySnapshot: IPartySnapshot;
+  contactSnapshot?: IContactSnapshot;
+
   items: IItem[];
   totalAmount: number;
   discount: number;
@@ -113,11 +141,55 @@ const AuditEntrySchema: Schema = new Schema({
   }],
 });
 
+const PartySnapshotSchema: Schema = new Schema({
+  displayName: { type: String, required: true },
+  address: {
+    street: { type: String },
+    city: { type: String },
+    district: { type: String },
+    state: { type: String },
+    country: { type: String },
+    postalCode: { type: String },
+  },
+  taxIdentifiers: {
+    vatNumber: { type: String },
+  },
+}, { _id: false });
+
+const ContactSnapshotSchema: Schema = new Schema({
+  name: { type: String, required: true },
+  phone: { type: String },
+  email: { type: String },
+  designation: { type: String },
+}, { _id: false });
+
 const InvoiceSchema: Schema<IInvoice> = new Schema({
   invoiceNumber: { type: String, required: true, unique: true },
-  customerName: { type: String, required: true },
-  customerPhone: { type: String },
-  customerEmail: { type: String },
+
+  // Party & Contact References
+  partyId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Party',
+    required: true,
+    index: true
+  },
+  contactId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Contact',
+    required: false,
+    index: true
+  },
+
+  // Immutable Snapshots
+  partySnapshot: {
+    type: PartySnapshotSchema,
+    required: true
+  },
+  contactSnapshot: {
+    type: ContactSnapshotSchema,
+    required: false
+  },
+
   items: [ItemSchema],
   totalAmount: { type: Number, required: true },
   discount: { type: Number, default: 0 },
@@ -164,14 +236,15 @@ const InvoiceSchema: Schema<IInvoice> = new Schema({
 // Indexes
 InvoiceSchema.index({ isDeleted: 1, invoiceDate: -1 });
 InvoiceSchema.index({ status: 1 });
-InvoiceSchema.index({ customerName: 1 });
 InvoiceSchema.index({ paymentStatus: 1 });
 InvoiceSchema.index({ 'connectedDocuments.receiptIds': 1 });
 InvoiceSchema.index({ 'connectedDocuments.quotationId': 1 });
 InvoiceSchema.index({ 'receiptAllocations.voucherId': 1 });
 InvoiceSchema.index({ 'connectedDocuments.returnNoteIds': 1 });
+InvoiceSchema.index({ partyId: 1, invoiceDate: -1 });
+InvoiceSchema.index({ 'partySnapshot.displayName': 'text' });
 
-// ✅ UPDATED: Removed automatic audit tracking for paid/received amount changes
+// Pre-save hook
 InvoiceSchema.pre('save', function (next) {
   // Calculate paid amount from receipt allocations
   if (this.receiptAllocations && this.receiptAllocations.length > 0) {
@@ -218,7 +291,7 @@ InvoiceSchema.pre(/^find/, function (this: Query<any, any>, next) {
   next();
 });
 
-// Existing methods
+// Instance methods
 InvoiceSchema.methods.allocateReceipt = function (
   voucherId: mongoose.Types.ObjectId,
   amount: number
@@ -281,7 +354,6 @@ InvoiceSchema.methods.canAllocate = function (amount: number): boolean {
   return (currentAllocated + amount) <= this.grandTotal;
 };
 
-// Audit entry method
 InvoiceSchema.methods.addAuditEntry = function (
   action: string,
   userId: string | null = null,

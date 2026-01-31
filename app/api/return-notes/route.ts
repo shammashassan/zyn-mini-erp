@@ -8,10 +8,13 @@ import Invoice from "@/models/Invoice";
 import Material from "@/models/Material";
 import DebitNote from "@/models/DebitNote";
 import CreditNote from "@/models/CreditNote";
+import Party from "@/models/Party";
+import Contact from "@/models/Contact";
 import StockAdjustment from "@/models/StockAdjustment";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
+import { createPartySnapshot } from "@/utils/partySnapshot";
 
 export async function GET(request: Request) {
   try {
@@ -22,7 +25,7 @@ export async function GET(request: Request) {
 
     await dbConnect();
 
-    const _ensureModels = [DebitNote, CreditNote, Purchase, Invoice, Material];
+    const _ensureModels = [DebitNote, CreditNote, Purchase, Invoice, Material, Party, Contact];
 
     const { searchParams } = new URL(request.url);
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
@@ -58,12 +61,12 @@ export async function GET(request: Request) {
       const populateOptions = populate ? [
         {
           path: 'connectedDocuments.purchaseId',
-          select: 'referenceNumber supplierName items inventoryStatus',
+          select: 'referenceNumber items inventoryStatus',
           match: { isDeleted: false }
         },
         {
           path: 'connectedDocuments.invoiceId',
-          select: 'invoiceNumber customerName items status',
+          select: 'invoiceNumber items status',
           match: { isDeleted: false }
         },
         {
@@ -99,9 +102,45 @@ export async function GET(request: Request) {
       const populate = searchParams.get('populate') === 'true';
       const filter: any = { isDeleted: false };
 
-      // ✅ ADD returnType filter for non-server-side requests too
+      const returnTypeParam = searchParams.get('returnType');
+      const partyIdParam = searchParams.get('partyId');
+      const statusParam = searchParams.get('status');
+      const excludeLinked = searchParams.get('excludeLinked') === 'true';
+      const includeId = searchParams.get('includeId');
+
       if (returnTypeParam) {
         filter.returnType = returnTypeParam;
+      }
+      if (partyIdParam) {
+        filter.partyId = partyIdParam;
+      }
+      if (statusParam) {
+        filter.status = statusParam;
+      }
+
+      // Handle linked document exclusion with optional inclusion of a specific ID
+      if (excludeLinked) {
+        let exclusionCriteria = {};
+
+        if (returnTypeParam === 'purchaseReturn') {
+          // Exclude if it has a debit note linked
+          exclusionCriteria = { 'connectedDocuments.debitNoteId': { $exists: false } };
+        } else if (returnTypeParam === 'salesReturn') {
+          // Exclude if it has a credit note linked
+          exclusionCriteria = { 'connectedDocuments.creditNoteId': { $exists: false } };
+        }
+
+        if (includeId) {
+          // If includeId is provided, we want:
+          // (criteria match) OR (_id === includeId)
+          filter.$or = [
+            exclusionCriteria,
+            { _id: includeId }
+          ];
+        } else {
+          // Otherwise just apply the exclusion
+          Object.assign(filter, exclusionCriteria);
+        }
       }
 
       if (startDateParam || endDateParam) {
@@ -120,12 +159,12 @@ export async function GET(request: Request) {
         query = query
           .populate({
             path: 'connectedDocuments.purchaseId',
-            select: 'referenceNumber supplierName items inventoryStatus',
+            select: 'referenceNumber items inventoryStatus',
             match: { isDeleted: false }
           })
           .populate({
             path: 'connectedDocuments.invoiceId',
-            select: 'invoiceNumber customerName items status',
+            select: 'invoiceNumber items status',
             match: { isDeleted: false }
           })
           .populate({
@@ -165,8 +204,8 @@ export async function POST(request: Request) {
       returnType = 'purchaseReturn',
       purchaseId,
       invoiceId,
-      supplierName,
-      customerName,
+      partyId,
+      contactId,
       items,
       reason,
       notes,
@@ -176,24 +215,23 @@ export async function POST(request: Request) {
       grandTotal
     } = body;
 
+    // Validate partyId
+    if (!partyId) {
+      return NextResponse.json({ error: "Party ID is required" }, { status: 400 });
+    }
+
     // Validate return type
     if (returnType === 'purchaseReturn') {
       if (!purchaseId) {
         return NextResponse.json({ error: "Purchase ID is required for purchase returns" }, { status: 400 });
       }
-      if (!supplierName) {
-        return NextResponse.json({ error: "Supplier name is required for purchase returns" }, { status: 400 });
-      }
     } else if (returnType === 'salesReturn') {
       if (!invoiceId) {
         return NextResponse.json({ error: "Invoice ID is required for sales returns" }, { status: 400 });
       }
-      if (!customerName) {
-        return NextResponse.json({ error: "Customer name is required for sales returns" }, { status: 400 });
-      }
     } else {
-      return NextResponse.json({ 
-        error: "Invalid return type. Must be 'purchaseReturn' or 'salesReturn'" 
+      return NextResponse.json({
+        error: "Invalid return type. Must be 'purchaseReturn' or 'salesReturn'"
       }, { status: 400 });
     }
 
@@ -289,10 +327,17 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
+    // ✅ Create party and contact snapshots
+    const { partySnapshot, contactSnapshot } = await createPartySnapshot(partyId, contactId);
+
     // Create return note data
     const returnNoteData: any = {
       returnNumber,
       returnType,
+      partyId,
+      contactId,
+      partySnapshot,
+      contactSnapshot,
       items,
       returnDate: returnDate || new Date(),
       reason,
@@ -315,11 +360,9 @@ export async function POST(request: Request) {
     // Add type-specific fields
     if (returnType === 'purchaseReturn') {
       const purchase = await Purchase.findById(purchaseId);
-      returnNoteData.supplierName = supplierName;
       returnNoteData.connectedDocuments.purchaseId = purchase._id;
     } else if (returnType === 'salesReturn') {
       const invoice = await Invoice.findById(invoiceId);
-      returnNoteData.customerName = customerName;
       returnNoteData.totalAmount = totalAmount;
       returnNoteData.grandTotal = grandTotal;
       returnNoteData.connectedDocuments.invoiceId = invoice._id;

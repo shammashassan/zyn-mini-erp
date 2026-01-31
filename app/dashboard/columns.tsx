@@ -1,9 +1,9 @@
-// app/dashboard/columns.tsx - UPDATED: Cleaned for Invoice data
+// app/dashboard/columns.tsx
 
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, Eye, FileText, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown, Eye, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,13 +13,36 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { formatDisplayDate, formatTime } from "@/utils/formatters/date";
 
 export interface RecentSale {
   _id: string;
   invoiceNumber: string;
-  customerName: string;
+
+  // ✅ Party Snapshot (Frozen - Legal Truth)
+  partySnapshot?: {
+    displayName: string;
+    address?: {
+      street?: string;
+      city?: string;
+      district?: string;
+      state?: string;
+      country?: string;
+      postalCode?: string;
+    };
+    taxIdentifiers?: {
+      vatNumber?: string;
+    };
+  };
+
+  // ✅ Fallback to populated party (for backward compatibility)
+  partyId?: {
+    name?: string;
+    company?: string;
+  };
+
   grandTotal: number;
   createdAt: string;
   documentType?: "invoice"; // Always invoice
@@ -67,18 +90,29 @@ export const getColumns = (onViewPdf: (sale: RecentSale) => void): ColumnDef<Rec
     ),
   },
   {
-    accessorKey: "customerName",
+    id: "partyName",
+    accessorKey: "partySnapshot.displayName",
     header: ({ column }) => (
       <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
         Customer
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => (
-      <div className="font-medium">
-        {row.getValue("customerName")}
-      </div>
-    ),
+    cell: ({ row }) => {
+      // ✅ Use snapshot as primary, fallback to populated party
+      const name = row.original.partySnapshot?.displayName
+        || row.original.partyId?.company
+        || row.original.partyId?.name
+        || "Unknown";
+
+      return (
+        <div className="flex justify-center">
+          <Badge variant="primary" appearance="outline">
+            {name}
+          </Badge>
+        </div>
+      );
+    },
     meta: {
       label: "Customer",
       placeholder: "Search customer...",
@@ -97,10 +131,10 @@ export const getColumns = (onViewPdf: (sale: RecentSale) => void): ColumnDef<Rec
     cell: ({ row }) => {
       const amount = row.getValue("grandTotal");
       if (typeof amount !== 'number' || isNaN(amount)) {
-        return <div className="text-right font-medium text-muted-foreground">-</div>;
+        return <div className="text-center font-medium text-muted-foreground">-</div>;
       }
       return (
-        <div className="text-right font-medium text-green-600">
+        <div className="text-center font-medium text-green-600">
           {formatCurrency(amount)}
         </div>
       );

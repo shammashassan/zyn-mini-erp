@@ -13,7 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 interface DeletedDebitNote {
   _id: string;
   debitNoteNumber?: string;
-  supplierName?: string;
+  partyId?: any; // Populated
   items?: Array<{
     materialName: string;
     quantity: number;
@@ -33,9 +33,9 @@ interface DeletedDebitNote {
 
 export default function DebitNotesTrashPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const { 
-    permissions: { canViewTrash }, 
-    isPending 
+  const {
+    permissions: { canViewTrash },
+    isPending
   } = useDebitNotePermissions();
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export default function DebitNotesTrashPage() {
   if (!isMounted || isPending) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
   }
@@ -73,7 +73,11 @@ export default function DebitNotesTrashPage() {
         const deletedByUsername = deleteAction?.username || item.deletedBy || 'Unknown';
         const displayTotal = item.grandTotal || (item.totalAmount || 0) + (item.vatAmount || 0);
         const statusBadge = item.status ? ` • ${item.status}` : '';
-        return `${item.supplierName || 'Unknown Supplier'} • ${totalQuantity} units • ${formatCurrency(displayTotal)}${statusBadge} • Deleted by @${deletedByUsername}`;
+
+        const party = item.partyId;
+        const name = party?.name || party?.company || 'Unknown Party';
+
+        return `${name} • ${totalQuantity} units • ${formatCurrency(displayTotal)}${statusBadge} • Deleted by @${deletedByUsername}`;
       }}
     />
   );

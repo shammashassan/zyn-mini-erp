@@ -26,10 +26,10 @@ export async function GET(request: NextRequest) {
     if (isServerSide) {
       // 🚀 SERVER-SIDE MODE
       const { page, pageSize, sorting, filters } = extractTableParams(searchParams);
-      
+
       // Build Base Filter from Custom Params
       const baseFilter: any = { isDeleted: false };
-      
+
       const status = searchParams.get('status');
       const referenceType = searchParams.get('referenceType');
       const startDate = searchParams.get('startDate');
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
       if (status && status !== 'all') baseFilter.status = status;
       if (referenceType && referenceType !== 'all') baseFilter.referenceType = referenceType;
-      
+
       if (startDate && endDate) {
         baseFilter.entryDate = {
           $gte: new Date(startDate),
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
 
       if (status && status !== 'all') query.status = status;
       if (referenceType && referenceType !== 'all') query.referenceType = referenceType;
-      
+
       if (startDate && endDate) {
         query.entryDate = {
           $gte: new Date(startDate),

@@ -1,13 +1,15 @@
-// app/api/credit-notes/route.ts - UPDATED: Support Return Note Linking
+// app/api/credit-notes/route.ts - FINAL: Using Party/Contact snapshots
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import CreditNote from "@/models/CreditNote";
 import ReturnNote from "@/models/ReturnNote";
 import Voucher from "@/models/Voucher";
+import Party from "@/models/Party";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
+import { createPartySnapshot } from "@/utils/partySnapshot";
 
 export async function GET(request: Request) {
   try {
@@ -19,7 +21,7 @@ export async function GET(request: Request) {
     await dbConnect();
 
     // Ensure models are registered
-    const _ensureModels = [Voucher, ReturnNote];
+    const _ensureModels = [Voucher, ReturnNote, Party];
 
     const { searchParams } = new URL(request.url);
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
@@ -49,7 +51,7 @@ export async function GET(request: Request) {
       const populateOptions = populate ? [
         {
           path: 'connectedDocuments.returnNoteId',
-          select: 'returnNumber invoiceReference customerName',
+          select: 'returnNumber invoiceReference',
           match: { isDeleted: false }
         },
         {
@@ -57,6 +59,10 @@ export async function GET(request: Request) {
           model: 'Voucher',
           select: 'invoiceNumber grandTotal voucherType',
           match: { isDeleted: false }
+        },
+        {
+          path: 'partyId',
+          select: 'name company type roles',
         }
       ] : undefined;
 
@@ -97,7 +103,7 @@ export async function GET(request: Request) {
         query = query
           .populate({
             path: 'connectedDocuments.returnNoteId',
-            select: 'returnNumber invoiceReference customerName',
+            select: 'returnNumber invoiceReference',
             match: { isDeleted: false }
           })
           .populate({
@@ -105,6 +111,10 @@ export async function GET(request: Request) {
             model: 'Voucher',
             select: 'invoiceNumber grandTotal voucherType',
             match: { isDeleted: false }
+          })
+          .populate({
+            path: 'partyId',
+            select: 'name company type roles'
           });
       }
 
@@ -131,13 +141,8 @@ export async function POST(request: Request) {
 
     const {
       returnNoteId,
-      customerName,
-      customerId,
-      supplierName,
-      supplierId,
-      payeeName,
-      payeeId,
-      vendorName,
+      partyId,
+      contactId,
       items,
       discount = 0,
       isTaxPayable = true,
@@ -145,17 +150,17 @@ export async function POST(request: Request) {
       reason,
       notes,
       status = 'pending',
-      creditType = 'standalone'
+      creditType = 'standalone',
     } = body;
 
-    // Validate party
-    if (!customerName && !supplierName && !payeeName && !vendorName) {
-      return NextResponse.json({ 
-        error: "Party information is required (customer, supplier, payee, or vendor)" 
+    // ✅ Validation: Party is required
+    if (!partyId) {
+      return NextResponse.json({
+        error: "Party is required"
       }, { status: 400 });
     }
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
+    if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "At least one item is required" }, { status: 400 });
     }
 
@@ -182,6 +187,9 @@ export async function POST(request: Request) {
         }, { status: 400 });
       }
     }
+
+    // ✅ Create immutable snapshots
+    const { partySnapshot, contactSnapshot } = await createPartySnapshot(partyId, contactId);
 
     // Calculate amounts
     const grossTotal = items.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0);
@@ -217,13 +225,15 @@ export async function POST(request: Request) {
     // Create credit note
     const newCreditNote = new CreditNote({
       creditNoteNumber,
-      customerName: customerName || undefined,
-      customerId: customerId || undefined,
-      supplierName: supplierName || undefined,
-      supplierId: supplierId || undefined,
-      payeeName: payeeName || undefined,
-      payeeId: payeeId || undefined,
-      vendorName: vendorName || undefined,
+
+      // ✅ Party & Contact References
+      partyId,
+      contactId,
+
+      // ✅ Immutable Snapshots
+      partySnapshot,
+      contactSnapshot,
+
       items,
       totalAmount: grossTotal,
       discount: discountAmount,
@@ -239,9 +249,9 @@ export async function POST(request: Request) {
       paidAmount: 0,
       remainingAmount: grandTotal,
       paymentStatus: 'pending',
-      connectedDocuments: { 
+      connectedDocuments: {
         returnNoteId: returnNoteId || undefined,
-        paymentIds: [] 
+        paymentIds: []
       },
       isDeleted: false,
       deletedAt: null,
@@ -257,6 +267,9 @@ export async function POST(request: Request) {
     });
 
     const savedCreditNote = await newCreditNote.save();
+
+    console.log(`✅ Successfully created credit note: ${savedCreditNote.creditNoteNumber}`);
+    console.log(`   Party: ${partySnapshot.displayName}`);
 
     // If linked to return note, update it
     if (savedCreditNote.connectedDocuments?.returnNoteId) {

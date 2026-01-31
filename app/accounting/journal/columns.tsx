@@ -325,7 +325,7 @@ export const getJournalColumns = (
 
         const getPartyVariant = (type: string) => {
           switch (type) {
-            case 'Customer': return 'success';
+            case 'Customer': return 'primary';
             case 'Supplier': return 'warning';
             case 'Payee': return 'cyan';
             case 'Vendor': return 'secondary';

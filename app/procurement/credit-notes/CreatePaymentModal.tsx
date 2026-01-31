@@ -52,6 +52,17 @@ export function CreatePaymentModal({
   const [paymentMethod, setPaymentMethod] = useState("Bank Transfer");
   const [notes, setNotes] = useState("");
 
+  // ✅  Use party/contact from credit note (via snapshot/reference)
+  const partyId = typeof creditNote.partyId === 'object'
+    ? (creditNote.partyId as any)?._id
+    : creditNote.partyId;
+  const contactId = typeof creditNote.contactId === 'object'
+    ? (creditNote.contactId as any)?._id
+    : creditNote.contactId;
+
+  // Display name from snapshot
+  const partyDisplayName = creditNote.partySnapshot?.displayName || "Unknown Party";
+
   const remainingAmount = creditNote.remainingAmount || (creditNote.grandTotal - creditNote.paidAmount);
   const alreadyPaid = creditNote.paidAmount || 0;
 
@@ -97,25 +108,9 @@ export function CreatePaymentModal({
         },
         totalAmount: amount,
         grandTotal: amount,
+        partyId: partyId,
+        contactId: contactId,
       };
-
-      // Add party information
-      if (creditNote.customerName) {
-        paymentData.customerName = creditNote.customerName;
-        if (creditNote.customerId) paymentData.customerId = creditNote.customerId;
-      } else if (creditNote.supplierName) {
-        paymentData.supplierName = creditNote.supplierName;
-        if (creditNote.supplierId) paymentData.supplierId = creditNote.supplierId;
-      } else if (creditNote.payeeName) {
-        paymentData.payeeName = creditNote.payeeName;
-        if (creditNote.payeeId) paymentData.payeeId = creditNote.payeeId;
-      } else if (creditNote.vendorName) {
-        paymentData.vendorName = creditNote.vendorName;
-      } else {
-        toast.error("Credit note is missing party information");
-        setIsLoading(false);
-        return;
-      }
 
       // Create payment voucher
       const paymentRes = await fetch("/api/vouchers", {
@@ -165,9 +160,6 @@ export function CreatePaymentModal({
     }
   };
 
-  // Determine party display name
-  const partyName = creditNote.customerName || creditNote.supplierName || creditNote.payeeName || creditNote.vendorName || "N/A";
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] lg:max-w-2xl max-h-[90vh] overflow-y-auto sidebar-scroll">
@@ -184,9 +176,14 @@ export function CreatePaymentModal({
         <div className="space-y-4">
           {/* Credit Note Summary */}
           <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Party:</span>
-              <span className="text-sm font-medium">{partyName}</span>
+            <div className="col-span-2 space-y-2">
+              <Label className="text-xs text-muted-foreground">Party</Label>
+              <Input
+                value={partyDisplayName}
+                readOnly
+                disabled
+                className="bg-muted"
+              />
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Total Amount:</span>

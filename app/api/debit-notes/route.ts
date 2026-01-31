@@ -1,13 +1,15 @@
-// app/api/debit-notes/route.ts - FIXED: Support All Party Types
+// app/api/debit-notes/route.ts - COMPLETE MIGRATION: Using party snapshots, removed legacy fields
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import DebitNote from "@/models/DebitNote";
 import ReturnNote from "@/models/ReturnNote";
 import Voucher from "@/models/Voucher";
+import Party from "@/models/Party";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
+import { createPartySnapshot } from "@/utils/partySnapshot";
 
 export async function GET(request: Request) {
   try {
@@ -18,7 +20,7 @@ export async function GET(request: Request) {
 
     await dbConnect();
 
-    const ensureModels = [DebitNote, ReturnNote, Voucher];
+    const ensureModels = [DebitNote, ReturnNote, Voucher, Party];
 
     const { searchParams } = new URL(request.url);
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
@@ -43,19 +45,28 @@ export async function GET(request: Request) {
         }
       }
 
+      const partyId = searchParams.get('partyId');
+      if (partyId) {
+        baseFilter.partyId = partyId;
+      }
+
       const populate = searchParams.get('populate') === 'true';
 
       const populateOptions = populate ? [
         {
           path: 'connectedDocuments.returnNoteId',
-          select: 'returnNumber purchaseReference supplierName',
+          select: 'returnNumber returnType status isDeleted',
           match: { isDeleted: false }
         },
         {
           path: 'connectedDocuments.receiptIds',
           model: 'Voucher',
-          select: 'invoiceNumber grandTotal voucherType',
+          select: 'invoiceNumber grandTotal voucherType isDeleted',
           match: { isDeleted: false }
+        },
+        {
+          path: 'partyId',
+          select: 'name company type roles',
         }
       ] : undefined;
 
@@ -96,14 +107,18 @@ export async function GET(request: Request) {
         query = query
           .populate({
             path: 'connectedDocuments.returnNoteId',
-            select: 'returnNumber purchaseReference supplierName',
+            select: 'returnNumber returnType status isDeleted',
             match: { isDeleted: false }
           })
           .populate({
             path: 'connectedDocuments.receiptIds',
             model: 'Voucher',
-            select: 'invoiceNumber grandTotal voucherType',
+            select: 'invoiceNumber grandTotal voucherType isDeleted',
             match: { isDeleted: false }
+          })
+          .populate({
+            path: 'partyId',
+            select: 'name company type roles'
           });
       }
 
@@ -130,13 +145,6 @@ export async function POST(request: Request) {
 
     const {
       returnNoteId,
-      supplierName,
-      supplierId,
-      customerName,
-      customerId,
-      payeeName,
-      payeeId,
-      vendorName,
       items,
       discount = 0,
       isTaxPayable = true,
@@ -144,13 +152,15 @@ export async function POST(request: Request) {
       reason,
       notes,
       status = 'pending',
-      debitType = 'standalone'
+      debitType = 'standalone',
+      partyId,
+      contactId
     } = body;
 
-    // Validate party - at least one must be provided
-    if (!supplierName && !customerName && !payeeName && !vendorName) {
-      return NextResponse.json({ 
-        error: "Party information is required (supplier, customer, payee, or vendor)" 
+    // ✅ Validation: Party is required
+    if (!partyId) {
+      return NextResponse.json({
+        error: "Party is required"
       }, { status: 400 });
     }
 
@@ -175,6 +185,9 @@ export async function POST(request: Request) {
         }, { status: 400 });
       }
     }
+
+    // ✅ Create immutable snapshots of party and contact
+    const { partySnapshot, contactSnapshot } = await createPartySnapshot(partyId, contactId);
 
     // Calculate amounts
     const grossTotal = items.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0);
@@ -202,21 +215,25 @@ export async function POST(request: Request) {
     });
 
     if (existingDebitNote) {
+      console.error(`❌ CRITICAL: Generated duplicate debit note number ${debitNoteNumber}`);
       return NextResponse.json({
-        error: 'Failed to generate unique debit note number. Please try again.'
+        error: 'Failed to generate unique debit note number. Please try again.',
+        details: 'Debit note number collision detected'
       }, { status: 500 });
     }
 
-    // Create debit note
-    const newDebitNote = new DebitNote({
+    // Build debit note data
+    const debitNoteData: any = {
       debitNoteNumber,
-      supplierName: supplierName || undefined,
-      supplierId: supplierId || undefined,
-      customerName: customerName || undefined,
-      customerId: customerId || undefined,
-      payeeName: payeeName || undefined,
-      payeeId: payeeId || undefined,
-      vendorName: vendorName || undefined,
+
+      // ✅ Party & Contact References
+      partyId,
+      contactId,
+
+      // ✅ Immutable Snapshots (legal/historical truth)
+      partySnapshot,
+      contactSnapshot,
+
       items,
       totalAmount: grossTotal,
       discount: discountAmount,
@@ -232,9 +249,9 @@ export async function POST(request: Request) {
       receivedAmount: 0,
       remainingAmount: grandTotal,
       paymentStatus: 'pending',
-      connectedDocuments: { 
+      connectedDocuments: {
         returnNoteId: returnNoteId || undefined,
-        receiptIds: [] 
+        receiptIds: []
       },
       isDeleted: false,
       deletedAt: null,
@@ -247,31 +264,56 @@ export async function POST(request: Request) {
         username: user.username || user.name,
         timestamp: new Date(),
       }],
-    });
+    };
 
-    const savedDebitNote = await newDebitNote.save();
+    // Create and save debit note
+    const newDebitNote = new DebitNote(debitNoteData);
 
-    // If linked to return note, update it
-    if (savedDebitNote.connectedDocuments?.returnNoteId) {
-      await ReturnNote.findByIdAndUpdate(savedDebitNote.connectedDocuments.returnNoteId, {
-        'connectedDocuments.debitNoteId': savedDebitNote._id
-      });
+    try {
+      await newDebitNote.save();
+
+      console.log(`✅ Successfully created debit note: ${newDebitNote.debitNoteNumber}`);
+      console.log(`   Party: ${partySnapshot.displayName}`);
+
+      // If linked to return note, update it
+      if (newDebitNote.connectedDocuments?.returnNoteId) {
+        await ReturnNote.findByIdAndUpdate(newDebitNote.connectedDocuments.returnNoteId, {
+          'connectedDocuments.debitNoteId': newDebitNote._id
+        });
+      }
+
+      // If status is 'approved', create journal entry
+      if (newDebitNote.status === 'approved') {
+        console.log('📝 Creating journal for APPROVED debit note');
+        try {
+          const { createJournalForDebitNote } = await import('@/utils/journalAutoCreate');
+          await createJournalForDebitNote(
+            newDebitNote.toObject(),
+            user.id,
+            user.username || user.name
+          );
+        } catch (journalError) {
+          console.error('Failed to create journal entry:', journalError);
+        }
+      }
+
+      return NextResponse.json({
+        message: 'Debit note saved',
+        debitNote: newDebitNote
+      }, { status: 201 });
+
+    } catch (saveError: any) {
+      console.error('❌ Error saving debit note:', saveError);
+
+      if (saveError.code === 11000 && saveError.keyPattern?.debitNoteNumber) {
+        return NextResponse.json({
+          error: 'Duplicate debit note number detected. Please try again.',
+          details: saveError.message
+        }, { status: 500 });
+      }
+
+      throw saveError;
     }
-
-    // If status is 'approved', create journal entry
-    if (status === 'approved') {
-      const { createJournalForDebitNote } = await import('@/utils/journalAutoCreate');
-      await createJournalForDebitNote(
-        savedDebitNote.toObject(),
-        user.id,
-        user.username || user.name
-      );
-    }
-
-    return NextResponse.json({
-      message: 'Debit note created successfully',
-      debitNote: savedDebitNote
-    }, { status: 201 });
 
   } catch (error: any) {
     console.error('❌ Error in POST /api/debit-notes:', error);

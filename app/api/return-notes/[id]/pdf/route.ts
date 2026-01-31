@@ -37,7 +37,6 @@ export async function GET(
 
     await dbConnect();
 
-    // Allow finding soft-deleted return notes for PDF generation
     const returnNote = await ReturnNote.findById(id)
       .setOptions({ includeDeleted: true })
       .populate('connectedDocuments.purchaseId', 'referenceNumber')
@@ -47,26 +46,9 @@ export async function GET(
       return NextResponse.json({ message: "Return Note not found" }, { status: 404 });
     }
 
-    // Fetch party contact details based on return type
-    let returnNoteWithDetails = returnNote.toObject();
+    // Convert to plain object - snapshots are already in the database
+    const returnNoteWithDetails = returnNote.toObject();
 
-    if (returnNote.returnType === 'purchaseReturn' && returnNote.supplierName) {
-      // Fetch supplier details
-      const Supplier = (await import('@/models/Supplier')).default;
-      const supplier = await Supplier.findOne({ name: returnNote.supplierName });
-      if (supplier) {
-        returnNoteWithDetails.supplierPhone = supplier.contactNumbers?.[0] || '';
-        returnNoteWithDetails.supplierEmail = supplier.email || '';
-      }
-    } else if (returnNote.returnType === 'salesReturn' && returnNote.customerName) {
-      // Fetch customer details
-      const Customer = (await import('@/models/Customer')).default;
-      const customer = await Customer.findOne({ name: returnNote.customerName });
-      if (customer) {
-        returnNoteWithDetails.customerPhone = customer.phone || '';
-        returnNoteWithDetails.customerEmail = customer.email || '';
-      }
-    }
 
     // Fetch Company Details
     let companyDetails = await CompanyDetails.findOne();

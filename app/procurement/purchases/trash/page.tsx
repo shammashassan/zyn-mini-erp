@@ -17,7 +17,7 @@ interface DeletedPurchase {
   material?: {
     name?: string;
   };
-  supplierName?: string;
+  partyId?: any; // Populated
   items?: Array<{
     quantity: number;
   }>;
@@ -36,9 +36,9 @@ interface DeletedPurchase {
 
 export default function PurchasesTrashPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const { 
-    permissions: { canViewTrash }, 
-    isPending 
+  const {
+    permissions: { canViewTrash },
+    isPending
   } = usePurchasePermissions();
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function PurchasesTrashPage() {
   if (!isMounted || isPending) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
   }
@@ -78,7 +78,11 @@ export default function PurchasesTrashPage() {
         const deleteAction = item.actionHistory?.find(a => a.action === 'Soft Deleted');
         const deletedByUsername = deleteAction?.username || item.deletedBy || 'Unknown';
         const displayTotal = item.grandTotal || (item.totalAmount || 0) + (item.vatAmount || 0);
-        return `${item.supplierName || 'Unknown Supplier'} • ${totalQuantity} units • ${formatCurrency(displayTotal)} • Deleted by @${deletedByUsername}`;
+
+        const party = item.partyId;
+        const name = party?.name || party?.company || 'Unknown Party';
+
+        return `${name} • ${totalQuantity} units • ${formatCurrency(displayTotal)} • Deleted by @${deletedByUsername}`;
       }}
     />
   );

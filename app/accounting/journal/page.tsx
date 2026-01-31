@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import { toast } from "sonner";
-import { NotebookPen, Plus, Trash2, Filter, Users } from "lucide-react";
+import { NotebookPen, Plus, Trash2, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table/data-table";
@@ -38,6 +38,7 @@ import {
   CommandItem,
   CommandList
 } from "@/components/ui/command";
+import { PartyContactSelector } from "@/components/PartyContactSelector";
 import { useJournalPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
@@ -55,7 +56,8 @@ function JournalPageContent() {
   const [selectedJournal, setSelectedJournal] = useState<IJournal | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
-  const isSubmittingRef = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedPartyName, setSelectedPartyName] = useState("");
 
   const [pageCount, setPageCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -90,8 +92,8 @@ function JournalPageContent() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [typePopoverOpen, setTypePopoverOpen] = useState(false);
   const [typeSearchQuery, setTypeSearchQuery] = useState("");
-  const [partyTypeFilter, setPartyTypeFilter] = useState<string>("all");
   const [selectedPartyId, setSelectedPartyId] = useState<string>("");
+  const [selectedPartyType, setSelectedPartyType] = useState<'customer' | 'supplier' | 'payee' | 'vendor' | undefined>(undefined);
 
   const typeOptions = [
     { value: "all", label: "All Types" },
@@ -108,37 +110,14 @@ function JournalPageContent() {
     { value: "ReturnNote", label: "Return Note" },
   ];
 
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [payees, setPayees] = useState<any[]>([]);
-  const [partyPopoverOpen, setPartyPopoverOpen] = useState(false);
+
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(subMonths(new Date(), 5)),
     to: endOfMonth(new Date())
   });
 
-  useEffect(() => {
-    const fetchReferenceData = async () => {
-      if (!canRead) return;
-      try {
-        const [customersRes, suppliersRes, payeesRes] = await Promise.all([
-          fetch("/api/customers"),
-          fetch("/api/suppliers"),
-          fetch("/api/payees"),
-        ]);
 
-        if (customersRes.ok) setCustomers(await customersRes.json());
-        if (suppliersRes.ok) setSuppliers(await suppliersRes.json());
-        if (payeesRes.ok) setPayees(await payeesRes.json());
-      } catch (error) {
-        console.error("Failed to fetch reference data:", error);
-      }
-    };
-    if (session && canRead) {
-      fetchReferenceData();
-    }
-  }, [canRead, session]);
 
   const fetchJournals = useCallback(async (background = false) => {
     if (!canRead) return;
@@ -163,7 +142,6 @@ function JournalPageContent() {
       if (typeFilter !== "all") params.append("referenceType", typeFilter);
       if (dateRange?.from) params.append("startDate", dateRange.from.toISOString());
       if (dateRange?.to) params.append("endDate", dateRange.to.toISOString());
-      if (partyTypeFilter !== "all") params.append("partyType", partyTypeFilter);
       if (selectedPartyId) params.append("partyId", selectedPartyId);
 
       const res = await fetch(`/api/journal?${params.toString()}`);
@@ -197,7 +175,6 @@ function JournalPageContent() {
     statusFilter,
     typeFilter,
     dateRange,
-    partyTypeFilter,
     selectedPartyId
   ]);
 
@@ -247,8 +224,8 @@ function JournalPageContent() {
   };
 
   const handleFormSubmit = async (data: any, id?: string) => {
-    if (isSubmittingRef.current) return;
-    isSubmittingRef.current = true;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     const url = id ? `/api/journal/${id}` : "/api/journal";
     const method = id ? "PUT" : "POST";
@@ -278,7 +255,7 @@ function JournalPageContent() {
     } catch (error: any) {
       toast.error(error.message || `Failed to ${id ? "update" : "create"} journal entry.`);
     } finally {
-      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -359,8 +336,8 @@ function JournalPageContent() {
   const clearFilters = () => {
     setStatusFilter("all");
     setTypeFilter("all");
-    setPartyTypeFilter("all");
     setSelectedPartyId("");
+    setSelectedPartyType(undefined);
     setDateRange({
       from: startOfMonth(subMonths(new Date(), 5)),
       to: endOfMonth(new Date())
@@ -408,21 +385,10 @@ function JournalPageContent() {
     getRowId: (row) => row._id,
   });
 
-  const getCurrentPartyList = () => {
-    switch (partyTypeFilter) {
-      case "Customer": return customers;
-      case "Supplier": return suppliers;
-      case "Payee": return payees;
-      case "Vendor": return [];
-      default: return [];
-    }
-  };
 
-  const currentPartyList = getCurrentPartyList();
-  const selectedParty = currentPartyList.find(p => p._id === selectedPartyId);
 
   const hasActiveFilters = statusFilter !== "all" || typeFilter !== "all" ||
-    partyTypeFilter !== "all" || selectedPartyId !== "" ||
+    selectedPartyId !== "" ||
     (dateRange?.from?.getTime() !== startOfMonth(subMonths(new Date(), 5)).getTime()) ||
     (dateRange?.to?.getTime() !== endOfMonth(new Date()).getTime()) ||
     (urlState.filters && urlState.filters.length > 0);
@@ -621,96 +587,25 @@ function JournalPageContent() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                  <div className="pt-4 border-t">
                     <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        Filter by Party
-                      </Label>
-                      <div className="flex gap-2">
-                        <Select
-                          value={partyTypeFilter}
-                          onValueChange={(value) => {
-                            setPartyTypeFilter(value);
-                            setSelectedPartyId("");
-                            setUrlState({ page: 1 });
-                          }}
-                        >
-                          <SelectTrigger className="w-[130px]">
-                            <SelectValue placeholder="Type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Parties</SelectItem>
-                            <SelectItem value="Customer">Customer</SelectItem>
-                            <SelectItem value="Supplier">Supplier</SelectItem>
-                            <SelectItem value="Payee">Payee</SelectItem>
-                            <SelectItem value="Vendor">Vendor</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        <Popover open={partyPopoverOpen} onOpenChange={setPartyPopoverOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className="flex-1 justify-between"
-                              disabled={partyTypeFilter === "all" || partyTypeFilter === "Vendor"}
-                            >
-                              <span className="truncate">
-                                {partyTypeFilter === "Vendor"
-                                  ? "Manual entries only"
-                                  : selectedParty?.name || `Select ${partyTypeFilter?.toLowerCase() || 'party'}...`}
-                              </span>
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[300px] p-0">
-                            <Command>
-                              <CommandInput placeholder={`Search ${partyTypeFilter?.toLowerCase()}s...`} />
-                              <CommandList
-                                className="max-h-[200px] overflow-y-auto"
-                                onWheel={(e) => e.stopPropagation()}
-                              >
-                                <CommandEmpty>No {partyTypeFilter?.toLowerCase()} found.</CommandEmpty>
-                                <CommandGroup>
-                                  {currentPartyList.map((party) => (
-                                    <CommandItem
-                                      key={party._id}
-                                      value={party.name}
-                                      onSelect={() => {
-                                        setSelectedPartyId(party._id);
-                                        setPartyPopoverOpen(false);
-                                        setUrlState({ page: 1 });
-                                      }}
-                                    >
-                                      <Check className={cn("mr-2 h-4 w-4", selectedPartyId === party._id ? "opacity-100" : "opacity-0")} />
-                                      <div className="flex-1">
-                                        <div>{party.name}</div>
-                                        {party.email && (
-                                          <div className="text-xs text-muted-foreground">{party.email}</div>
-                                        )}
-                                      </div>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-
-                        {selectedPartyId && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setSelectedPartyId("");
-                              setUrlState({ page: 1 });
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
+                      <PartyContactSelector
+                        allowedRoles={['customer', 'supplier', 'payee', 'vendor']}
+                        value={{
+                          partyId: selectedPartyId,
+                          partyType: selectedPartyType,
+                          partyName: selectedPartyName
+                        }}
+                        onChange={(val) => {
+                          setSelectedPartyId(val.partyId || "");
+                          setSelectedPartyType(val.partyType);
+                          setSelectedPartyName(val.partyName || "");
+                          setUrlState({ page: 1 });
+                        }}
+                        showContactSelector={false}
+                        layout="horizontal"
+                        className="w-full"
+                      />
                     </div>
                   </div>
                 </CardContent>

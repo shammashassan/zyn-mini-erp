@@ -1,4 +1,4 @@
-// app/sales/delivery-notes/delivery-note-form.tsx - UPDATED: Responsive Items View
+// app/sales/delivery-notes/delivery-note-form.tsx - FINAL: Using PartyContactSelector, no legacy fields
 
 "use client";
 
@@ -40,17 +40,14 @@ import { ChevronsUpDown, Check, AlertCircle, Truck, CalendarIcon, Package } from
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type { ICustomer } from "@/models/Customer";
 import type { DeliveryNote } from "./columns";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { Spinner } from "@/components/ui/spinner";
+import { PartyContactSelector } from "@/components/PartyContactSelector";
 
 interface ConnectedInvoice {
   _id: string;
   invoiceNumber: string;
-  customerName: string;
-  customerPhone?: string;
-  customerEmail?: string;
   grandTotal: number;
   items: Array<{
     description: string;
@@ -61,7 +58,8 @@ interface ConnectedInvoice {
 }
 
 interface DeliveryNoteFormData {
-  customerName: string;
+  partyId: string;
+  contactId?: string;
   invoiceId: string;
   deliveryDate: Date;
   status: 'pending' | 'dispatched' | 'delivered' | 'cancelled';
@@ -90,7 +88,8 @@ export function DeliveryNoteForm({
     formState: { isSubmitting, isDirty }
   } = useForm<DeliveryNoteFormData>({
     defaultValues: {
-      customerName: "",
+      partyId: '',
+      contactId: undefined,
       invoiceId: "",
       deliveryDate: new Date(),
       status: 'pending',
@@ -98,22 +97,15 @@ export function DeliveryNoteForm({
     }
   });
 
-  const [customers, setCustomers] = useState<ICustomer[]>([]);
   const [invoices, setInvoices] = useState<ConnectedInvoice[]>([]);
-  const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [invoicePopoverOpen, setInvoicePopoverOpen] = useState(false);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
-  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<ConnectedInvoice | null>(null);
-
   const [isDesktop, setIsDesktop] = useState(true);
 
-  const customerName = watch("customerName");
+  const partyId = watch("partyId");
   const invoiceId = watch("invoiceId");
-  const deliveryDate = watch("deliveryDate");
-  const notes = watch("notes");
-
   const isEditMode = !!defaultValues?._id;
 
   useEffect(() => {
@@ -123,28 +115,15 @@ export function DeliveryNoteForm({
     return () => window.removeEventListener("resize", checkIsDesktop);
   }, []);
 
-  // Fetch customers
+  // Fetch invoices when partyId changes
   useEffect(() => {
-    const fetchCustomers = async () => {
-      try {
-        const res = await fetch("/api/customers");
-        if (res.ok) setCustomers(await res.json());
-      } catch (error) {
-        console.error("Failed to fetch customers:", error);
-      }
-    };
-    fetchCustomers();
-  }, []);
-
-  // Fetch invoices when customer changes
-  useEffect(() => {
-    if (!customerName || !isOpen) return;
+    if (!partyId || !isOpen) return;
 
     const fetchInvoices = async () => {
       setLoadingInvoices(true);
       try {
         const res = await fetch(
-          `/api/invoices?status=approved&customerName=${encodeURIComponent(customerName)}&populate=true`
+          `/api/invoices?status=approved&partyId=${partyId}&populate=true`
         );
         if (res.ok) {
           const fetchedInvoices = await res.json();
@@ -162,7 +141,7 @@ export function DeliveryNoteForm({
     };
 
     fetchInvoices();
-  }, [customerName, isOpen, defaultValues]);
+  }, [partyId, isOpen, defaultValues]);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -170,20 +149,19 @@ export function DeliveryNoteForm({
       if (defaultValues) {
         // Edit mode
         reset({
-          customerName: defaultValues.customerName || "",
+          partyId: (defaultValues as any).partyId?.toString() || "",
+          contactId: (defaultValues as any).contactId?.toString() || undefined,
           invoiceId: (defaultValues.connectedDocuments?.invoiceIds?.[0] as any)?._id || "",
           deliveryDate: defaultValues.deliveryDate ? new Date(defaultValues.deliveryDate) : new Date(),
           status: defaultValues.status || 'pending',
           notes: defaultValues.notes || "",
         });
-        setCustomerSearchQuery(defaultValues.customerName || "");
 
         const invoiceData = defaultValues.connectedDocuments?.invoiceIds?.[0];
         if (invoiceData && typeof invoiceData === 'object') {
           setSelectedInvoice({
             _id: invoiceData._id,
             invoiceNumber: invoiceData.invoiceNumber,
-            customerName: defaultValues.customerName,
             grandTotal: defaultValues.grandTotal,
             items: defaultValues.items || []
           });
@@ -191,40 +169,28 @@ export function DeliveryNoteForm({
       } else {
         // Create mode
         reset({
-          customerName: "",
+          partyId: "",
+          contactId: undefined,
           invoiceId: "",
           deliveryDate: new Date(),
           status: 'pending',
           notes: "",
         });
-        setCustomerSearchQuery("");
         setSelectedInvoice(null);
         setInvoices([]);
       }
     }
   }, [isOpen, defaultValues, reset]);
 
-  const handleCustomerSelect = (customer: ICustomer) => {
-    setValue("customerName", customer.name, { shouldDirty: true });
-    setCustomerSearchQuery(customer.name);
-    setCustomerPopoverOpen(false);
-    setInvoices([]);
-    setValue("invoiceId", "");
-    setValue("notes", "");
-    setSelectedInvoice(null);
-  };
-
   const handleInvoiceSelect = (invoice: ConnectedInvoice) => {
     setValue("invoiceId", invoice._id, { shouldDirty: true });
     setSelectedInvoice(invoice);
     setInvoicePopoverOpen(false);
-
-    // Don't auto-generate notes - let user add them manually
   };
 
   const handleFormSubmit = async (data: DeliveryNoteFormData) => {
-    if (!data.customerName || !data.customerName.trim()) {
-      toast.error("Please select a customer");
+    if (!data.partyId) {
+      toast.error("Please select a customer (Party)");
       return;
     }
 
@@ -244,19 +210,17 @@ export function DeliveryNoteForm({
     }
 
     const submitData: any = {
+      partyId: data.partyId,
+      contactId: data.contactId,
       status: isEditMode ? data.status : 'pending',
       deliveryDate: data.deliveryDate,
       notes: data.notes.trim() || (selectedInvoice ? `Delivery note for invoice ${selectedInvoice.invoiceNumber}` : ""),
     };
 
-    // Only include items and customer data if creating (not editing)
+    // Only include items and invoice connection if creating (not editing)
     if (!isEditMode && selectedInvoice) {
-      submitData.customerName = selectedInvoice.customerName;
-      submitData.customerPhone = selectedInvoice.customerPhone;
-      submitData.customerEmail = selectedInvoice.customerEmail;
       submitData.items = selectedInvoice.items;
       submitData.discount = 0;
-
       submitData.connectedDocuments = {
         invoiceId: data.invoiceId,
       };
@@ -280,78 +244,31 @@ export function DeliveryNoteForm({
             "grid grid-cols-1 gap-4",
             isEditMode ? "lg:grid-cols-4" : "lg:grid-cols-3"
           )}>
-            {/* Customer */}
-            <div className="space-y-2">
-              <Label>Customer <span className="text-destructive">*</span></Label>
+            {/* Customer Field - PartyContactSelector */}
+            <div>
               <Controller
-                name="customerName"
+                name="partyId"
                 control={control}
                 render={({ field }) => (
-                  <Popover
-                    open={customerPopoverOpen}
-                    onOpenChange={(isOpen) => {
-                      setCustomerPopoverOpen(isOpen);
-                      if (isOpen) setCustomerSearchQuery(field.value);
+                  <PartyContactSelector
+                    value={{ partyId: field.value, contactId: watch('contactId') }}
+                    onChange={(val, party) => {
+                      const isPartyChange = val.partyId !== field.value;
+                      field.onChange(val.partyId);
+                      setValue('contactId', val.contactId);
+                      // Reset invoice selection when party changes
+                      if (isPartyChange) {
+                        setInvoices([]);
+                        setValue("invoiceId", "");
+                        setValue("notes", "");
+                        setSelectedInvoice(null);
+                      }
                     }}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        ref={field.ref}
-                        type="button"
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between h-9 px-3"
-                        disabled={isEditMode}
-                      >
-                        {field.value || "Select customer..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                      <Command shouldFilter={false}>
-                        <CommandInput
-                          placeholder="Search customer..."
-                          value={customerSearchQuery}
-                          onValueChange={setCustomerSearchQuery}
-                        />
-                        <CommandList
-                          className="max-h-[200px] overflow-y-auto"
-                          onWheel={(e) => e.stopPropagation()}
-                          onTouchStart={(e) => e.stopPropagation()}
-                          onTouchMove={(e) => e.stopPropagation()}
-                        >
-                          <CommandEmpty>No customer found.</CommandEmpty>
-                          <CommandGroup>
-                            {customers
-                              .filter(customer =>
-                                !customerSearchQuery ||
-                                customer.name.toLowerCase().includes(customerSearchQuery.toLowerCase())
-                              )
-                              .map((customer) => (
-                                <CommandItem
-                                  key={String(customer._id)}
-                                  value={customer.name}
-                                  onSelect={() => handleCustomerSelect(customer)}
-                                >
-                                  <Check className={cn(
-                                    "mr-2 h-4 w-4",
-                                    field.value === customer.name ? "opacity-100" : "opacity-0"
-                                  )} />
-                                  <div>
-                                    <div>{customer.name}</div>
-                                    {customer.email && (
-                                      <div className="text-xs text-muted-foreground">
-                                        {customer.email}
-                                      </div>
-                                    )}
-                                  </div>
-                                </CommandItem>
-                              ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                    allowedRoles={['customer']}
+                    className="w-full"
+                    layout="vertical"
+                    disabled={isEditMode}
+                  />
                 )}
               />
             </div>
@@ -374,7 +291,7 @@ export function DeliveryNoteForm({
                         variant="outline"
                         role="combobox"
                         className="w-full justify-between h-9 px-3"
-                        disabled={!customerName || loadingInvoices || isEditMode}
+                        disabled={!partyId || loadingInvoices || isEditMode}
                       >
                         {field.value
                           ? (invoices.find(inv => inv._id === field.value)?.invoiceNumber ||
@@ -487,7 +404,7 @@ export function DeliveryNoteForm({
           </div>
 
           {/* Warning if no invoices available */}
-          {customerName && invoices.length === 0 && !loadingInvoices && (
+          {partyId && invoices.length === 0 && !loadingInvoices && (
             <div className="flex items-center gap-2 p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
               <AlertCircle className="h-5 w-5 text-yellow-600" />
               <p className="text-sm text-yellow-900 dark:text-yellow-100">
@@ -506,10 +423,6 @@ export function DeliveryNoteForm({
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Invoice No.:</span>
                       <span className="font-medium font-mono">{selectedInvoice.invoiceNumber}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Customer:</span>
-                      <span className="font-medium">{selectedInvoice.customerName}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Total Items:</span>

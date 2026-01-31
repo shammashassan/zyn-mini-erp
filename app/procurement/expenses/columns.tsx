@@ -240,35 +240,27 @@ export const getColumns = (
     },
     {
       accessorKey: "vendor",
-      header: "Vendor",
+      header: "Vendor/Payee",
       cell: ({ row }) => {
         const expense = row.original as any;
 
-        if (expense.payeeId && typeof expense.payeeId === 'object') {
-          return (
-            <Badge variant="cyan" appearance="outline">
-              {expense.payeeId.name}
-            </Badge>
-          );
-        }
+        // ✅ Use snapshot as primary source
+        const displayName = expense.payeeSnapshot?.name
+          || expense.payeeId?.name
+          || expense.vendor
+          || 'Unknown';
 
-        if (expense.supplierId && typeof expense.supplierId === 'object') {
-          return (
-            <Badge variant="warning" appearance="outline">
-              {expense.supplierId.name}
-            </Badge>
-          );
-        }
+        const isPayee = !!expense.payeeSnapshot || !!expense.payeeId;
 
         return (
-          <Badge variant="secondary" appearance="outline">
-            {expense.vendor || <span className="text-muted-foreground">N/A</span>}
+          <Badge variant={isPayee ? "cyan" : "secondary"} appearance="outline">
+            {displayName}
           </Badge>
         );
       },
       meta: {
-        label: "Vendor",
-        placeholder: "Search vendor...",
+        label: "Vendor/Payee",
+        placeholder: "Search vendor/payee...",
         variant: "text",
       },
       enableColumnFilter: true,

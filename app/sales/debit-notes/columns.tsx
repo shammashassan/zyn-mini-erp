@@ -1,4 +1,4 @@
-// app/sales/debit-notes/columns.tsx - UPDATED: Use DebitNoteConnectedDocumentsBadge
+// app/sales/debit-notes/columns.tsx - COMPLETE MIGRATION: Using partySnapshot for display
 
 "use client";
 
@@ -19,7 +19,7 @@ import {
   CreditCard,
   Receipt,
 } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -51,15 +51,33 @@ import { toast } from "sonner";
 export interface DebitNote {
   _id: string;
   debitNoteNumber: string;
-  returnNoteId?: string | any;
-  returnNumber?: string;
-  supplierName?: string;
-  supplierId?: string;
-  customerName?: string;
-  customerId?: string;
-  payeeName?: string;
-  payeeId?: string;
-  vendorName?: string;
+
+  // ✅ Party & Contact References (Dynamic - Current Truth)
+  partyId: any;
+  contactId?: string;
+
+  // ✅ Snapshots (Frozen - Legal Truth) - Optional for backward compatibility
+  partySnapshot?: {
+    displayName: string;
+    address?: {
+      street?: string;
+      city?: string;
+      district?: string;
+      state?: string;
+      country?: string;
+      postalCode?: string;
+    };
+    taxIdentifiers?: {
+      vatNumber?: string;
+    };
+  };
+  contactSnapshot?: {
+    name: string;
+    phone?: string;
+    email?: string;
+    designation?: string;
+  };
+
   items: Array<{
     materialName: string;
     quantity: number;
@@ -84,6 +102,7 @@ export interface DebitNote {
   remainingAmount: number;
   paymentStatus: "pending" | "paid" | "partially paid";
   connectedDocuments?: {
+    returnNoteId?: string | any;
     receiptIds?: (string | any)[];
   };
   isDeleted: boolean;
@@ -105,38 +124,21 @@ interface DebitNotePermissions {
   canCreateReceipt: boolean;
 }
 
-interface RowActionsProps {
-  debitNote: DebitNote;
-  onEdit: (debitNote: DebitNote) => void;
-  onDelete: (id: string) => void;
-  onView?: (debitNote: DebitNote) => void;
-  onViewPdf?: (debitNote: DebitNote) => void;
-  permissions: DebitNotePermissions;
-}
-
 const getStatusVariant = (status: string) => {
   switch (status) {
-    case "approved":
-      return "success";
-    case "pending":
-      return "warning";
-    case "cancelled":
-      return "destructive";
-    default:
-      return "neutral";
+    case "approved": return "success";
+    case "pending": return "warning";
+    case "cancelled": return "destructive";
+    default: return "neutral";
   }
 };
 
 const getStatusIcon = (status: string) => {
   switch (status) {
-    case "approved":
-      return CheckCircle;
-    case "pending":
-      return Clock;
-    case "cancelled":
-      return XCircle;
-    default:
-      return AlertCircle;
+    case "approved": return CheckCircle;
+    case "pending": return Clock;
+    case "cancelled": return XCircle;
+    default: return AlertCircle;
   }
 };
 
@@ -247,6 +249,15 @@ const CreateReceiptButton = ({
     </>
   );
 };
+
+interface RowActionsProps {
+  debitNote: DebitNote;
+  onEdit: (debitNote: DebitNote) => void;
+  onDelete: (id: string) => void;
+  onView?: (debitNote: DebitNote) => void;
+  onViewPdf?: (debitNote: DebitNote) => void;
+  permissions: DebitNotePermissions;
+}
 
 const RowActions = ({
   debitNote,
@@ -402,44 +413,27 @@ export const getColumns = (
     },
     {
       id: "partyName",
-      accessorFn: (row) => row.customerName || row.supplierName || row.payeeName || row.vendorName || "",
+      accessorKey: "partySnapshot.displayName",
       header: "Party",
       cell: ({ row }) => {
-        const debitNote = row.original;
+        // ✅ Use snapshot as primary, fallback to populated party
+        const name = row.original.partySnapshot?.displayName
+          || row.original.partyId?.company
+          || row.original.partyId?.name
+          || "Unknown";
 
-        if (debitNote.customerName) {
-          return (
-            <Badge variant="primary" appearance="outline" className="gap-1">
-              {debitNote.customerName}
-            </Badge>
-          );
-        }
+        const party = row.original.partyId;
+        const roles = party?.roles || {};
 
-        if (debitNote.supplierName) {
-          return (
-            <Badge variant="warning" appearance="outline" className="gap-1">
-              {debitNote.supplierName}
-            </Badge>
-          );
-        }
+        let variant = "secondary";
+        if (roles.customer) variant = "primary";
+        else if (roles.supplier) variant = "warning";
 
-        if (debitNote.payeeName) {
-          return (
-            <Badge variant="cyan" appearance="outline" className="gap-1">
-              {debitNote.payeeName}
-            </Badge>
-          );
-        }
-
-        if (debitNote.vendorName) {
-          return (
-            <Badge variant="secondary" appearance="outline" className="gap-1">
-              {debitNote.vendorName}
-            </Badge>
-          );
-        }
-
-        return <span className="text-muted-foreground">Not Specified</span>;
+        return (
+          <Badge variant={variant as any} appearance="outline" className="gap-1">
+            {name}
+          </Badge>
+        );
       },
       meta: {
         label: "Party",

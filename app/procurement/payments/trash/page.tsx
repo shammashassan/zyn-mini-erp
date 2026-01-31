@@ -13,10 +13,9 @@ import { Spinner } from "@/components/ui/spinner";
 interface DeletedPayment {
     _id: string;
     invoiceNumber: string;
-    customerName?: string;
-    supplierName?: string;
     payeeName?: string;
     vendorName?: string;
+    partyId?: any; // Populated
     voucherType?: 'payment';
     grandTotal?: number;
     deletedAt?: Date | string;
@@ -59,9 +58,12 @@ export default function PaymentsTrashPage() {
             getItemName={(item) =>
                 `${item.invoiceNumber || "Unnamed Payment"}`
             }
-            getItemDescription={(item) =>
-                `${item.customerName || item.supplierName || item.payeeName || item.vendorName || 'Unknown'} • ${formatCurrency(item.grandTotal || 0.00)}`
-            }
+            getItemDescription={(item) => {
+                const party = item.partyId;
+                const name = party?.name || party?.company || item.payeeName || item.vendorName || 'Unknown';
+
+                return `${name} • ${formatCurrency(item.grandTotal || 0.00)}`;
+            }}
         />
     );
 }

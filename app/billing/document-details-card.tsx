@@ -1,4 +1,4 @@
-// app/billing/document-details-card.tsx - UPDATED: Removed Delivery Note
+// app/billing/document-details-card.tsx - UPDATED: Imports BillPayload from page.tsx
 
 "use client";
 
@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import type { BillPayload } from "@/lib/types";
+import type { BillPayload } from "./page"; // ✅ Import from page.tsx
 import { Check, ChevronsUpDown, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 

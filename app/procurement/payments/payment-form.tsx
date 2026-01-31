@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,19 +17,6 @@ import {
     DialogFooter
 } from "@/components/ui/dialog";
 import {
-    Popover,
-    PopoverTrigger,
-    PopoverContent
-} from "@/components/ui/popover";
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList
-} from "@/components/ui/command";
-import {
     Select,
     SelectContent,
     SelectItem,
@@ -40,14 +27,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import {
-    ChevronsUpDown,
-    Check,
     Wallet,
     AlertCircle,
     Building2,
     User,
     Store,
-    Plus,
     Calendar as CalendarIcon,
     DollarSign,
     CreditCard,
@@ -58,10 +42,9 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
-import type { ICustomer } from "@/models/Customer";
-import type { ISupplier } from "@/models/Supplier";
-import type { IPayee } from "@/models/Payee";
+import { PartyContactSelector } from "@/components/PartyContactSelector";
 import { formatCurrency } from "@/utils/formatters/currency";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface ConnectedPurchase {
     _id: string;
@@ -70,13 +53,7 @@ interface ConnectedPurchase {
     grandTotal: number;
     paymentStatus: 'pending' | 'paid' | 'partially paid';
     paidAmount: number;
-    totalPaid?: number;
     remainingAmount: number;
-    connectedDocuments?: {
-        paymentIds?: any[];
-    }
-    vatAmount?: number;
-    supplierName?: string;
 }
 
 type PartyType = 'customer' | 'supplier' | 'payee' | 'vendor';
@@ -88,7 +65,6 @@ type PaymentFormData = {
     discount: number;
     notes: string;
     paymentDate: Date;
-    selectedPurchaseIds?: string[];
 };
 
 interface PaymentFormProps {
@@ -118,14 +94,11 @@ export function PaymentForm({ isOpen, onClose, onSubmit }: PaymentFormProps) {
         }
     });
 
-    const [customers, setCustomers] = useState<ICustomer[]>([]);
-    const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
-    const [payees, setPayees] = useState<IPayee[]>([]);
+
     const [purchases, setPurchases] = useState<ConnectedPurchase[]>([]);
-    const [partyPopoverOpen, setPartyPopoverOpen] = useState(false);
+    const [selectedPartyId, setSelectedPartyId] = useState("");
+    const [selectedContactId, setSelectedContactId] = useState<string | undefined>(undefined);
     const [selectedParty, setSelectedParty] = useState("");
-    const [partySearchQuery, setPartySearchQuery] = useState("");
-    const [vendorName, setVendorName] = useState("");
     const [loadingPurchases, setLoadingPurchases] = useState(false);
     const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<Set<string>>(new Set());
     const [datePopoverOpen, setDatePopoverOpen] = useState(false);
@@ -144,26 +117,6 @@ export function PaymentForm({ isOpen, onClose, onSubmit }: PaymentFormProps) {
         return () => window.removeEventListener("resize", checkIsDesktop);
     }, []);
 
-    // Fetch customers, suppliers and payees
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [customersRes, suppliersRes, payeesRes] = await Promise.all([
-                    fetch("/api/customers"),
-                    fetch("/api/suppliers"),
-                    fetch("/api/payees")
-                ]);
-
-                if (customersRes.ok) setCustomers(await customersRes.json());
-                if (suppliersRes.ok) setSuppliers(await suppliersRes.json());
-                if (payeesRes.ok) setPayees(await payeesRes.json());
-            } catch (error) {
-                console.error("Failed to fetch data:", error);
-            }
-        };
-        fetchData();
-    }, []);
-
     // Fetch purchases for suppliers
     useEffect(() => {
         if (partyType !== 'supplier' || !selectedParty || !isOpen) return;
@@ -175,7 +128,6 @@ export function PaymentForm({ isOpen, onClose, onSubmit }: PaymentFormProps) {
                 if (res.ok) {
                     const allPurchases = await res.json();
 
-                    // Filter purchases for the selected supplier
                     const availablePurchases = allPurchases
                         .filter((purchase: any) => {
                             if (purchase.supplierName !== selectedParty) return false;
@@ -184,14 +136,14 @@ export function PaymentForm({ isOpen, onClose, onSubmit }: PaymentFormProps) {
                             if (paymentStatus !== 'pending' && paymentStatus !== 'partially paid') return false;
 
                             const total = purchase.grandTotal ?? purchase.totalAmount ?? 0;
-                            const paid = purchase.paidAmount ?? purchase.totalPaid ?? 0;
+                            const paid = purchase.paidAmount ?? 0;
                             const remaining = purchase.remainingAmount ?? (total - paid);
 
                             return remaining > 0;
                         })
                         .map((purchase: any) => {
                             const total = purchase.grandTotal ?? purchase.totalAmount ?? 0;
-                            const paid = purchase.paidAmount ?? purchase.totalPaid ?? 0;
+                            const paid = purchase.paidAmount ?? 0;
                             const remaining = purchase.remainingAmount ?? (total - paid);
 
                             return {
@@ -224,38 +176,12 @@ export function PaymentForm({ isOpen, onClose, onSubmit }: PaymentFormProps) {
             setValue("notes", "");
             setValue("paymentDate", new Date());
             setSelectedParty("");
-            setPartySearchQuery("");
-            setVendorName("");
+            setSelectedPartyId("");
+            setSelectedContactId(undefined);
             setSelectedPurchaseIds(new Set());
             setPurchases([]);
         }
     }, [isOpen, setValue]);
-
-    // Get party list based on selected type
-    const getPartyList = () => {
-        switch (partyType) {
-            case 'customer': return customers;
-            case 'supplier': return suppliers;
-            case 'payee': return payees;
-            case 'vendor': return [];
-            default: return [];
-        }
-    };
-
-    const handlePartySelect = (party: ICustomer | ISupplier | IPayee) => {
-        setSelectedParty(party.name);
-        setPartySearchQuery(party.name);
-        setPartyPopoverOpen(false);
-        setSelectedPurchaseIds(new Set());
-    };
-
-    const handleCreateNew = () => {
-        if (partySearchQuery.trim()) {
-            setSelectedParty(partySearchQuery.trim());
-            setPartyPopoverOpen(false);
-            setSelectedPurchaseIds(new Set());
-        }
-    };
 
     const togglePurchaseSelection = (purchaseId: string) => {
         const newSet = new Set(selectedPurchaseIds);
@@ -278,13 +204,6 @@ export function PaymentForm({ isOpen, onClose, onSubmit }: PaymentFormProps) {
         }
     }, [hasLinkedDocuments, selectedPurchasesTotalAmount, discount, setValue]);
 
-    const doesPartyExist = () => {
-        const partyList = getPartyList();
-        return partyList.some(
-            (p) => p.name.toLowerCase() === partySearchQuery.trim().toLowerCase()
-        );
-    };
-
     const handleFormSubmit = async (data: PaymentFormData) => {
         if (!paymentMethod) {
             toast.error("Please select a payment method");
@@ -302,87 +221,14 @@ export function PaymentForm({ isOpen, onClose, onSubmit }: PaymentFormProps) {
         }
 
         // Validate party selection
-        if (partyType === 'vendor') {
-            if (!vendorName || vendorName.trim() === '') {
-                toast.error("Please enter a vendor name");
-                return;
-            }
-        } else {
-            if (!selectedParty) {
-                toast.error(`Please select a ${partyType}`);
-                return;
-            }
-
-            // Check if party exists, if not create it
-            const partyList = getPartyList();
-            const partyExists = partyList.some(
-                (p) => p.name.toLowerCase() === selectedParty.trim().toLowerCase()
-            );
-
-            if (!partyExists) {
-                try {
-                    let endpoint = '';
-                    let partyPayload: any = { name: selectedParty.trim() };
-                    let entityName = '';
-
-                    switch (partyType) {
-                        case 'customer':
-                            endpoint = '/api/customers';
-                            entityName = 'Customer';
-                            break;
-                        case 'supplier':
-                            endpoint = '/api/suppliers';
-                            entityName = 'Supplier';
-                            break;
-                        case 'payee':
-                            endpoint = '/api/payees';
-                            partyPayload.type = 'individual';
-                            entityName = 'Payee';
-                            break;
-                    }
-
-                    const createRes = await fetch(endpoint, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(partyPayload),
-                    });
-
-                    if (createRes.ok) {
-                        toast.success(`${entityName} "${selectedParty}" created successfully`);
-
-                        const refreshRes = await fetch(endpoint);
-                        if (refreshRes.ok) {
-                            const updatedList = await refreshRes.json();
-                            switch (partyType) {
-                                case 'customer':
-                                    setCustomers(updatedList);
-                                    break;
-                                case 'supplier':
-                                    setSuppliers(updatedList);
-                                    break;
-                                case 'payee':
-                                    setPayees(updatedList);
-                                    break;
-                            }
-                        }
-                    } else {
-                        const error = await createRes.json();
-                        toast.error(`Failed to create ${entityName.toLowerCase()}`, {
-                            description: error.error || "Please try again"
-                        });
-                        return;
-                    }
-                } catch (error) {
-                    console.error(`Error creating ${partyType}:`, error);
-                    toast.error(`Failed to create ${partyType}`);
-                    return;
-                }
-            }
+        if (!selectedParty && !selectedPartyId) {
+            toast.error("Please select a party");
+            return;
         }
 
         let selectedDocuments: any = {};
 
-        if (selectedPurchaseIds.size > 0) {
+        if (selectedPurchaseIds.size > 0 && partyType === 'supplier') {
             selectedDocuments = { purchaseIds: Array.from(selectedPurchaseIds) };
         }
 
@@ -396,56 +242,37 @@ export function PaymentForm({ isOpen, onClose, onSubmit }: PaymentFormProps) {
             grandTotal: data.paymentAmount,
             voucherDate: data.paymentDate,
             connectedDocuments: selectedDocuments,
+            partyId: (partyType === 'customer' || partyType === 'supplier') ? selectedPartyId : undefined,
+            payeeId: partyType === 'payee' ? selectedPartyId : undefined,
+            contactId: selectedContactId,
         };
 
-        // Set party data based on party type
-        switch (partyType) {
-            case 'customer':
-                submitData.customerName = selectedParty;
-                break;
-            case 'supplier':
-                submitData.supplierName = selectedParty;
-                break;
-            case 'payee':
-                submitData.payeeName = selectedParty;
-                break;
-            case 'vendor':
-                submitData.vendorName = vendorName.trim();
-                break;
+        // Party name will be set based on partyType from PartyContactSelector
+        if (selectedParty) {
+            switch (partyType) {
+                case 'customer':
+                    submitData.customerName = selectedParty;
+                    break;
+                case 'supplier':
+                    submitData.supplierName = selectedParty;
+                    break;
+                case 'payee':
+                    submitData.payeeName = selectedParty;
+                    break;
+                case 'vendor':
+                    submitData.vendorName = selectedParty;
+                    break;
+            }
         }
 
         await onSubmit(submitData);
     };
 
-    const getPartyTypeIcon = (type: PartyType) => {
-        switch (type) {
-            case 'customer': return User;
-            case 'supplier': return Building2;
-            case 'payee': return User;
-            case 'vendor': return Store;
-        }
-    };
 
-    const handlePartyTypeChange = (value: PartyType) => {
-        if (value) {
-            setValue('partyType', value);
-            setSelectedParty("");
-            setPartySearchQuery("");
-            setVendorName("");
-            setSelectedPurchaseIds(new Set());
-        }
-    };
 
-    const partyList = getPartyList();
     const showPurchases = partyType === 'supplier';
-
     const totalSelectedItems = selectedPurchaseIds.size;
-
-    const showSummarySeparator =
-        selectedPurchaseIds.size > 0 &&
-        hasLinkedDocuments &&
-        discount > 0;
-
+    const showSummarySeparator = selectedPurchaseIds.size > 0 && hasLinkedDocuments && discount > 0;
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -458,131 +285,45 @@ export function PaymentForm({ isOpen, onClose, onSubmit }: PaymentFormProps) {
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-                    {/* Top Row: Party Type, Party Selection, Date */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {/* Party Type Selection */}
-                        <div className="space-y-2">
-                            <Label>Party Type <span className="text-destructive">*</span></Label>
-                            <Select value={partyType} onValueChange={handlePartyTypeChange}>
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select party type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {(['customer', 'supplier', 'payee', 'vendor'] as PartyType[]).map((type) => {
-                                        const Icon = getPartyTypeIcon(type);
-                                        return (
-                                            <SelectItem key={type} value={type}>
-                                                <div className="flex items-center gap-2 capitalize">
-                                                    <Icon className="h-4 w-4" />
-                                                    {type}
-                                                </div>
-                                            </SelectItem>
-                                        );
-                                    })}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
+                    {/* Top Row: Party Selection, Date */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {/* Party Selection */}
-                        {partyType === 'vendor' ? (
-                            <div className="space-y-2">
-                                <Label htmlFor="vendorName">Vendor Name <span className="text-destructive">*</span></Label>
-                                <Input
-                                    id="vendorName"
-                                    placeholder="Enter vendor name..."
-                                    value={vendorName}
-                                    onChange={(e) => setVendorName(e.target.value)}
-                                />
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                <Label>
-                                    {partyType.charAt(0).toUpperCase() + partyType.slice(1)} <span className="text-destructive">*</span>
-                                </Label>
-                                <Popover
-                                    open={partyPopoverOpen}
-                                    onOpenChange={(isOpen) => {
-                                        setPartyPopoverOpen(isOpen);
-                                        if (isOpen) setPartySearchQuery(selectedParty);
-                                    }}
-                                >
-                                    <PopoverTrigger asChild>
-                                        <Button variant="outline" role="combobox" className="w-full justify-between">
-                                            <span className="truncate">{selectedParty || `Select ${partyType}...`}</span>
-                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                                        <Command shouldFilter={false}>
-                                            <CommandInput
-                                                placeholder={`Search ${partyType}...`}
-                                                value={partySearchQuery}
-                                                onValueChange={setPartySearchQuery}
-                                            />
-                                            <CommandList
-                                                className="max-h-[200px] overflow-y-auto"
-                                                onWheel={(e) => e.stopPropagation()}
-                                                onTouchStart={(e) => e.stopPropagation()}
-                                                onTouchMove={(e) => e.stopPropagation()}
-                                            >
-                                                <CommandEmpty>
-                                                    {partySearchQuery.trim() ? `No ${partyType} found.` : "Start typing to search..."}
-                                                </CommandEmpty>
+                        <div>
+                            <PartyContactSelector
+                                allowedRoles={['customer', 'supplier', 'payee', 'vendor']}
+                                value={{
+                                    partyId: selectedPartyId,
+                                    contactId: selectedContactId,
+                                    partyType: partyType,
+                                    partyName: selectedParty
+                                }}
+                                onChange={(val, party) => {
+                                    const isPartyChange = val.partyId !== selectedPartyId;
+                                    setSelectedPartyId(val.partyId ?? "");
+                                    setSelectedContactId(val.contactId);
 
-                                                {partyList.length > 0 && (
-                                                    <CommandGroup heading={`Existing ${partyType.charAt(0).toUpperCase() + partyType.slice(1)}s`}>
-                                                        {partyList
-                                                            .filter(party =>
-                                                                !partySearchQuery || party.name.toLowerCase().includes(partySearchQuery.toLowerCase())
-                                                            )
-                                                            .map((party) => (
-                                                                <CommandItem
-                                                                    key={String(party._id)}
-                                                                    value={party.name}
-                                                                    onSelect={() => handlePartySelect(party)}
-                                                                >
-                                                                    <Check className={cn("mr-2 h-4 w-4", selectedParty === party.name ? "opacity-100" : "opacity-0")} />
-                                                                    <div className="flex-1">
-                                                                        <span>{party.name}</span>
-                                                                        {partyType === 'customer' && ((party as any).email || (party as any).phone) && (
-                                                                            <div className="text-xs text-muted-foreground">
-                                                                                {(party as any).email || (party as any).phone}
-                                                                            </div>
-                                                                        )}
-                                                                        {partyType === 'supplier' && (party as any).city && (party as any).district && (
-                                                                            <div className="text-xs text-muted-foreground">
-                                                                                {(party as any).city}, {(party as any).district}
-                                                                            </div>
-                                                                        )}
-                                                                        {partyType === 'payee' && (party as any).type && (
-                                                                            <div className="text-xs text-muted-foreground capitalize">
-                                                                                {(party as any).type}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </CommandItem>
-                                                            ))}
-                                                    </CommandGroup>
-                                                )}
+                                    // Update partyType from component
+                                    if (val.partyType) {
+                                        setValue('partyType', val.partyType);
+                                    }
 
-                                                {partySearchQuery.trim() && !doesPartyExist() && (
-                                                    <CommandGroup heading="Create New">
-                                                        <CommandItem
-                                                            onSelect={handleCreateNew}
-                                                            className="text-primary"
-                                                            value={partySearchQuery}
-                                                        >
-                                                            <Plus className="mr-2 h-4 w-4" />
-                                                            Create "{partySearchQuery}"
-                                                        </CommandItem>
-                                                    </CommandGroup>
-                                                )}
-                                            </CommandList>
-                                        </Command>
-                                    </PopoverContent>
-                                </Popover>
-                            </div>
-                        )}
+                                    // Set party name (from API or manual input)
+                                    if (val.partyName) {
+                                        setSelectedParty(val.partyName);
+                                    } else if (party) {
+                                        setSelectedParty(party.company || party.name || "");
+                                    }
+
+                                    // Reset linked purchases when party changes
+                                    if (isPartyChange) {
+                                        setSelectedPurchaseIds(new Set());
+                                    }
+                                }}
+                                showCreateButton={true}
+                                layout="vertical"
+                                className="w-full"
+                            />
+                        </div>
 
                         {/* Payment Date */}
                         <div className="space-y-2">
@@ -660,7 +401,6 @@ export function PaymentForm({ isOpen, onClose, onSubmit }: PaymentFormProps) {
                                         <p className="text-sm text-yellow-900 dark:text-yellow-100">No pending purchases found.</p>
                                     </div>
                                 ) : isDesktop && purchases.length > 0 ? (
-                                    /* Desktop Table View */
                                     <div className="w-full overflow-x-auto">
                                         <table className="w-full border-collapse">
                                             <thead>
@@ -675,9 +415,7 @@ export function PaymentForm({ isOpen, onClose, onSubmit }: PaymentFormProps) {
                                             </thead>
                                             <tbody>
                                                 {purchases.map((purchase) => {
-                                                    const displayTotal = purchase.grandTotal ?? purchase.totalAmount ?? 0;
                                                     const isSelected = selectedPurchaseIds.has(purchase._id);
-
                                                     return (
                                                         <tr
                                                             key={purchase._id}
@@ -700,7 +438,7 @@ export function PaymentForm({ isOpen, onClose, onSubmit }: PaymentFormProps) {
                                                                 </Badge>
                                                             </td>
                                                             <td className="p-3 text-right tabular-nums">
-                                                                {formatCurrency(displayTotal)}
+                                                                {formatCurrency(purchase.grandTotal)}
                                                             </td>
                                                             <td className="p-3 text-right tabular-nums text-green-600">
                                                                 {formatCurrency(purchase.paidAmount)}
@@ -715,12 +453,9 @@ export function PaymentForm({ isOpen, onClose, onSubmit }: PaymentFormProps) {
                                         </table>
                                     </div>
                                 ) : purchases.length > 0 ? (
-                                    /* Mobile Card View */
                                     <div className="space-y-3">
                                         {purchases.map((purchase) => {
-                                            const displayTotal = purchase.grandTotal ?? purchase.totalAmount ?? 0;
                                             const isSelected = selectedPurchaseIds.has(purchase._id);
-
                                             return (
                                                 <Card
                                                     key={purchase._id}
@@ -754,7 +489,7 @@ export function PaymentForm({ isOpen, onClose, onSubmit }: PaymentFormProps) {
                                                         <div className="grid grid-cols-3 gap-2 text-xs">
                                                             <div className="space-y-1">
                                                                 <div className="text-muted-foreground">Total</div>
-                                                                <div className="font-medium">{formatCurrency(displayTotal)}</div>
+                                                                <div className="font-medium">{formatCurrency(purchase.grandTotal)}</div>
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <div className="text-muted-foreground">Paid</div>

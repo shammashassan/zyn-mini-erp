@@ -56,8 +56,8 @@ const routeGroups: Record<string, { label: string; path: string }[]> = {
     { label: "Stock Adjustment", path: "/inventory/stock-adjustment" },
   ],
   people: [
-    { label: "Customers", path: "/people/customers" },
-    { label: "Suppliers", path: "/people/suppliers" },
+    { label: "Parties", path: "/people/parties" },
+    { label: "Contacts", path: "/people/contacts" },
     { label: "Payees", path: "/people/payees" },
   ],
   procurement: [

@@ -50,7 +50,8 @@ export interface SalesReturn {
 
   invoiceId?: string | any;
   invoiceReference?: string;
-  customerName?: string;
+  partyId: any;
+  partySnapshot?: any;
 
   items: Array<{
     productName?: string;
@@ -324,23 +325,22 @@ export const getColumns = (
       enableColumnFilter: true,
     },
     {
-      id: "customerName",
-      accessorKey: "customerName",
-      header: "Customer",
+      id: "partyName",
+      accessorKey: "partyId",
+      header: "Party",
       cell: ({ row }) => {
-        const customerName = row.original.customerName;
-
-        return customerName ? (
+        const partySnapshot = row.original.partySnapshot as any;
+        const party = row.original.partyId as any;
+        const name = partySnapshot?.displayName || (party?.name || party?.company) || "Unknown";
+        return (
           <Badge variant="primary" appearance="outline">
-            {customerName}
+            {name}
           </Badge>
-        ) : (
-          <span className="text-muted-foreground">-</span>
         );
       },
       meta: {
-        label: "Customer",
-        placeholder: "Search customer...",
+        label: "Party",
+        placeholder: "Search party...",
         variant: "text",
       },
       enableColumnFilter: true,

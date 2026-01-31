@@ -49,6 +49,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
+import { PartyContactSelector } from "@/components/PartyContactSelector";
 
 type ReturnItem = {
   materialId: string;
@@ -63,7 +64,6 @@ type ReturnItem = {
 
 type PurchaseReturnFormData = {
   returnType: 'purchaseReturn';
-  supplierName: string;
   purchaseId: string;
   items: ReturnItem[];
   reason: string;
@@ -113,20 +113,18 @@ export function PurchaseReturnForm({
     }
   });
 
-  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
 
-  const [selectedSupplier, setSelectedSupplier] = useState<string>("");
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
+  const [selectedContactId, setSelectedContactId] = useState<string | undefined>(undefined);
   const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
 
-  const [supplierPopoverOpen, setSupplierPopoverOpen] = useState(false);
   const [purchasePopoverOpen, setPurchasePopoverOpen] = useState(false);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [returnQuantities, setReturnQuantities] = useState<Record<string, number>>({});
 
-  const [supplierSearchQuery, setSupplierSearchQuery] = useState("");
   const [isDesktop, setIsDesktop] = useState(true);
   const [initialState, setInitialState] = useState<any>(null);
   const [isLoadingPurchase, setIsLoadingPurchase] = useState(false);
@@ -163,37 +161,37 @@ export function PurchaseReturnForm({
   }, []);
 
   useEffect(() => {
-    const fetchSuppliers = async () => {
-      if (!isOpen) return;
-
-      try {
-        const res = await fetch('/api/suppliers');
-        if (res.ok) setSuppliers(await res.json());
-      } catch (error) {
-        console.error("Failed to fetch suppliers:", error);
-      }
-    };
-
-    fetchSuppliers();
-  }, [isOpen]);
-
-  useEffect(() => {
     const fetchPurchases = async () => {
-      if (!selectedSupplier) {
+      if (!selectedSupplierId) {
         setPurchases([]);
         return;
       }
 
       try {
-        const res = await fetch('/api/purchases?populate=true');
+        // ✅ Filter purchases by partyId at the API level
+        const res = await fetch(`/api/purchases?partyId=${selectedSupplierId}&populate=true`);
         if (res.ok) {
-          const allPurchases = await res.json();
-          const eligible = allPurchases.filter(
-            (p: any) =>
-              p.supplierName === selectedSupplier &&
-              (p.inventoryStatus === 'received' || p.inventoryStatus === 'partially received') &&
-              !p.isDeleted
-          );
+          const purchases = await res.json();
+
+          // ✅ Further filter to only include purchases with correct inventory status and returnable items
+          const eligible = purchases.filter((p: any) => {
+            if (p.isDeleted) return false;
+
+            // Check inventory status
+            if (p.inventoryStatus !== 'received' && p.inventoryStatus !== 'partially received') {
+              return false;
+            }
+
+            // Check if purchase has items with returnable quantity
+            const hasReturnableItems = p.items?.some((item: any) => {
+              const receivedQty = item.receivedQuantity || 0;
+              const returnedQty = item.returnedQuantity || 0;
+              return receivedQty > returnedQty;
+            });
+
+            return hasReturnableItems;
+          });
+
           setPurchases(eligible);
         }
       } catch (error) {
@@ -202,7 +200,7 @@ export function PurchaseReturnForm({
     };
 
     fetchPurchases();
-  }, [selectedSupplier]);
+  }, [selectedSupplierId]);
 
   useEffect(() => {
     const loadEditMode = async () => {
@@ -214,9 +212,12 @@ export function PurchaseReturnForm({
           returnDate: defaultValues.returnDate ? new Date(defaultValues.returnDate) : new Date()
         });
 
-        if (defaultValues.supplierName) {
-          setSelectedSupplier(defaultValues.supplierName);
-          setSupplierSearchQuery(defaultValues.supplierName);
+        // Extract partyId and contactId from defaultValues
+        if (defaultValues.partyId) {
+          setSelectedSupplierId(defaultValues.partyId);
+        }
+        if (defaultValues.contactId) {
+          setSelectedContactId(defaultValues.contactId);
         }
 
         if (defaultValues.connectedDocuments?.purchaseId) {
@@ -272,8 +273,7 @@ export function PurchaseReturnForm({
           returnDate: new Date(),
           status: 'pending'
         });
-        setSelectedSupplier("");
-        setSupplierSearchQuery("");
+        setSelectedSupplierId("");
         setSelectedPurchase(null);
         setSelectedItems(new Set());
         setReturnQuantities({});
@@ -283,20 +283,6 @@ export function PurchaseReturnForm({
 
     loadEditMode();
   }, [isOpen, defaultValues, reset, setValue]);
-
-  const handleSupplierSelect = (supplier: any) => {
-    setSelectedSupplier(supplier.name);
-    setSupplierSearchQuery(supplier.name);
-    setValue('supplierName', supplier.name);
-    setSupplierPopoverOpen(false);
-    
-    if (!isEditMode) {
-      setSelectedPurchase(null);
-      setValue('purchaseId', '');
-      setSelectedItems(new Set());
-      setReturnQuantities({});
-    }
-  };
 
   const handlePurchaseSelect = (purchase: any) => {
     setSelectedPurchase(purchase);
@@ -352,7 +338,7 @@ export function PurchaseReturnForm({
   const totalSelectedItems = selectedItems.size;
 
   const handleFormSubmit = async (data: PurchaseReturnFormData) => {
-    if (!selectedSupplier) {
+    if (!selectedSupplierId) {
       toast.error('Please select a supplier');
       return;
     }
@@ -400,7 +386,8 @@ export function PurchaseReturnForm({
     const submitData: any = {
       returnType: 'purchaseReturn',
       purchaseId: selectedPurchase._id,
-      supplierName: selectedSupplier,
+      partyId: selectedSupplierId,
+      contactId: selectedContactId,
       items: returnItems,
       reason: data.reason.trim(),
       notes: data.notes?.trim() || '',
@@ -435,72 +422,29 @@ export function PurchaseReturnForm({
 
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>
-                Supplier <span className="text-destructive">*</span>
-              </Label>
-              <Popover open={supplierPopoverOpen} onOpenChange={setSupplierPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between"
-                    disabled={isEditMode}
-                  >
-                    <div className="truncate">
-                      {selectedSupplier || "Select supplier..."}
-                    </div>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                  <Command shouldFilter={false}>
-                    <CommandInput
-                      placeholder="Search suppliers..."
-                      value={supplierSearchQuery}
-                      onValueChange={setSupplierSearchQuery}
-                    />
-                    <CommandList
-                      className="max-h-[200px] overflow-y-auto"
-                      onWheel={(e) => e.stopPropagation()}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onTouchMove={(e) => e.stopPropagation()}
-                    >
-                      <CommandEmpty>No supplier found.</CommandEmpty>
-                      <CommandGroup>
-                        {suppliers
-                          .filter(supplier =>
-                            !supplierSearchQuery ||
-                            supplier.name.toLowerCase().includes(supplierSearchQuery.toLowerCase())
-                          )
-                          .map((supplier) => (
-                            <CommandItem
-                              key={supplier._id}
-                              value={supplier.name}
-                              onSelect={() => handleSupplierSelect(supplier)}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  selectedSupplier === supplier.name ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              <div className="flex-1">
-                                <span>{supplier.name}</span>
-                                {supplier.city && supplier.district && (
-                                  <div className="text-xs text-muted-foreground">
-                                    {supplier.city}, {supplier.district}
-                                  </div>
-                                )}
-                              </div>
-                            </CommandItem>
-                          ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+            <div>
+              <PartyContactSelector
+                allowedRoles={['supplier']}
+                value={{ partyId: selectedSupplierId, contactId: selectedContactId }}
+                onChange={(val, party) => {
+                  const isPartyChange = val.partyId !== selectedSupplierId;
+
+                  setSelectedSupplierId(val.partyId ?? "");
+                  setSelectedContactId(val.contactId);
+
+                  if (party) {
+                    if (!isEditMode && isPartyChange) {
+                      setSelectedPurchase(null);
+                      setValue('purchaseId', '');
+                      setSelectedItems(new Set());
+                      setReturnQuantities({});
+                    }
+                  }
+                }}
+                disabled={isEditMode}
+                className="w-full"
+                layout="vertical"
+              />
             </div>
 
             <div className="space-y-2">
@@ -514,14 +458,14 @@ export function PurchaseReturnForm({
                     variant="outline"
                     role="combobox"
                     className="w-full justify-between"
-                    disabled={isEditMode || !selectedSupplier || purchases.length === 0 || isLoadingPurchase}
+                    disabled={isEditMode || !selectedSupplierId || purchases.length === 0 || isLoadingPurchase}
                   >
                     <div className="truncate">
                       {isLoadingPurchase ? (
                         "Loading..."
                       ) : selectedPurchase ? (
                         selectedPurchase.referenceNumber
-                      ) : !selectedSupplier ? (
+                      ) : !selectedSupplierId ? (
                         "Select supplier first..."
                       ) : purchases.length === 0 ? (
                         "No eligible purchases"

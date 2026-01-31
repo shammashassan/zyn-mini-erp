@@ -1,4 +1,4 @@
-// app/api/credit-notes/[id]/pdf/route.ts
+// app/api/credit-notes/[id]/pdf/route.ts - FINAL: Using snapshots for PDF generation
 
 import { NextRequest, NextResponse } from "next/server";
 import React from "react";
@@ -6,6 +6,7 @@ import { renderToStream } from "@react-pdf/renderer";
 import dbConnect from "@/lib/dbConnect";
 import CreditNote from "@/models/CreditNote";
 import CompanyDetails from "@/models/CompanyDetails";
+import Party from "@/models/Party";
 import { CreditNoteDocument } from "@/components/CreditNoteDocument";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 
@@ -36,41 +37,19 @@ export async function GET(
 
     await dbConnect();
 
-    // Allow finding soft-deleted credit notes for PDF generation
+    // Ensure Party model is registered
+    const _ensureModels = [Party];
+
     const creditNote = await CreditNote.findById(id)
       .setOptions({ includeDeleted: true })
-      .populate('connectedDocuments.returnNoteId', 'returnNumber');
+      .populate('connectedDocuments.returnNoteId', 'returnNumber')
+      .populate('partyId');
 
     if (!creditNote) {
       return NextResponse.json({ message: "Credit Note not found" }, { status: 404 });
     }
 
-    // Fetch party contact details based on party type
-    let creditNoteWithDetails = creditNote.toObject();
-
-    if (creditNote.customerName) {
-      const Customer = (await import('@/models/Customer')).default;
-      const customer = await Customer.findOne({ name: creditNote.customerName });
-      if (customer) {
-        creditNoteWithDetails.customerPhone = customer.phone || '';
-        creditNoteWithDetails.customerEmail = customer.email || '';
-      }
-    } else if (creditNote.supplierName) {
-      const Supplier = (await import('@/models/Supplier')).default;
-      const supplier = await Supplier.findOne({ name: creditNote.supplierName });
-      if (supplier) {
-        creditNoteWithDetails.supplierPhone = supplier.contactNumbers?.[0] || '';
-        creditNoteWithDetails.supplierEmail = supplier.email || '';
-      }
-    } else if (creditNote.payeeName) {
-      const Payee = (await import('@/models/Payee')).default;
-      const payee = await Payee.findOne({ name: creditNote.payeeName });
-      if (payee) {
-        creditNoteWithDetails.payeePhone = payee.phone || '';
-        creditNoteWithDetails.payeeEmail = payee.email || '';
-      }
-    }
-
+    // ✅ Credit note already has snapshots - use them for PDF
     let companyDetails = await CompanyDetails.findOne();
 
     if (!companyDetails) {
@@ -83,7 +62,7 @@ export async function GET(
     }
 
     const documentElement = React.createElement(CreditNoteDocument, {
-      creditNote: creditNoteWithDetails,
+      creditNote: creditNote.toObject(),
       companyDetails,
     });
 

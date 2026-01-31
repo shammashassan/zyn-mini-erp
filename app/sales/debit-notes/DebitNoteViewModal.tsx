@@ -1,4 +1,4 @@
-// app/sales/debit-notes/DebitNoteViewModal.tsx - UPDATED: Show Return Note Reference
+// app/sales/debit-notes/DebitNoteViewModal.tsx - FINAL: Using snapshots for display
 
 "use client";
 
@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   FileText,
   Calendar,
@@ -26,8 +25,8 @@ import {
   Clock,
   AlertCircle,
   XCircle,
-  Receipt,
   RotateCcw,
+  AlertTriangle
 } from "lucide-react";
 import type { DebitNote } from "./columns";
 import { ConnectedDocumentsBadges } from "./ConnectedDocumentsBadges";
@@ -138,6 +137,34 @@ export function DebitNoteViewModal({
 
   const currentData = debitNote || initialDebitNote || {};
 
+  // ✅ Use snapshot as primary source with populated reference fallback
+  const partyName = currentData.partySnapshot?.displayName
+    || currentData.partyId?.company
+    || currentData.partyId?.name
+    || 'Unknown';
+
+  const partyAddress = currentData.partySnapshot?.address;
+  const partyVAT = currentData.partySnapshot?.taxIdentifiers?.vatNumber
+    || currentData.partyId?.vatNumber;
+
+  const contactName = currentData.contactSnapshot?.name
+    || currentData.contactId?.name;
+
+  const contactPhone = currentData.contactSnapshot?.phone
+    || currentData.contactId?.phone
+    || currentData.partyId?.phone;
+
+  const contactEmail = currentData.contactSnapshot?.email
+    || currentData.contactId?.email
+    || currentData.partyId?.email;
+
+  const contactDesignation = currentData.contactSnapshot?.designation
+    || currentData.contactId?.designation;
+
+  // ✅ Check if party data has changed since snapshot
+  const hasPartyChanged = currentData.partyId && currentData.partySnapshot &&
+    (currentData.partyId.company || currentData.partyId.name) !== currentData.partySnapshot.displayName;
+
   const creatorUsername = getCreatorUsername(currentData);
   const totalItems = currentData.items?.length || 0;
   const totalQuantity = currentData.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0;
@@ -150,12 +177,6 @@ export function DebitNoteViewModal({
 
   const StatusIcon = getStatusIcon(currentData.status);
   const PaymentIcon = getPaymentStatusIcon(currentData.paymentStatus);
-
-  const canShowReceiptButton =
-    canCreateReceipt &&
-    currentData.status === 'approved' &&
-    currentData.paymentStatus !== 'paid' &&
-    onCreateReceipt;
 
   const isManualEntry = currentData.items?.length === 1 && !currentData.items[0].materialId;
 
@@ -214,36 +235,77 @@ export function DebitNoteViewModal({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
+                {/* Party Changed Warning */}
+                {hasPartyChanged && (
+                  <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                    <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                    <div className="text-xs sm:text-sm">
+                      <p className="font-medium text-warning">Party name has changed</p>
+                      <p className="text-muted-foreground">
+                        This debit note was created for "{currentData.partySnapshot.displayName}"
+                        (currently: "{currentData.partyId.company || currentData.partyId.name}")
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   <div className="flex items-start gap-3">
                     <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                     <div className="min-w-0">
                       <div className="text-xs sm:text-sm text-muted-foreground">Debit Date</div>
-                      <div className="font-medium text-xs sm:text-sm break-words">{formatLongDate(currentData.debitDate)}</div>
+                      <div className="font-medium text-xs sm:text-sm break-words">
+                        {formatLongDate(currentData.debitDate)}
+                      </div>
                     </div>
                   </div>
 
-                  {(currentData.supplierName || currentData.customerName || currentData.payeeName || currentData.vendorName) && (
+                  {partyName && (
                     <div className="flex items-start gap-3">
                       <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                       <div className="min-w-0">
-                        <div className="text-xs sm:text-sm text-muted-foreground">
-                          {currentData.supplierName ? 'Supplier' : currentData.customerName ? 'Customer' : currentData.payeeName ? 'Payee' : 'Vendor'}
-                        </div>
+                        <div className="text-xs sm:text-sm text-muted-foreground">Party</div>
                         <div className="font-medium text-xs sm:text-sm break-words">
-                          {currentData.supplierName || currentData.customerName || currentData.payeeName || currentData.vendorName}
+                          {partyName}
                         </div>
+                        {partyVAT && (
+                          <div className="text-xs text-muted-foreground">
+                            VAT: {partyVAT}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
 
-                  {/* ✅ NEW: Return Note Reference */}
+                  {contactName && (
+                    <div className="flex items-start gap-3">
+                      <CircleUserRound className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-xs sm:text-sm text-muted-foreground">Contact</div>
+                        <div className="font-medium text-xs sm:text-sm break-words">
+                          {contactName}
+                          {contactDesignation && (
+                            <span className="text-muted-foreground"> ({contactDesignation})</span>
+                          )}
+                        </div>
+                        {contactPhone && (
+                          <div className="text-xs text-muted-foreground">{contactPhone}</div>
+                        )}
+                        {contactEmail && (
+                          <div className="text-xs text-muted-foreground">{contactEmail}</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {returnNote && (
                     <div className="flex items-start gap-3">
                       <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                       <div className="min-w-0">
                         <div className="text-xs sm:text-sm text-muted-foreground">Return Note</div>
-                        <div className="font-medium text-xs sm:text-sm font-mono break-words">{returnNote.returnNumber}</div>
+                        <div className="font-medium text-xs sm:text-sm font-mono break-words">
+                          {returnNote.returnNumber}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -258,13 +320,13 @@ export function DebitNoteViewModal({
                     </div>
                   )}
 
-                  <div className="flex items-start gap-3">
+                  {/* <div className="flex items-start gap-3">
                     <Package className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                     <div>
                       <div className="text-xs sm:text-sm text-muted-foreground">Total Items</div>
                       <div className="font-medium text-xs sm:text-sm">{totalItems} item(s)</div>
                     </div>
-                  </div>
+                  </div> */}
 
                   <div className="flex items-start gap-3">
                     <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
@@ -274,6 +336,22 @@ export function DebitNoteViewModal({
                     </div>
                   </div>
                 </div>
+
+                {/* Party Address (from snapshot) */}
+                {/* {partyAddress && (
+                  <div className="pt-3 border-t">
+                    <div className="text-xs sm:text-sm text-muted-foreground mb-2">Party Address</div>
+                    <div className="text-xs sm:text-sm">
+                      {partyAddress.street && <div>{partyAddress.street}</div>}
+                      <div>
+                        {[partyAddress.city, partyAddress.state, partyAddress.postalCode]
+                          .filter(Boolean)
+                          .join(', ')}
+                      </div>
+                      {partyAddress.country && <div>{partyAddress.country}</div>}
+                    </div>
+                  </div>
+                )} */}
 
                 {currentData.reason && (
                   <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
@@ -299,7 +377,9 @@ export function DebitNoteViewModal({
                 {isManualEntry ? (
                   <div className="space-y-4">
                     <div className="p-4 bg-muted/50 rounded-lg border">
-                      <div className="text-sm text-muted-foreground mb-1 font-medium tracking-wider">Description</div>
+                      <div className="text-sm text-muted-foreground mb-1 font-medium tracking-wider">
+                        Description
+                      </div>
                       <div className="font-medium text-base text-foreground">
                         {currentData.items[0].materialName}
                       </div>
@@ -382,10 +462,7 @@ export function DebitNoteViewModal({
                           </tr>
                           {discount > 0 && (
                             <tr className="bg-muted/50">
-                              <td
-                                colSpan={4}
-                                className="p-3 text-right text-orange-600"
-                              >
+                              <td colSpan={4} className="p-3 text-right text-orange-600">
                                 <div className="flex items-center justify-end gap-2">
                                   <Percent className="h-3 w-3" />
                                   Discount:
@@ -433,8 +510,12 @@ export function DebitNoteViewModal({
                           <CardContent className="p-3 sm:p-4 space-y-2">
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex-1 min-w-0">
-                                <div className="text-xs text-muted-foreground mb-1">Item #{index + 1}</div>
-                                <div className="font-medium text-sm break-words">{item.materialName}</div>
+                                <div className="text-xs text-muted-foreground mb-1">
+                                  Item #{index + 1}
+                                </div>
+                                <div className="font-medium text-sm break-words">
+                                  {item.materialName}
+                                </div>
                               </div>
                             </div>
 
@@ -444,7 +525,9 @@ export function DebitNoteViewModal({
                                 <div className="font-medium">{item.quantity?.toFixed(2)}</div>
                               </div>
                               <div className="text-right">
-                                <div className="text-xs text-muted-foreground mb-0.5">Unit Cost</div>
+                                <div className="text-xs text-muted-foreground mb-0.5">
+                                  Unit Cost
+                                </div>
                                 <div className="font-medium">{formatCurrency(item.unitCost)}</div>
                               </div>
                             </div>
@@ -452,7 +535,9 @@ export function DebitNoteViewModal({
                             <div className="pt-2 border-t">
                               <div className="flex items-center justify-between">
                                 <span className="text-xs text-muted-foreground">Total</span>
-                                <span className="font-bold text-sm sm:text-base">{formatCurrency(item.total)}</span>
+                                <span className="font-bold text-sm sm:text-base">
+                                  {formatCurrency(item.total)}
+                                </span>
                               </div>
                             </div>
                           </CardContent>
@@ -472,7 +557,9 @@ export function DebitNoteViewModal({
                                 <Percent className="h-3 w-3" />
                                 Discount
                               </span>
-                              <span className="font-semibold text-orange-600">-{formatCurrency(discount)}</span>
+                              <span className="font-semibold text-orange-600">
+                                -{formatCurrency(discount)}
+                              </span>
                             </div>
                           )}
                           <div className="flex justify-between text-xs sm:text-sm pt-2 border-t">
@@ -510,14 +597,18 @@ export function DebitNoteViewModal({
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   <div className="p-3 sm:p-4 rounded-lg bg-muted/50">
-                    <div className="text-xs sm:text-sm text-muted-foreground mb-1">Total Amount</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground mb-1">
+                      Total Amount
+                    </div>
                     <div className="text-xl sm:text-2xl font-bold">
                       {formatCurrency(displayTotal)}
                     </div>
                   </div>
 
                   <div className="p-3 sm:p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900">
-                    <div className="text-xs sm:text-sm text-muted-foreground mb-1">Received Amount</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground mb-1">
+                      Received Amount
+                    </div>
                     <div className="text-xl sm:text-2xl font-bold text-green-600">
                       {formatCurrency(currentData.receivedAmount || 0)}
                     </div>
@@ -529,7 +620,9 @@ export function DebitNoteViewModal({
                   </div>
 
                   <div className="p-3 sm:p-4 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900">
-                    <div className="text-xs sm:text-sm text-muted-foreground mb-1">Remaining Amount</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground mb-1">
+                      Remaining Amount
+                    </div>
                     <div className="text-xl sm:text-2xl font-bold text-orange-600">
                       {formatCurrency(currentData.remainingAmount || 0)}
                     </div>
@@ -547,7 +640,9 @@ export function DebitNoteViewModal({
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full bg-green-600 transition-all"
-                        style={{ width: `${Math.min((currentData.receivedAmount / displayTotal) * 100, 100)}%` }}
+                        style={{
+                          width: `${Math.min((currentData.receivedAmount / displayTotal) * 100, 100)}%`
+                        }}
                       />
                     </div>
                   </div>
@@ -555,8 +650,8 @@ export function DebitNoteViewModal({
               </CardContent>
             </Card>
 
-            {/* Connected Documents - Receipt Vouchers & Return Notes */}
-            {(currentData.connectedDocuments?.receiptIds?.length > 0 || currentData.returnNoteId) && (
+            {/* Connected Documents */}
+            {(currentData.connectedDocuments?.receiptIds?.length > 0 || returnNote) && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm sm:text-base flex items-center gap-2">
@@ -601,7 +696,10 @@ export function DebitNoteViewModal({
                 <CardContent>
                   <div className="space-y-2">
                     {currentData.actionHistory.map((action: any, index: number) => (
-                      <div key={index} className="flex items-start gap-3 text-xs sm:text-sm p-2 sm:p-3 rounded-lg bg-muted/50">
+                      <div
+                        key={index}
+                        className="flex items-start gap-3 text-xs sm:text-sm p-2 sm:p-3 rounded-lg bg-muted/50"
+                      >
                         <div className="flex-1 min-w-0">
                           <div className="font-medium break-words">{action.action}</div>
                           {(action.username || action.userId) && (
@@ -621,9 +719,13 @@ export function DebitNoteViewModal({
                                   <span className="font-medium">{change.field}:</span>{' '}
                                   {change.field === 'receivedAmount' ? (
                                     <>
-                                      <span className="line-through">{formatCurrency(change.oldValue)}</span>
+                                      <span className="line-through">
+                                        {formatCurrency(change.oldValue)}
+                                      </span>
                                       {' → '}
-                                      <span className="text-green-600">{formatCurrency(change.newValue)}</span>
+                                      <span className="text-green-600">
+                                        {formatCurrency(change.newValue)}
+                                      </span>
                                     </>
                                   ) : (
                                     <>

@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { toast } from "sonner";
-import { BookOpen, CalendarIcon, Users, X, ChevronsUpDown, Check, Book } from "lucide-react";
+import { BookOpen, CalendarIcon, X, ChevronsUpDown, Check, Book } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -29,6 +29,7 @@ import { useSearchParams } from "next/navigation";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { getLedgerColumns, type LedgerEntry } from "./columns";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
+import { PartyContactSelector, type PartyContactValue } from "@/components/PartyContactSelector";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
 import { StatsCards, type StatItem } from "@/components/stats-cards";
@@ -81,12 +82,9 @@ function LedgerPageContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [payees, setPayees] = useState<any[]>([]);
-  const [partyTypeFilter, setPartyTypeFilter] = useState<string>("all");
   const [selectedPartyId, setSelectedPartyId] = useState<string>("");
-  const [partyPopoverOpen, setPartyPopoverOpen] = useState(false);
+  const [selectedPartyType, setSelectedPartyType] = useState<'customer' | 'supplier' | 'payee' | 'vendor' | undefined>(undefined);
+  const [selectedPartyName, setSelectedPartyName] = useState("");
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(subMonths(new Date(), 5)),
@@ -94,10 +92,10 @@ function LedgerPageContent() {
   });
 
   const [accountPopoverOpen, setAccountPopoverOpen] = useState(false);
-
-  const [pdfUrl, setPdfUrl] = useState<string>("");
-  const [isPdfViewerOpen, setIsPdfViewerOpen] = useState(false);
+  // Export State
   const [isExporting, setIsExporting] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [isPdfViewerOpen, setIsPdfViewerOpen] = useState(false);
 
   const {
     permissions: { canRead, canExport },
@@ -125,29 +123,6 @@ function LedgerPageContent() {
 
     if (canRead) {
       fetchAccounts();
-    }
-  }, [canRead]);
-
-  useEffect(() => {
-    const fetchPartyData = async () => {
-      if (!canRead) return;
-      try {
-        const [customersRes, suppliersRes, payeesRes] = await Promise.all([
-          fetch("/api/customers"),
-          fetch("/api/suppliers"),
-          fetch("/api/payees")
-        ]);
-
-        if (customersRes.ok) setCustomers(await customersRes.json());
-        if (suppliersRes.ok) setSuppliers(await suppliersRes.json());
-        if (payeesRes.ok) setPayees(await payeesRes.json());
-      } catch (error) {
-        console.error("Failed to fetch party data:", error);
-      }
-    };
-
-    if (canRead) {
-      fetchPartyData();
     }
   }, [canRead]);
 
@@ -196,7 +171,6 @@ function LedgerPageContent() {
       params.append('accountCode', selectedAccountCode);
       params.append('startDate', dateRange.from.toISOString());
       params.append('endDate', dateRange.to.toISOString());
-      if (partyTypeFilter !== "all") params.append("partyType", partyTypeFilter);
       if (selectedPartyId) params.append("partyId", selectedPartyId);
 
       const res = await fetch(`/api/ledger?${params.toString()}`);
@@ -210,13 +184,13 @@ function LedgerPageContent() {
     } finally {
       if (!background) setIsLoading(false);
     }
-  }, [canRead, selectedAccountCode, dateRange, partyTypeFilter, selectedPartyId]);
+  }, [canRead, selectedAccountCode, dateRange, selectedPartyId]);
 
   useEffect(() => {
     if (selectedAccountCode && dateRange?.from && dateRange?.to && canRead) {
       fetchLedger();
     }
-  }, [selectedAccountCode, dateRange, partyTypeFilter, selectedPartyId, canRead, fetchLedger]);
+  }, [selectedAccountCode, dateRange, selectedPartyId, canRead, fetchLedger]);
 
   useEffect(() => {
     const onFocus = () => {
@@ -232,18 +206,7 @@ function LedgerPageContent() {
     };
   }, [fetchLedger, isMounted, canRead, selectedAccountCode]);
 
-  const getCurrentPartyList = () => {
-    switch (partyTypeFilter) {
-      case "Customer": return customers;
-      case "Supplier": return suppliers;
-      case "Payee": return payees;
-      case "Vendor": return [];
-      default: return [];
-    }
-  };
 
-  const currentPartyList = getCurrentPartyList();
-  const selectedParty = currentPartyList.find(p => p._id === selectedPartyId);
 
   const handleQuickSelect = (period: string) => {
     const now = new Date();
@@ -538,94 +501,22 @@ function LedgerPageContent() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t md:col-span-3">
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                          <Users className="h-4 w-4" />
-                          Filter by Party
-                        </Label>
-                        <div className="flex gap-2">
-                          <Select
-                            value={partyTypeFilter}
-                            onValueChange={(value) => {
-                              setPartyTypeFilter(value);
-                              setSelectedPartyId("");
-                            }}
-                          >
-                            <SelectTrigger className="w-[130px]">
-                              <SelectValue placeholder="Type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Parties</SelectItem>
-                              <SelectItem value="Customer">Customer</SelectItem>
-                              <SelectItem value="Supplier">Supplier</SelectItem>
-                              <SelectItem value="Payee">Payee</SelectItem>
-                              <SelectItem value="Vendor">Vendor</SelectItem>
-                            </SelectContent>
-                          </Select>
-
-                          <Popover open={partyPopoverOpen} onOpenChange={setPartyPopoverOpen}>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                className="flex-1 justify-between"
-                                disabled={partyTypeFilter === "all" || partyTypeFilter === "Vendor"}
-                              >
-                                <span className="truncate">
-                                  {partyTypeFilter === "Vendor"
-                                    ? "Manual entries only"
-                                    : selectedParty?.name || `Select ${partyTypeFilter?.toLowerCase() || 'party'}...`}
-                                </span>
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[300px] p-0">
-                              <Command>
-                                <CommandInput placeholder={`Search ${partyTypeFilter?.toLowerCase()}s...`} />
-                                <CommandList
-                                  className="max-h-[200px] overflow-y-auto"
-                                  onWheel={(e) => e.stopPropagation()}
-                                >
-                                  <CommandEmpty>No {partyTypeFilter?.toLowerCase()} found.</CommandEmpty>
-                                  <CommandGroup>
-                                    {currentPartyList.map((party) => (
-                                      <CommandItem
-                                        key={party._id}
-                                        value={party.name}
-                                        onSelect={() => {
-                                          setSelectedPartyId(party._id);
-                                          setPartyPopoverOpen(false);
-                                        }}
-                                      >
-                                        <Check className={cn("mr-2 h-4 w-4", selectedPartyId === party._id ? "opacity-100" : "opacity-0")} />
-                                        <div className="flex-1">
-                                          <div>{party.name}</div>
-                                          {party.email && (
-                                            <div className="text-xs text-muted-foreground">{party.email}</div>
-                                          )}
-                                        </div>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-
-                          {selectedPartyId && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setSelectedPartyId("")}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                        {partyTypeFilter === "Vendor" && (
-                          <p className="text-xs text-muted-foreground">
-                            Note: Vendor entries are manual and don't have IDs, so filtering is not available.
-                          </p>
-                        )}
+                        <PartyContactSelector
+                          allowedRoles={['customer', 'supplier', 'payee', 'vendor']}
+                          value={{
+                            partyId: selectedPartyId,
+                            partyType: selectedPartyType,
+                            partyName: selectedPartyName
+                          }}
+                          onChange={(val) => {
+                            setSelectedPartyId(val.partyId || "");
+                            setSelectedPartyType(val.partyType);
+                            setSelectedPartyName(val.partyName || "");
+                          }}
+                          showContactSelector={false}
+                          layout="horizontal"
+                          className="w-full"
+                        />
                       </div>
                     </div>
                   </div>
@@ -724,7 +615,7 @@ function LedgerPageContent() {
             setPdfUrl("");
           }
         }}
-        pdfUrl={pdfUrl}
+        pdfUrl={pdfUrl || ""}
         title={`Ledger - ${ledgerData?.account.accountCode || ''}`}
       />
     </>

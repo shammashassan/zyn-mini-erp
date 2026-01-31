@@ -19,11 +19,12 @@ interface PurchaseReturn {
   _id: string;
   returnNumber: string;
   status: 'pending' | 'approved' | 'cancelled';
-  supplierName?: string;
   items?: Array<{
     materialName?: string;
     returnQuantity: number;
   }>;
+  partyId?: any;
+  partySnapshot?: any;
 }
 
 interface PurchaseReturnStatusUpdateModalProps {
@@ -51,11 +52,11 @@ const getStatusIcon = (status: string) => {
   }
 };
 
-export function PurchaseReturnStatusUpdateModal({ 
-  isOpen, 
-  onClose, 
-  purchaseReturn, 
-  onRefresh 
+export function PurchaseReturnStatusUpdateModal({
+  isOpen,
+  onClose,
+  purchaseReturn,
+  onRefresh
 }: PurchaseReturnStatusUpdateModalProps) {
   const [initialStatus, setInitialStatus] = useState(purchaseReturn.status);
   const [newStatus, setNewStatus] = useState(purchaseReturn.status);
@@ -72,9 +73,9 @@ export function PurchaseReturnStatusUpdateModal({
 
   const handleUpdateStatus = async () => {
     setIsLoading(true);
-    
+
     try {
-      const updateData = { 
+      const updateData = {
         status: newStatus
       };
 
@@ -86,13 +87,13 @@ export function PurchaseReturnStatusUpdateModal({
 
       if (res.ok) {
         let message = 'Purchase return status updated successfully';
-        
+
         if (newStatus === 'approved' && initialStatus !== 'approved') {
           message = 'Purchase return approved - Stock reduced';
         } else if (initialStatus === 'approved' && newStatus !== 'approved') {
           message = 'Purchase return reversed - Stock restored';
         }
-        
+
         toast.success(message);
         onClose();
         onRefresh();
@@ -111,7 +112,7 @@ export function PurchaseReturnStatusUpdateModal({
   const willAffectStock = () => {
     const willReduceStock = newStatus === 'approved' && initialStatus !== 'approved';
     const willRestoreStock = initialStatus === 'approved' && newStatus !== 'approved';
-    
+
     return { willReduceStock, willRestoreStock };
   };
 
@@ -135,12 +136,14 @@ export function PurchaseReturnStatusUpdateModal({
               <span className="text-muted-foreground">Return No:</span>
               <span className="font-medium font-mono">{purchaseReturn.returnNumber}</span>
             </div>
-            {purchaseReturn.supplierName && (
+            {purchaseReturn.partySnapshot?.displayName || purchaseReturn.partyId?.name || purchaseReturn.partyId?.company ? (
               <div className="flex justify-between mt-1">
-                <span className="text-muted-foreground">Supplier:</span>
-                <span className="font-medium">{purchaseReturn.supplierName}</span>
+                <span className="text-muted-foreground">Party:</span>
+                <span className="font-medium">
+                  {purchaseReturn.partySnapshot?.displayName || purchaseReturn.partyId?.name || purchaseReturn.partyId?.company || 'Unknown Party'}
+                </span>
               </div>
-            )}
+            ) : null}
             {purchaseReturn.items && purchaseReturn.items.length > 0 && (
               <>
                 <div className="flex justify-between mt-1">

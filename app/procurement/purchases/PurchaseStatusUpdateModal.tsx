@@ -1,4 +1,4 @@
-// app/procurement/purchases/PurchaseStatusUpdateModal.tsx - NEW: Purchase Approval Status Only
+// app/procurement/purchases/PurchaseStatusUpdateModal.tsx - FINAL: Using partySnapshot for display
 
 "use client";
 
@@ -21,10 +21,13 @@ import { Clock, CheckCircle, XCircle } from "lucide-react";
 interface Purchase {
   _id: string;
   purchaseStatus: 'pending' | 'approved' | 'cancelled';
-  supplierName?: string;
+  partySnapshot: {
+    displayName: string;
+  };
   totalAmount: number;
   grandTotal?: number;
   vatAmount?: number;
+  partyId?: any; // For fallback
 }
 
 interface PurchaseStatusUpdateModalProps {
@@ -52,11 +55,11 @@ const getPurchaseStatusIcon = (status: string) => {
   }
 };
 
-export function PurchaseStatusUpdateModal({ 
-  isOpen, 
-  onClose, 
-  purchase, 
-  onRefresh 
+export function PurchaseStatusUpdateModal({
+  isOpen,
+  onClose,
+  purchase,
+  onRefresh
 }: PurchaseStatusUpdateModalProps) {
   const [initialStatus, setInitialStatus] = useState(purchase.purchaseStatus);
   const [newStatus, setNewStatus] = useState(purchase.purchaseStatus);
@@ -64,6 +67,12 @@ export function PurchaseStatusUpdateModal({
 
   const availableStatuses: Purchase['purchaseStatus'][] = ['pending', 'approved', 'cancelled'];
   const displayTotal = purchase.grandTotal || (purchase.totalAmount + (purchase.vatAmount || 0));
+
+  // ✅ Use snapshot for display with fallback
+  const displayName = purchase.partySnapshot?.displayName
+    || purchase.partyId?.company
+    || purchase.partyId?.name
+    || 'Unknown Party';
 
   useEffect(() => {
     if (isOpen) {
@@ -74,9 +83,9 @@ export function PurchaseStatusUpdateModal({
 
   const handleUpdateStatus = async () => {
     setIsLoading(true);
-    
+
     try {
-      const updateData = { 
+      const updateData = {
         purchaseStatus: newStatus
       };
 
@@ -108,21 +117,23 @@ export function PurchaseStatusUpdateModal({
         <DialogHeader>
           <DialogTitle>Update Purchase Status</DialogTitle>
           <DialogDescription>
-             Change the approval status for this purchase order
+            Change the approval status for this purchase order
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Purchase Info - Kept minimal for context */}
+          {/* Purchase Info */}
           <div className="rounded-lg border p-3 bg-muted/50 text-sm">
-             <div className="flex justify-between">
-                <span className="text-muted-foreground">Supplier:</span>
-                <span className="font-medium">{purchase.supplierName || 'N/A'}</span>
-             </div>
-             <div className="flex justify-between mt-1">
-                <span className="text-muted-foreground">Total:</span>
-                <span className="font-medium">{formatCurrency(displayTotal)}</span>
-             </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Party:</span>
+              <span className="font-medium">
+                {displayName}
+              </span>
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-muted-foreground">Total:</span>
+              <span className="font-medium">{formatCurrency(displayTotal)}</span>
+            </div>
           </div>
 
           {/* Status Selection */}

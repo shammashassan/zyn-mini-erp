@@ -31,43 +31,63 @@ export interface IReturnNote extends Document {
   _id: string;
   returnNumber: string;
   returnType: 'salesReturn' | 'purchaseReturn';
-  
-  // For Purchase Returns
-  supplierName?: string;
-  
-  // For Sales Returns
-  customerName?: string;
-  
+
+  // Party & Contact References
+  partyId: mongoose.Types.ObjectId;
+  contactId?: mongoose.Types.ObjectId;
+
+  // Immutable snapshots for historical accuracy (PDFs, reports)
+  partySnapshot: {
+    displayName: string;
+    address?: {
+      street?: string;
+      city?: string;
+      district?: string;
+      state?: string;
+      country?: string;
+      postalCode?: string;
+    };
+    taxIdentifiers?: {
+      vatNumber?: string;
+    };
+  };
+  contactSnapshot?: {
+    name: string;
+    phone?: string;
+    email?: string;
+    designation?: string;
+  };
+
   items: IReturnItem[];
   returnDate: Date;
   reason: string;
   notes?: string;
   status: 'pending' | 'approved' | 'cancelled';
-  
+
   // Financial fields for sales returns
   totalAmount?: number;
   discount?: number;
   vatAmount?: number;
   grandTotal?: number;
-  
+
   connectedDocuments: {
     purchaseId?: mongoose.Types.ObjectId;
     invoiceId?: mongoose.Types.ObjectId;
     debitNoteId?: mongoose.Types.ObjectId;
     creditNoteId?: mongoose.Types.ObjectId;
   };
-  
+
   isDeleted: boolean;
   deletedAt: Date | null;
   deletedBy: string | null;
-  
+
   createdBy: string | null;
   updatedBy: string | null;
   actionHistory: IAuditEntry[];
-  
+
   createdAt: Date;
   updatedAt: Date;
-  
+
   addAuditEntry(
     action: string,
     userId?: string | null,
@@ -80,13 +100,13 @@ const ReturnItemSchema: Schema = new Schema({
   // Purchase return fields
   materialId: { type: String },
   materialName: { type: String },
-  
+
   // Sales return fields
   productId: { type: String },
   productName: { type: String },
   rate: { type: Number },
   total: { type: Number },
-  
+
   // Common fields
   orderedQuantity: { type: Number },
   receivedQuantity: { type: Number },
@@ -108,35 +128,63 @@ const AuditEntrySchema: Schema = new Schema({
 
 const ReturnNoteSchema: Schema<IReturnNote> = new Schema({
   returnNumber: { type: String, required: true, unique: true },
-  returnType: { 
-    type: String, 
+  returnType: {
+    type: String,
     required: true,
     enum: ['salesReturn', 'purchaseReturn'],
     default: 'purchaseReturn'
   },
-  
-  // Purchase return fields
-  supplierName: { type: String },
-  
-  // Sales return fields
-  customerName: { type: String },
-  
+
+  // Party & Contact References
+  partyId: { type: Schema.Types.ObjectId, ref: 'Party', required: true, index: true },
+  contactId: { type: Schema.Types.ObjectId, ref: 'Contact', required: false },
+
+  // Immutable snapshots
+  partySnapshot: {
+    type: {
+      displayName: { type: String, required: true },
+      address: {
+        street: { type: String },
+        city: { type: String },
+        district: { type: String },
+        state: { type: String },
+        country: { type: String },
+        postalCode: { type: String },
+      },
+      taxIdentifiers: {
+        vatNumber: { type: String }
+      },
+    },
+    required: true,
+    _id: false
+  },
+  contactSnapshot: {
+    type: {
+      name: { type: String, required: true },
+      phone: { type: String },
+      email: { type: String },
+      designation: { type: String },
+    },
+    required: false,
+    _id: false
+  },
+
   items: [ReturnItemSchema],
   returnDate: { type: Date, required: true },
   reason: { type: String, required: true },
   notes: { type: String },
-  status: { 
-    type: String, 
+  status: {
+    type: String,
     enum: ['pending', 'approved', 'cancelled'],
     default: 'pending'
   },
-  
+
   // Financial fields (for sales returns)
   totalAmount: { type: Number },
   discount: { type: Number },
   vatAmount: { type: Number },
   grandTotal: { type: Number },
-  
+
   connectedDocuments: {
     type: {
       purchaseId: { type: Schema.Types.ObjectId, ref: 'Purchase' },
@@ -146,11 +194,11 @@ const ReturnNoteSchema: Schema<IReturnNote> = new Schema({
     },
     default: {}
   },
-  
+
   isDeleted: { type: Boolean, default: false, index: true },
   deletedAt: { type: Date, default: null },
   deletedBy: { type: String, default: null },
-  
+
   createdBy: { type: String, default: null },
   updatedBy: { type: String, default: null },
   actionHistory: [AuditEntrySchema],
@@ -160,28 +208,26 @@ const ReturnNoteSchema: Schema<IReturnNote> = new Schema({
 ReturnNoteSchema.index({ isDeleted: 1, returnDate: -1 });
 ReturnNoteSchema.index({ returnType: 1 });
 ReturnNoteSchema.index({ status: 1 });
-ReturnNoteSchema.index({ supplierName: 1 });
-ReturnNoteSchema.index({ customerName: 1 });
 ReturnNoteSchema.index({ 'connectedDocuments.purchaseId': 1 });
 ReturnNoteSchema.index({ 'connectedDocuments.invoiceId': 1 });
 
 // Pre-find hook to exclude deleted records by default
-ReturnNoteSchema.pre(/^find/, function(this: Query<any, any>, next) {
+ReturnNoteSchema.pre(/^find/, function (this: Query<any, any>, next) {
   const options = this.getOptions();
-  
+
   if (options.includeDeleted !== true) {
     this.find({ isDeleted: false });
   }
-  
+
   if (!this.getOptions().sort) {
     this.sort({ returnDate: -1 });
   }
-  
+
   next();
 });
 
 // Add audit entry method
-ReturnNoteSchema.methods.addAuditEntry = function(
+ReturnNoteSchema.methods.addAuditEntry = function (
   action: string,
   userId: string | null = null,
   username: string | null = null,

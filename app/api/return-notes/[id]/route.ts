@@ -32,12 +32,12 @@ export async function GET(request: Request, context: RequestContext) {
     const returnNote = await ReturnNote.findById(id)
       .populate({
         path: 'connectedDocuments.purchaseId',
-        select: 'referenceNumber supplierName items inventoryStatus',
+        select: 'referenceNumber items inventoryStatus partySnapshot',
         match: { isDeleted: false }
       })
       .populate({
         path: 'connectedDocuments.invoiceId',
-        select: 'invoiceNumber customerName items status',
+        select: 'invoiceNumber items status partySnapshot',
         match: { isDeleted: false }
       })
       .populate({

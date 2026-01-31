@@ -1,15 +1,19 @@
-// app/api/purchases/[id]/route.ts - FIXED: Enhanced audit tracking with username
+// app/api/purchases/[id]/route.ts - FIXED: Proper partyId and contactId population in GET
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Purchase from "@/models/Purchase";
 import Material from "@/models/Material";
 import StockAdjustment from "@/models/StockAdjustment";
+import Voucher from "@/models/Voucher";
+import ReturnNote from "@/models/ReturnNote";
+import Party from "@/models/Party";
 import { softDelete } from "@/utils/softDelete";
 import { getUserInfo } from "@/lib/auth-helpers";
 import { createJournalForPurchase } from '@/utils/journalAutoCreate';
 import { voidJournalsForReference } from '@/utils/journalManager';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
+import { createPartySnapshot } from "@/utils/partySnapshot";
 
 interface RequestContext {
   params: Promise<{
@@ -19,6 +23,7 @@ interface RequestContext {
 
 /**
  * GET - Fetch a single purchase by ID
+ * ✅ FIXED: Added partyId and contactId population
  */
 export async function GET(request: Request, context: RequestContext) {
   try {
@@ -29,9 +34,20 @@ export async function GET(request: Request, context: RequestContext) {
     if (error) return error;
 
     await dbConnect();
+
+    const _ensureModels = [Purchase, Material, StockAdjustment, Voucher, ReturnNote, Party];
     const { id } = await context.params;
 
+    // ✅ FIXED: Added partyId and contactId population
     const purchase = await Purchase.findById(id)
+      .populate({
+        path: 'partyId',
+        select: 'name company type roles email phone address city district state country postalCode vatNumber'
+      })
+      .populate({
+        path: 'contactId',
+        select: 'name phone email designation'
+      })
       .populate({
         path: 'connectedDocuments.paymentIds',
         model: 'Voucher',
@@ -68,7 +84,6 @@ function detectChanges(oldPurchase: any, newData: any) {
     'paymentStatus',
     'totalAmount',
     'discount',
-    'supplierName',
     'paidAmount',
     'date',
     'purchaseDate'
@@ -261,7 +276,7 @@ function determineInventoryStatusAfterEdit(items: any[], oldInventoryStatus: str
 
 /**
  * PUT - Update a purchase
- * ✅ FIXED: Enhanced audit tracking with proper username for automatic changes
+ * ✅ FIXED: Added snapshot updates when party/contact changes
  */
 export async function PUT(request: Request, context: RequestContext) {
   try {
@@ -285,6 +300,33 @@ export async function PUT(request: Request, context: RequestContext) {
       return NextResponse.json({
         error: "Cannot update a deleted purchase. Please restore it first."
       }, { status: 400 });
+    }
+
+    // ✅ FIXED: Handle party/contact changes - update snapshots
+    if (body.partyId && body.partyId !== currentPurchase.partyId.toString()) {
+      console.log(`🔄 Party changed for purchase ${id}, updating snapshots`);
+
+      const { partySnapshot, contactSnapshot } = await createPartySnapshot(
+        body.partyId,
+        body.contactId
+      );
+
+      body.partySnapshot = partySnapshot;
+      body.contactSnapshot = contactSnapshot;
+
+      console.log(`   Old Party: ${currentPurchase.partySnapshot?.displayName || 'N/A'}`);
+      console.log(`   New Party: ${partySnapshot.displayName}`);
+    }
+    // ✅ If only contact changed (same party)
+    else if (body.contactId && body.contactId !== currentPurchase.contactId?.toString()) {
+      console.log(`🔄 Contact changed for purchase ${id}, updating contact snapshot`);
+
+      const { contactSnapshot } = await createPartySnapshot(
+        currentPurchase.partyId.toString(),
+        body.contactId
+      );
+
+      body.contactSnapshot = contactSnapshot;
     }
 
     const oldPurchaseStatus = currentPurchase.purchaseStatus;
@@ -442,7 +484,7 @@ export async function PUT(request: Request, context: RequestContext) {
     // Detect changes for manual audit entry
     const changes = detectChanges(currentPurchase.toObject(), body);
 
-    // ✅ Only add manual "Updated" entry if there are explicit changes
+    // Only add manual "Updated" entry if there are explicit changes
     if (changes.length > 0) {
       currentPurchase.addAuditEntry(
         'Updated',

@@ -1,18 +1,19 @@
-// app/api/purchases/route.ts - UPDATED: Using purchaseDate field
+// app/api/purchases/route.ts - FIXED: Proper partyId population
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Purchase from "@/models/Purchase";
 import Voucher from "@/models/Voucher";
 import ReturnNote from "@/models/ReturnNote";
-import Supplier from "@/models/Supplier";
 import Material from "@/models/Material";
 import StockAdjustment from "@/models/StockAdjustment";
+import Party from "@/models/Party";
 import { getUserInfo } from "@/lib/auth-helpers";
 import { createJournalForPurchase } from '@/utils/journalAutoCreate';
 import generateInvoiceNumber from '@/utils/invoiceNumber';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
+import { createPartySnapshot } from "@/utils/partySnapshot";
 
 /**
  * GET all active purchases with optional populate
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
 
     await dbConnect();
 
-    const ensureModels = [Purchase, Voucher, ReturnNote, Supplier, Material, StockAdjustment];
+    const ensureModels = [Purchase, Voucher, ReturnNote, Material, StockAdjustment, Party];
 
     const { searchParams } = new URL(request.url);
 
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
 
       const baseFilter: any = { isDeleted: false };
 
-      // ✅ UPDATED: Apply Date Range Filter using purchaseDate
+      // Apply Date Range Filter using purchaseDate
       if (startDateParam || endDateParam) {
         baseFilter.purchaseDate = {};
         if (startDateParam) {
@@ -56,6 +57,7 @@ export async function GET(request: Request) {
 
       const populate = searchParams.get('populate') === 'true';
 
+      // ✅ FIXED: Added partyId and contactId population
       const populateOptions = populate ? [
         {
           path: 'connectedDocuments.paymentIds',
@@ -66,10 +68,17 @@ export async function GET(request: Request) {
           path: 'connectedDocuments.returnNoteIds',
           select: 'returnNumber status',
           match: { isDeleted: false }
+        },
+        {
+          path: 'partyId',
+          select: 'name company type roles email phone',
+        },
+        {
+          path: 'contactId',
+          select: 'name phone email designation',
         }
       ] : undefined;
 
-      // ✅ UPDATED: Default sort by purchaseDate
       const result = await executePaginatedQuery(Purchase, {
         baseFilter,
         columnFilters: filters,
@@ -90,8 +99,10 @@ export async function GET(request: Request) {
     } else {
       const populate = searchParams.get('populate') === 'true';
       const filter: any = { isDeleted: false };
+      const partyId = searchParams.get('partyId');
 
-      // ✅ UPDATED: Apply Date Range using purchaseDate
+      if (partyId) filter.partyId = partyId;
+
       if (startDateParam || endDateParam) {
         filter.purchaseDate = {};
         if (startDateParam) filter.purchaseDate.$gte = new Date(startDateParam);
@@ -102,8 +113,9 @@ export async function GET(request: Request) {
         }
       }
 
-      let query = Purchase.find(filter).sort({ purchaseDate: -1 }); // ✅ UPDATED: Sort by purchaseDate
+      let query = Purchase.find(filter).sort({ purchaseDate: -1 });
 
+      // ✅ FIXED: Added partyId and contactId population
       if (populate) {
         query = query
           .populate({
@@ -115,6 +127,14 @@ export async function GET(request: Request) {
             path: 'connectedDocuments.returnNoteIds',
             select: 'returnNumber status',
             match: { isDeleted: false }
+          })
+          .populate({
+            path: 'partyId',
+            select: 'name company type roles email phone'
+          })
+          .populate({
+            path: 'contactId',
+            select: 'name phone email designation'
           });
       }
 
@@ -128,7 +148,7 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST - Create a new purchase
+ * POST - Create a new purchase with snapshots
  */
 export async function POST(request: Request) {
   try {
@@ -149,15 +169,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "At least one item is required" }, { status: 400 });
     }
 
-    if (!body.supplierName || !body.supplierName.trim()) {
-      return NextResponse.json({ error: "Supplier name is required" }, { status: 400 });
+    if (!body.partyId) {
+      return NextResponse.json({ error: "Supplier (Party) is required" }, { status: 400 });
     }
 
     if (body.totalAmount === undefined) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // ✅ NEW: Validate purchase date
     if (!body.purchaseDate && !body.date) {
       return NextResponse.json({
         error: 'Purchase date is required'
@@ -178,24 +197,8 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Auto-create supplier if doesn't exist
-    await Supplier.findOneAndUpdate(
-      { name: body.supplierName.trim() },
-      {
-        $setOnInsert: {
-          name: body.supplierName.trim(),
-          email: '',
-          vatNumber: '',
-          district: '',
-          city: '',
-          street: '',
-          buildingNo: '',
-          postalCode: '',
-          contactNumbers: [],
-        }
-      },
-      { upsert: true, new: true }
-    );
+    // ✅ Create immutable snapshots of party and contact
+    const { partySnapshot, contactSnapshot } = await createPartySnapshot(body.partyId, body.contactId);
 
     // Generate reference number
     const referenceNumber = await generateInvoiceNumber('purchase');
@@ -220,25 +223,32 @@ export async function POST(request: Request) {
     const vatAmount = body.isTaxPayable ? (subtotal * 0.05) : 0;
     const grandTotal = subtotal + vatAmount;
 
-    // ✅ NEW: Set default statuses
     const purchaseStatus = 'pending';
     const inventoryStatus = 'pending';
 
-    // ✅ UPDATED: Use purchaseDate, fallback to date for backward compatibility
     const purchaseDate = body.purchaseDate ? new Date(body.purchaseDate) : new Date(body.date);
 
     // Create purchase
     const newPurchase = new Purchase({
       ...body,
       referenceNumber,
+
+      // ✅ Party & Contact References
+      partyId: body.partyId,
+      contactId: body.contactId,
+
+      // ✅ Immutable Snapshots
+      partySnapshot,
+      contactSnapshot,
+
       discount,
       totalAmount: grossTotal,
       vatAmount,
       grandTotal,
-      purchaseDate,        // ✅ NEW: Primary purchase date field
-      date: purchaseDate,  // Keep date synced for backward compatibility
-      purchaseStatus,     
-      inventoryStatus,    
+      purchaseDate,
+      date: purchaseDate,
+      purchaseStatus,
+      inventoryStatus,
       paymentStatus: 'pending',
       isDeleted: false,
       deletedAt: null,
@@ -255,7 +265,10 @@ export async function POST(request: Request) {
 
     const savedPurchase = await newPurchase.save();
 
-    // ✅ BACKWARD COMPATIBILITY: Handle direct creation with received/partially received status
+    console.log(`✅ Successfully created purchase: ${savedPurchase.referenceNumber}`);
+    console.log(`   Party: ${partySnapshot.displayName}`);
+
+    // Handle direct creation with received/partially received status
     if (savedPurchase.inventoryStatus === 'received' || savedPurchase.inventoryStatus === 'partially received') {
       console.log(`📦 Processing stock for directly created ${savedPurchase.inventoryStatus} purchase`);
 
@@ -296,7 +309,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // ✅ AUTO-CREATE JOURNAL ENTRY - ONLY if inventoryStatus is "received" on creation
+    // AUTO-CREATE JOURNAL ENTRY - ONLY if inventoryStatus is "received" on creation
     if (savedPurchase.inventoryStatus === 'received') {
       try {
         await createJournalForPurchase(

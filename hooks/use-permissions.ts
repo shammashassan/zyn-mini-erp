@@ -127,29 +127,29 @@ export function useStockAdjustmentPermissions() {
   });
 }
 
-// Specific hook for customer permissions
-export function useCustomerPermissions() {
+// Specific hook for party permissions
+export function usePartyPermissions() {
   return usePermissions({
-    canRead: { customer: ["read"] },
-    canCreate: { customer: ["create"] },
-    canUpdate: { customer: ["update"] },
-    canDelete: { customer: ["soft_delete"] },
-    canViewTrash: { customer: ["view_trash"] },
-    canRestore: { customer: ["restore"] },
-    canPermanentDelete: { customer: ["permanent_delete"] },
+    canRead: { party: ["read"] },
+    canCreate: { party: ["create"] },
+    canUpdate: { party: ["update"] },
+    canDelete: { party: ["soft_delete"] },
+    canViewTrash: { party: ["view_trash"] },
+    canRestore: { party: ["restore"] },
+    canPermanentDelete: { party: ["permanent_delete"] },
   });
 }
 
-// Specific hook for supplier permissions
-export function useSupplierPermissions() {
+// Specific hook for contact permissions
+export function useContactPermissions() {
   return usePermissions({
-    canRead: { supplier: ["read"] },
-    canCreate: { supplier: ["create"] },
-    canUpdate: { supplier: ["update"] },
-    canDelete: { supplier: ["soft_delete"] },
-    canViewTrash: { supplier: ["view_trash"] },
-    canRestore: { supplier: ["restore"] },
-    canPermanentDelete: { supplier: ["permanent_delete"] },
+    canRead: { contact: ["read"] },
+    canCreate: { contact: ["create"] },
+    canUpdate: { contact: ["update"] },
+    canDelete: { contact: ["soft_delete"] },
+    canViewTrash: { contact: ["view_trash"] },
+    canRestore: { contact: ["restore"] },
+    canPermanentDelete: { contact: ["permanent_delete"] },
   });
 }
 

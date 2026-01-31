@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate');
     const partyType = searchParams.get('partyType');
     const partyId = searchParams.get('partyId');
+    const contactId = searchParams.get('contactId');
 
     if (!accountCode) {
       return NextResponse.json(
@@ -57,6 +58,9 @@ export async function GET(request: NextRequest) {
     }
     if (partyId) {
       partyFilter.partyId = partyId;
+    }
+    if (contactId) {
+      partyFilter.contactId = contactId;
     }
 
     // Calculate opening balance (transactions before start date)

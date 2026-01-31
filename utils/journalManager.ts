@@ -27,14 +27,14 @@ export async function voidJournalsForReference(
       // Only change status, keep everything else the same
       journal.status = 'void';
       journal.updatedBy = userId;
-      
+
       journal.addAuditEntry(
         `Voided - ${reason}`,
         userId,
         username,
         [{ field: 'status', oldValue: 'posted', newValue: 'void' }]
       );
-      
+
       // Save with validation disabled to avoid enum issues
       await journal.save({ validateBeforeSave: false });
       console.log(`✅ Voided journal ${journal.journalNumber}`);
@@ -78,20 +78,21 @@ export async function createJournalWithDate(
   try {
     // Generate journal number with retry mechanism
     const journalNumber = await generateInvoiceNumber('journal');
-    
+
     const journal = new Journal({
       ...journalData,
       journalNumber,
       entryDate,
-      
+
       // ✅ IMPORTANT: Preserve party and item references from original journal
       partyType: journalData.partyType,
       partyId: journalData.partyId,
+      contactId: journalData.contactId,
       partyName: journalData.partyName,
       itemType: journalData.itemType,
       itemId: journalData.itemId,
       itemName: journalData.itemName,
-      
+
       status: 'posted',
       createdBy: userId,
       postedBy: userId,
@@ -106,7 +107,7 @@ export async function createJournalWithDate(
 
     await journal.save();
     console.log(`✅ Recreated journal ${journalNumber} with date ${entryDate}`);
-    
+
     // Log preserved references
     if (journal.partyType && journal.partyName) {
       console.log(`   Party: ${journal.partyType} - ${journal.partyName}`);
@@ -114,7 +115,7 @@ export async function createJournalWithDate(
     if (journal.itemType && journal.itemName) {
       console.log(`   Item: ${journal.itemType} - ${journal.itemName}`);
     }
-    
+
     return journal;
   } catch (error) {
     console.error('Error creating journal with date:', error);

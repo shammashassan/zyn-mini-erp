@@ -8,7 +8,6 @@ import { Receipt, ExternalLink, CreditCard, FileText } from "lucide-react";
 interface ConnectedInvoice {
   _id: string;
   invoiceNumber: string;
-  customerName: string;
   status: string;
 }
 

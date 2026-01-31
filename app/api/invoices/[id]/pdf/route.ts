@@ -1,9 +1,12 @@
+// app/api/invoices/[id]/pdf/route.ts - FINAL: Using snapshots for PDF generation
+
 import { NextRequest, NextResponse } from "next/server";
 import React from "react";
 import { renderToStream } from "@react-pdf/renderer";
 import dbConnect from "@/lib/dbConnect";
 import Invoice from "@/models/Invoice";
 import CompanyDetails from "@/models/CompanyDetails";
+import Party from "@/models/Party";
 import { InvoiceDocument } from "@/components/InvoiceDocument";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 
@@ -34,13 +37,21 @@ export async function GET(
     if (error) return error;
 
     await dbConnect();
-    
-    // ✅ FIXED: Allow finding soft-deleted invoices for PDF generation
-    const invoice = await Invoice.findById(id).setOptions({ includeDeleted: true });
+
+    // Ensure Party model is registered
+    const _ensureModels = [Party];
+
+    // ✅ Allow finding soft-deleted invoices for PDF generation
+    const invoice = await Invoice.findById(id)
+      .setOptions({ includeDeleted: true })
+      .populate('partyId');
 
     if (!invoice) {
       return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
     }
+
+    // ✅ Invoice already has snapshots, no need to populate
+    // Snapshots are the source of truth for PDF generation
 
     // Fetch Company Details
     let companyDetails = await CompanyDetails.findOne();

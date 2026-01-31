@@ -13,6 +13,7 @@ import {
   PackageX,
   Calendar,
   User,
+  CircleUserRound,
   Receipt,
   CheckCircle,
   Clock,
@@ -31,7 +32,8 @@ interface SalesReturn {
   returnType: 'salesReturn';
 
   invoiceReference?: string;
-  customerName?: string;
+  partyId?: any;
+  partySnapshot?: any;
 
   items: Array<{
     productName?: string;
@@ -125,9 +127,20 @@ export function SalesReturnViewModal({
 
   const documentRef = invoice?.invoiceNumber;
 
-  const hasConnectedDocuments = 
+  const hasConnectedDocuments =
     (salesReturn.connectedDocuments?.invoiceId && typeof salesReturn.connectedDocuments.invoiceId === 'object') ||
     (salesReturn.connectedDocuments?.creditNoteId && typeof salesReturn.connectedDocuments.creditNoteId === 'object');
+
+  const party = salesReturn.partyId as any;
+  const partySnapshot = salesReturn.partySnapshot as any;
+  const contactSnapshot = (salesReturn as any).contactSnapshot;
+
+  const partyName = partySnapshot?.displayName || (party?.name || party?.company) || 'Unknown Party';
+
+  const contactName = contactSnapshot?.name;
+  const contactPhone = contactSnapshot?.phone || party?.phone;
+  const contactEmail = contactSnapshot?.email || party?.email;
+  const contactDesignation = contactSnapshot?.designation;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -187,15 +200,15 @@ export function SalesReturnViewModal({
                   </div>
                 )}
 
-                {salesReturn.customerName && (
+                {partyName && (
                   <div className="flex items-start gap-3">
                     <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                     <div className="min-w-0">
                       <div className="text-xs sm:text-sm text-muted-foreground">
-                        Customer
+                        Party
                       </div>
                       <div className="font-medium text-xs sm:text-sm break-words">
-                        {salesReturn.customerName}
+                        {partyName}
                       </div>
                     </div>
                   </div>
@@ -215,17 +228,26 @@ export function SalesReturnViewModal({
                   </div>
                 )}
 
-                <div className="flex items-start gap-3">
-                  <PackageX className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
-                  <div>
-                    <div className="text-xs sm:text-sm text-muted-foreground">
-                      Total Products
-                    </div>
-                    <div className="font-medium text-xs sm:text-sm">
-                      {totalItemsCount} product(s)
+                {contactName && (
+                  <div className="flex items-start gap-3">
+                    <CircleUserRound className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-xs sm:text-sm text-muted-foreground">Contact</div>
+                      <div className="font-medium text-xs sm:text-sm break-words">
+                        {contactName}
+                        {contactDesignation && (
+                          <span className="text-muted-foreground"> ({contactDesignation})</span>
+                        )}
+                      </div>
+                      {contactPhone && (
+                        <div className="text-xs text-muted-foreground">{contactPhone}</div>
+                      )}
+                      {contactEmail && (
+                        <div className="text-xs text-muted-foreground">{contactEmail}</div>
+                      )}
                     </div>
                   </div>
-                </div>
+                )}
 
                 <div className="flex items-start gap-3">
                   <PackageX className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
@@ -372,7 +394,7 @@ export function SalesReturnViewModal({
               </div>
             </CardContent>
           </Card>
-          
+
           {hasConnectedDocuments && (
             <Card>
               <CardHeader>

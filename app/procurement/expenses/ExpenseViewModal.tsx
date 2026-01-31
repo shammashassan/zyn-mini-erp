@@ -1,4 +1,4 @@
-// app/procurement/expenses/ExpenseViewModal.tsx - FULLY RESPONSIVE VERSION
+// app/procurement/expenses/ExpenseViewModal.tsx - UPDATED: Using payeeSnapshot for display
 
 "use client";
 
@@ -25,7 +25,8 @@ import {
   Clock,
   Wallet,
   CreditCard,
-  FileText
+  FileText,
+  AlertTriangle
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
@@ -125,6 +126,29 @@ export function ExpenseViewModal({ isOpen, onClose, expense: initialExpense, onV
   if (!isOpen) return null;
 
   const currentData = expense || initialExpense || {};
+
+  // ✅ Use snapshot as primary source with populated reference fallback
+  const payeeName = currentData.payeeSnapshot?.name
+    || currentData.payeeId?.name
+    || currentData.vendor
+    || 'Unknown';
+
+  const payeeType = currentData.payeeSnapshot?.type
+    || currentData.payeeId?.type;
+
+  const payeeEmail = currentData.payeeSnapshot?.email
+    || currentData.payeeId?.email;
+
+  const payeePhone = currentData.payeeSnapshot?.phone
+    || currentData.payeeId?.phone;
+
+  const payeeAddress = currentData.payeeSnapshot?.address
+    || currentData.payeeId?.address;
+
+  // ✅ Check if payee data has changed since snapshot
+  const hasPayeeChanged = currentData.payeeId && currentData.payeeSnapshot &&
+    currentData.payeeId.name !== currentData.payeeSnapshot.name;
+
   const creatorUsername = getCreatorUsername(currentData);
   const categoryColor = getCategoryColor(currentData.category);
   const statusColor = getStatusColor(currentData.status);
@@ -195,12 +219,26 @@ export function ExpenseViewModal({ isOpen, onClose, expense: initialExpense, onV
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
+                {/* Payee Changed Warning */}
+                {hasPayeeChanged && (
+                  <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                    <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                    <div className="text-xs sm:text-sm">
+                      <p className="font-medium text-warning">Payee name has changed</p>
+                      <p className="text-muted-foreground">
+                        This expense was recorded for "{currentData.payeeSnapshot.name}"
+                        (currently: "{currentData.payeeId.name}")
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   <div className="flex items-start gap-3">
                     <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                     <div className="min-w-0">
                       <div className="text-xs sm:text-sm text-muted-foreground">Expense Date</div>
-                      <div className="font-medium text-xs sm:text-sm break-words">{formatLongDate(currentData.date)}</div>
+                      <div className="font-medium text-xs sm:text-sm break-words">{formatLongDate(currentData.expenseDate)}</div>
                     </div>
                   </div>
 
@@ -214,24 +252,21 @@ export function ExpenseViewModal({ isOpen, onClose, expense: initialExpense, onV
                     </div>
                   </div>
 
-                  {(currentData.payeeId || currentData.supplierId || currentData.vendor) && (
+                  {payeeName && (
                     <div className="flex items-start gap-3">
                       <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                       <div className="min-w-0">
                         <div className="text-xs sm:text-sm text-muted-foreground">
-                          {currentData.payeeId && typeof currentData.payeeId === 'object'
-                            ? 'Payee'
-                            : currentData.supplierId && typeof currentData.supplierId === 'object'
-                              ? 'Supplier'
-                              : 'Vendor'}
+                          {currentData.payeeSnapshot ? 'Payee' : 'Vendor'}
                         </div>
                         <div className="font-medium text-xs sm:text-sm break-words">
-                          {currentData.payeeId && typeof currentData.payeeId === 'object'
-                            ? currentData.payeeId.name
-                            : currentData.supplierId && typeof currentData.supplierId === 'object'
-                              ? currentData.supplierId.name
-                              : currentData.vendor ?? 'N/A'}
+                          {payeeName}
                         </div>
+                        {payeeType && (
+                          <div className="text-xs text-muted-foreground capitalize">
+                            {payeeType.replace(/_/g, ' ')}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -274,6 +309,18 @@ export function ExpenseViewModal({ isOpen, onClose, expense: initialExpense, onV
                     </div>
                   </div>
                 </div>
+
+                {/* Payee Contact Info (from snapshot) */}
+                {/* {(payeeEmail || payeePhone || payeeAddress) && (
+                  <div className="pt-3 border-t">
+                    <div className="text-xs sm:text-sm text-muted-foreground mb-2">Contact Information</div>
+                    <div className="space-y-1 text-xs sm:text-sm">
+                      {payeeEmail && <div>Email: {payeeEmail}</div>}
+                      {payeePhone && <div>Phone: {payeePhone}</div>}
+                      {payeeAddress && <div>Address: {payeeAddress}</div>}
+                    </div>
+                  </div>
+                )} */}
 
                 {/* Description - Styled like Debit Note Reason */}
                 {currentData.description && (
@@ -368,7 +415,7 @@ export function ExpenseViewModal({ isOpen, onClose, expense: initialExpense, onV
               </Card>
             )}
 
-            {/* Additional Notes - Now in a separate card like Debit Note */}
+            {/* Additional Notes */}
             {currentData.notes && (
               <Card>
                 <CardHeader>

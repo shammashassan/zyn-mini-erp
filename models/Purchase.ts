@@ -1,4 +1,4 @@
-// models/Purchase.ts - UPDATED: Removed automatic paid amount audit tracking
+// models/Purchase.ts - FINAL: Using party snapshots, removed all legacy fields
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
@@ -30,11 +30,40 @@ export interface IAuditEntry {
   }[];
 }
 
+export interface IPartySnapshot {
+  displayName: string;
+  address?: {
+    street?: string;
+    city?: string;
+    district?: string;
+    state?: string;
+    country?: string;
+    postalCode?: string;
+  };
+  taxIdentifiers?: {
+    vatNumber?: string;
+  };
+}
+
+export interface IContactSnapshot {
+  name: string;
+  phone?: string;
+  email?: string;
+  designation?: string;
+}
+
 export interface IPurchase extends Document {
   _id: string;
   referenceNumber: string;
-  supplierId?: string;
-  supplierName?: string;
+
+  // ✅ Party & Contact References (Dynamic - Current Truth)
+  partyId: mongoose.Types.ObjectId;
+  contactId?: mongoose.Types.ObjectId;
+
+  // ✅ Immutable Snapshots (Frozen - Legal Truth)
+  partySnapshot: IPartySnapshot;
+  contactSnapshot?: IContactSnapshot;
+
   items: IPurchaseItem[];
   totalAmount: number;
   discount: number;
@@ -114,14 +143,59 @@ const AuditEntrySchema: Schema = new Schema({
   }],
 });
 
+const PartySnapshotSchema: Schema = new Schema({
+  displayName: { type: String, required: true },
+  address: {
+    street: { type: String },
+    city: { type: String },
+    district: { type: String },
+    state: { type: String },
+    country: { type: String },
+    postalCode: { type: String },
+  },
+  taxIdentifiers: {
+    vatNumber: { type: String },
+  },
+}, { _id: false });
+
+const ContactSnapshotSchema: Schema = new Schema({
+  name: { type: String, required: true },
+  phone: { type: String },
+  email: { type: String },
+  designation: { type: String },
+}, { _id: false });
+
 const PurchaseSchema: Schema<IPurchase> = new Schema({
   referenceNumber: {
     type: String,
     required: true,
     unique: true
   },
-  supplierId: { type: String, required: false },
-  supplierName: { type: String, required: false, trim: true },
+
+  // ✅ Party & Contact References
+  partyId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Party',
+    required: true,
+    index: true
+  },
+  contactId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Contact',
+    required: false,
+    index: true
+  },
+
+  // ✅ Immutable Snapshots
+  partySnapshot: {
+    type: PartySnapshotSchema,
+    required: true
+  },
+  contactSnapshot: {
+    type: ContactSnapshotSchema,
+    required: false
+  },
+
   items: [PurchaseItemSchema],
   totalAmount: { type: Number, required: true, min: 0 },
   discount: { type: Number, default: 0, min: 0 },
@@ -161,7 +235,7 @@ const PurchaseSchema: Schema<IPurchase> = new Schema({
   totalPaid: { type: Number, default: 0, min: 0 },
   remainingAmount: { type: Number, default: 0, min: 0 },
 
-  isDeleted: { type: Boolean, default: false },
+  isDeleted: { type: Boolean, default: false, index: true },
   deletedAt: { type: Date, default: null },
   deletedBy: { type: String, default: null },
 
@@ -175,13 +249,14 @@ const PurchaseSchema: Schema<IPurchase> = new Schema({
 // Indexes
 PurchaseSchema.index({ isDeleted: 1, purchaseDate: -1 });
 PurchaseSchema.index({ purchaseStatus: 1, inventoryStatus: 1, paymentStatus: 1 });
-PurchaseSchema.index({ supplierName: 1 });
 PurchaseSchema.index({ 'connectedDocuments.paymentIds': 1 });
 PurchaseSchema.index({ 'connectedDocuments.returnNoteIds': 1 });
 PurchaseSchema.index({ purchaseDate: 1 });
 PurchaseSchema.index({ 'paymentAllocations.voucherId': 1 });
+PurchaseSchema.index({ partyId: 1, purchaseDate: -1 });
+PurchaseSchema.index({ 'partySnapshot.displayName': 'text' });
 
-// ✅ UPDATED: Removed automatic audit tracking for paid amount changes
+// Pre-save hook
 PurchaseSchema.pre('save', function (next) {
   const grossTotal = this.totalAmount;
   const discount = this.discount || 0;
@@ -226,7 +301,7 @@ PurchaseSchema.pre('save', function (next) {
   next();
 });
 
-// Pre-find hook - default sort by purchaseDate
+// Pre-find hook
 PurchaseSchema.pre(/^find/, function (this: Query<any, any>, next) {
   const options = this.getOptions();
 
@@ -241,6 +316,7 @@ PurchaseSchema.pre(/^find/, function (this: Query<any, any>, next) {
   next();
 });
 
+// Instance methods
 PurchaseSchema.methods.allocatePayment = function (
   voucherId: mongoose.Types.ObjectId,
   amount: number

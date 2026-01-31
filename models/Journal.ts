@@ -32,7 +32,7 @@ export interface IJournal extends Document {
 
   // ✅ UPDATED: Added Payee and Vendor to party types
   partyType?: 'Customer' | 'Supplier' | 'Payee' | 'Vendor';
-  partyId?: string;
+  partyId?: mongoose.Types.ObjectId; // Changed to ObjectId
   partyName?: string;
   itemType?: 'Material' | 'Product';
   itemId?: string;
@@ -116,7 +116,7 @@ const JournalSchema: Schema<IJournal> = new Schema({
     index: true
   },
   partyId: {
-    type: String,
+    type: Schema.Types.ObjectId, // Changed to ObjectId
     index: true
   },
   partyName: {

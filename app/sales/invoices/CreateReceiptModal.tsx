@@ -1,4 +1,4 @@
-// app/sales/invoices/CreateReceiptModal.tsx - UPDATED: Auto notes generation
+// app/sales/invoices/CreateReceiptModal.tsx - FINAL: Using snapshots for display
 
 "use client";
 
@@ -55,6 +55,24 @@ export function CreateReceiptModal({
   const remainingAmount = invoice.remainingAmount || (invoice.grandTotal - invoice.paidAmount);
   const alreadyPaid = invoice.paidAmount || 0;
 
+  // ✅ Safe extraction of party display name with fallback chain
+  const getPartyDisplayName = () => {
+    // 1. Try snapshot (immutable legal truth)
+    if (invoice.partySnapshot?.displayName) {
+      return invoice.partySnapshot.displayName;
+    }
+
+    // 2. Try populated partyId
+    if (invoice.partyId) {
+      const party = invoice.partyId;
+      if (typeof party === 'object') {
+        return party.company || party.name || 'Unknown Customer';
+      }
+    }
+
+    return 'Unknown Customer';
+  };
+
   const handleCreateReceipt = async () => {
     setIsLoading(true);
 
@@ -85,6 +103,10 @@ export function CreateReceiptModal({
 
       console.log(`Creating receipt voucher for ${formatCurrency(amount)} via ${paymentMethod}`);
 
+      // ✅ Extract party/contact IDs (references for relationships)
+      const partyId = typeof invoice.partyId === 'object' ? invoice.partyId._id : invoice.partyId;
+      const contactId = invoice.contactId;
+
       // Generate notes - use custom notes if provided, otherwise auto-generate
       const receiptNotes = notes.trim()
         ? notes
@@ -96,7 +118,10 @@ export function CreateReceiptModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           voucherType: "receipt",
-          customerName: invoice.customerName,
+
+          // ✅ Party references for relationships
+          partyId: partyId,
+          contactId: contactId,
           paymentMethod: paymentMethod,
           items: [],
           notes: receiptNotes,
@@ -119,7 +144,7 @@ export function CreateReceiptModal({
 
       console.log(`✅ Receipt voucher created: ${newReceiptData.voucher.invoiceNumber}`);
 
-      // ✅ SIMPLIFIED: No need to manually update invoice - backend did it automatically
+      // ✅ Backend automatically updates invoice - no manual update needed
       toast.success(
         `Receipt Voucher ${newReceiptData.voucher.invoiceNumber} created!`,
         {
@@ -150,6 +175,8 @@ export function CreateReceiptModal({
     }
   };
 
+  const displayName = getPartyDisplayName();
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] lg:max-w-2xl max-h-[90vh] overflow-y-auto sidebar-scroll">
@@ -166,9 +193,14 @@ export function CreateReceiptModal({
         <div className="space-y-4">
           {/* Invoice Summary */}
           <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Customer:</span>
-              <span className="text-sm font-medium">{invoice.customerName || "N/A"}</span>
+            <div className="col-span-2">
+              <Label className="text-xs text-muted-foreground mb-1 block">Customer</Label>
+              <Input
+                value={displayName}
+                readOnly
+                disabled
+                className="bg-muted"
+              />
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Total Amount:</span>

@@ -1,4 +1,4 @@
-// app/sales/invoices/invoice-form.tsx - UPDATED: Using invoiceDate field
+// app/sales/invoices/invoice-form.tsx - FINAL: Using PartyContactSelector, no legacy fields
 
 "use client";
 
@@ -41,12 +41,12 @@ import { ChevronsUpDown, Check, Plus, PlusCircle, X, FileText, CalendarIcon } fr
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import type { ICustomer } from "@/models/Customer";
 import type { IProduct } from "@/models/Product";
 import type { Invoice } from "./columns";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 import { Spinner } from "@/components/ui/spinner";
+import { PartyContactSelector } from "@/components/PartyContactSelector";
 
 type InvoiceItem = {
   productId?: string;
@@ -54,18 +54,17 @@ type InvoiceItem = {
   quantity: number;
   rate: number;
   total: number;
-  shouldCreateProduct?: boolean; // Flag to indicate if product should be created on submit
+  shouldCreateProduct?: boolean;
 };
 
 type InvoiceFormData = {
-  customerName: string;
-  customerPhone: string;
-  customerEmail: string;
+  partyId: string;
+  contactId?: string;
   items: InvoiceItem[];
   discount: number;
   notes: string;
   quotationId?: string;
-  invoiceDate: Date; // ✅ UPDATED: Changed from 'date' to 'invoiceDate'
+  invoiceDate: Date;
   status: 'pending' | 'approved' | 'cancelled';
 };
 
@@ -95,10 +94,12 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     formState: { isSubmitting, isDirty }
   } = useForm<InvoiceFormData>({
     defaultValues: {
+      partyId: "",
+      contactId: undefined,
       items: [{ productId: "", description: "", quantity: 1, rate: 0, total: 0 }],
       discount: 0,
       notes: "",
-      invoiceDate: new Date(), // ✅ UPDATED: Changed from 'date' to 'invoiceDate'
+      invoiceDate: new Date(),
       status: 'pending',
     }
   });
@@ -108,18 +109,13 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     name: "items"
   });
 
-  const [customers, setCustomers] = useState<ICustomer[]>([]);
   const [products, setProducts] = useState<IProduct[]>([]);
   const [quotations, setQuotations] = useState<ConnectedQuotation[]>([]);
-  const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
   const [quotationPopoverOpen, setQuotationPopoverOpen] = useState(false);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [productPopovers, setProductPopovers] = useState<Record<number, boolean>>({});
   const [productSearchQueries, setProductSearchQueries] = useState<Record<number, string>>({});
   const [loadingQuotations, setLoadingQuotations] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-
-  // Responsive check
   const [isDesktop, setIsDesktop] = useState(true);
 
   useEffect(() => {
@@ -130,7 +126,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
   }, []);
 
   const watchedItems = watch("items");
-  const customerName = watch("customerName");
+  const partyId = watch("partyId");
   const quotationId = watch("quotationId");
   const discount = watch("discount");
 
@@ -144,31 +140,24 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
   const totalItems = watchedItems.filter(item => item.description).length;
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchProducts = async () => {
       try {
-        const [customersRes, productsRes] = await Promise.all([
-          fetch("/api/customers"),
-          fetch("/api/products")
-        ]);
-
-        if (customersRes.ok) setCustomers(await customersRes.json());
+        const productsRes = await fetch("/api/products");
         if (productsRes.ok) setProducts(await productsRes.json());
       } catch (error) {
-        console.error("Failed to fetch data:", error);
+        console.error("Failed to fetch products:", error);
       }
     };
-    fetchData();
+    fetchProducts();
   }, []);
 
   useEffect(() => {
-    if (!customerName || !isOpen || isEditMode) return;
+    if (!partyId || !isOpen || isEditMode) return;
 
     const fetchQuotations = async () => {
       setLoadingQuotations(true);
       try {
-        const res = await fetch(
-          `/api/quotations?customerName=${encodeURIComponent(customerName)}&populate=true`
-        );
+        const res = await fetch(`/api/quotations?partyId=${partyId}&populate=true`);
         if (res.ok) {
           const quotations = await res.json();
           const availableQuotations = quotations.filter(
@@ -187,56 +176,40 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     };
 
     fetchQuotations();
-  }, [customerName, isOpen, isEditMode]);
+  }, [partyId, isOpen, isEditMode]);
 
   useEffect(() => {
     if (isOpen) {
       if (defaultValues) {
+        // ✅ Extract party/contact IDs correctly
+        const partyIdValue = typeof defaultValues.partyId === 'object'
+          ? defaultValues.partyId._id
+          : defaultValues.partyId;
+
         reset({
-          customerName: defaultValues.customerName || "",
-          customerPhone: defaultValues.customerPhone || "",
-          customerEmail: defaultValues.customerEmail || "",
-          items: defaultValues.items || [{ description: "", quantity: 1, rate: 0, total: 0 }],
+          partyId: partyIdValue || "",
+          contactId: defaultValues.contactId?.toString() || undefined,
+          items: defaultValues.items || [{ productId: "", description: "", quantity: 1, rate: 0, total: 0 }],
           discount: defaultValues.discount || 0,
           notes: defaultValues.notes || "",
           quotationId: "",
-          invoiceDate: defaultValues.invoiceDate ? new Date(defaultValues.invoiceDate) : new Date(), // ✅ UPDATED
+          invoiceDate: defaultValues.invoiceDate ? new Date(defaultValues.invoiceDate) : new Date(),
           status: defaultValues.status || 'pending',
         });
-        setSearchQuery(defaultValues.customerName || "");
       } else {
         reset({
-          customerName: "",
-          customerPhone: "",
-          customerEmail: "",
+          partyId: "",
+          contactId: undefined,
           items: [{ productId: "", description: "", quantity: 1, rate: 0, total: 0 }],
           discount: 0,
           notes: "",
           quotationId: "",
-          invoiceDate: new Date(), // ✅ UPDATED
+          invoiceDate: new Date(),
           status: 'pending',
         });
-        setSearchQuery("");
       }
     }
   }, [isOpen, defaultValues, reset]);
-
-  const handleCustomerSelect = (customer: ICustomer) => {
-    setValue("customerName", customer.name, { shouldDirty: true });
-    setValue("customerPhone", customer.phone || "", { shouldDirty: true });
-    setValue("customerEmail", customer.email || "", { shouldDirty: true });
-    setSearchQuery(customer.name);
-    setCustomerPopoverOpen(false);
-  };
-
-  const handleCreateNew = () => {
-    if (searchQuery.trim()) {
-      setValue("customerName", searchQuery.trim(), { shouldDirty: true });
-      setValue("customerPhone", "", { shouldDirty: true });
-      setValue("customerEmail", "", { shouldDirty: true });
-      setCustomerPopoverOpen(false);
-    }
-  };
 
   const handleQuotationSelect = (quotation: ConnectedQuotation) => {
     setValue("quotationId", quotation._id, { shouldDirty: true });
@@ -264,7 +237,6 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
       setValue(`items.${index}.productId`, "", { shouldDirty: true });
       setValue(`items.${index}.description`, searchQuery.trim(), { shouldDirty: true });
       setValue(`items.${index}.shouldCreateProduct`, false, { shouldDirty: true });
-      // Don't auto-set rate for custom items, let user decide
       setProductPopovers(prev => ({ ...prev, [index]: false }));
       setProductSearchQueries(prev => ({ ...prev, [index]: "" }));
     }
@@ -353,18 +325,14 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     }
   };
 
-  const doesCustomerExist = customers.some(
-    (c) => c.name.toLowerCase() === searchQuery.trim().toLowerCase()
-  );
-
   const handleFormSubmit = async (data: InvoiceFormData) => {
-    // Validation
-    if (!data.customerName || !data.customerName.trim()) {
-      toast.error("Please select a customer");
+    // ✅ Validation
+    if (!data.partyId) {
+      toast.error("Please select a customer (Party)");
       return;
     }
 
-    if (!data.invoiceDate) { // ✅ UPDATED
+    if (!data.invoiceDate) {
       toast.error("Please select an invoice date");
       return;
     }
@@ -377,115 +345,63 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
 
     const calculatedGrossTotal = validItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
     if (data.discount > calculatedGrossTotal) {
-      toast.error("Discount cannot exceed gross total", {
-        description: "Discount cannot exceed the gross total"
-      });
+      toast.error("Discount cannot exceed gross total");
       return;
     }
 
-    // Create products for items marked for creation
-    const itemsWithProductIds = await Promise.all(
-      validItems.map(async (item) => {
-        if (item.shouldCreateProduct && item.description && !item.productId) {
-          try {
-            const productPayload = {
-              name: item.description.trim(),
-              type: "General",
-              price: Number(item.rate) || 0,
-            };
-
-            const response = await fetch("/api/products", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(productPayload),
-            });
-
-            if (response.ok) {
-              const newProduct = await response.json();
-              toast.success(`Product "${item.description}" created`);
-              return {
-                ...item,
-                productId: newProduct._id,
-                shouldCreateProduct: false,
+    // ✅ Create products for items marked for creation (only on new invoices)
+    if (!isEditMode) {
+      const itemsWithProductIds = await Promise.all(
+        validItems.map(async (item) => {
+          if (item.shouldCreateProduct && item.description && !item.productId) {
+            try {
+              const productPayload = {
+                name: item.description.trim(),
+                type: "General",
+                price: Number(item.rate) || 0,
               };
-            } else {
-              const error = await response.json();
-              toast.error(`Failed to create product "${item.description}"`, {
-                description: error.error || "Continuing with custom item"
+
+              const response = await fetch("/api/products", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(productPayload),
               });
+
+              if (response.ok) {
+                const newProduct = await response.json();
+                toast.success(`Product "${item.description}" created`);
+                return {
+                  ...item,
+                  productId: newProduct._id,
+                  shouldCreateProduct: false,
+                };
+              } else {
+                const error = await response.json();
+                toast.error(`Failed to create product "${item.description}"`, {
+                  description: error.error || "Continuing with custom item"
+                });
+                return { ...item, shouldCreateProduct: false };
+              }
+            } catch (error) {
+              console.error("Error creating product:", error);
+              toast.error(`Failed to create product "${item.description}"`);
               return { ...item, shouldCreateProduct: false };
             }
-          } catch (error) {
-            console.error("Error creating product:", error);
-            toast.error(`Failed to create product "${item.description}"`);
-            return { ...item, shouldCreateProduct: false };
           }
-        }
-        return item;
-      })
-    );
+          return item;
+        })
+      );
 
-    // Refresh products list if any were created
-    const anyProductsCreated = itemsWithProductIds.some((item, index) =>
-      item.productId && validItems[index].shouldCreateProduct
-    );
-    if (anyProductsCreated) {
-      try {
-        const productsRes = await fetch("/api/products");
-        if (productsRes.ok) {
-          const updatedProducts = await productsRes.json();
-          setProducts(updatedProducts);
-        }
-      } catch (error) {
-        console.error("Failed to refresh products list:", error);
-      }
-    }
-
-    // Check if customer exists, if not create it
-    const customerExists = customers.some(
-      (c) => c.name.toLowerCase() === data.customerName.trim().toLowerCase()
-    );
-
-    if (!customerExists && !isEditMode) {
-      try {
-        const customerPayload = {
-          name: data.customerName.trim(),
-          phone: data.customerPhone.trim(),
-          email: data.customerEmail.trim(),
-        };
-
-        const customerRes = await fetch("/api/customers", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(customerPayload),
-        });
-
-        if (customerRes.ok) {
-          toast.success(`Customer "${data.customerName}" created successfully`);
-          // Refresh customers list
-          const customersRes = await fetch("/api/customers");
-          if (customersRes.ok) setCustomers(await customersRes.json());
-        } else {
-          const error = await customerRes.json();
-          toast.error("Failed to create customer", {
-            description: error.error || "Please try again"
-          });
-          return;
-        }
-      } catch (error) {
-        console.error("Error creating customer:", error);
-        toast.error("Failed to create customer");
-        return;
-      }
+      // Use the processed items
+      validItems.splice(0, validItems.length, ...itemsWithProductIds);
     }
 
     const submitData = {
-      customerName: data.customerName.trim(),
-      customerPhone: data.customerPhone.trim(),
-      customerEmail: data.customerEmail.trim(),
-      invoiceDate: data.invoiceDate, // ✅ UPDATED: Use invoiceDate
-      items: itemsWithProductIds.map(item => ({
-        productId: item.productId || '',  // ✅ Ensure productId is included
+      partyId: data.partyId,
+      contactId: data.contactId,
+      invoiceDate: data.invoiceDate,
+      items: validItems.map(item => ({
+        productId: item.productId || '',
         description: item.description,
         quantity: Number(item.quantity) || 0,
         rate: Number(item.rate) || 0,
@@ -510,98 +426,32 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
             {isEditMode ? "Edit Invoice" : "Create Invoice"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
 
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
           {/* Main Top Grid */}
           <div className={cn("grid grid-cols-1 gap-4", isEditMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
-            {/* Customer Field */}
-            <div className="space-y-2">
-              <Label>Customer <span className="text-destructive">*</span></Label>
+            {/* ✅ Customer Field - PartyContactSelector */}
+            <div>
               <Controller
-                name="customerName"
+                name="partyId"
                 control={control}
                 render={({ field }) => (
-                  <Popover
-                    open={customerPopoverOpen}
-                    onOpenChange={(isOpen) => {
-                      setCustomerPopoverOpen(isOpen);
-                      if (isOpen) setSearchQuery(field.value);
+                  <PartyContactSelector
+                    value={{ partyId: field.value, contactId: watch('contactId') }}
+                    onChange={(val) => {
+                      field.onChange(val.partyId);
+                      setValue('contactId', val.contactId);
                     }}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        ref={field.ref}
-                        type="button"
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                      >
-                        {field.value || "Select or type customer..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                      <Command shouldFilter={false}>
-                        <CommandInput
-                          placeholder="Search customer..."
-                          value={searchQuery}
-                          onValueChange={setSearchQuery}
-                        />
-                        <CommandList
-                          className="max-h-[200px] overflow-y-auto"
-                          onWheel={(e) => e.stopPropagation()}
-                          onTouchStart={(e) => e.stopPropagation()}
-                          onTouchMove={(e) => e.stopPropagation()}
-                        >
-                          <CommandEmpty>
-                            {searchQuery.trim() ? "No customer found." : "Start typing to search..."}
-                          </CommandEmpty>
-
-                          <CommandGroup heading="Existing Customers">
-                            {customers
-                              .filter(customer =>
-                                !searchQuery || customer.name.toLowerCase().includes(searchQuery.toLowerCase())
-                              )
-                              .map((customer) => (
-                                <CommandItem
-                                  key={String(customer._id)}
-                                  value={customer.name}
-                                  onSelect={() => handleCustomerSelect(customer)}
-                                >
-                                  <Check className={cn("mr-2 h-4 w-4", field.value === customer.name ? "opacity-100" : "opacity-0")} />
-                                  <div className="flex-1">
-                                    <span>{customer.name}</span>
-                                    {customer.email && (
-                                      <div className="text-xs text-muted-foreground">
-                                        {customer.email}
-                                      </div>
-                                    )}
-                                  </div>
-                                </CommandItem>
-                              ))}
-                          </CommandGroup>
-
-                          {searchQuery.trim() && !doesCustomerExist && (
-                            <CommandGroup heading="New Customer">
-                              <CommandItem
-                                onSelect={handleCreateNew}
-                                className="text-primary"
-                                value={searchQuery}
-                              >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Create "{searchQuery}"
-                              </CommandItem>
-                            </CommandGroup>
-                          )}
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                    allowedRoles={['customer']}
+                    showCreateButton={true}
+                    className="w-full"
+                    layout="vertical"
+                  />
                 )}
               />
             </div>
 
-            {/* Date Field - ✅ UPDATED: Using invoiceDate */}
+            {/* Date Field */}
             <div className="space-y-2">
               <Label>Invoice Date</Label>
               <Controller
@@ -661,8 +511,8 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
             )}
           </div>
 
-          {/* Quotation Link Section (Conditional) */}
-          {!isEditMode && customerName && quotations.length > 0 && (
+          {/* Quotation Link Section */}
+          {!isEditMode && partyId && quotations.length > 0 && (
             <div className="space-y-2 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
               <Label className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
                 <FileText className="h-4 w-4" />
@@ -723,6 +573,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
             </div>
           )}
 
+          {/* Items Section */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Items</CardTitle>

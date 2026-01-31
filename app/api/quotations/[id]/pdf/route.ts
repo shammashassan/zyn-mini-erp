@@ -4,6 +4,7 @@ import { renderToStream } from "@react-pdf/renderer";
 import dbConnect from "@/lib/dbConnect";
 import Quotation from "@/models/Quotation";
 import CompanyDetails from "@/models/CompanyDetails";
+import Party from "@/models/Party";
 import { QuotationDocument } from "@/components/QuotationDocument";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 
@@ -35,11 +36,29 @@ export async function GET(
 
     await dbConnect();
 
+    await dbConnect();
+
     // ✅ FIXED: Allow finding soft-deleted quotations for PDF generation
-    const quotation = await Quotation.findById(id).setOptions({ includeDeleted: true });
+    // Ensure Party model is registered
+    const _ensureModels = [Party];
+
+    const quotation = await Quotation.findById(id)
+      .setOptions({ includeDeleted: true })
+      .populate('partyId');
 
     if (!quotation) {
       return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+    }
+
+    // Prepare quotation with details
+    let quotationWithDetails = quotation.toObject();
+
+    // Populate contact details from partyId if available
+    if (quotation.partyId) {
+      const party = quotation.partyId as any;
+      quotationWithDetails.partyName = party.name || party.company;
+      quotationWithDetails.partyPhone = party.phone || '';
+      quotationWithDetails.partyEmail = party.email || '';
     }
 
     // Fetch Company Details
@@ -55,7 +74,7 @@ export async function GET(
     }
 
     const documentElement = React.createElement(QuotationDocument, {
-      bill: quotation,
+      bill: quotationWithDetails,
       companyDetails,
     });
 

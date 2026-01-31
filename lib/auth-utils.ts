@@ -86,7 +86,8 @@ export function validateRequiredFields(
   fields: string[]
 ): { error: NextResponse | null; isValid: boolean } {
   for (const field of fields) {
-    if (!body[field]) {
+    const value = body[field];
+    if (value === undefined || value === null || value === "") {
       return {
         error: NextResponse.json(
           { error: `${field} is required` },

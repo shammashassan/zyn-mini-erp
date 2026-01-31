@@ -1,4 +1,4 @@
-// app/api/credit-notes/[id]/route.ts - UPDATED: Support Return Note Linking
+// app/api/credit-notes/[id]/route.ts - FINAL: Using Party/Contact snapshots
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -10,6 +10,7 @@ import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { handleCreditNoteStatusChange } from '@/utils/journalAutoCreate';
 import { voidJournalsForReference } from '@/utils/journalManager';
 import { getUserInfo } from "@/lib/auth-helpers";
+import { createPartySnapshot } from "@/utils/partySnapshot";
 
 interface RequestContext {
   params: Promise<{
@@ -33,7 +34,7 @@ export async function GET(request: Request, context: RequestContext) {
     const creditNote = await CreditNote.findById(id)
       .populate({
         path: 'connectedDocuments.returnNoteId',
-        select: 'returnNumber invoiceReference customerName',
+        select: 'returnNumber invoiceReference',
         match: { isDeleted: false }
       })
       .populate({
@@ -41,6 +42,10 @@ export async function GET(request: Request, context: RequestContext) {
         model: 'Voucher',
         select: 'invoiceNumber grandTotal voucherType',
         match: { isDeleted: false }
+      })
+      .populate({
+        path: 'partyId',
+        select: 'name company type roles'
       });
 
     if (!creditNote) {
@@ -100,6 +105,33 @@ export async function PUT(request: Request, context: RequestContext) {
       return NextResponse.json({
         error: "Cannot update a deleted credit note. Please restore it first."
       }, { status: 400 });
+    }
+
+    // ✅ Handle party/contact changes - update snapshots
+    if (body.partyId && body.partyId !== currentCreditNote.partyId.toString()) {
+      console.log(`🔄 Party changed for credit note ${id}, updating snapshots`);
+
+      const { partySnapshot, contactSnapshot } = await createPartySnapshot(
+        body.partyId,
+        body.contactId
+      );
+
+      body.partySnapshot = partySnapshot;
+      body.contactSnapshot = contactSnapshot;
+
+      console.log(`   Old Party: ${currentCreditNote.partySnapshot.displayName}`);
+      console.log(`   New Party: ${partySnapshot.displayName}`);
+    }
+    // ✅ If only contact changed (same party)
+    else if (body.contactId && body.contactId !== currentCreditNote.contactId?.toString()) {
+      console.log(`🔄 Contact changed for credit note ${id}, updating contact snapshot`);
+
+      const { contactSnapshot } = await createPartySnapshot(
+        currentCreditNote.partyId.toString(),
+        body.contactId
+      );
+
+      body.contactSnapshot = contactSnapshot;
     }
 
     const oldStatus = currentCreditNote.status;

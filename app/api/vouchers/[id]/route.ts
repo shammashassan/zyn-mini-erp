@@ -1,4 +1,4 @@
-// app/api/vouchers/[id]/route.ts
+// app/api/vouchers/[id]/route.ts - PUT and DELETE operations
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -12,6 +12,7 @@ import { softDelete } from "@/utils/softDelete";
 import { voidJournalsForReference } from '@/utils/journalManager';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { formatCurrency } from "@/utils/formatters/currency";
+import { createPartySnapshot } from "@/utils/partySnapshot";
 
 interface RequestContext {
   params: Promise<{
@@ -93,6 +94,35 @@ export async function PUT(request: Request, context: RequestContext) {
       return NextResponse.json({
         error: "Cannot update a deleted voucher. Please restore it first."
       }, { status: 400 });
+    }
+
+    // ✅ Handle party/contact changes - update snapshots
+    if (body.partyId && body.partyId !== currentVoucher.partyId?.toString()) {
+      console.log(`🔄 Party changed for voucher ${id}, updating snapshots`);
+
+      const { partySnapshot, contactSnapshot } = await createPartySnapshot(
+        body.partyId,
+        body.contactId
+      );
+
+      body.partySnapshot = partySnapshot;
+      body.contactSnapshot = contactSnapshot;
+
+      console.log(`   Old Party: ${currentVoucher.partySnapshot?.displayName || 'None'}`);
+      console.log(`   New Party: ${partySnapshot.displayName}`);
+    }
+    // ✅ If only contact changed (same party)
+    else if (body.contactId && body.contactId !== currentVoucher.contactId?.toString()) {
+      console.log(`🔄 Contact changed for voucher ${id}, updating contact snapshot`);
+
+      if (currentVoucher.partyId) {
+        const { contactSnapshot } = await createPartySnapshot(
+          currentVoucher.partyId.toString(),
+          body.contactId
+        );
+
+        body.contactSnapshot = contactSnapshot;
+      }
     }
 
     const changes = detectChanges(currentVoucher.toObject(), body);
@@ -777,6 +807,7 @@ export async function DELETE(request: Request, context: RequestContext) {
         }
       }
     }
+
     await voidJournalsForReference(
       voucher._id,
       user.id,

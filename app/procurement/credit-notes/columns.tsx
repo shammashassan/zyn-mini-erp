@@ -1,4 +1,4 @@
-// app/procurement/credit-notes/columns.tsx - UPDATED: Support Return Note
+// app/procurement/credit-notes/columns.tsx - FINAL: Using Party snapshots for display
 
 "use client";
 
@@ -19,7 +19,7 @@ import {
   CreditCard,
   Receipt,
 } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -51,16 +51,35 @@ import { toast } from "sonner";
 export interface CreditNote {
   _id: string;
   creditNoteNumber: string;
-  returnNoteId?: string | any;
-  returnNumber?: string;
-  customerName?: string;
-  customerId?: string;
-  supplierName?: string;
-  supplierId?: string;
-  payeeName?: string;
-  payeeId?: string;
-  vendorName?: string;
+
+  // ✅ Party & Contact References (Dynamic - Current Truth)
+  partyId: any;
+  contactId?: string;
+
+  // ✅ Snapshots (Frozen - Legal Truth) - Optional for backward compatibility
+  partySnapshot?: {
+    displayName: string;
+    address?: {
+      street?: string;
+      city?: string;
+      district?: string;
+      state?: string;
+      country?: string;
+      postalCode?: string;
+    };
+    taxIdentifiers?: {
+      vatNumber?: string;
+    };
+  };
+  contactSnapshot?: {
+    name: string;
+    phone?: string;
+    email?: string;
+    designation?: string;
+  };
+
   items: Array<{
+    productId?: string;
     description: string;
     quantity: number;
     price: number;
@@ -84,6 +103,7 @@ export interface CreditNote {
   remainingAmount: number;
   paymentStatus: "pending" | "paid" | "partially paid";
   connectedDocuments?: {
+    returnNoteId?: string | any;
     paymentIds?: (string | any)[];
   };
   isDeleted: boolean;
@@ -402,44 +422,27 @@ export const getColumns = (
     },
     {
       id: "partyName",
-      accessorFn: (row) => row.customerName || row.supplierName || row.payeeName || row.vendorName || "",
+      accessorKey: "partySnapshot.displayName",
       header: "Party",
       cell: ({ row }) => {
-        const creditNote = row.original;
+        // ✅ Use snapshot as primary, fallback to populated party
+        const name = row.original.partySnapshot?.displayName
+          || row.original.partyId?.company
+          || row.original.partyId?.name
+          || "Unknown";
 
-        if (creditNote.customerName) {
-          return (
-            <Badge variant="primary" appearance="outline" className="gap-1">
-              {creditNote.customerName}
-            </Badge>
-          );
-        }
+        const party = row.original.partyId;
+        const roles = party?.roles || {};
 
-        if (creditNote.supplierName) {
-          return (
-            <Badge variant="warning" appearance="outline" className="gap-1">
-              {creditNote.supplierName}
-            </Badge>
-          );
-        }
+        let variant = "secondary";
+        if (roles.supplier) variant = "warning";
+        else if (roles.customer) variant = "primary";
 
-        if (creditNote.payeeName) {
-          return (
-            <Badge variant="cyan" appearance="outline" className="gap-1">
-              {creditNote.payeeName}
-            </Badge>
-          );
-        }
-
-        if (creditNote.vendorName) {
-          return (
-            <Badge variant="secondary" appearance="outline" className="gap-1">
-              {creditNote.vendorName}
-            </Badge>
-          );
-        }
-
-        return <span className="text-muted-foreground">Not Specified</span>;
+        return (
+          <Badge variant={variant as any} appearance="outline" className="gap-1">
+            {name}
+          </Badge>
+        );
       },
       meta: {
         label: "Party",

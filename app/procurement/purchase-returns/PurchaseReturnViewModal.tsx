@@ -13,6 +13,7 @@ import {
   PackageX,
   Calendar,
   User,
+  CircleUserRound,
   ShoppingCart,
   CheckCircle,
   Clock,
@@ -30,7 +31,8 @@ interface PurchaseReturn {
   returnType: 'purchaseReturn';
 
   purchaseReference?: string;
-  supplierName?: string;
+  partyId?: any;
+  partySnapshot?: any;
 
   items: Array<{
     materialName?: string;
@@ -127,9 +129,20 @@ export function PurchaseReturnViewModal({
 
   const documentRef = purchase?.referenceNumber;
 
-  const hasConnectedDocuments = 
+  const hasConnectedDocuments =
     (purchaseReturn.connectedDocuments?.purchaseId && typeof purchaseReturn.connectedDocuments.purchaseId === 'object') ||
     (purchaseReturn.connectedDocuments?.debitNoteId && typeof purchaseReturn.connectedDocuments.debitNoteId === 'object');
+
+  const party = purchaseReturn.partyId as any;
+  const partySnapshot = purchaseReturn.partySnapshot as any;
+  const contactSnapshot = (purchaseReturn as any).contactSnapshot;
+
+  const partyName = partySnapshot?.displayName || (party?.name || party?.company) || 'Unknown Party';
+
+  const contactName = contactSnapshot?.name;
+  const contactPhone = contactSnapshot?.phone || party?.phone;
+  const contactEmail = contactSnapshot?.email || party?.email;
+  const contactDesignation = contactSnapshot?.designation;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -189,15 +202,15 @@ export function PurchaseReturnViewModal({
                   </div>
                 )}
 
-                {purchaseReturn.supplierName && (
+                {partyName && (
                   <div className="flex items-start gap-3">
                     <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                     <div className="min-w-0">
                       <div className="text-xs sm:text-sm text-muted-foreground">
-                        Supplier
+                        Party
                       </div>
                       <div className="font-medium text-xs sm:text-sm break-words">
-                        {purchaseReturn.supplierName}
+                        {partyName}
                       </div>
                     </div>
                   </div>
@@ -217,17 +230,26 @@ export function PurchaseReturnViewModal({
                   </div>
                 )}
 
-                <div className="flex items-start gap-3">
-                  <PackageX className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
-                  <div>
-                    <div className="text-xs sm:text-sm text-muted-foreground">
-                      Total Materials
-                    </div>
-                    <div className="font-medium text-xs sm:text-sm">
-                      {totalItemsCount} material(s)
+                {contactName && (
+                  <div className="flex items-start gap-3">
+                    <CircleUserRound className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-xs sm:text-sm text-muted-foreground">Contact</div>
+                      <div className="font-medium text-xs sm:text-sm break-words">
+                        {contactName}
+                        {contactDesignation && (
+                          <span className="text-muted-foreground"> ({contactDesignation})</span>
+                        )}
+                      </div>
+                      {contactPhone && (
+                        <div className="text-xs text-muted-foreground">{contactPhone}</div>
+                      )}
+                      {contactEmail && (
+                        <div className="text-xs text-muted-foreground">{contactEmail}</div>
+                      )}
                     </div>
                   </div>
-                </div>
+                )}
 
                 <div className="flex items-start gap-3">
                   <PackageX className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
@@ -377,7 +399,7 @@ export function PurchaseReturnViewModal({
               </div>
             </CardContent>
           </Card>
-          
+
           {hasConnectedDocuments && (
             <Card>
               <CardHeader>
@@ -444,7 +466,7 @@ export function PurchaseReturnViewModal({
                                 <span className="line-through">
                                   {String(change.oldValue)}
                                 </span>
-                                {' →' }
+                                {' →'}
                                 <span className="text-green-600">
                                   {String(change.newValue)}
                                 </span>

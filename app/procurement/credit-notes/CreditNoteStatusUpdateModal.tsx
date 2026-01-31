@@ -21,13 +21,11 @@ import { AlertCircle, Clock, CheckCircle, XCircle } from "lucide-react";
 interface CreditNote {
   _id: string;
   status: 'pending' | 'approved' | 'cancelled';
-  customerName?: string;
-  supplierName?: string;
   payeeName?: string;
-  vendorName?: string;
   totalAmount: number;
   grandTotal?: number;
   vatAmount?: number;
+  partyId?: any; // Unified Party Reference
 }
 
 interface CreditNoteStatusUpdateModalProps {
@@ -55,11 +53,11 @@ const getStatusIcon = (status: string) => {
   }
 };
 
-export function CreditNoteStatusUpdateModal({ 
-  isOpen, 
-  onClose, 
-  creditNote, 
-  onRefresh 
+export function CreditNoteStatusUpdateModal({
+  isOpen,
+  onClose,
+  creditNote,
+  onRefresh
 }: CreditNoteStatusUpdateModalProps) {
   const [initialStatus, setInitialStatus] = useState(creditNote.status);
   const [newStatus, setNewStatus] = useState(creditNote.status);
@@ -77,9 +75,9 @@ export function CreditNoteStatusUpdateModal({
 
   const handleUpdateStatus = async () => {
     setIsLoading(true);
-    
+
     try {
-      const updateData = { 
+      const updateData = {
         status: newStatus
       };
 
@@ -127,11 +125,9 @@ export function CreditNoteStatusUpdateModal({
           {/* Credit Note Info */}
           <div className="rounded-lg border p-3 bg-muted/50 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                {creditNote.customerName ? 'Customer' : creditNote.supplierName ? 'Supplier' : creditNote.payeeName ? 'Payee' : creditNote.vendorName ? 'Vendor' : ''}:
-              </span>
+              <span className="text-muted-foreground">Party:</span>
               <span className="font-medium">
-                {creditNote.customerName || creditNote.supplierName || creditNote.payeeName || creditNote.vendorName || 'N/A'}
+                {creditNote.partyId?.name || creditNote.partyId?.company || 'Unknown Party'}
               </span>
             </div>
             <div className="flex justify-between mt-2">

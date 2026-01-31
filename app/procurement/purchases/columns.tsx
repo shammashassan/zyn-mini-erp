@@ -1,4 +1,4 @@
-// app/procurement/purchases/columns.tsx - UPDATED: Conditional Inventory Status & Payment Button
+// app/procurement/purchases/columns.tsx - FINAL: Using partySnapshot for display
 
 "use client";
 
@@ -20,11 +20,9 @@ import {
   CreditCard,
   AlertCircle,
   FileCheck,
-  FileClock,
-  FileX,
   CircleX
 } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -57,7 +55,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 export type { IPurchase } from "@/models/Purchase";
 
-// ✅ Purchase Status helpers
+// Purchase Status helpers
 const getPurchaseStatusVariant = (status: string) => {
   switch (status) {
     case 'approved': return 'success';
@@ -76,7 +74,7 @@ const getPurchaseStatusIcon = (status: string) => {
   }
 };
 
-// ✅ Inventory Status helpers
+// Inventory Status helpers
 const getInventoryStatusVariant = (status: string) => {
   switch (status) {
     case 'received': return 'success';
@@ -125,7 +123,7 @@ const CreatePaymentButton = ({
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
 
-  // ✅ NEW: Hide button if purchase status is not 'approved'
+  // Hide button if purchase status is not 'approved'
   if (purchase.purchaseStatus !== 'approved') {
     return null;
   }
@@ -184,7 +182,6 @@ const RowActions = ({
   canCreate
 }: RowActionsProps) => {
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
-  const hasPayments = purchase.connectedDocuments?.paymentIds && purchase.connectedDocuments.paymentIds.length > 0;
 
   const canEdit = canUpdate && purchase.purchaseStatus === 'pending';
 
@@ -254,26 +251,6 @@ const RowActions = ({
                   </p>
                 </div>
               )}
-              {/* {["partially paid", "paid"].includes(purchase.paymentStatus) && (
-                <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    💳 This purchase has {purchase.connectedDocuments?.paymentIds?.length ?? 0} connected payment(s)
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    The purchase will be unlinked from payment vouchers, but the vouchers will remain intact.
-                  </p>
-                </div>
-              )}
-              {["partially received", "received"].includes(purchase.inventoryStatus) && (
-                <div className="space-y-3 p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
-                  <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
-                    📦 Inventory has been received for this purchase
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Deleting this purchase may affect stock quantities and linked inventory records.
-                  </p>
-                </div>
-              )} */}
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -309,7 +286,7 @@ export const getColumns = (
   onViewReturnNotePdf?: (returnNote: any) => void
 ): ColumnDef<IPurchase>[] => [
     {
-      accessorKey: "expenseDate", // Changed from "date"
+      accessorKey: "purchaseDate",
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -320,7 +297,7 @@ export const getColumns = (
         </Button>
       ),
       cell: ({ row }) => {
-        const date = new Date(row.original.purchaseDate); // Changed
+        const date = new Date(row.original.purchaseDate);
         return (
           <div className="text-left font-medium min-w-[100px]">
             <div>{formatDisplayDate(date)}</div>
@@ -331,8 +308,8 @@ export const getColumns = (
         );
       },
       sortingFn: (rowA, rowB) => {
-        const dateA = new Date(rowA.original.purchaseDate); // Changed
-        const dateB = new Date(rowB.original.purchaseDate); // Changed
+        const dateA = new Date(rowA.original.purchaseDate);
+        const dateB = new Date(rowB.original.purchaseDate);
         return dateB.getTime() - dateA.getTime();
       },
     },
@@ -353,17 +330,19 @@ export const getColumns = (
       enableColumnFilter: true,
     },
     {
-      id: "supplierName",
-      accessorKey: "supplierName",
+      id: "partyName",
+      accessorKey: "partySnapshot.displayName",
       header: "Supplier",
       cell: ({ row }) => {
-        const supplierName = row.original.supplierName;
-        return supplierName ? (
+        // ✅ Use snapshot as primary, fallback to populated party
+        const name = row.original.partySnapshot?.displayName
+          || (row.original.partyId as any)?.company
+          || (row.original.partyId as any)?.name
+          || "Unknown";
+        return (
           <Badge variant="warning" appearance="outline">
-            {supplierName}
+            {name}
           </Badge>
-        ) : (
-          <span className="text-muted-foreground">-</span>
         );
       },
       meta: {
@@ -463,7 +442,7 @@ export const getColumns = (
         const refresh = onRefresh || (() => { });
         const InventoryIcon = getInventoryStatusIcon(purchase.inventoryStatus);
 
-        // ✅ NEW: Make badge non-clickable if purchase status is not 'approved'
+        // Make badge non-clickable if purchase status is not 'approved'
         const isClickable = canUpdateStatus && purchase.purchaseStatus === 'approved';
 
         return (

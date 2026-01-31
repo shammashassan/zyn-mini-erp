@@ -23,8 +23,8 @@ export const statement = {
   stockAdjustment: ["read", "create", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // People Resources
-  customer: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
-  supplier: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
+  party: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
+  contact: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
   payee: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Documents Resources
@@ -33,7 +33,7 @@ export const statement = {
   voucher: ["read", "create", "soft_delete", "view_trash", "restore", "permanent_delete"],
   debitNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_receipt"],
   creditNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
-  deliveryNote: ["read", "create", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
+  deliveryNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Financial Resources
   purchase: ["read", "create", "update", "update_purchase_status", "update_inventory_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
@@ -80,8 +80,8 @@ export const user = ac.newRole({
   stockAdjustment: ["read", "create"],
 
   // People - View, create, update only
-  customer: ["read", "create", "update"],
-  supplier: ["read", "create", "update"],
+  party: ["read", "create", "update"],
+  contact: ["read", "create", "update"],
   payee: ["read", "create", "update"],
 
   // Documents - View, create, update only
@@ -90,7 +90,7 @@ export const user = ac.newRole({
   voucher: ["read", "create"],
   debitNote: ["read", "create", "update"],
   creditNote: ["read", "create", "update"],
-  deliveryNote: ["read", "create", "update_status"],
+  deliveryNote: ["read", "create", "update", "update_status"],
 
   // Financial - View, create, update only
   purchase: ["read", "create", "update", "update_inventory_status", "update_purchase_status"],
@@ -127,8 +127,8 @@ export const manager = ac.newRole({
   stockAdjustment: ["read", "create", "soft_delete"],
 
   // People - Add soft delete
-  customer: ["read", "create", "update", "soft_delete"],
-  supplier: ["read", "create", "update", "soft_delete"],
+  party: ["read", "create", "update", "soft_delete"],
+  contact: ["read", "create", "update", "soft_delete"],
   payee: ["read", "create", "update", "soft_delete"],
 
   // Documents - Add soft delete, status updates, and create connected docs
@@ -137,7 +137,7 @@ export const manager = ac.newRole({
   voucher: ["read", "create", "soft_delete"],
   debitNote: ["read", "create", "update", "update_status", "soft_delete", "create_receipt"],
   creditNote: ["read", "create", "update", "update_status", "soft_delete", "create_payment"],
-  deliveryNote: ["read", "create", "update_status", "soft_delete"],
+  deliveryNote: ["read", "create", "update", "update_status", "soft_delete"],
 
   // Financial - Add soft delete and payment creation
   purchase: ["read", "create", "update", "update_inventory_status", "update_purchase_status", "soft_delete", "create_payment"],
@@ -182,8 +182,8 @@ export const admin = ac.newRole({
   stockAdjustment: ["read", "create", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // People - Full access
-  customer: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
-  supplier: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
+  party: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
+  contact: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
   payee: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Documents - Full access
@@ -192,7 +192,7 @@ export const admin = ac.newRole({
   voucher: ["read", "create", "soft_delete", "view_trash", "restore", "permanent_delete"],
   debitNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_receipt"],
   creditNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
-  deliveryNote: ["read", "create", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
+  deliveryNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Financial - Full access
   purchase: ["read", "create", "update", "update_inventory_status", "update_purchase_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
@@ -241,8 +241,8 @@ export const owner = ac.newRole({
   stockAdjustment: ["read", "create", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // People - Full access
-  customer: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
-  supplier: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
+  party: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
+  contact: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
   payee: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Documents - Full access
@@ -251,7 +251,7 @@ export const owner = ac.newRole({
   voucher: ["read", "create", "soft_delete", "view_trash", "restore", "permanent_delete"],
   debitNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_receipt"],
   creditNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],
-  deliveryNote: ["read", "create", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
+  deliveryNote: ["read", "create", "update", "update_status", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
   // Financial - Full access
   purchase: ["read", "create", "update", "update_inventory_status", "update_purchase_status", "soft_delete", "view_trash", "restore", "permanent_delete", "create_payment"],

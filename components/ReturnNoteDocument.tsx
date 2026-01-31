@@ -15,6 +15,13 @@ const styles = StyleSheet.create({
 
   entityName: { fontSize: 11, fontWeight: 'bold', color: pdfColors.textMain, marginBottom: 2 },
   entityDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
+  labelRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 },
+  inlineLabel: { fontSize: 9, color: pdfColors.primary, marginRight: 6, fontWeight: 'bold' },
+
+  // New Styles for label-only layout
+  labelOnly: { marginBottom: 4 },
+  standAloneLabel: { fontSize: 9, color: pdfColors.primary, fontWeight: 'bold' },
+
   dateInfo: { alignItems: 'flex-end' },
   dateLabel: { fontSize: 7, color: pdfColors.textMuted, marginBottom: 2 },
   dateValue: { fontSize: 10, fontWeight: 'bold', color: pdfColors.primary },
@@ -157,15 +164,11 @@ const styles = StyleSheet.create({
   },
 });
 
-interface PopulatedPurchase { _id: string; referenceNumber: string; supplierName?: string; }
-interface PopulatedInvoice { _id: string; invoiceNumber: string; customerName?: string; }
+interface PopulatedPurchase { _id: string; referenceNumber: string; }
+interface PopulatedInvoice { _id: string; invoiceNumber: string; }
 
 interface ReturnNoteDocumentProps {
   returnNote: IReturnNote & {
-    supplierPhone?: string;
-    supplierEmail?: string;
-    customerPhone?: string;
-    customerEmail?: string;
     connectedDocuments?: {
       purchaseId?: PopulatedPurchase | string;
       invoiceId?: PopulatedInvoice | string;
@@ -191,7 +194,17 @@ export const ReturnNoteDocument: React.FC<ReturnNoteDocumentProps> = ({ returnNo
 
   const isPurchaseReturn = returnNote.returnType === 'purchaseReturn';
   const isSalesReturn = returnNote.returnType === 'salesReturn';
-  const entityName = isPurchaseReturn ? returnNote.supplierName : returnNote.customerName;
+
+  // Use snapshots for party information
+  const partyName = returnNote.partySnapshot.displayName;
+  const partyAddress = returnNote.partySnapshot.address;
+  // const partyVAT = returnNote.partySnapshot.taxIdentifiers?.vatNumber;
+
+  // Use contact snapshot for contact details
+  const contactName = returnNote.contactSnapshot?.name;
+  const contactDesignation = returnNote.contactSnapshot?.designation;
+  const contactPhone = returnNote.contactSnapshot?.phone;
+  const contactEmail = returnNote.contactSnapshot?.email;
 
   const purchase = typeof returnNote.connectedDocuments?.purchaseId === 'object' ? returnNote.connectedDocuments.purchaseId as PopulatedPurchase : null;
   const invoice = typeof returnNote.connectedDocuments?.invoiceId === 'object' ? returnNote.connectedDocuments.invoiceId as PopulatedInvoice : null;
@@ -227,6 +240,11 @@ export const ReturnNoteDocument: React.FC<ReturnNoteDocumentProps> = ({ returnNo
     rightSigLabel = "Received By (Supplier)\n(Name, Signature & Date)";
   }
 
+  // Check if there's any additional info beyond party name
+  const hasAdditionalInfo = contactName || contactPhone || contactEmail ||
+    (partyAddress && (partyAddress.street || partyAddress.city || partyAddress.state ||
+      partyAddress.postalCode || partyAddress.country));
+
   return (
     <Document>
       <Page size="A4" style={commonStyles.page}>
@@ -243,12 +261,41 @@ export const ReturnNoteDocument: React.FC<ReturnNoteDocumentProps> = ({ returnNo
 
         <View style={commonStyles.infoBar}>
           <View style={{ flex: 1 }}>
-            <Text style={commonStyles.sectionLabel}>{entityLabel}:</Text>
-            <Text style={styles.entityName}>{entityName}</Text>
-            {isPurchaseReturn && returnNote.supplierPhone && <Text style={styles.entityDetail}>{returnNote.supplierPhone}</Text>}
-            {isPurchaseReturn && returnNote.supplierEmail && <Text style={styles.entityDetail}>{returnNote.supplierEmail}</Text>}
-            {isSalesReturn && returnNote.customerPhone && <Text style={styles.entityDetail}>{returnNote.customerPhone}</Text>}
-            {isSalesReturn && returnNote.customerEmail && <Text style={styles.entityDetail}>{returnNote.customerEmail}</Text>}
+            {hasAdditionalInfo ? (
+              /* Has Contact Info or Address */
+              <>
+                <View style={styles.labelRow}>
+                  <Text style={styles.inlineLabel}>{entityLabel}:</Text>
+                  <Text style={styles.entityName}>{partyName}</Text>
+                </View>
+                {contactName && (
+                  <Text style={styles.entityDetail}>
+                    {contactName}{contactDesignation && ` (${contactDesignation})`}
+                  </Text>
+                )}
+                {contactPhone && <Text style={styles.entityDetail}>{contactPhone}</Text>}
+                {contactEmail && <Text style={styles.entityDetail}>{contactEmail}</Text>}
+                {partyAddress && (
+                  <Text style={styles.entityDetail}>
+                    {[
+                      partyAddress.street,
+                      partyAddress.city,
+                      partyAddress.state,
+                      partyAddress.postalCode,
+                      partyAddress.country
+                    ].filter(Boolean).join(', ')}
+                  </Text>
+                )}
+              </>
+            ) : (
+              /* Only Party Name - No Additional Info */
+              <>
+                <View style={styles.labelOnly}>
+                  <Text style={styles.standAloneLabel}>{entityLabel}:</Text>
+                </View>
+                <Text style={styles.entityName}>{partyName}</Text>
+              </>
+            )}
           </View>
           <View style={styles.dateInfo}>
             <Text style={styles.dateLabel}>Return Date</Text>

@@ -13,7 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 interface DeletedCreditNote {
   _id: string;
   creditNoteNumber?: string;
-  customerName?: string;
+  partyId?: any; // Populated
   items?: Array<{
     description: string;
     quantity: number;
@@ -33,9 +33,9 @@ interface DeletedCreditNote {
 
 export default function CreditNotesTrashPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const { 
-    permissions: { canViewTrash }, 
-    isPending 
+  const {
+    permissions: { canViewTrash },
+    isPending
   } = useCreditNotePermissions();
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export default function CreditNotesTrashPage() {
   if (!isMounted || isPending) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
   }
@@ -73,7 +73,11 @@ export default function CreditNotesTrashPage() {
         const deletedByUsername = deleteAction?.username || item.deletedBy || 'Unknown';
         const displayTotal = item.grandTotal || (item.totalAmount || 0) + (item.vatAmount || 0);
         const statusBadge = item.status ? ` • ${item.status}` : '';
-        return `${item.customerName || 'Unknown Customer'} • ${totalQuantity} units • ${formatCurrency(displayTotal)}${statusBadge} • Deleted by @${deletedByUsername}`;
+
+        const party = item.partyId;
+        const name = party?.name || party?.company || 'Unknown Party';
+
+        return `${name} • ${totalQuantity} units • ${formatCurrency(displayTotal)}${statusBadge} • Deleted by @${deletedByUsername}`;
       }}
     />
   );

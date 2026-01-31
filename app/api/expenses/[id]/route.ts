@@ -4,13 +4,13 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Expense from "@/models/Expense";
 import Payee from "@/models/Payee";
-import Supplier from "@/models/Supplier";
 import Voucher from "@/models/Voucher";
 import { softDelete } from "@/utils/softDelete";
 import { getUserInfo } from "@/lib/auth-helpers";
 import { voidJournalsForReference } from '@/utils/journalManager';
 import { handleExpenseStatusChange } from '@/utils/journalAutoCreate';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
+import { createPayeeSnapshot } from "@/utils/partySnapshot";
 
 interface RequestContext {
   params: Promise<{
@@ -21,7 +21,7 @@ interface RequestContext {
 function detectChanges(oldExpense: any, newData: any) {
   const changes: Array<{ field: string; oldValue: any; newValue: any }> = [];
   const fieldsToTrack = ['amount', 'category', 'paymentMethod', 'vendor', 'notes', 'description', 'expenseDate', 'status']; // ✅ UPDATED: Changed from 'date' to 'expenseDate'
-  
+
   for (const field of fieldsToTrack) {
     if (newData[field] !== undefined && oldExpense[field] !== newData[field]) {
       changes.push({
@@ -43,6 +43,8 @@ export async function GET(request: Request, context: RequestContext) {
     if (error) return error;
 
     await dbConnect();
+
+    const _ensuremodel = [Payee, Voucher];
     const { id } = await context.params;
 
     const expense = await Expense.findById(id)
@@ -57,11 +59,6 @@ export async function GET(request: Request, context: RequestContext) {
         model: 'Payee',
         select: 'name type email phone'
       })
-      .populate({
-        path: 'supplierId',
-        model: 'Supplier',
-        select: 'name email city'
-      });
 
     if (!expense) {
       return NextResponse.json({ error: "Expense not found" }, { status: 404 });
@@ -92,21 +89,21 @@ export async function PUT(request: Request, context: RequestContext) {
     if (!currentExpense) {
       return NextResponse.json({ error: "Expense not found" }, { status: 404 });
     }
-    
+
     // Permission check for editing approved expenses
-    const isSystemUpdate = Object.keys(body).every(k => 
+    const isSystemUpdate = Object.keys(body).every(k =>
       ['connectedDocuments', 'paidAmount', 'paymentStatus', 'status', 'remainingAmount'].includes(k)
     );
 
     if (currentExpense.status === 'approved' && !isSystemUpdate) {
-       if (body.status === 'approved' || !body.status) {
-         return NextResponse.json({ 
-          error: `Cannot edit details of an approved expense. Please change status to Pending first.` 
+      if (body.status === 'approved' || !body.status) {
+        return NextResponse.json({
+          error: `Cannot edit details of an approved expense. Please change status to Pending first.`
         }, { status: 400 });
-       }
+      }
     }
 
-    // ✅ Handle payeeName - auto-create if provided
+    // ✅ Handle payee changes - update snapshot
     if (body.payeeName && body.payeeName.trim()) {
       const payee = await Payee.findOneAndUpdate(
         { name: body.payeeName.trim() },
@@ -125,48 +122,27 @@ export async function PUT(request: Request, context: RequestContext) {
       );
 
       body.payeeId = payee._id;
-      delete body.payeeName;
-      delete body.vendor;
-      delete body.supplierId;
-      delete body.supplierName;
-    }
-    // ✅ Handle supplierName - auto-create if provided
-    else if (body.supplierName && body.supplierName.trim()) {
-      const supplier = await Supplier.findOneAndUpdate(
-        { name: body.supplierName.trim() },
-        {
-          $setOnInsert: {
-            name: body.supplierName.trim(),
-            email: '',
-            vatNumber: '',
-            district: '',
-            city: '',
-            street: '',
-            buildingNo: '',
-            postalCode: '',
-            contactNumbers: [],
-            isDeleted: false,
-            createdBy: user.id,
-          }
-        },
-        { upsert: true, new: true }
-      );
 
-      body.supplierId = supplier._id;
-      delete body.supplierName;
-      delete body.vendor;
-      delete body.payeeId;
+      // ✅ Update snapshot when payee changes
+      if (body.payeeId !== currentExpense.payeeId?.toString()) {
+        console.log(`🔄 Payee changed for expense ${id}, updating snapshot`);
+        body.payeeSnapshot = await createPayeeSnapshot(payee._id);
+
+        console.log(`   Old Payee: ${currentExpense.payeeSnapshot?.name || 'None'}`);
+        console.log(`   New Payee: ${body.payeeSnapshot?.name}`);
+      }
+
       delete body.payeeName;
+      delete body.vendor;
     }
     // Manual vendor - keep as is, clean up other fields
     else if (body.vendor !== undefined) {
       delete body.payeeId;
       delete body.payeeName;
-      delete body.supplierId;
-      delete body.supplierName;
+      delete body.payeeSnapshot; // Clear snapshot for manual vendor
     }
 
-    // ✅ UPDATED: Sync expenseDate with legacy date field
+    // ✅ Sync expenseDate with legacy date field
     if (body.expenseDate) {
       body.date = body.expenseDate;
     }
@@ -191,7 +167,7 @@ export async function PUT(request: Request, context: RequestContext) {
     });
 
     await currentExpense.save();
-    
+
     // Status Change Logic
     if (oldStatus !== newStatus) {
       await handleExpenseStatusChange(
@@ -221,29 +197,29 @@ export async function DELETE(request: Request, context: RequestContext) {
     await dbConnect();
     const { id } = await context.params;
     const user = await getUserInfo();
-    
+
     const expense = await Expense.findById(id);
-    
+
     if (!expense) {
       return NextResponse.json({ error: "Expense not found" }, { status: 404 });
     }
-    
+
     if (expense.isDeleted) {
       return NextResponse.json({ error: "Expense already deleted" }, { status: 400 });
     }
-    
+
     await voidJournalsForReference(
       expense._id,
       user.id,
       user.username,
       'Expense soft deleted'
     );
-    
+
     const deletedExpense = await softDelete(Expense, id, user.id, user.username);
-    
-    return NextResponse.json({ 
+
+    return NextResponse.json({
       message: "Expense soft deleted successfully",
-      expense: deletedExpense 
+      expense: deletedExpense
     });
   } catch (error) {
     console.error(`Failed to delete expense:`, error);

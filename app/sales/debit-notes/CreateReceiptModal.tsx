@@ -1,4 +1,4 @@
-// app/sales/debit-notes/CreateReceiptModal.tsx - FIXED: Proper Party Handling
+// app/sales/debit-notes/CreateReceiptModal.tsx - COMPLETE MIGRATION: Using snapshots for display
 
 "use client";
 
@@ -85,6 +85,13 @@ export function CreateReceiptModal({
 
       console.log(`Creating receipt voucher for debit note ${debitNote.debitNoteNumber} - ${formatCurrency(amount)} via ${paymentMethod}`);
 
+      // ✅ Extract party/contact IDs from references
+      const partyId = typeof debitNote.partyId === 'object'
+        ? debitNote.partyId._id
+        : debitNote.partyId;
+
+      const contactId = debitNote.contactId;
+
       // Build receipt data with proper party information
       const receiptData: any = {
         voucherType: "receipt",
@@ -96,26 +103,11 @@ export function CreateReceiptModal({
         },
         totalAmount: amount,
         grandTotal: amount,
-      };
 
-      // Add party information to receipt
-      if (debitNote.supplierName) {
-        receiptData.supplierName = debitNote.supplierName;
-        if (debitNote.supplierId) receiptData.supplierId = debitNote.supplierId;
-      } else if (debitNote.customerName) {
-        receiptData.customerName = debitNote.customerName;
-        if (debitNote.customerId) receiptData.customerId = debitNote.customerId;
-      } else if (debitNote.payeeName) {
-        receiptData.payeeName = debitNote.payeeName;
-        if (debitNote.payeeId) receiptData.payeeId = debitNote.payeeId;
-      } else if (debitNote.vendorName) {
-        receiptData.vendorName = debitNote.vendorName;
-      } else {
-        // Fallback - this should not happen but just in case
-        toast.error("Debit note is missing party information");
-        setIsLoading(false);
-        return;
-      }
+        // ✅ Use party/contact references (not snapshots - receipts create their own snapshots)
+        partyId: partyId,
+        contactId: contactId,
+      };
 
       // Create receipt voucher
       const receiptRes = await fetch("/api/vouchers", {
@@ -165,8 +157,25 @@ export function CreateReceiptModal({
     }
   };
 
-  // Determine party display name
-  const partyName = debitNote.supplierName || debitNote.customerName || debitNote.payeeName || debitNote.vendorName || "N/A";
+  // ✅ Safe extraction of party display name with fallback chain
+  const getPartyDisplayName = () => {
+    // 1. Try snapshot (immutable legal truth)
+    if (debitNote.partySnapshot?.displayName) {
+      return debitNote.partySnapshot.displayName;
+    }
+
+    // 2. Try populated partyId
+    if (debitNote.partyId) {
+      const party = debitNote.partyId;
+      if (typeof party === 'object') {
+        return party.company || party.name || 'Unknown Party';
+      }
+    }
+
+    return 'Unknown Party';
+  };
+
+  const displayName = getPartyDisplayName();
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -184,9 +193,14 @@ export function CreateReceiptModal({
         <div className="space-y-4">
           {/* Debit Note Summary */}
           <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Party:</span>
-              <span className="text-sm font-medium">{partyName}</span>
+            <div className="col-span-2 space-y-2">
+              <Label className="text-xs text-muted-foreground">Party</Label>
+              <Input
+                value={displayName}
+                readOnly
+                disabled
+                className="bg-muted"
+              />
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Total Amount:</span>

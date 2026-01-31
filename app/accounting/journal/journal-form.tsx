@@ -47,6 +47,7 @@ import type { IJournal } from "@/models/Journal";
 import type { IChartOfAccount } from "@/models/ChartOfAccount";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { Spinner } from "@/components/ui/spinner";
+import { PartyContactSelector } from "@/components/PartyContactSelector";
 
 type JournalEntry = {
   accountCode: string;
@@ -105,11 +106,11 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
   const [accounts, setAccounts] = useState<IChartOfAccount[]>([]);
   const [accountPopovers, setAccountPopovers] = useState<Record<number, boolean>>({});
 
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [payees, setPayees] = useState<any[]>([]);
-  const [partyPopoverOpen, setPartyPopoverOpen] = useState(false);
-  const [partySearchQuery, setPartySearchQuery] = useState("");
+  // const [customers, setCustomers] = useState<any[]>([]);
+  // const [suppliers, setSuppliers] = useState<any[]>([]);
+  // const [payees, setPayees] = useState<any[]>([]);
+  // const [partyPopoverOpen, setPartyPopoverOpen] = useState(false);
+  // const [partySearchQuery, setPartySearchQuery] = useState("");
   const [refTypeOpen, setRefTypeOpen] = useState(false);
   const [refTypeSearchQuery, setRefTypeSearchQuery] = useState("");
 
@@ -140,24 +141,6 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
           const accountsData = await accountsRes.json();
           setAccounts(accountsData);
         }
-
-        const customersRes = await fetch("/api/customers");
-        if (customersRes.ok) {
-          const customersData = await customersRes.json();
-          setCustomers(customersData);
-        }
-
-        const suppliersRes = await fetch("/api/suppliers");
-        if (suppliersRes.ok) {
-          const suppliersData = await suppliersRes.json();
-          setSuppliers(suppliersData);
-        }
-
-        const payeesRes = await fetch("/api/payees");
-        if (payeesRes.ok) {
-          const payeesData = await payeesRes.json();
-          setPayees(payeesData);
-        }
       } catch (error) {
         console.error("Failed to fetch data:", error);
       }
@@ -187,7 +170,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
           referenceType: defaultValues.referenceType,
           referenceNumber: defaultValues.referenceNumber || "",
           partyType: defaultValues.partyType,
-          partyId: defaultValues.partyId,
+          partyId: (defaultValues.partyId as any)?._id?.toString() || defaultValues.partyId?.toString(),
           partyName: defaultValues.partyName,
           narration: defaultValues.narration,
           entries: defaultValues.entries || [
@@ -196,7 +179,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
           ],
           status: defaultValues.status,
         });
-        setPartySearchQuery(defaultValues.partyName || "");
+        // setPartySearchQuery(defaultValues.partyName || "");
         setRefTypeSearchQuery(defaultValues.referenceType || "");
       } else {
         reset({
@@ -214,7 +197,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
           ],
           status: 'draft',
         });
-        setPartySearchQuery("");
+        // setPartySearchQuery("");
       }
     }
   }, [isOpen, defaultValues, reset]);
@@ -228,6 +211,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
     }
   };
 
+  /*
   const handlePartySelect = (partyType: 'Customer' | 'Supplier' | 'Payee', party: any) => {
     setValue('partyType', partyType, { shouldDirty: true });
     setValue('partyId', party._id, { shouldDirty: true });
@@ -242,6 +226,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
     setValue('partyName', undefined, { shouldDirty: true });
     setPartySearchQuery("");
   };
+  */
 
   const handleDebitChange = (index: number, value: string) => {
     const numValue = parseFloat(value);
@@ -304,17 +289,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
     await onSubmit(submitData, submissionId);
   };
 
-  const getCurrentPartyList = () => {
-    switch (watchedPartyType) {
-      case 'Customer': return customers;
-      case 'Supplier': return suppliers;
-      case 'Payee': return payees;
-      case 'Vendor': return [];
-      default: return [];
-    }
-  };
-
-  const currentPartyList = getCurrentPartyList();
+  // Placeholder comment
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -374,13 +349,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                 render={({ field }) => (
                   <Popover
                     open={refTypeOpen}
-                    onOpenChange={(isOpen) => {
-                      setRefTypeOpen(isOpen);
-                      if (isOpen) {
-                        const type = referenceTypes.find(t => t.value === field.value);
-                        setRefTypeSearchQuery(type ? type.label : "");
-                      }
-                    }}
+                    onOpenChange={setRefTypeOpen}
                   >
                     <PopoverTrigger asChild>
                       <Button
@@ -417,7 +386,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                                   value={type.label}
                                   onSelect={() => {
                                     field.onChange(type.value);
-                                    setRefTypeSearchQuery(type.label);
+                                    setRefTypeSearchQuery(""); // Clear search on select
                                     setRefTypeOpen(false);
                                   }}
                                 >
@@ -479,117 +448,46 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
             <CardHeader>
               <CardTitle className="text-sm flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                Optional References (for filtering)
+                Optional Party References (for filtering)
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Party Reference
-                </Label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Controller
-                    name="partyType"
-                    control={control}
-                    render={({ field }) => (
-                      <Select
-                        value={field.value || ''}
-                        onValueChange={(value) => {
-                          field.onChange(value || undefined);
-                          setValue('partyId', undefined, { shouldDirty: true });
-                          setValue('partyName', undefined, { shouldDirty: true });
-                          setPartySearchQuery("");
-                        }}
-                      >
-                        <SelectTrigger className="w-full sm:w-[120px]">
-                          <SelectValue placeholder="Type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Customer">Customer</SelectItem>
-                          <SelectItem value="Supplier">Supplier</SelectItem>
-                          <SelectItem value="Payee">Payee</SelectItem>
-                          <SelectItem value="Vendor">Vendor</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-
-                  {watchedPartyType && watchedPartyType !== 'Vendor' && (
-                    <Popover
-                      open={partyPopoverOpen}
-                      onOpenChange={(open) => {
-                        setPartyPopoverOpen(open);
-                        if (open) setPartySearchQuery(watch('partyName') || "");
+                <Controller
+                  name="partyId"
+                  control={control}
+                  render={({ field }) => (
+                    <PartyContactSelector
+                      allowedRoles={['customer', 'supplier', 'payee', 'vendor']}
+                      value={{
+                        partyId: field.value || '',
+                        // Convert from form's capitalized format to component's lowercase format
+                        partyType: watch('partyType')?.toLowerCase() as 'customer' | 'supplier' | 'payee' | 'vendor' | undefined,
+                        partyName: watch('partyName')
                       }}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          role="combobox"
-                          className="flex-1 justify-between"
-                        >
-                          <span className="truncate">
-                            {watch('partyName') || `Select ${watchedPartyType?.toLowerCase()}...`}
-                          </span>
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[300px] p-0">
-                        <Command shouldFilter={false}>
-                          <CommandInput
-                            placeholder={`Search ${watchedPartyType?.toLowerCase()}s...`}
-                            value={partySearchQuery}
-                            onValueChange={setPartySearchQuery}
-                          />
-                          <CommandList
-                            className="max-h-[200px] overflow-y-auto"
-                            onWheel={(e) => e.stopPropagation()}
-                            onTouchStart={(e) => e.stopPropagation()}
-                            onTouchMove={(e) => e.stopPropagation()}
-                          >
-                            <CommandEmpty>No {watchedPartyType?.toLowerCase()} found.</CommandEmpty>
-                            <CommandGroup>
-                              {currentPartyList
-                                .filter(party => !partySearchQuery || party.name.toLowerCase().includes(partySearchQuery.toLowerCase()))
-                                .map((party) => (
-                                  <CommandItem
-                                    key={party._id}
-                                    value={party.name}
-                                    onSelect={() => handlePartySelect(watchedPartyType!, party)}
-                                  >
-                                    <Check className={cn("mr-2 h-4 w-4", watch('partyId') === party._id ? "opacity-100" : "opacity-0")} />
-                                    <div className="flex-1">
-                                      <div>{party.name}</div>
-                                      {party.email && (
-                                        <div className="text-xs text-muted-foreground">{party.email}</div>
-                                      )}
-                                    </div>
-                                  </CommandItem>
-                                ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  )}
+                      onChange={(val, party) => {
+                        field.onChange(val.partyId);
 
-                  {watchedPartyType === 'Vendor' && (
-                    <Input
-                      placeholder="Enter vendor name..."
-                      value={watch('partyName') || ''}
-                      onChange={(e) => setValue('partyName', e.target.value, { shouldDirty: true })}
-                      className="flex-1"
+                        // Update partyType - convert from component's lowercase to form's capitalized format
+                        if (val.partyType) {
+                          const capitalizedType = (val.partyType.charAt(0).toUpperCase() + val.partyType.slice(1)) as 'Customer' | 'Supplier' | 'Payee' | 'Vendor';
+                          setValue('partyType', capitalizedType, { shouldDirty: true });
+                        }
+
+                        // Update partyName from component or party object
+                        if (val.partyName) {
+                          setValue('partyName', val.partyName, { shouldDirty: true });
+                        } else if (party) {
+                          setValue('partyName', party.name || party.company || "Selected Party", { shouldDirty: true });
+                        }
+                      }}
+                      showContactSelector={false}
+                      showCreateButton={true}
+                      layout="horizontal"
+                      className="w-full"
                     />
                   )}
-
-                  {watch('partyId') && (
-                    <Button type="button" variant="ghost" size="icon" onClick={clearParty} className="shrink-0">
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+                />
               </div>
             </CardContent>
           </Card>

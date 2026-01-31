@@ -13,7 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 interface DeletedInvoice {
   _id: string;
   invoiceNumber: string;
-  customerName?: string;
+  partyId?: any; // Populated
   grandTotal?: number;
   paymentStatus?: string;
   deletedAt?: Date | string;
@@ -22,9 +22,9 @@ interface DeletedInvoice {
 
 export default function InvoicesTrashPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const { 
-    permissions: { canViewTrash }, 
-    isPending 
+  const {
+    permissions: { canViewTrash },
+    isPending
   } = useInvoicePermissions();
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export default function InvoicesTrashPage() {
   if (!isMounted || isPending) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
   }
@@ -54,9 +54,11 @@ export default function InvoicesTrashPage() {
       backUrl="../invoices"
       backLabel="Back to Invoices"
       getItemName={(item) => item.invoiceNumber || "Unnamed Invoice"}
-      getItemDescription={(item) => 
-        `${item.customerName || 'Unknown Customer'} • ${formatCurrency(item.grandTotal || 0.00)} • ${item.paymentStatus || 'N/A'}`
-      }
+      getItemDescription={(item) => {
+        const party = item.partyId;
+        const name = party?.name || party?.company || 'Unknown Party';
+        return `${name} • ${formatCurrency(item.grandTotal || 0.00)} • ${item.paymentStatus || 'N/A'}`;
+      }}
     />
   );
 }

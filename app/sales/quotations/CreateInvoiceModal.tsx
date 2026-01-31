@@ -1,4 +1,4 @@
-// app/sales/quotations/CreateInvoiceModal.tsx - FIXED: Pass discount and set status to pending
+// app/sales/quotations/CreateInvoiceModal.tsx - FINAL: No legacy fields
 
 "use client";
 
@@ -127,20 +127,19 @@ export function CreateInvoiceModal({
       console.log("Creating new invoice from quotation");
 
       // Generate notes - use custom notes if provided, otherwise auto-generate
-      const invoiceNotes = notes.trim() 
-        ? notes 
+      const invoiceNotes = notes.trim()
+        ? notes
         : `Created from quotation ${quotation.invoiceNumber}`;
 
       const invoiceRes = await fetch("/api/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customerName: quotation.customerName,
-          customerPhone: quotation.customerPhone,
-          customerEmail: quotation.customerEmail,
-          status: "pending", // ✅ FIXED: Set to pending instead of approved
+          partyId: quotation.partyId,
+          contactId: quotation.contactId,
+          status: "pending",
           items: quotation.items,
-          discount: quotation.discount || 0, // ✅ FIXED: Pass discount from quotation
+          discount: quotation.discount || 0,
           invoiceDate: new Date(),
           notes: invoiceNotes,
           connectedDocuments: {
@@ -201,6 +200,12 @@ export function CreateInvoiceModal({
     }
   };
 
+  // Get display name from snapshot with fallback
+  const customerName = quotation.partySnapshot?.displayName
+    || quotation.partyId?.company
+    || quotation.partyId?.name
+    || 'Unknown Customer';
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
@@ -213,9 +218,9 @@ export function CreateInvoiceModal({
 
         <div className="space-y-4">
           <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Customer:</span>
-              <span className="text-sm font-medium">{quotation.customerName}</span>
+            <div className="col-span-2">
+              <Label className="text-xs text-muted-foreground mb-1 block">Customer</Label>
+              <div className="text-sm font-medium">{customerName}</div>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Quotation:</span>

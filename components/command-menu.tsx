@@ -37,7 +37,8 @@ import {
   Factory,
   Bell,
   Undo2,
-  Redo2
+  Redo2,
+  User
 } from "lucide-react";
 
 import {
@@ -65,8 +66,8 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Stock Adjustment": { stockAdjustment: ["read"] },
 
   // People
-  "Customers": { customer: ["read"] },
-  "Suppliers": { supplier: ["read"] },
+  "Parties": { party: ["read"] },
+  "Contacts": { contact: ["read"] },
   "Payees": { payee: ["read"] },
 
   // Sales
@@ -127,8 +128,8 @@ const navigationData = [
   { title: "Stock Adjustment", url: "/inventory/stock-adjustment", icon: ArrowRightLeft, group: "Inventory" },
 
   // People
-  { title: "Customers", url: "/people/customers", icon: Users, group: "People" },
-  { title: "Suppliers", url: "/people/suppliers", icon: Building2, group: "People" },
+  { title: "Parties", url: "/people/parties", icon: Users, group: "People" },
+  { title: "Contacts", url: "/people/contacts", icon: User, group: "People" },
   { title: "Payees", url: "/people/payees", icon: Users, group: "People" },
 
   // Sales

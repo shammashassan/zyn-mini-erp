@@ -1,3 +1,5 @@
+// components/VoucherDocument.tsx - Using party snapshots for PDF generation
+
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
 import type { IVoucher } from '@/models/Voucher';
@@ -18,7 +20,7 @@ const styles = StyleSheet.create({
   watermark: {
     position: 'absolute', top: '40%', left: '25%', fontSize: 60, color: '#f0f0f0', opacity: 0.06, transform: 'rotate(-45deg)', fontWeight: 'bold',
   },
-  
+
   titleSection: {
     backgroundColor: pdfColors.primaryDark, padding: '7 15', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
@@ -57,26 +59,79 @@ const styles = StyleSheet.create({
   itemQty: { width: '12%', fontSize: 7, color: pdfColors.textDark, textAlign: 'center' },
   itemRate: { width: '15%', fontSize: 7, color: pdfColors.textDark, textAlign: 'right' },
   itemAmount: { width: '15%', fontSize: 7, color: pdfColors.textDark, textAlign: 'right', fontWeight: 'bold' },
+
+  partyValueContainer: {
+    flexDirection: 'column',
+  },
+  partyName: {
+    fontSize: 7.5,
+    color: '#000000',
+  },
+  contactText: {
+    fontSize: 6.5,
+    color: '#999999',
+    marginTop: 1,
+  },
 });
 
 interface VoucherDocumentProps {
-  bill: IVoucher;
+  bill: IVoucher & {
+    partySnapshot?: {
+      displayName: string;
+      address?: {
+        street?: string;
+        city?: string;
+        district?: string;
+        state?: string;
+        country?: string;
+        postalCode?: string;
+      };
+      taxIdentifiers?: {
+        vatNumber?: string;
+      };
+    };
+    contactSnapshot?: {
+      name: string;
+      phone?: string;
+      email?: string;
+      designation?: string;
+    };
+  };
   companyDetails: ICompanyDetails | null;
 }
 
 export const VoucherDocument: React.FC<VoucherDocumentProps> = ({ bill, companyDetails }) => {
   registerPdfFonts();
-  
+
   const type = bill.voucherType || (bill as any).documentType;
   const isReceipt = type === 'receipt';
   const voucherTitle = isReceipt ? 'RECEIPT VOUCHER' : 'PAYMENT VOUCHER';
   const partyLabel = isReceipt ? 'Received From' : 'Paid To';
-  
-  let partyName = '';
-  if (isReceipt) {
-    partyName = bill.customerName || bill.supplierName || bill.payeeName || (bill as any).vendorName || '';
-  } else {
-    partyName = bill.supplierName || bill.payeeName || (bill as any).vendorName || bill.customerName || '';
+
+  // ✅ Use snapshots for party/contact display (immutable legal truth)
+  let partyName = 'Walk-in Customer';
+  let partyAddress = null;
+  let partyVAT = null;
+  let contactName = null;
+  let contactPhone = null;
+  let contactEmail = null;
+  let contactDesignation = null;
+
+  if (bill.partySnapshot) {
+    partyName = bill.partySnapshot.displayName;
+    partyAddress = bill.partySnapshot.address;
+    partyVAT = bill.partySnapshot.taxIdentifiers?.vatNumber;
+  } else if (bill.payeeName) {
+    partyName = bill.payeeName;
+  } else if (bill.vendorName) {
+    partyName = bill.vendorName;
+  }
+
+  if (bill.contactSnapshot) {
+    contactName = bill.contactSnapshot.name;
+    contactPhone = bill.contactSnapshot.phone;
+    contactEmail = bill.contactSnapshot.email;
+    contactDesignation = bill.contactSnapshot.designation;
   }
 
   const connectedInvoiceIds = bill.connectedDocuments?.invoiceIds || [];
@@ -122,11 +177,20 @@ export const VoucherDocument: React.FC<VoucherDocumentProps> = ({ bill, companyD
 
         <View style={styles.content}>
           <View>
-            <View style={styles.table}>
-              <View style={styles.tableRow}>
-                <Text style={styles.tableLabel}>{partyLabel}</Text>
-                <Text style={styles.tableValue}>{partyName || 'Walk-in Customer'}</Text>
+            {/* Party Information Row */}
+            <View style={styles.tableRow}>
+              <Text style={styles.tableLabel}>{partyLabel}</Text>
+              <View style={[styles.tableValue, styles.partyValueContainer]}>
+                <Text style={styles.partyName}>{partyName}</Text>
+                {(contactName || contactPhone) && (
+                  <Text style={styles.contactText}>
+                    {contactName}
+                  </Text>
+                )}
               </View>
+            </View>
+
+            <View style={styles.table}>
               {connectedInvoiceIds.length > 0 && (
                 <View style={styles.tableRow}><Text style={styles.tableLabel}>Agst Invoice(s)</Text><Text style={styles.tableValue}>{connectedInvoicesDisplay}</Text></View>
               )}

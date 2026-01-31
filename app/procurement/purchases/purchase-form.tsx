@@ -1,4 +1,4 @@
-// app/procurement/purchases/purchase-form.tsx - UPDATED: Populated combobox inputs
+// app/procurement/purchases/purchase-form.tsx - FINAL: Using PartyContactSelector, no legacy fields
 
 "use client";
 
@@ -43,10 +43,10 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { IPurchase } from "@/models/Purchase";
 import type { IMaterial } from "@/models/Material";
-import type { ISupplier } from "@/models/Supplier";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 import { Spinner } from "@/components/ui/spinner";
+import { PartyContactSelector } from "@/components/PartyContactSelector";
 
 type PurchaseItem = {
   materialId: string;
@@ -58,11 +58,11 @@ type PurchaseItem = {
 };
 
 type PurchaseFormData = {
-  supplierName: string;
+  partyId: string;
+  contactId?: string;
   items: PurchaseItem[];
   purchaseDate: Date;
   purchaseStatus: 'pending' | 'approved' | 'cancelled';
-  inventoryStatus: 'pending' | 'received' | 'partially received';
   discount: number;
   isTaxPayable: boolean;
 };
@@ -85,12 +85,13 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
     formState: { isSubmitting, isDirty }
   } = useForm<PurchaseFormData>({
     defaultValues: {
+      partyId: "",
+      contactId: undefined,
       items: [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
       purchaseDate: new Date(),
       discount: 0,
       isTaxPayable: true,
       purchaseStatus: 'pending',
-      inventoryStatus: 'pending',
     }
   });
 
@@ -100,9 +101,6 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
   });
 
   const [materials, setMaterials] = useState<IMaterial[]>([]);
-  const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
-  const [supplierPopoverOpen, setSupplierPopoverOpen] = useState(false);
-  const [supplierSearchQuery, setSupplierSearchQuery] = useState("");
   const [materialPopovers, setMaterialPopovers] = useState<Record<number, boolean>>({});
   const [materialSearchQueries, setMaterialSearchQueries] = useState<Record<number, string>>({});
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
@@ -117,12 +115,12 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
   }, []);
 
   const watchedItems = watch("items");
-  const discount = watch("discount") || 0;
+  const discount = watch("discount");
   const isTaxPayable = watch("isTaxPayable");
 
   const isEditMode = !!defaultValues?._id;
 
-  // Calculate with discount
+  // Calculate totals
   const grossTotal = watchedItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
   const subtotal = grossTotal - discount;
   const vatAmount = isTaxPayable ? subtotal * (UAE_VAT_PERCENTAGE / 100) : 0;
@@ -130,46 +128,44 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
   const totalItems = watchedItems.filter(item => item.materialId).length;
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchMaterials = async () => {
       try {
-        const [materialsRes, suppliersRes] = await Promise.all([
-          fetch("/api/materials"),
-          fetch("/api/suppliers")
-        ]);
-
+        const materialsRes = await fetch("/api/materials");
         if (materialsRes.ok) setMaterials(await materialsRes.json());
-        if (suppliersRes.ok) setSuppliers(await suppliersRes.json());
       } catch (error) {
-        console.error("Failed to fetch data:", error);
+        console.error("Failed to fetch materials:", error);
       }
     };
-    fetchData();
+    fetchMaterials();
   }, []);
 
   useEffect(() => {
     if (isOpen) {
       if (defaultValues) {
+        // ✅ Extract party/contact IDs correctly
+        const partyIdValue = typeof defaultValues.partyId === 'object'
+          ? (defaultValues.partyId as any)._id
+          : defaultValues.partyId;
+
         reset({
-          supplierName: defaultValues.supplierName || "",
+          partyId: partyIdValue || "",
+          contactId: defaultValues.contactId?.toString() || undefined,
           items: defaultValues.items || [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
-          purchaseDate: defaultValues.date ? new Date(defaultValues.date) : new Date(),
+          purchaseDate: defaultValues.purchaseDate ? new Date(defaultValues.purchaseDate) : new Date(),
           purchaseStatus: defaultValues.purchaseStatus || 'pending',
-          inventoryStatus: defaultValues.inventoryStatus || 'pending',
           discount: defaultValues.discount || 0,
           isTaxPayable: defaultValues.isTaxPayable !== undefined ? defaultValues.isTaxPayable : true,
         });
-        setSupplierSearchQuery(defaultValues.supplierName || "");
       } else {
         reset({
-          supplierName: "",
+          partyId: "",
+          contactId: undefined,
           items: [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
           purchaseDate: new Date(),
           purchaseStatus: 'pending',
-          inventoryStatus: 'pending',
           discount: 0,
           isTaxPayable: true,
         });
-        setSupplierSearchQuery("");
       }
     }
   }, [isOpen, defaultValues, reset]);
@@ -177,9 +173,9 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
   const handleMaterialSelect = (index: number, materialId: string) => {
     const material = materials.find(m => m._id === materialId);
     if (material) {
-      setValue(`items.${index}.materialId`, materialId);
-      setValue(`items.${index}.materialName`, material.name);
-      setValue(`items.${index}.unitCost`, material.unitCost);
+      setValue(`items.${index}.materialId`, materialId, { shouldDirty: true });
+      setValue(`items.${index}.materialName`, material.name, { shouldDirty: true });
+      setValue(`items.${index}.unitCost`, material.unitCost, { shouldDirty: true });
 
       const quantity = parseFloat(String(watchedItems[index].quantity)) || 1;
       setValue(`items.${index}.total`, quantity * material.unitCost, { shouldDirty: true });
@@ -190,17 +186,17 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
   };
 
   const handleCreateCustomMaterial = (index: number, materialName: string) => {
-    setValue(`items.${index}.materialId`, "");
-    setValue(`items.${index}.materialName`, materialName.trim());
-    setValue(`items.${index}.shouldCreateMaterial`, false);
+    setValue(`items.${index}.materialId`, "", { shouldDirty: true });
+    setValue(`items.${index}.materialName`, materialName.trim(), { shouldDirty: true });
+    setValue(`items.${index}.shouldCreateMaterial`, false, { shouldDirty: true });
     setMaterialPopovers(prev => ({ ...prev, [index]: false }));
     setMaterialSearchQueries(prev => ({ ...prev, [index]: "" }));
   };
 
   const handleMarkForMaterialCreation = (index: number, materialName: string) => {
-    setValue(`items.${index}.materialId`, "");
-    setValue(`items.${index}.materialName`, materialName.trim());
-    setValue(`items.${index}.shouldCreateMaterial`, true);
+    setValue(`items.${index}.materialId`, "", { shouldDirty: true });
+    setValue(`items.${index}.materialName`, materialName.trim(), { shouldDirty: true });
+    setValue(`items.${index}.shouldCreateMaterial`, true, { shouldDirty: true });
     setMaterialPopovers(prev => ({ ...prev, [index]: false }));
     setMaterialSearchQueries(prev => ({ ...prev, [index]: "" }));
     toast.info("Material will be created when purchase is submitted");
@@ -219,6 +215,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
   const handleUnitCostChange = (index: number, value: string) => {
     const unitCost = parseFloat(value);
     const quantity = Number(watchedItems[index].quantity) || 0;
+    setValue(`items.${index}.unitCost`, isNaN(unitCost) ? 0 : unitCost, { shouldDirty: true });
     if (!isNaN(unitCost)) {
       setValue(`items.${index}.total`, quantity * unitCost, { shouldDirty: true });
     } else {
@@ -227,8 +224,9 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
   };
 
   const handleFormSubmit = async (data: PurchaseFormData) => {
-    if (!data.supplierName || !data.supplierName.trim()) {
-      toast.error("Please select or enter a supplier");
+    // ✅ Validation
+    if (!data.partyId) {
+      toast.error("Please select a supplier (Party)");
       return;
     }
 
@@ -263,13 +261,64 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
       return;
     }
 
+    // ✅ Create materials for items marked for creation (only on new purchases)
+    if (!isEditMode) {
+      const itemsWithMaterialIds = await Promise.all(
+        validItems.map(async (item) => {
+          if (item.shouldCreateMaterial && item.materialName && !item.materialId) {
+            try {
+              const materialPayload = {
+                name: item.materialName.trim(),
+                type: "General",
+                unit: "pieces",
+                unitCost: Number(item.unitCost) || 0,
+                stock: 0,
+              };
+
+              const response = await fetch("/api/materials", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(materialPayload),
+              });
+
+              if (response.ok) {
+                const newMaterial = await response.json();
+                toast.success(`Material "${item.materialName}" created`);
+                return {
+                  ...item,
+                  materialId: newMaterial._id,
+                  shouldCreateMaterial: false,
+                };
+              } else {
+                const error = await response.json();
+                toast.error(`Failed to create material "${item.materialName}"`, {
+                  description: error.error || "Continuing with custom item"
+                });
+                return { ...item, shouldCreateMaterial: false };
+              }
+            } catch (error) {
+              console.error("Error creating material:", error);
+              toast.error(`Failed to create material "${item.materialName}"`);
+              return { ...item, shouldCreateMaterial: false };
+            }
+          }
+          return item;
+        })
+      );
+
+      // Use the processed items
+      validItems.splice(0, validItems.length, ...itemsWithMaterialIds);
+    }
+
     // Calculate amounts with discount
     const calculatedSubtotal = itemsGrossTotal - discountAmount;
     const calculatedVatAmount = data.isTaxPayable ? calculatedSubtotal * (UAE_VAT_PERCENTAGE / 100) : 0;
     const calculatedGrandTotal = calculatedSubtotal + calculatedVatAmount;
 
     const submitData = {
-      supplierName: data.supplierName.trim(),
+      partyId: data.partyId,
+      contactId: data.contactId,
+      purchaseDate: data.purchaseDate,
       items: validItems.map(item => ({
         ...item,
         quantity: Number(item.quantity) || 0,
@@ -280,7 +329,6 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
       isTaxPayable: data.isTaxPayable,
       vatAmount: calculatedVatAmount,
       grandTotal: calculatedGrandTotal,
-      date: data.purchaseDate,
       purchaseStatus: isEditMode ? data.purchaseStatus : 'pending',
       inventoryStatus: isEditMode ? (defaultValues?.inventoryStatus || 'pending') : 'pending',
       paymentStatus: 'pending',
@@ -303,98 +351,30 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
         </DialogHeader>
 
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+          {/* Main Top Grid */}
           <div className={cn("grid grid-cols-1 gap-4", isEditMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
-            <div className="space-y-2">
-              <Label>Supplier <span className="text-destructive">*</span></Label>
+            {/* ✅ Supplier Field - PartyContactSelector */}
+            <div>
               <Controller
-                name="supplierName"
+                name="partyId"
                 control={control}
                 render={({ field }) => (
-                  <Popover
-                    open={supplierPopoverOpen}
-                    onOpenChange={(isOpen) => {
-                      setSupplierPopoverOpen(isOpen);
-                      if (isOpen) setSupplierSearchQuery(field.value);
+                  <PartyContactSelector
+                    value={{ partyId: field.value, contactId: watch('contactId') }}
+                    onChange={(val) => {
+                      field.onChange(val.partyId);
+                      setValue('contactId', val.contactId);
                     }}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        ref={field.ref}
-                        type="button"
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                      >
-                        {field.value || "Select or type supplier..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                      <Command shouldFilter={false}>
-                        <CommandInput
-                          placeholder="Search supplier..."
-                          value={supplierSearchQuery}
-                          onValueChange={setSupplierSearchQuery}
-                        />
-                        <CommandList
-                          className="max-h-[200px] overflow-y-auto"
-                          onWheel={(e) => e.stopPropagation()}
-                          onTouchStart={(e) => e.stopPropagation()}
-                          onTouchMove={(e) => e.stopPropagation()}
-                        >
-                          <CommandEmpty>
-                            {supplierSearchQuery.trim() ? "No supplier found." : "Start typing to search..."}
-                          </CommandEmpty>
-
-                          <CommandGroup heading="Existing Suppliers">
-                            {suppliers
-                              .filter(s => !supplierSearchQuery || s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase()))
-                              .map((supplier) => (
-                                <CommandItem
-                                  key={supplier._id}
-                                  value={supplier.name}
-                                  onSelect={() => {
-                                    field.onChange(supplier.name);
-                                    setSupplierSearchQuery(supplier.name);
-                                    setSupplierPopoverOpen(false);
-                                  }}
-                                >
-                                  <Check className={cn("mr-2 h-4 w-4", field.value === supplier.name ? "opacity-100" : "opacity-0")} />
-                                  <div className="flex-1">
-                                    <span>{supplier.name}</span>
-                                    {supplier.city && supplier.district && (
-                                      <div className="text-xs text-muted-foreground">
-                                        {supplier.city}, {supplier.district}
-                                      </div>
-                                    )}
-                                  </div>
-                                </CommandItem>
-                              ))}
-                          </CommandGroup>
-
-                          {supplierSearchQuery.trim() && !suppliers.some(s => s.name.toLowerCase() === supplierSearchQuery.trim().toLowerCase()) && (
-                            <CommandGroup heading="New Supplier">
-                              <CommandItem
-                                onSelect={() => {
-                                  field.onChange(supplierSearchQuery.trim());
-                                  setSupplierPopoverOpen(false);
-                                }}
-                                className="text-primary"
-                                value={supplierSearchQuery}
-                              >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Create "{supplierSearchQuery}"
-                              </CommandItem>
-                            </CommandGroup>
-                          )}
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                    allowedRoles={['supplier']}
+                    showCreateButton={true}
+                    className="w-full"
+                    layout="vertical"
+                  />
                 )}
               />
             </div>
 
+            {/* Date Field */}
             <div className="space-y-2">
               <Label>Purchase Date</Label>
               <Controller
@@ -403,7 +383,12 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                 render={({ field }) => (
                   <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
                     <PopoverTrigger asChild>
-                      <Button ref={field.ref} type="button" variant="outline" className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
+                      <Button
+                        ref={field.ref}
+                        type="button"
+                        variant="outline"
+                        className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                      >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {field.value ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
                       </Button>
@@ -425,7 +410,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
               />
             </div>
 
-            {/* Purchase Status (only in edit mode) */}
+            {/* Purchase Status Field (Edit Mode Only) */}
             {isEditMode && (
               <div className="space-y-2">
                 <Label>Purchase Status</Label>
@@ -449,6 +434,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
             )}
           </div>
 
+          {/* Tax Payable Toggle */}
           <Label
             htmlFor="isTaxPayable"
             className={cn(
@@ -478,6 +464,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
             />
           </Label>
 
+          {/* Materials Section */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Materials</CardTitle>
@@ -790,6 +777,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                   })}
                 </div>
               )}
+
               <Button
                 type="button"
                 variant="outline"
@@ -803,6 +791,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
             </CardContent>
           </Card>
 
+          {/* Discount */}
           <div className="space-y-2">
             <Label htmlFor="discount">Discount:</Label>
             <Input
@@ -824,6 +813,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
             />
           </div>
 
+          {/* Totals Summary */}
           <Card className="bg-muted/50">
             <CardContent className="p-6">
               <div className="space-y-3">
@@ -873,13 +863,17 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
               type="submit"
               disabled={isSubmitting || (isEditMode && !isDirty)}
             >
-              {isSubmitting ? (
+              {isSubmitting ? (isEditMode ? (
                 <>
                   <Spinner />
-                  Saving...
+                  Updating...
                 </>
-              )
-                : defaultValues ? "Update Purchase" : "Create Purchase"}
+              ) : (
+                <>
+                  <Spinner />
+                  Creating...
+                </>
+              )) : (isEditMode ? "Update Purchase" : "Create Purchase")}
             </Button>
           </DialogFooter>
         </form>

@@ -1,3 +1,5 @@
+// components/DebitNoteDocument.tsx - FINAL: Using party snapshots for PDF generation
+
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
 import type { IDebitNote } from '@/models/DebitNote';
@@ -18,58 +20,134 @@ const styles = StyleSheet.create({
   rateCol: { width: '20%', textAlign: 'right' },
   totalCol: { width: '25%', textAlign: 'right', fontWeight: 'bold' },
 
-  supplierName: { fontSize: 11, fontWeight: 'bold', color: pdfColors.textMain, marginBottom: 2 },
-  partyDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
+  entityName: { fontSize: 11, fontWeight: 'bold', color: pdfColors.textMain, marginBottom: 2 },
+  entityDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
+  labelRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 },
+  inlineLabel: { fontSize: 9, color: pdfColors.primary, marginRight: 6, fontWeight: 'bold' },
+
+  // New Styles for label-only layout
+  labelOnly: { marginBottom: 4 },
+  standAloneLabel: { fontSize: 9, color: pdfColors.primary, fontWeight: 'bold' },
+
   dateInfo: { alignItems: 'flex-end' },
   dateLabel: { fontSize: 7, color: pdfColors.textMuted, marginBottom: 2 },
   dateValue: { fontSize: 10, fontWeight: 'bold', color: pdfColors.primary },
 
   reasonBox: {
-    backgroundColor: pdfColors.secondary, border: `1.5 solid ${pdfColors.primary}`, borderRadius: 4, padding: 10, marginBottom: 15,
+    backgroundColor: pdfColors.secondary,
+    border: `1.5 solid ${pdfColors.primary}`,
+    borderRadius: 4,
+    padding: 10,
+    marginBottom: 15,
   },
-  reasonLabel: { fontSize: 8, color: pdfColors.primary, fontWeight: 'bold', marginBottom: 4, textTransform: 'uppercase' },
+  reasonLabel: {
+    fontSize: 8,
+    color: pdfColors.primary,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    textTransform: 'uppercase'
+  },
   reasonText: { fontSize: 8.5, color: pdfColors.textDark, lineHeight: 1.4 },
 
   summaryContainer: { marginTop: 20 },
   summaryRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 15 },
   totalsBox: {
-    width: '42%', backgroundColor: pdfColors.white, border: `1.5 solid ${pdfColors.primary}`, borderRadius: 4, overflow: 'hidden',
+    width: '42%',
+    backgroundColor: pdfColors.white,
+    border: `1.5 solid ${pdfColors.primary}`,
+    borderRadius: 4,
+    overflow: 'hidden',
   },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', padding: '6 10', borderBottomWidth: 0.5, borderBottomColor: pdfColors.border },
-  grandTotalRow: { backgroundColor: pdfColors.primary, padding: '8 10', flexDirection: 'row', justifyContent: 'space-between' },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: '6 10',
+    borderBottomWidth: 0.5,
+    borderBottomColor: pdfColors.border
+  },
+  grandTotalRow: {
+    backgroundColor: pdfColors.primary,
+    padding: '8 10',
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
   totalLabel: { fontSize: 8.5, color: pdfColors.textDark },
   totalValue: { fontSize: 8.5, color: pdfColors.textDark, fontWeight: 'bold' },
   grandTotalLabel: { fontSize: 10, fontWeight: 'bold', color: pdfColors.white },
   grandTotalValue: { fontSize: 11, fontWeight: 'bold', color: pdfColors.accent },
 
   amountInWordsBox: {
-    backgroundColor: pdfColors.secondary, border: `1.5 solid ${pdfColors.primary}`, borderRadius: 4, padding: 12, marginBottom: 15,
+    backgroundColor: pdfColors.secondary,
+    border: `1.5 solid ${pdfColors.primary}`,
+    borderRadius: 4,
+    padding: 12,
+    marginBottom: 15,
   },
   amountWordsRow: { marginBottom: 8 },
-  amountWordsLabel: { fontSize: 7, color: pdfColors.primary, fontWeight: 'bold', marginBottom: 3, textTransform: 'uppercase' },
-  amountWordsText: { fontSize: 8, color: pdfColors.textDark, backgroundColor: pdfColors.white, padding: '5 8', borderRadius: 3, border: `0.5 solid ${pdfColors.border}` },
+  amountWordsLabel: {
+    fontSize: 7,
+    color: pdfColors.primary,
+    fontWeight: 'bold',
+    marginBottom: 3,
+    textTransform: 'uppercase'
+  },
+  amountWordsText: {
+    fontSize: 8,
+    color: pdfColors.textDark,
+    backgroundColor: pdfColors.white,
+    padding: '5 8',
+    borderRadius: 3,
+    border: `0.5 solid ${pdfColors.border}`
+  },
 
   bottomSection: { flexDirection: 'row', gap: 15, marginBottom: 10 },
-  bankBox: { flex: 1, backgroundColor: '#f5f5f5', border: `1 solid ${pdfColors.border}`, borderRadius: 4, padding: 10 },
-  termsBox: { flex: 1, backgroundColor: pdfColors.warning, border: `1 solid ${pdfColors.warningBorder}`, borderRadius: 4, padding: 10 },
-  boxTitle: { fontSize: 9, fontWeight: 'bold', color: pdfColors.primary, marginBottom: 6, textTransform: 'uppercase' },
+  bankBox: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    border: `1 solid ${pdfColors.border}`,
+    borderRadius: 4,
+    padding: 10
+  },
+  termsBox: {
+    flex: 1,
+    backgroundColor: pdfColors.warning,
+    border: `1 solid ${pdfColors.warningBorder}`,
+    borderRadius: 4,
+    padding: 10
+  },
+  boxTitle: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: pdfColors.primary,
+    marginBottom: 6,
+    textTransform: 'uppercase'
+  },
   boxContent: { fontSize: 8, color: pdfColors.textDark, lineHeight: 1.4 },
 
-  notesBox: { backgroundColor: pdfColors.warning, border: `1 solid ${pdfColors.warningBorder}`, borderRadius: 4, padding: 10, marginBottom: 10 },
-  notesTitle: { fontSize: 9, fontWeight: 'bold', color: pdfColors.primary, marginBottom: 6, textTransform: 'uppercase' },
+  notesBox: {
+    backgroundColor: pdfColors.warning,
+    border: `1 solid ${pdfColors.warningBorder}`,
+    borderRadius: 4,
+    padding: 10,
+    marginBottom: 10
+  },
+  notesTitle: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: pdfColors.primary,
+    marginBottom: 6,
+    textTransform: 'uppercase'
+  },
   notesContent: { fontSize: 8, color: pdfColors.textDark, lineHeight: 1.4 },
 });
 
-interface PopulatedReturnNote { _id: string; returnNumber: string; }
+interface PopulatedReturnNote {
+  _id: string;
+  returnNumber: string;
+}
 
 interface DebitNoteDocumentProps {
   debitNote: IDebitNote & {
-    supplierPhone?: string;
-    supplierEmail?: string;
-    customerPhone?: string;
-    customerEmail?: string;
-    payeePhone?: string;
-    payeeEmail?: string;
     connectedDocuments?: {
       returnNoteId?: PopulatedReturnNote | string;
     };
@@ -77,7 +155,10 @@ interface DebitNoteDocumentProps {
   companyDetails: ICompanyDetails | null;
 }
 
-export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({ debitNote, companyDetails }) => {
+export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({
+  debitNote,
+  companyDetails
+}) => {
   registerPdfFonts();
 
   // Extract connected return note info
@@ -93,14 +174,22 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({ debitNote,
   const discount = debitNote.discount || 0;
   const grandTotal = debitNote.grandTotal || 0;
 
-  const partyName = debitNote.supplierName || debitNote.customerName || debitNote.payeeName || debitNote.vendorName;
-  let partyLabel = "Supplier";
-  if (debitNote.customerName) partyLabel = "Customer";
-  if (debitNote.payeeName) partyLabel = "Payee";
-  if (debitNote.vendorName) partyLabel = "Vendor";
+  // Use snapshots for PDF (immutable legal truth)
+  const partyName = debitNote.partySnapshot.displayName;
+  const partyAddress = debitNote.partySnapshot.address;
+  // const partyVAT = debitNote.partySnapshot.taxIdentifiers?.vatNumber;
 
+  const contactName = debitNote.contactSnapshot?.name;
+  const contactPhone = debitNote.contactSnapshot?.phone;
+  const contactEmail = debitNote.contactSnapshot?.email;
+  const contactDesignation = debitNote.contactSnapshot?.designation;
 
   const isManualEntry = debitNote.items?.length === 1 && !debitNote.items[0].materialId;
+
+  // Check if there's any additional info beyond party name
+  const hasAdditionalInfo = contactName || contactPhone || contactEmail ||
+    (partyAddress && (partyAddress.street || partyAddress.city || partyAddress.state ||
+      partyAddress.postalCode || partyAddress.country));
 
   return (
     <Document>
@@ -116,15 +205,43 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({ debitNote,
 
         <View style={commonStyles.infoBar}>
           <View style={{ flex: 1 }}>
-            <Text style={commonStyles.sectionLabel}>{partyLabel}:</Text>
-            <Text style={styles.supplierName}>{partyName}</Text>
-            {debitNote.supplierName && debitNote.supplierPhone && <Text style={styles.partyDetail}>{debitNote.supplierPhone}</Text>}
-            {debitNote.supplierName && debitNote.supplierEmail && <Text style={styles.partyDetail}>{debitNote.supplierEmail}</Text>}
-            {debitNote.customerName && debitNote.customerPhone && <Text style={styles.partyDetail}>{debitNote.customerPhone}</Text>}
-            {debitNote.customerName && debitNote.customerEmail && <Text style={styles.partyDetail}>{debitNote.customerEmail}</Text>}
-            {debitNote.payeeName && debitNote.payeePhone && <Text style={styles.partyDetail}>{debitNote.payeePhone}</Text>}
-            {debitNote.payeeName && debitNote.payeeEmail && <Text style={styles.partyDetail}>{debitNote.payeeEmail}</Text>}
+            {hasAdditionalInfo ? (
+              /* Has Contact Info or Address */
+              <>
+                <View style={styles.labelRow}>
+                  <Text style={styles.inlineLabel}>Party:</Text>
+                  <Text style={styles.entityName}>{partyName}</Text>
+                </View>
+                {contactName && (
+                  <Text style={styles.entityDetail}>
+                    {contactName}{contactDesignation && ` (${contactDesignation})`}
+                  </Text>
+                )}
+                {contactPhone && <Text style={styles.entityDetail}>{contactPhone}</Text>}
+                {contactEmail && <Text style={styles.entityDetail}>{contactEmail}</Text>}
+                {partyAddress && (
+                  <Text style={styles.entityDetail}>
+                    {[
+                      partyAddress.street,
+                      partyAddress.city,
+                      partyAddress.state,
+                      partyAddress.postalCode,
+                      partyAddress.country
+                    ].filter(Boolean).join(', ')}
+                  </Text>
+                )}
+              </>
+            ) : (
+              /* Only Party Name - No Additional Info */
+              <>
+                <View style={styles.labelOnly}>
+                  <Text style={styles.standAloneLabel}>Party:</Text>
+                </View>
+                <Text style={styles.entityName}>{partyName}</Text>
+              </>
+            )}
           </View>
+
           <View style={styles.dateInfo}>
             <Text style={styles.dateLabel}>Debit Note Date</Text>
             <Text style={styles.dateValue}>{formatDisplayDate(debitNote.debitDate)}</Text>
@@ -138,18 +255,17 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({ debitNote,
         </View>
 
         <View style={styles.content}>
-
           {(debitNote.reason || isManualEntry) && (
             <View style={styles.reasonBox}>
               {isManualEntry && (
                 <View style={{ marginBottom: debitNote.reason ? 10 : 0 }}>
-                  <Text style={styles.reasonLabel}>Description:</Text>
+                  <Text style={styles.reasonLabel}>Description: </Text>
                   <Text style={styles.reasonText}>{debitNote.items[0].materialName}</Text>
                 </View>
               )}
               {debitNote.reason && (
                 <View>
-                  <Text style={styles.reasonLabel}>Reason:</Text>
+                  <Text style={styles.reasonLabel}>Reason: </Text>
                   <Text style={styles.reasonText}>{debitNote.reason}</Text>
                 </View>
               )}
@@ -168,8 +284,12 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({ debitNote,
                 <View style={commonStyles.tableRow} key={index}>
                   <Text style={[commonStyles.tableCell, styles.descCol]}>{item.materialName}</Text>
                   <Text style={[commonStyles.tableCell, styles.qtyCol]}>{item.quantity}</Text>
-                  <Text style={[commonStyles.tableCell, styles.rateCol]}>{formatCurrency(item.unitCost || 0)}</Text>
-                  <Text style={[commonStyles.tableCell, styles.totalCol]}>{formatCurrency(item.total || 0)}</Text>
+                  <Text style={[commonStyles.tableCell, styles.rateCol]}>
+                    {formatCurrency(item.unitCost || 0)}
+                  </Text>
+                  <Text style={[commonStyles.tableCell, styles.totalCol]}>
+                    {formatCurrency(item.total || 0)}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -193,7 +313,7 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({ debitNote,
                   <Text style={styles.totalValue}>{formatCurrency(subtotal)}</Text>
                 </View>
                 <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>VAT ({UAE_VAT_PERCENTAGE}%)</Text>
+                  <Text style={styles.totalLabel}>VAT ({UAE_VAT_PERCENTAGE}%) </Text>
                   <Text style={styles.totalValue}>{formatCurrency(vatAmount)}</Text>
                 </View>
                 <View style={styles.grandTotalRow}>
@@ -205,13 +325,17 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({ debitNote,
 
             <View style={styles.amountInWordsBox}>
               <View style={styles.amountWordsRow}>
-                <Text style={styles.amountWordsLabel}>Amount in Words:</Text>
-                <Text style={styles.amountWordsText}>Rupees {numberToWords(grandTotal)} Only</Text>
+                <Text style={styles.amountWordsLabel}>Amount in Words: </Text>
+                <Text style={styles.amountWordsText}>
+                  Rupees {numberToWords(grandTotal)} Only
+                </Text>
               </View>
               {vatAmount > 0 && (
                 <View style={styles.amountWordsRow}>
-                  <Text style={styles.amountWordsLabel}>VAT Amount:</Text>
-                  <Text style={styles.amountWordsText}>Rupees {numberToWords(vatAmount)} Only</Text>
+                  <Text style={styles.amountWordsLabel}>VAT Amount: </Text>
+                  <Text style={styles.amountWordsText}>
+                    Rupees {numberToWords(vatAmount)} Only
+                  </Text>
                 </View>
               )}
             </View>

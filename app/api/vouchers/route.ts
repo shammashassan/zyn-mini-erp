@@ -3,19 +3,19 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Voucher from "@/models/Voucher";
-import Customer from "@/models/Customer";
-import Supplier from "@/models/Supplier";
-import Payee from "@/models/Payee";
 import Purchase from "@/models/Purchase";
 import Expense from "@/models/Expense";
 import Invoice from "@/models/Invoice";
 import DebitNote from "@/models/DebitNote";
 import CreditNote from "@/models/CreditNote";
+import Payee from "@/models/Payee";
+import Party from "@/models/Party";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { createJournalForVoucher } from '@/utils/journalAutoCreate';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
+import { createPartySnapshot } from "@/utils/partySnapshot";
 
 export async function GET(request: Request) {
   try {
@@ -25,6 +25,8 @@ export async function GET(request: Request) {
     if (error) return error;
 
     await dbConnect();
+
+    const _ensuremodels = [Voucher, Purchase, Expense, Invoice, DebitNote, CreditNote, Payee, Party];
 
     const { searchParams } = new URL(request.url);
 
@@ -58,8 +60,6 @@ export async function GET(request: Request) {
         const searchRegex = { $regex: partyFilter.value, $options: 'i' };
 
         baseFilter.$or = [
-          { customerName: searchRegex },
-          { supplierName: searchRegex },
           { payeeName: searchRegex },
           { vendorName: searchRegex }
         ];
@@ -101,8 +101,7 @@ export async function GET(request: Request) {
           match: { isDeleted: false }
         },
         { path: 'payeeId', select: 'name type', match: { isDeleted: false } },
-        { path: 'customerId', select: 'name email phone', match: { isDeleted: false } },
-        { path: 'supplierId', select: 'name email', match: { isDeleted: false } }
+        { path: 'partyId', select: 'name company type roles', match: { isDeleted: false } }
       ] : undefined;
 
       const result = await executePaginatedQuery(Voucher, {
@@ -111,7 +110,7 @@ export async function GET(request: Request) {
         sorting,
         page,
         pageSize,
-        defaultSort: { createdAt: -1 },
+        defaultSort: { voucherDate: -1 },
         populate: populateOptions,
       });
 
@@ -125,15 +124,11 @@ export async function GET(request: Request) {
     } else {
       const voucherType = searchParams.get('voucherType');
       const limit = searchParams.get('limit');
-      const customerName = searchParams.get('customerName');
-      const supplierName = searchParams.get('supplierName');
       const payeeName = searchParams.get('payeeName');
       const populate = searchParams.get('populate') === 'true';
 
       const filter: any = { isDeleted: false };
       if (voucherType) filter.voucherType = voucherType;
-      if (customerName) filter.customerName = customerName;
-      if (supplierName) filter.supplierName = supplierName;
       if (payeeName) filter.payeeName = payeeName;
 
       if (startDateParam || endDateParam) {
@@ -176,8 +171,10 @@ export async function GET(request: Request) {
             match: { isDeleted: false }
           })
           .populate('payeeId', 'name type')
-          .populate('customerId', 'name email phone')
-          .populate('supplierId', 'name email');
+          .populate({
+            path: 'partyId',
+            select: 'name company type roles'
+          });
       }
 
       if (limit) {
@@ -211,13 +208,11 @@ export async function POST(request: Request) {
 
     const {
       voucherType,
-      customerName,
-      supplierName,
+      partyId,
+      contactId,
       payeeName,
       payeeId,
       vendorName,
-      customerPhone,
-      customerEmail,
       items,
       paymentMethod,
       notes,
@@ -226,19 +221,20 @@ export async function POST(request: Request) {
       connectedDocuments,
       totalAmount: customTotalAmount,
       grandTotal: customGrandTotal,
-      skipAutoCreation
+      skipAutoCreation,
     } = body;
 
-    // Validation
+    // ✅ Validation
     if (!voucherType || !['receipt', 'payment'].includes(voucherType)) {
       return NextResponse.json({
         error: 'Valid voucherType (receipt or payment) is required'
       }, { status: 400 });
     }
 
-    if (!customerName && !supplierName && !payeeName && !vendorName) {
+    // ✅ Party validation - at least one must be provided
+    if (!partyId && !payeeName && !vendorName) {
       return NextResponse.json({
-        error: 'A valid party (Customer, Supplier, Payee, or Vendor) is required'
+        error: 'A valid party (Party ID, Payee, or Vendor) is required'
       }, { status: 400 });
     }
 
@@ -254,48 +250,24 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Upsert/lookup for all party types
-    let resolvedCustomerId = null;
-    let resolvedSupplierId = null;
-    let resolvedPayeeId = null;
+    // ✅ Create immutable snapshots (if partyId provided)
+    let partySnapshot;
+    let contactSnapshot;
 
-    if (!skipAutoCreation) {
-      if (customerName) {
-        const customerDoc = await Customer.findOneAndUpdate(
-          { name: customerName },
-          { $set: { phone: customerPhone, email: customerEmail } },
-          { upsert: true, new: true }
-        );
-        resolvedCustomerId = customerDoc._id;
-      }
+    if (partyId) {
+      const snapshotResult = await createPartySnapshot(partyId, contactId);
+      partySnapshot = snapshotResult.partySnapshot;
+      contactSnapshot = snapshotResult.contactSnapshot;
+    }
 
-      if (supplierName) {
-        const supplierDoc = await Supplier.findOneAndUpdate(
-          { name: supplierName },
-          {},
-          { upsert: true, new: true }
-        );
-        resolvedSupplierId = supplierDoc._id;
-      }
+    // ✅ Resolve Payee Name if only ID is provided
+    let resolvedPayeeId = payeeId;
+    let finalPayeeName = payeeName;
 
-      if (payeeName && payeeId) {
-        const payeeDoc = await Payee.findById(payeeId);
-        if (payeeDoc) {
-          resolvedPayeeId = payeeDoc._id;
-        }
-      }
-    } else {
-      if (customerName) {
-        const existing = await Customer.findOne({ name: customerName });
-        if (existing) resolvedCustomerId = existing._id;
-      }
-      if (supplierName) {
-        const existing = await Supplier.findOne({ name: supplierName });
-        if (existing) resolvedSupplierId = existing._id;
-      }
-      if (payeeName && payeeId) {
-        const existing = await Payee.findById(payeeId);
-        if (existing) resolvedPayeeId = existing._id;
+    if (resolvedPayeeId && !finalPayeeName) {
+      const payee = await Payee.findById(resolvedPayeeId);
+      if (payee) {
+        finalPayeeName = payee.name;
       }
     }
 
@@ -328,7 +300,12 @@ export async function POST(request: Request) {
           if (invoiceIds.length === 1) {
             const invoice = invoices[0];
             if (invoice.canAllocate(finalGrandTotal)) {
-              allocations.push({ documentId: invoice._id, documentType: 'invoice', amount: finalGrandTotal, createdAt: new Date() });
+              allocations.push({
+                documentId: invoice._id,
+                documentType: 'invoice',
+                amount: finalGrandTotal,
+                createdAt: new Date()
+              });
             }
           } else {
             const totalRemaining = invoices.reduce((sum, inv) => sum + (inv.grandTotal - inv.getTotalAllocated()), 0);
@@ -337,9 +314,16 @@ export async function POST(request: Request) {
               for (let i = 0; i < invoices.length; i++) {
                 const invoice = invoices[i];
                 const invoiceRemaining = invoice.grandTotal - invoice.getTotalAllocated();
-                let allocationAmount = (i === invoices.length - 1) ? remaining : Math.min(Math.round(finalGrandTotal * (invoiceRemaining / totalRemaining) * 100) / 100, invoiceRemaining, remaining);
+                let allocationAmount = (i === invoices.length - 1)
+                  ? remaining
+                  : Math.min(Math.round(finalGrandTotal * (invoiceRemaining / totalRemaining) * 100) / 100, invoiceRemaining, remaining);
                 if (allocationAmount > 0) {
-                  allocations.push({ documentId: invoice._id, documentType: 'invoice', amount: allocationAmount, createdAt: new Date() });
+                  allocations.push({
+                    documentId: invoice._id,
+                    documentType: 'invoice',
+                    amount: allocationAmount,
+                    createdAt: new Date()
+                  });
                   remaining -= allocationAmount;
                 }
               }
@@ -407,7 +391,12 @@ export async function POST(request: Request) {
           if (purchaseIds.length === 1) {
             const purchase = purchases[0];
             if (purchase.canAllocate(finalGrandTotal)) {
-              allocations.push({ documentId: purchase._id, documentType: 'purchase', amount: finalGrandTotal, createdAt: new Date() });
+              allocations.push({
+                documentId: purchase._id,
+                documentType: 'purchase',
+                amount: finalGrandTotal,
+                createdAt: new Date()
+              });
             }
           } else {
             let remaining = finalGrandTotal;
@@ -416,9 +405,16 @@ export async function POST(request: Request) {
               for (let i = 0; i < purchases.length; i++) {
                 const p = purchases[i];
                 const pRem = p.grandTotal - p.getTotalAllocated();
-                let amt = (i === purchases.length - 1) ? remaining : Math.min(Math.round(finalGrandTotal * (pRem / totalRemaining) * 100) / 100, pRem, remaining);
+                let amt = (i === purchases.length - 1)
+                  ? remaining
+                  : Math.min(Math.round(finalGrandTotal * (pRem / totalRemaining) * 100) / 100, pRem, remaining);
                 if (amt > 0) {
-                  allocations.push({ documentId: p._id, documentType: 'purchase', amount: amt, createdAt: new Date() });
+                  allocations.push({
+                    documentId: p._id,
+                    documentType: 'purchase',
+                    amount: amt,
+                    createdAt: new Date()
+                  });
                   remaining -= amt;
                 }
               }
@@ -438,7 +434,12 @@ export async function POST(request: Request) {
           if (expenseIds.length === 1) {
             const exp = expenses[0];
             if (exp.canAllocate(finalGrandTotal)) {
-              allocations.push({ documentId: exp._id, documentType: 'expense', amount: finalGrandTotal, createdAt: new Date() });
+              allocations.push({
+                documentId: exp._id,
+                documentType: 'expense',
+                amount: finalGrandTotal,
+                createdAt: new Date()
+              });
             }
           } else {
             let remaining = finalGrandTotal;
@@ -447,9 +448,16 @@ export async function POST(request: Request) {
               for (let i = 0; i < expenses.length; i++) {
                 const e = expenses[i];
                 const eRem = e.amount - e.getTotalAllocated();
-                let amt = (i === expenses.length - 1) ? remaining : Math.min(Math.round(finalGrandTotal * (eRem / totalRemaining) * 100) / 100, eRem, remaining);
+                let amt = (i === expenses.length - 1)
+                  ? remaining
+                  : Math.min(Math.round(finalGrandTotal * (eRem / totalRemaining) * 100) / 100, eRem, remaining);
                 if (amt > 0) {
-                  allocations.push({ documentId: e._id, documentType: 'expense', amount: amt, createdAt: new Date() });
+                  allocations.push({
+                    documentId: e._id,
+                    documentType: 'expense',
+                    amount: amt,
+                    createdAt: new Date()
+                  });
                   remaining -= amt;
                 }
               }
@@ -470,7 +478,12 @@ export async function POST(request: Request) {
             const creditNote = creditNotes[0];
             const remaining = creditNote.grandTotal - creditNote.getTotalAllocated();
             if (remaining >= finalGrandTotal) {
-              allocations.push({ documentId: creditNote._id, documentType: 'creditNote', amount: finalGrandTotal, createdAt: new Date() });
+              allocations.push({
+                documentId: creditNote._id,
+                documentType: 'creditNote',
+                amount: finalGrandTotal,
+                createdAt: new Date()
+              });
             }
           } else {
             let remaining = finalGrandTotal;
@@ -479,9 +492,16 @@ export async function POST(request: Request) {
               for (let i = 0; i < creditNotes.length; i++) {
                 const cn = creditNotes[i];
                 const cnRem = cn.grandTotal - cn.getTotalAllocated();
-                let amt = (i === creditNotes.length - 1) ? remaining : Math.min(Math.round(finalGrandTotal * (cnRem / totalRemaining) * 100) / 100, cnRem, remaining);
+                let amt = (i === creditNotes.length - 1)
+                  ? remaining
+                  : Math.min(Math.round(finalGrandTotal * (cnRem / totalRemaining) * 100) / 100, cnRem, remaining);
                 if (amt > 0) {
-                  allocations.push({ documentId: cn._id, documentType: 'creditNote', amount: amt, createdAt: new Date() });
+                  allocations.push({
+                    documentId: cn._id,
+                    documentType: 'creditNote',
+                    amount: amt,
+                    createdAt: new Date()
+                  });
                   remaining -= amt;
                 }
               }
@@ -496,15 +516,20 @@ export async function POST(request: Request) {
       invoiceNumber,
       voucherType,
       voucherDate: body.voucherDate ? new Date(body.voucherDate) : new Date(),
-      customerName: customerName || undefined,
-      customerId: resolvedCustomerId || undefined,
-      supplierName: supplierName || undefined,
-      supplierId: resolvedSupplierId || undefined,
-      payeeName: payeeName || undefined,
-      payeeId: resolvedPayeeId || payeeId || undefined,
+
+      // ✅ Party & Contact References
+      partyId: partyId || undefined,
+      contactId: contactId || undefined,
+
+      // ✅ Immutable Snapshots
+      partySnapshot: partySnapshot || undefined,
+      contactSnapshot: contactSnapshot || undefined,
+
+      // ✅ Special Cases
+      payeeName: finalPayeeName || undefined,
+      payeeId: resolvedPayeeId || undefined,
       vendorName: vendorName || undefined,
-      customerPhone,
-      customerEmail,
+
       items,
       notes,
       totalAmount: finalTotalAmount,
@@ -540,21 +565,16 @@ export async function POST(request: Request) {
         await newVoucher.save();
       }
 
-      // ✅ UPDATED: Apply Allocations with CUMULATIVE audit tracking
+      // ✅ Apply Allocations with CUMULATIVE audit tracking
       if (voucherType === 'receipt' && allocations.length > 0) {
         for (const allocation of allocations) {
           if (allocation.documentType === 'invoice') {
             const invoice = await Invoice.findById(allocation.documentId);
             if (invoice && !invoice.isDeleted) {
-              // 📊 Get current total BEFORE allocation
               const oldTotal = invoice.getTotalAllocated();
-
               invoice.allocateReceipt(newVoucher._id, allocation.amount);
-
-              // 📊 Calculate new total AFTER allocation
               const newTotal = oldTotal + allocation.amount;
 
-              // ✅ Add audit entry showing cumulative progression
               invoice.addAuditEntry(
                 'Receipt Voucher Created',
                 user.id,
@@ -578,15 +598,10 @@ export async function POST(request: Request) {
           else if (allocation.documentType === 'debitNote') {
             const debitNote = await DebitNote.findById(allocation.documentId);
             if (debitNote && !debitNote.isDeleted) {
-              // 📊 Get current total BEFORE allocation
               const oldTotal = debitNote.getTotalAllocated();
-
               debitNote.allocateReceipt(newVoucher._id, allocation.amount);
-
-              // 📊 Calculate new total AFTER allocation
               const newTotal = oldTotal + allocation.amount;
 
-              // ✅ Add audit entry showing cumulative progression
               debitNote.addAuditEntry(
                 'Receipt Voucher Created',
                 user.id,
@@ -610,21 +625,16 @@ export async function POST(request: Request) {
         }
       }
 
-      // ✅ UPDATED: Apply allocations to Purchases, Expenses, and Credit Notes with CUMULATIVE audit
+      // ✅ Apply allocations to Purchases, Expenses, and Credit Notes
       if (voucherType === 'payment' && allocations.length > 0) {
         for (const allocation of allocations) {
           if (allocation.documentType === 'purchase') {
             const purchase = await Purchase.findById(allocation.documentId);
             if (purchase && !purchase.isDeleted) {
-              // 📊 Get current total BEFORE allocation
               const oldTotal = purchase.getTotalAllocated();
-
               purchase.allocatePayment(newVoucher._id, allocation.amount);
-
-              // 📊 Calculate new total AFTER allocation
               const newTotal = oldTotal + allocation.amount;
 
-              // ✅ Add audit entry showing cumulative progression
               purchase.addAuditEntry(
                 'Payment Voucher Created',
                 user.id,
@@ -647,15 +657,10 @@ export async function POST(request: Request) {
           } else if (allocation.documentType === 'expense') {
             const expense = await Expense.findById(allocation.documentId);
             if (expense && !expense.isDeleted) {
-              // 📊 Get current total BEFORE allocation
               const oldTotal = expense.getTotalAllocated();
-
               expense.allocatePayment(newVoucher._id, allocation.amount);
-
-              // 📊 Calculate new total AFTER allocation
               const newTotal = oldTotal + allocation.amount;
 
-              // ✅ Add audit entry showing cumulative progression
               expense.addAuditEntry(
                 'Payment Voucher Created',
                 user.id,
@@ -679,15 +684,10 @@ export async function POST(request: Request) {
           else if (allocation.documentType === 'creditNote') {
             const creditNote = await CreditNote.findById(allocation.documentId);
             if (creditNote && !creditNote.isDeleted) {
-              // 📊 Get current total BEFORE allocation
               const oldTotal = creditNote.getTotalAllocated();
-
               creditNote.allocatePayment(newVoucher._id, allocation.amount);
-
-              // 📊 Calculate new total AFTER allocation
               const newTotal = oldTotal + allocation.amount;
 
-              // ✅ Add audit entry showing cumulative progression
               creditNote.addAuditEntry(
                 'Payment Voucher Created',
                 user.id,
@@ -716,6 +716,15 @@ export async function POST(request: Request) {
         await createJournalForVoucher(newVoucher.toObject(), user.id, user.username || user.name);
       } catch (journalError) {
         console.error('Failed to create journal entry:', journalError);
+      }
+
+      console.log(`✅ Successfully created voucher: ${newVoucher.invoiceNumber}`);
+      if (partySnapshot) {
+        console.log(`   Party: ${partySnapshot.displayName}`);
+      } else if (finalPayeeName) {
+        console.log(`   Payee: ${finalPayeeName}`);
+      } else if (vendorName) {
+        console.log(`   Vendor: ${vendorName}`);
       }
 
       return NextResponse.json({

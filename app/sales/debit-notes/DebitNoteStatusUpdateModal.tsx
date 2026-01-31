@@ -1,4 +1,4 @@
-// app/sales/debit-notes/DebitNoteStatusUpdateModal.tsx
+// app/sales/debit-notes/DebitNoteStatusUpdateModal.tsx - COMPLETE MIGRATION: Using snapshots
 
 "use client";
 
@@ -21,13 +21,17 @@ import { AlertCircle, Clock, CheckCircle, XCircle } from "lucide-react";
 interface DebitNote {
   _id: string;
   status: 'pending' | 'approved' | 'cancelled';
-  supplierName?: string;
-  customerName?: string;
-  payeeName?: string;
-  vendorName?: string;
   totalAmount: number;
   grandTotal?: number;
   vatAmount?: number;
+
+  // ✅ Snapshots (primary)
+  partySnapshot?: {
+    displayName: string;
+  };
+
+  // ✅ References (fallback)
+  partyId?: any;
 }
 
 interface DebitNoteStatusUpdateModalProps {
@@ -55,11 +59,11 @@ const getStatusIcon = (status: string) => {
   }
 };
 
-export function DebitNoteStatusUpdateModal({ 
-  isOpen, 
-  onClose, 
-  debitNote, 
-  onRefresh 
+export function DebitNoteStatusUpdateModal({
+  isOpen,
+  onClose,
+  debitNote,
+  onRefresh
 }: DebitNoteStatusUpdateModalProps) {
   const [initialStatus, setInitialStatus] = useState(debitNote.status);
   const [newStatus, setNewStatus] = useState(debitNote.status);
@@ -67,6 +71,11 @@ export function DebitNoteStatusUpdateModal({
 
   const availableStatuses: DebitNote['status'][] = ['pending', 'approved', 'cancelled'];
   const displayTotal = debitNote.grandTotal || (debitNote.totalAmount + (debitNote.vatAmount || 0));
+
+  // ✅ Get party name from snapshot with fallback
+  const partyName = debitNote.partySnapshot?.displayName
+    || (typeof debitNote.partyId === 'object' ? (debitNote.partyId?.company || debitNote.partyId?.name) : '')
+    || 'Unknown Party';
 
   useEffect(() => {
     if (isOpen) {
@@ -77,9 +86,9 @@ export function DebitNoteStatusUpdateModal({
 
   const handleUpdateStatus = async () => {
     setIsLoading(true);
-    
+
     try {
-      const updateData = { 
+      const updateData = {
         status: newStatus
       };
 
@@ -119,10 +128,8 @@ export function DebitNoteStatusUpdateModal({
           {/* Debit Note Info */}
           <div className="rounded-lg border p-3 bg-muted/50 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">{debitNote.supplierName ? 'Supplier' : debitNote.customerName ? 'Customer' : debitNote.payeeName ? 'Payee' : debitNote.vendorName ? 'Vendor' : ''}:</span>
-              <span className="font-medium">
-                {debitNote.supplierName || debitNote.customerName || debitNote.payeeName || debitNote.vendorName || 'N/A'}
-              </span>
+              <span className="text-muted-foreground">Party:</span>
+              <span className="font-medium">{partyName}</span>
             </div>
             <div className="flex justify-between mt-2">
               <span className="text-muted-foreground">Total:</span>

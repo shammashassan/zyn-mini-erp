@@ -1,4 +1,4 @@
-// app/sales/invoices/InvoiceViewModal.tsx
+// app/sales/invoices/InvoiceViewModal.tsx - FINAL: Using snapshots for display
 
 "use client";
 
@@ -24,7 +24,8 @@ import {
   DollarSign,
   CreditCard,
   Percent,
-  Wallet
+  Wallet,
+  AlertTriangle
 } from "lucide-react";
 import type { Invoice } from "./columns";
 import { ConnectedDocumentsBadges } from "./ConnectedDocumentsBadges";
@@ -129,6 +130,34 @@ export function InvoiceViewModal({
 
   const currentData = invoice || initialInvoice || {};
 
+  // ✅ Use snapshot as primary source with populated reference fallback
+  const partyName = currentData.partySnapshot?.displayName
+    || currentData.partyId?.company
+    || currentData.partyId?.name
+    || 'Unknown';
+
+  const partyAddress = currentData.partySnapshot?.address;
+  const partyVAT = currentData.partySnapshot?.taxIdentifiers?.vatNumber
+    || currentData.partyId?.vatNumber;
+
+  const contactName = currentData.contactSnapshot?.name
+    || currentData.contactId?.name;
+
+  const contactPhone = currentData.contactSnapshot?.phone
+    || currentData.contactId?.phone
+    || currentData.partyId?.phone;
+
+  const contactEmail = currentData.contactSnapshot?.email
+    || currentData.contactId?.email
+    || currentData.partyId?.email;
+
+  const contactDesignation = currentData.contactSnapshot?.designation
+    || currentData.contactId?.designation;
+
+  // ✅ Check if party data has changed since snapshot
+  const hasPartyChanged = currentData.partyId && currentData.partySnapshot &&
+    (currentData.partyId.company || currentData.partyId.name) !== currentData.partySnapshot.displayName;
+
   const creatorUsername = getCreatorUsername(currentData);
   const totalItems = currentData.items?.length || 0;
   const totalQuantity = currentData.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0;
@@ -185,6 +214,20 @@ export function InvoiceViewModal({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
+                {/* Party Changed Warning */}
+                {hasPartyChanged && (
+                  <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                    <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                    <div className="text-xs sm:text-sm">
+                      <p className="font-medium text-warning">Party name has changed</p>
+                      <p className="text-muted-foreground">
+                        This invoice was created for "{currentData.partySnapshot.displayName}"
+                        (currently: "{currentData.partyId.company || currentData.partyId.name}")
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   <div className="flex items-start gap-3">
                     <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
@@ -196,14 +239,40 @@ export function InvoiceViewModal({
                     </div>
                   </div>
 
-                  {currentData.customerName && (
+                  {partyName && (
                     <div className="flex items-start gap-3">
                       <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                       <div className="min-w-0">
-                        <div className="text-xs sm:text-sm text-muted-foreground">Customer</div>
+                        <div className="text-xs sm:text-sm text-muted-foreground">Party</div>
                         <div className="font-medium text-xs sm:text-sm break-words">
-                          {currentData.customerName}
+                          {partyName}
                         </div>
+                        {partyVAT && (
+                          <div className="text-xs text-muted-foreground">
+                            VAT: {partyVAT}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {contactName && (
+                    <div className="flex items-start gap-3">
+                      <CircleUserRound className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-xs sm:text-sm text-muted-foreground">Contact</div>
+                        <div className="font-medium text-xs sm:text-sm break-words">
+                          {contactName}
+                          {contactDesignation && (
+                            <span className="text-muted-foreground"> ({contactDesignation})</span>
+                          )}
+                        </div>
+                        {contactPhone && (
+                          <div className="text-xs text-muted-foreground">{contactPhone}</div>
+                        )}
+                        {contactEmail && (
+                          <div className="text-xs text-muted-foreground">{contactEmail}</div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -234,6 +303,22 @@ export function InvoiceViewModal({
                     </div>
                   </div>
                 </div>
+
+                {/* Party Address (from snapshot) */}
+                {/* {partyAddress && (
+                  <div className="pt-3 border-t">
+                    <div className="text-xs sm:text-sm text-muted-foreground mb-2">Party Address</div>
+                    <div className="text-xs sm:text-sm">
+                      {partyAddress.street && <div>{partyAddress.street}</div>}
+                      <div>
+                        {[partyAddress.city, partyAddress.state, partyAddress.postalCode]
+                          .filter(Boolean)
+                          .join(', ')}
+                      </div>
+                      {partyAddress.country && <div>{partyAddress.country}</div>}
+                    </div>
+                  </div>
+                )} */}
               </CardContent>
             </Card>
 

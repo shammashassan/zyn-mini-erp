@@ -19,36 +19,117 @@ const styles = StyleSheet.create({
   rateCol: { width: '20%', textAlign: 'right' },
   totalCol: { width: '25%', textAlign: 'right', fontWeight: 'bold' },
 
-  customerName: { fontSize: 11, fontWeight: 'bold', color: pdfColors.textMain, marginBottom: 2 },
-  customerDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
+  entityName: { fontSize: 11, fontWeight: 'bold', color: pdfColors.textMain, marginBottom: 2 },
+  entityDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
+  labelRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 },
+  inlineLabel: { fontSize: 9, color: pdfColors.primary, marginRight: 6, fontWeight: 'bold' },
+
+  // New Styles for label-only layout
+  labelOnly: { marginBottom: 4 },
+  standAloneLabel: { fontSize: 9, color: pdfColors.primary, fontWeight: 'bold' },
+
   dateInfo: { alignItems: 'flex-end' },
   dateLabel: { fontSize: 7, color: pdfColors.textMuted, marginBottom: 2 },
   dateValue: { fontSize: 10, fontWeight: 'bold', color: pdfColors.primary },
 
   summaryContainer: { marginTop: 20 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 15, marginBottom: 15 },
-  
-  notesBox: { width: '55%', backgroundColor: pdfColors.warning, border: `1 solid ${pdfColors.warningBorder}`, borderRadius: 4, padding: 10 },
-  boxTitle: { fontSize: 9, fontWeight: 'bold', color: pdfColors.primary, marginBottom: 6, textTransform: 'uppercase' },
-  boxContent: { fontSize: 8, color: pdfColors.textDark, lineHeight: 1.4 },
-  
-  totalsBox: { width: '40%', backgroundColor: pdfColors.white, border: `1.5 solid ${pdfColors.primary}`, borderRadius: 4, overflow: 'hidden' },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', padding: '6 10', borderBottomWidth: 0.5, borderBottomColor: pdfColors.border },
-  grandTotalRow: { backgroundColor: pdfColors.primary, padding: '8 10', borderBottomWidth: 0, flexDirection: 'row', justifyContent: 'space-between' },
+
+  notesBox: {
+    width: '55%',
+    backgroundColor: pdfColors.warning,
+    border: `1 solid ${pdfColors.warningBorder}`,
+    borderRadius: 4,
+    padding: 10
+  },
+  boxTitle: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: pdfColors.primary,
+    marginBottom: 6,
+    textTransform: 'uppercase'
+  },
+  boxContent: {
+    fontSize: 8,
+    color: pdfColors.textDark,
+    lineHeight: 1.4
+  },
+
+  totalsBox: {
+    width: '40%',
+    backgroundColor: pdfColors.white,
+    border: `1.5 solid ${pdfColors.primary}`,
+    borderRadius: 4,
+    overflow: 'hidden'
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: '6 10',
+    borderBottomWidth: 0.5,
+    borderBottomColor: pdfColors.border
+  },
+  grandTotalRow: {
+    backgroundColor: pdfColors.primary,
+    padding: '8 10',
+    borderBottomWidth: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
   totalLabel: { fontSize: 8.5, color: pdfColors.textDark },
   totalValue: { fontSize: 8.5, color: pdfColors.textDark, fontWeight: 'bold' },
   grandTotalLabel: { fontSize: 10, fontWeight: 'bold', color: pdfColors.white },
   grandTotalValue: { fontSize: 11, fontWeight: 'bold', color: pdfColors.accent },
 
-  amountInWordsBox: { backgroundColor: pdfColors.secondary, border: `1.5 solid ${pdfColors.primary}`, borderRadius: 4, padding: 12, marginBottom: 15 },
-  amountWordsLabel: { fontSize: 7, color: pdfColors.primary, fontWeight: 'bold', marginBottom: 3, textTransform: 'uppercase' },
-  amountWordsText: { fontSize: 8, color: pdfColors.textDark, backgroundColor: pdfColors.white, padding: '5 8', borderRadius: 3, border: `0.5 solid ${pdfColors.border}` },
+  amountInWordsBox: {
+    backgroundColor: pdfColors.secondary,
+    border: `1.5 solid ${pdfColors.primary}`,
+    borderRadius: 4,
+    padding: 12,
+    marginBottom: 15
+  },
+  amountWordsLabel: {
+    fontSize: 7,
+    color: pdfColors.primary,
+    fontWeight: 'bold',
+    marginBottom: 3,
+    textTransform: 'uppercase'
+  },
+  amountWordsText: {
+    fontSize: 8,
+    color: pdfColors.textDark,
+    backgroundColor: pdfColors.white,
+    padding: '5 8',
+    borderRadius: 3,
+    border: `0.5 solid ${pdfColors.border}`
+  },
 
   bottomSection: { flexDirection: 'row', gap: 15, marginBottom: 10 },
-  validityBox: { flex: 1, backgroundColor: '#e3f2fd', border: `1 solid ${pdfColors.stroke}`, borderRadius: 4, padding: 10 },
-  validityItem: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 3 },
-  bulletPoint: { fontSize: 8, color: pdfColors.primary, marginRight: 5, fontWeight: 'bold' },
-  termsBox: { flex: 1, backgroundColor: '#f5f5f5', border: `1 solid ${pdfColors.border}`, borderRadius: 4, padding: 10 },
+  validityBox: {
+    flex: 1,
+    backgroundColor: '#e3f2fd',
+    border: `1 solid ${pdfColors.stroke}`,
+    borderRadius: 4,
+    padding: 10
+  },
+  validityItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 3
+  },
+  bulletPoint: {
+    fontSize: 8,
+    color: pdfColors.primary,
+    marginRight: 5,
+    fontWeight: 'bold'
+  },
+  termsBox: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    border: `1 solid ${pdfColors.border}`,
+    borderRadius: 4,
+    padding: 10
+  },
 });
 
 interface QuotationDocumentProps {
@@ -58,12 +139,27 @@ interface QuotationDocumentProps {
 
 export const QuotationDocument: React.FC<QuotationDocumentProps> = ({ bill, companyDetails }) => {
   registerPdfFonts();
-  
+
   const grossTotal = bill.totalAmount || 0;
   const vatAmount = bill.vatAmount || 0;
   const subtotal = grossTotal - bill.discount;
   const discount = bill.discount || 0;
   const grandTotal = bill.grandTotal || 0;
+
+  // Use snapshots for PDF (immutable legal truth)
+  const partyName = bill.partySnapshot.displayName;
+  const partyAddress = bill.partySnapshot.address;
+  // const partyVAT = bill.partySnapshot.taxIdentifiers?.vatNumber;
+
+  const contactName = bill.contactSnapshot?.name;
+  const contactPhone = bill.contactSnapshot?.phone;
+  const contactEmail = bill.contactSnapshot?.email;
+  const contactDesignation = bill.contactSnapshot?.designation;
+
+  // Check if there's any additional info beyond party name
+  const hasAdditionalInfo = contactName || contactPhone || contactEmail ||
+    (partyAddress && (partyAddress.street || partyAddress.city || partyAddress.state ||
+      partyAddress.postalCode || partyAddress.country));
 
   return (
     <Document>
@@ -82,11 +178,43 @@ export const QuotationDocument: React.FC<QuotationDocumentProps> = ({ bill, comp
 
         <View style={commonStyles.infoBar}>
           <View style={{ flex: 1 }}>
-            <Text style={commonStyles.sectionLabel}>Quoted For:</Text>
-            <Text style={styles.customerName}>{bill.customerName || 'N/A'}</Text>
-            {bill.customerPhone && <Text style={styles.customerDetail}>{bill.customerPhone}</Text>}
-            {bill.customerEmail && <Text style={styles.customerDetail}>{bill.customerEmail}</Text>}
+            {hasAdditionalInfo ? (
+              /* Has Contact Info or Address */
+              <>
+                <View style={styles.labelRow}>
+                  <Text style={styles.inlineLabel}>Quoted For:</Text>
+                  <Text style={styles.entityName}>{partyName}</Text>
+                </View>
+                {contactName && (
+                  <Text style={styles.entityDetail}>
+                    {contactName}{contactDesignation && ` (${contactDesignation})`}
+                  </Text>
+                )}
+                {contactPhone && <Text style={styles.entityDetail}>{contactPhone}</Text>}
+                {contactEmail && <Text style={styles.entityDetail}>{contactEmail}</Text>}
+                {partyAddress && (
+                  <Text style={styles.entityDetail}>
+                    {[
+                      partyAddress.street,
+                      partyAddress.city,
+                      partyAddress.state,
+                      partyAddress.postalCode,
+                      partyAddress.country
+                    ].filter(Boolean).join(', ')}
+                  </Text>
+                )}
+              </>
+            ) : (
+              /* Only Party Name - No Additional Info */
+              <>
+                <View style={styles.labelOnly}>
+                  <Text style={styles.standAloneLabel}>Quoted For:</Text>
+                </View>
+                <Text style={styles.entityName}>{partyName}</Text>
+              </>
+            )}
           </View>
+
           <View style={styles.dateInfo}>
             <Text style={styles.dateLabel}>Quotation Date</Text>
             <Text style={styles.dateValue}>{formatDisplayDate(bill.quotationDate)}</Text>
@@ -156,13 +284,25 @@ export const QuotationDocument: React.FC<QuotationDocumentProps> = ({ bill, comp
             <View style={styles.bottomSection}>
               <View style={styles.validityBox}>
                 <Text style={styles.boxTitle}>Validity & Terms</Text>
-                <View style={styles.validityItem}><Text style={styles.bulletPoint}>•</Text><Text style={styles.boxContent}>Valid for 30 days from date</Text></View>
-                <View style={styles.validityItem}><Text style={styles.bulletPoint}>•</Text><Text style={styles.boxContent}>Payment: Net 30 days</Text></View>
+                <View style={styles.validityItem}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.boxContent}>Valid for 30 days from date</Text>
+                </View>
+                <View style={styles.validityItem}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.boxContent}>Payment: Net 30 days</Text>
+                </View>
               </View>
               <View style={styles.termsBox}>
                 <Text style={styles.boxTitle}>Important</Text>
-                <View style={styles.validityItem}><Text style={styles.bulletPoint}>•</Text><Text style={styles.boxContent}>Illustrative purposes only.</Text></View>
-                <View style={styles.validityItem}><Text style={styles.bulletPoint}>•</Text><Text style={styles.boxContent}>Consult legal professional.</Text></View>
+                <View style={styles.validityItem}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.boxContent}>Illustrative purposes only.</Text>
+                </View>
+                <View style={styles.validityItem}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.boxContent}>Consult legal professional.</Text>
+                </View>
               </View>
             </View>
           </View>

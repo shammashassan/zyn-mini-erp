@@ -1,11 +1,11 @@
-// app/sales/delivery-notes/columns.tsx - UPDATED: Using deliveryDate instead of createdAt
+// app/sales/delivery-notes/columns.tsx - FINAL: Using partySnapshot for display
 
 "use client"
 
 import * as React from "react"
 import { ColumnDef } from "@tanstack/react-table"
 import { MoreHorizontal, ArrowUpDown, Trash2, FileText, CheckCircle, Clock, XCircle, Truck, AlertCircle, Edit, Eye } from "lucide-react"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,14 +40,38 @@ export interface ConnectedInvoice {
 export interface DeliveryNote {
   _id: string;
   invoiceNumber: string;
-  customerName: string;
-  customerPhone?: string;
-  customerEmail?: string;
+
+  // Party & Contact References (Dynamic - Current Truth)
+  partyId: any;
+  contactId?: string;
+
+  // Snapshots (Frozen - Legal Truth) - Optional for backward compatibility
+  partySnapshot?: {
+    displayName: string;
+    address?: {
+      street?: string;
+      city?: string;
+      district?: string;
+      state?: string;
+      country?: string;
+      postalCode?: string;
+    };
+    taxIdentifiers?: {
+      vatNumber?: string;
+    };
+  };
+  contactSnapshot?: {
+    name: string;
+    phone?: string;
+    email?: string;
+    designation?: string;
+  };
+
   grandTotal: number;
   status: "pending" | "dispatched" | "delivered" | "cancelled";
   notes: string;
   documentType: "delivery";
-  deliveryDate: string; // ✅ UPDATED: Changed from createdAt to deliveryDate
+  deliveryDate: string;
   items: Array<{
     description: string;
     quantity: number;
@@ -93,19 +117,28 @@ const RowActions = ({ note, onEdit, onView, onDelete, onViewPdf, onRefresh, perm
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
 
           {onView && (
-            <DropdownMenuItem onSelect={() => onView(note)}>
+            <DropdownMenuItem
+              onClick={() => onView(note)}
+              className="cursor-pointer"
+            >
               <Eye className="mr-2 w-4 h-4" />
               View Details
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuItem onSelect={() => onViewPdf(note)}>
+          <DropdownMenuItem
+            onClick={() => onViewPdf(note)}
+            className="cursor-pointer"
+          >
             <FileText className="mr-2 w-4 h-4" />
             View PDF
           </DropdownMenuItem>
 
           {canUpdate && onEdit && (
-            <DropdownMenuItem onSelect={() => onEdit(note)}>
+            <DropdownMenuItem
+              onClick={() => onEdit(note)}
+              className="cursor-pointer"
+            >
               <Edit className="mr-2 w-4 h-4" />
               Edit
             </DropdownMenuItem>
@@ -115,8 +148,11 @@ const RowActions = ({ note, onEdit, onView, onDelete, onViewPdf, onRefresh, perm
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onSelect={() => setIsDeleteDialogOpen(true)}
-                className="text-destructive"
+                className="text-destructive cursor-pointer"
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setIsDeleteDialogOpen(true);
+                }}
               >
                 <Trash2 className="mr-2 w-4 h-4" />
                 Delete
@@ -216,7 +252,7 @@ export const getColumns = (
   onView?: (note: DeliveryNote) => void,
 ): ColumnDef<DeliveryNote>[] => [
     {
-      accessorKey: "deliveryDate", // ✅ UPDATED: Changed from createdAt to deliveryDate
+      accessorKey: "deliveryDate",
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -228,7 +264,7 @@ export const getColumns = (
         </Button>
       ),
       cell: ({ row }) => {
-        const date = new Date(row.original.deliveryDate); // ✅ UPDATED
+        const date = new Date(row.original.deliveryDate);
         return (
           <div className="text-left font-medium">
             <div>{formatDisplayDate(date)}</div>
@@ -239,8 +275,8 @@ export const getColumns = (
         );
       },
       sortingFn: (rowA, rowB) => {
-        const dateA = new Date(rowA.original.deliveryDate); // ✅ UPDATED
-        const dateB = new Date(rowB.original.deliveryDate); // ✅ UPDATED
+        const dateA = new Date(rowA.original.deliveryDate);
+        const dateB = new Date(rowB.original.deliveryDate);
         return dateB.getTime() - dateA.getTime();
       },
     },
@@ -260,21 +296,24 @@ export const getColumns = (
       enableColumnFilter: true,
     },
     {
-      accessorKey: "customerName",
-      header: "Customer",
+      id: "partyName",
+      accessorKey: "partySnapshot.displayName",
+      header: "Party",
       cell: ({ row }) => {
-        const customerName = row.original.customerName;
-        return customerName ? (
+        // ✅ Use snapshot as primary, fallback to populated party
+        const name = row.original.partySnapshot?.displayName
+          || row.original.partyId?.company
+          || row.original.partyId?.name
+          || "Unknown";
+        return (
           <Badge variant="primary" appearance="outline">
-            {customerName}
+            {name}
           </Badge>
-        ) : (
-          <span className="text-muted-foreground">-</span>
         );
       },
       meta: {
-        label: "Customer",
-        placeholder: "search customer name...",
+        label: "Party",
+        placeholder: "search party...",
         variant: "text"
       },
       enableColumnFilter: true,

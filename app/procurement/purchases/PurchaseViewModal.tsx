@@ -1,4 +1,4 @@
-// app/procurement/purchases/PurchaseViewModal.tsx - FIXED: Correct Status Badges
+// app/procurement/purchases/PurchaseViewModal.tsx - FINAL: Using party snapshots for display
 
 "use client";
 
@@ -25,7 +25,8 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  XCircle
+  XCircle,
+  AlertTriangle
 } from "lucide-react";
 import type { IPurchase } from "@/models/Purchase";
 import { ConnectedDocumentsBadges } from "./ConnectedDocumentsBadges";
@@ -42,7 +43,7 @@ interface PurchaseViewModalProps {
   onViewReturnNotePdf?: (returnNote: any) => void;
 }
 
-// ✅ Purchase Status helpers
+// Purchase Status helpers
 const getPurchaseStatusVariant = (status: string) => {
   switch (status) {
     case 'approved': return 'success';
@@ -61,7 +62,7 @@ const getPurchaseStatusIcon = (status: string) => {
   }
 };
 
-// ✅ Inventory Status helpers
+// Inventory Status helpers
 const getInventoryStatusVariant = (status: string) => {
   switch (status) {
     case 'received': return 'success';
@@ -105,7 +106,13 @@ const getCreatorUsername = (purchase: any): string | null => {
   return createAction?.username || null;
 };
 
-export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, onViewPdf, onViewReturnNotePdf }: PurchaseViewModalProps) {
+export function PurchaseViewModal({
+  isOpen,
+  onClose,
+  purchase: initialPurchase,
+  onViewPdf,
+  onViewReturnNotePdf
+}: PurchaseViewModalProps) {
   const [purchase, setPurchase] = useState<any>(initialPurchase);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -145,6 +152,34 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
   if (!isOpen) return null;
 
   const currentData = purchase || initialPurchase || {};
+
+  // ✅ Use snapshot as primary source with populated reference fallback
+  const partyName = currentData.partySnapshot?.displayName
+    || currentData.partyId?.company
+    || currentData.partyId?.name
+    || 'Unknown';
+
+  const partyAddress = currentData.partySnapshot?.address;
+  const partyVAT = currentData.partySnapshot?.taxIdentifiers?.vatNumber
+    || currentData.partyId?.vatNumber;
+
+  const contactName = currentData.contactSnapshot?.name
+    || currentData.contactId?.name;
+
+  const contactPhone = currentData.contactSnapshot?.phone
+    || currentData.contactId?.phone
+    || currentData.partyId?.phone;
+
+  const contactEmail = currentData.contactSnapshot?.email
+    || currentData.contactId?.email
+    || currentData.partyId?.email;
+
+  const contactDesignation = currentData.contactSnapshot?.designation
+    || currentData.contactId?.designation;
+
+  // ✅ Check if party data has changed since snapshot
+  const hasPartyChanged = currentData.partyId && currentData.partySnapshot &&
+    (currentData.partyId.company || currentData.partyId.name) !== currentData.partySnapshot.displayName;
 
   const creatorUsername = getCreatorUsername(currentData);
   const totalItems = currentData.items?.length || 0;
@@ -225,21 +260,65 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
+                {/* Party Changed Warning */}
+                {hasPartyChanged && (
+                  <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                    <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                    <div className="text-xs sm:text-sm">
+                      <p className="font-medium text-warning">Party name has changed</p>
+                      <p className="text-muted-foreground">
+                        This purchase was created for "{currentData.partySnapshot.displayName}"
+                        (currently: "{currentData.partyId.company || currentData.partyId.name}")
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   <div className="flex items-start gap-3">
                     <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                     <div className="min-w-0">
                       <div className="text-xs sm:text-sm text-muted-foreground">Purchase Date</div>
-                      <div className="font-medium text-xs sm:text-sm break-words">{formatLongDate(currentData.purchaseDate)}</div>
+                      <div className="font-medium text-xs sm:text-sm break-words">
+                        {formatLongDate(currentData.purchaseDate)}
+                      </div>
                     </div>
                   </div>
 
-                  {currentData.supplierName && (
+                  {partyName && (
                     <div className="flex items-start gap-3">
                       <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                       <div className="min-w-0">
-                        <div className="text-xs sm:text-sm text-muted-foreground">Supplier</div>
-                        <div className="font-medium text-xs sm:text-sm break-words">{currentData.supplierName}</div>
+                        <div className="text-xs sm:text-sm text-muted-foreground">Party</div>
+                        <div className="font-medium text-xs sm:text-sm break-words">
+                          {partyName}
+                        </div>
+                        {partyVAT && (
+                          <div className="text-xs text-muted-foreground">
+                            VAT: {partyVAT}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {contactName && (
+                    <div className="flex items-start gap-3">
+                      <CircleUserRound className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-xs sm:text-sm text-muted-foreground">Contact</div>
+                        <div className="font-medium text-xs sm:text-sm break-words">
+                          {contactName}
+                          {contactDesignation && (
+                            <span className="text-muted-foreground"> ({contactDesignation})</span>
+                          )}
+                        </div>
+                        {contactPhone && (
+                          <div className="text-xs text-muted-foreground">{contactPhone}</div>
+                        )}
+                        {contactEmail && (
+                          <div className="text-xs text-muted-foreground">{contactEmail}</div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -280,6 +359,22 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                     </div>
                   )}
                 </div>
+
+                {/* Party Address (from snapshot) */}
+                {/* {partyAddress && (
+                  <div className="pt-3 border-t">
+                    <div className="text-xs sm:text-sm text-muted-foreground mb-2">Party Address</div>
+                    <div className="text-xs sm:text-sm">
+                      {partyAddress.street && <div>{partyAddress.street}</div>}
+                      <div>
+                        {[partyAddress.city, partyAddress.state, partyAddress.postalCode]
+                          .filter(Boolean)
+                          .join(', ')}
+                      </div>
+                      {partyAddress.country && <div>{partyAddress.country}</div>}
+                    </div>
+                  </div>
+                )} */}
               </CardContent>
             </Card>
 
@@ -535,10 +630,8 @@ export function PurchaseViewModal({ isOpen, onClose, purchase: initialPurchase, 
                       </span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-green-600 transition-all"
-                        style={{ width: `${Math.min((currentData.paidAmount / displayTotal) * 100, 100)}%` }}
-                      />
+                      <div className="h-full bg-green-600 transition-all"
+                        style={{ width: `${Math.min((currentData.paidAmount / displayTotal) * 100, 100)}%` }} />
                     </div>
                   </div>
                 )}

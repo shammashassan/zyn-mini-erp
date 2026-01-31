@@ -1,4 +1,4 @@
-// app/procurement/payments/PaymentViewModal.tsx
+// app/procurement/payments/PaymentViewModal.tsx - UPDATED: Party/Contact snapshots support
 
 "use client";
 
@@ -21,6 +21,7 @@ import {
     FileText as FileTextIcon,
     Wallet,
     Landmark,
+    AlertTriangle,
 } from "lucide-react";
 import type { Payment } from "./columns";
 import { ConnectedDocumentsBadges } from "./ConnectedDocumentsBadges";
@@ -56,11 +57,36 @@ const getCreatorUsername = (payment: any): string | null => {
 };
 
 const getPartyInfo = (payment: any) => {
-    if (payment.customerName) {
-        return { name: payment.customerName, type: 'Customer', icon: User };
+    // ✅ Priority 1: Use snapshots (immutable legal truth)
+    if (payment.partySnapshot?.displayName) {
+        return {
+            name: payment.partySnapshot.displayName,
+            type: 'Party',
+            icon: User,
+            address: payment.partySnapshot.address,
+            vat: payment.partySnapshot.taxIdentifiers?.vatNumber,
+        };
     }
-    if (payment.supplierName) {
-        return { name: payment.supplierName, type: 'Supplier', icon: User };
+
+    // ✅ Priority 2: Use populated partyId
+    const party = payment.partyId;
+    if (party && (party.name || party.company)) {
+        const name = party.name || party.company;
+        const type = party.partyType ? (party.partyType.charAt(0).toUpperCase() + party.partyType.slice(1)) : 'Party';
+        return {
+            name,
+            type,
+            icon: User,
+            address: party.address ? {
+                street: party.address,
+                city: party.city,
+                district: party.district,
+                state: party.state,
+                country: party.country,
+                postalCode: party.postalCode,
+            } : undefined,
+            vat: party.vatNumber,
+        };
     }
     if (payment.payeeName) {
         return { name: payment.payeeName, type: 'Payee', icon: User };
@@ -68,7 +94,39 @@ const getPartyInfo = (payment: any) => {
     if (payment.vendorName) {
         return { name: payment.vendorName, type: 'Vendor', icon: User };
     }
+
     return null;
+};
+
+const getContactInfo = (payment: any) => {
+    // ✅ Priority 1: Contact snapshot
+    if (payment.contactSnapshot) {
+        return {
+            name: payment.contactSnapshot.name,
+            phone: payment.contactSnapshot.phone,
+            email: payment.contactSnapshot.email,
+            designation: payment.contactSnapshot.designation,
+        };
+    }
+
+    // ✅ Priority 2: Populated contactId
+    if (payment.contactId) {
+        const contact = payment.contactId;
+        if (typeof contact === 'object') {
+            return {
+                name: contact.name,
+                phone: contact.phone,
+                email: contact.email,
+                designation: contact.designation,
+            };
+        }
+    }
+
+    // ✅ Priority 3: Legacy fields or partyId fallback
+    return {
+        phone: payment.partyId?.phone,
+        email: payment.partyId?.email,
+    };
 };
 
 export function PaymentViewModal({
@@ -122,8 +180,13 @@ export function PaymentViewModal({
 
     const creatorUsername = getCreatorUsername(currentData);
     const partyInfo = getPartyInfo(currentData);
+    const contactInfo = getContactInfo(currentData);
 
     const PaymentMethodIcon = getPaymentMethodIcon(currentData.paymentMethod);
+
+    // ✅ Check if party data has changed since snapshot
+    const hasPartyChanged = currentData.partyId && currentData.partySnapshot &&
+        (currentData.partyId.company || currentData.partyId.name) !== currentData.partySnapshot.displayName;
 
     // Check for existence of connected documents
     const hasConnectedDocuments =
@@ -171,6 +234,20 @@ export function PaymentViewModal({
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3 sm:space-y-4">
+                                {/* Party Changed Warning */}
+                                {hasPartyChanged && (
+                                    <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                                        <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                                        <div className="text-xs sm:text-sm">
+                                            <p className="font-medium text-warning">Party name has changed</p>
+                                            <p className="text-muted-foreground">
+                                                This payment was created for "{currentData.partySnapshot.displayName}"
+                                                (currently: "{currentData.partyId.company || currentData.partyId.name}")
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                                     <div className="flex items-start gap-3">
                                         <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
@@ -190,6 +267,34 @@ export function PaymentViewModal({
                                                 <div className="font-medium text-xs sm:text-sm break-words">
                                                     {partyInfo.name}
                                                 </div>
+                                                {partyInfo.vat && (
+                                                    <div className="text-xs text-muted-foreground">
+                                                        VAT: {partyInfo.vat}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {contactInfo && (contactInfo.name || contactInfo.phone || contactInfo.email) && (
+                                        <div className="flex items-start gap-3">
+                                            <CircleUserRound className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
+                                            <div className="min-w-0">
+                                                <div className="text-xs sm:text-sm text-muted-foreground">Contact</div>
+                                                {contactInfo.name && (
+                                                    <div className="font-medium text-xs sm:text-sm break-words">
+                                                        {contactInfo.name}
+                                                        {contactInfo.designation && (
+                                                            <span className="text-muted-foreground"> ({contactInfo.designation})</span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {contactInfo.phone && (
+                                                    <div className="text-xs text-muted-foreground">{contactInfo.phone}</div>
+                                                )}
+                                                {contactInfo.email && (
+                                                    <div className="text-xs text-muted-foreground">{contactInfo.email}</div>
+                                                )}
                                             </div>
                                         </div>
                                     )}
@@ -224,6 +329,22 @@ export function PaymentViewModal({
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Party Address (from snapshot) */}
+                                {partyInfo?.address && (
+                                    <div className="pt-3 border-t">
+                                        <div className="text-xs sm:text-sm text-muted-foreground mb-2">Party Address</div>
+                                        <div className="text-xs sm:text-sm">
+                                            {partyInfo.address.street && <div>{partyInfo.address.street}</div>}
+                                            <div>
+                                                {[partyInfo.address.city, partyInfo.address.state, partyInfo.address.postalCode]
+                                                    .filter(Boolean)
+                                                    .join(', ')}
+                                            </div>
+                                            {partyInfo.address.country && <div>{partyInfo.address.country}</div>}
+                                        </div>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
 

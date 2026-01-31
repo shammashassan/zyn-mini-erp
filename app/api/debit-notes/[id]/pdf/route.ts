@@ -1,4 +1,4 @@
-// app/api/debit-notes/[id]/pdf/route.ts - PDF Generation
+// app/api/debit-notes/[id]/pdf/route.ts - FINAL: Using snapshots for PDF generation
 
 import { NextRequest, NextResponse } from "next/server";
 import React from "react";
@@ -6,6 +6,7 @@ import { renderToStream } from "@react-pdf/renderer";
 import dbConnect from "@/lib/dbConnect";
 import DebitNote from "@/models/DebitNote";
 import CompanyDetails from "@/models/CompanyDetails";
+import Party from "@/models/Party";
 import { DebitNoteDocument } from "@/components/DebitNoteDocument";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 
@@ -36,40 +37,21 @@ export async function GET(
 
     await dbConnect();
 
-    // Allow finding soft-deleted debit notes for PDF generation
+    // Ensure Party model is registered
+    const _ensureModels = [Party];
+
+    // ✅ Allow finding soft-deleted debit notes for PDF generation
     const debitNote = await DebitNote.findById(id)
       .setOptions({ includeDeleted: true })
-      .populate('connectedDocuments.returnNoteId', 'returnNumber');
+      .populate('connectedDocuments.returnNoteId', 'returnNumber')
+      .populate('partyId');
 
     if (!debitNote) {
       return NextResponse.json({ message: "Debit Note not found" }, { status: 404 });
     }
 
-    // Fetch party contact details based on party type
-    let debitNoteWithDetails = debitNote.toObject();
-
-    if (debitNote.supplierName) {
-      const Supplier = (await import('@/models/Supplier')).default;
-      const supplier = await Supplier.findOne({ name: debitNote.supplierName });
-      if (supplier) {
-        debitNoteWithDetails.supplierPhone = supplier.contactNumbers?.[0] || '';
-        debitNoteWithDetails.supplierEmail = supplier.email || '';
-      }
-    } else if (debitNote.customerName) {
-      const Customer = (await import('@/models/Customer')).default;
-      const customer = await Customer.findOne({ name: debitNote.customerName });
-      if (customer) {
-        debitNoteWithDetails.customerPhone = customer.phone || '';
-        debitNoteWithDetails.customerEmail = customer.email || '';
-      }
-    } else if (debitNote.payeeName) {
-      const Payee = (await import('@/models/Payee')).default;
-      const payee = await Payee.findOne({ name: debitNote.payeeName });
-      if (payee) {
-        debitNoteWithDetails.payeePhone = payee.phone || '';
-        debitNoteWithDetails.payeeEmail = payee.email || '';
-      }
-    }
+    // ✅ Debit note already has snapshots, no need to populate
+    // Snapshots are the source of truth for PDF generation
 
     // Fetch Company Details
     let companyDetails = await CompanyDetails.findOne();
@@ -84,7 +66,7 @@ export async function GET(
     }
 
     const documentElement = React.createElement(DebitNoteDocument, {
-      debitNote: debitNoteWithDetails,
+      debitNote: debitNote.toObject(),
       companyDetails,
     });
 

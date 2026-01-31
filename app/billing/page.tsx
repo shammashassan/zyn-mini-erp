@@ -1,4 +1,4 @@
-// app/billing/page.tsx - UPDATED: Disable create button if rate is empty
+// app/billing/page.tsx - REFACTORED: BillPayload interface declared inside
 
 "use client";
 
@@ -6,35 +6,50 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { BillingForm } from "./billing-form";
-import type { BillPayload as OriginalBillPayload, Item } from "@/lib/types";
-import type { ICustomer } from "@/models/Customer";
+import type { Item } from "@/lib/types";
 import type { IProduct } from "@/models/Product";
-import type { ISupplier } from "@/models/Supplier";
 import { ScrollText } from "lucide-react";
 import { UAE_VAT_PERCENTAGE } from '@/utils/constants';
 import { useBillPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
-import { ca } from "date-fns/locale";
 
-interface BillPayload extends Omit<OriginalBillPayload, 'documentType'> {
-  documentType: "invoice" | "receipt" | "payment" | "quotation";
-  supplierName?: string;
+// ✅ BillPayload interface declared inside the billing page
+interface BillPayload {
+  // Party/Contact system (for invoices/quotations)
+  partyId?: string;
+  contactId?: string;
+
+  // Payee (for vouchers - from Payee collection)
+  payeeName?: string;
+  payeeId?: string;
+
+  // Vendor (for vouchers - manual input)
+  vendorName?: string;
+
+  // Document details
+  documentType: "invoice" | "quotation" | "receipt" | "payment";
+  paymentMethod?: string;
+  notes: string;
+  discount: number;
+  status: string;
+  items: Item[];
+
+  // Dates
   invoiceDate?: Date;
   quotationDate?: Date;
   voucherDate?: Date;
+
+  // Voucher-specific
+  voucherAmount?: number;
 }
 
 export default function CreateBillPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-
-  // Ref to prevent double submission during network lag
   const isSubmittingRef = useRef(false);
 
-  const [customers, setCustomers] = useState<ICustomer[]>([]);
-  const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
   const [products, setProducts] = useState<IProduct[]>([]);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -44,10 +59,11 @@ export default function CreateBillPage() {
   const [redirectPath, setRedirectPath] = useState<string | null>(null);
 
   const [payload, setPayload] = useState<BillPayload>({
-    customerName: "",
-    supplierName: "",
-    customerPhone: "",
-    customerEmail: "",
+    partyId: undefined,
+    contactId: undefined,
+    payeeName: "",
+    payeeId: undefined,
+    vendorName: "",
     paymentMethod: "",
     notes: "",
     discount: 0,
@@ -57,7 +73,7 @@ export default function CreateBillPage() {
     invoiceDate: new Date(),
     quotationDate: new Date(),
     voucherDate: new Date(),
-  } as BillPayload);
+  });
 
   const { permissions: { canCreate } } = useBillPermissions();
 
@@ -70,16 +86,8 @@ export default function CreateBillPage() {
       if (!canCreate) return;
 
       try {
-        const [customersRes, productsRes, suppliersRes] = await Promise.all([
-          fetch('/api/customers'),
-          fetch('/api/products'),
-          fetch('/api/suppliers')
-        ]);
-
-        if (customersRes.ok) setCustomers(await customersRes.json());
+        const productsRes = await fetch('/api/products');
         if (productsRes.ok) setProducts(await productsRes.json());
-        if (suppliersRes.ok) setSuppliers(await suppliersRes.json());
-
       } catch (error) {
         console.error("Could not fetch initial data", error);
         toast.error("Failed to load necessary data.");
@@ -103,12 +111,9 @@ export default function CreateBillPage() {
         case "quantity":
         case "rate":
           const strValue = String(value);
-          // Allow empty string to be set so users can clear the input
           if (strValue === "") {
             currentItem[field] = "" as any;
           } else if (strValue === "-") {
-            // If user types just "-", default to 0 to prevent NaN issues if needed, 
-            // or keep as 0. Most number inputs return "" for invalid state anyway.
             currentItem[field] = 0;
           } else {
             const numValue = parseFloat(strValue);
@@ -145,27 +150,17 @@ export default function CreateBillPage() {
 
   const isVoucher = payload.documentType === 'receipt' || payload.documentType === 'payment';
 
-  // Detailed calculation breakdown:
-  // Gross Total = Sum of line items (before discount, before VAT)
   const grossTotal = isVoucher ? (payload.voucherAmount || 0) : payload.items.reduce((sum, item) => sum + item.total, 0);
-
-  // Subtotal = Gross Total - Discount (this is the amount VAT is calculated on)
   const subTotal = isVoucher ? grossTotal : (grossTotal - payload.discount);
-
-  // VAT = Subtotal × VAT%
   const vatAmount = isVoucher ? 0 : (subTotal * (UAE_VAT_PERCENTAGE / 100));
-
-  // Grand Total = Subtotal + VAT
   const grandTotal = isVoucher ? grossTotal : (subTotal + vatAmount);
 
   const isFormValid = useMemo(() => {
-    // For vouchers: Either customer or supplier must be provided
     if (isVoucher) {
-      const hasParty = payload.customerName?.trim() || payload.supplierName?.trim();
+      const hasParty = payload.partyId || payload.payeeName?.trim() || payload.vendorName?.trim();
       if (!hasParty) return false;
     } else {
-      // For non-vouchers (invoice, quotation): Customer is required
-      if (!payload.customerName?.trim()) return false;
+      if (!payload.partyId) return false;
     }
 
     const requiresPaymentMethod = payload.documentType === 'receipt' || payload.documentType === 'payment';
@@ -177,11 +172,10 @@ export default function CreateBillPage() {
     } else {
       if (payload.items.length === 0) return false;
 
-      // Ensure ALL items have a description, positive quantity, and a non-empty rate
       const allItemsValid = payload.items.every(item =>
         item.description.trim() &&
         Number(item.quantity) > 0 &&
-        (item.rate as any) !== "" // Check that rate is not an empty string
+        (item.rate as any) !== ""
       );
 
       if (!allItemsValid) return false;
@@ -189,29 +183,25 @@ export default function CreateBillPage() {
     }
 
     return true;
-  }, [payload.customerName, payload.supplierName, payload.paymentMethod, payload.documentType, payload.items, payload.voucherAmount, grandTotal, isVoucher]);
+  }, [payload.partyId, payload.payeeName, payload.vendorName, payload.paymentMethod, payload.documentType, payload.items, payload.voucherAmount, grandTotal, isVoucher]);
 
   const handleSubmit = async () => {
-    // 1. Immediate Lock: Prevent double submission
     if (isSubmittingRef.current) return;
 
-    // 2. Synchronous Validations (Safety Net)
     if (!canCreate) {
       toast.error(`You do not have permission to create a ${payload.documentType}`);
       return;
     }
 
-    // Validation for vouchers: Either customer or supplier required
     if (isVoucher) {
-      const hasParty = payload.customerName?.trim() || payload.supplierName?.trim();
+      const hasParty = payload.partyId || payload.payeeName?.trim() || payload.vendorName?.trim();
       if (!hasParty) {
-        toast.error("Either customer or supplier name is required");
+        toast.error("Party, Payee, or Vendor is required");
         return;
       }
     } else {
-      // For non-vouchers: Customer required
-      if (!payload.customerName?.trim()) {
-        toast.error("Customer name is required");
+      if (!payload.partyId) {
+        toast.error("Party is required");
         return;
       }
     }
@@ -253,12 +243,10 @@ export default function CreateBillPage() {
       }
     }
 
-    // 3. Lock & Load
     isSubmittingRef.current = true;
     setIsLoading(true);
 
     try {
-      // Create products for items marked for creation (only for non-voucher documents)
       const isVoucherDoc = payload.documentType === 'receipt' || payload.documentType === 'payment';
       if (!isVoucherDoc) {
         const itemsWithProductCreation = await Promise.all(
@@ -278,12 +266,8 @@ export default function CreateBillPage() {
                 });
 
                 if (response.ok) {
-                  const newProduct = await response.json();
                   toast.success(`Product "${item.description}" created`);
-                  return {
-                    ...item,
-                    shouldCreateProduct: false,
-                  };
+                  return { ...item, shouldCreateProduct: false };
                 } else {
                   const error = await response.json();
                   toast.error(`Failed to create product "${item.description}"`, {
@@ -301,7 +285,6 @@ export default function CreateBillPage() {
           })
         );
 
-        // Update payload.items with the processed items
         payload.items = itemsWithProductCreation;
       }
 
@@ -336,22 +319,19 @@ export default function CreateBillPage() {
           break;
 
         case "receipt":
-          endpoint = "/api/vouchers";
-          responseKey = "receipt";
-          targetRoute = "/sales/receipts";
-          break;
         case "payment":
           endpoint = "/api/vouchers";
-          responseKey = "payment";
-          targetRoute = "/sales/payments";
+          responseKey = "voucher";
+          targetRoute = payload.documentType === 'receipt' ? "/sales/receipts" : "/sales/payments";
 
           payloadToSend = {
             voucherType: payload.documentType,
             paymentMethod: payload.paymentMethod,
-            customerName: payload.customerName || undefined,
-            supplierName: payload.supplierName || undefined,
-            customerPhone: payload.customerPhone,
-            customerEmail: payload.customerEmail,
+            partyId: payload.partyId,
+            contactId: payload.contactId,
+            payeeName: payload.payeeName,
+            payeeId: payload.payeeId,
+            vendorName: payload.vendorName,
             notes: payload.notes,
             items: [],
             totalAmount: payload.voucherAmount,
@@ -390,10 +370,11 @@ export default function CreateBillPage() {
 
         setPayload(prev => ({
           ...prev,
-          customerName: "",
-          supplierName: "",
-          customerPhone: "",
-          customerEmail: "",
+          partyId: undefined,
+          contactId: undefined,
+          payeeName: "",
+          payeeId: undefined,
+          vendorName: "",
           items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
           notes: "",
           voucherAmount: 0,
@@ -407,7 +388,6 @@ export default function CreateBillPage() {
       console.error("Error creating document:", err);
       toast.error("A server error occurred. Please try again.");
     } finally {
-      // 4. Release Lock
       isSubmittingRef.current = false;
       setIsLoading(false);
     }
@@ -446,8 +426,8 @@ export default function CreateBillPage() {
 
       <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs">
         <BillingForm
-          payload={payload as any}
-          setPayload={setPayload as any}
+          payload={payload}
+          setPayload={setPayload}
           updateItem={updateItem}
           addItem={addItem}
           removeItem={removeItem}
@@ -459,8 +439,6 @@ export default function CreateBillPage() {
           vatAmount={vatAmount}
           grandTotal={grandTotal}
           vatPercentage={UAE_VAT_PERCENTAGE}
-          customers={customers}
-          suppliers={suppliers}
           products={products}
         />
       </div>
@@ -474,3 +452,6 @@ export default function CreateBillPage() {
     </div>
   );
 }
+
+// Export BillPayload type for use in child components
+export type { BillPayload };

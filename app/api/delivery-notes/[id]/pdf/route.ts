@@ -1,4 +1,4 @@
-// app/api/delivery-notes/[id]/pdf/route.ts - FIXED: Populate invoice data for PDF
+// app/api/delivery-notes/[id]/pdf/route.ts - FINAL: Using snapshots for PDF generation
 
 import { NextRequest, NextResponse } from "next/server";
 import React from "react";
@@ -6,6 +6,7 @@ import { renderToStream } from "@react-pdf/renderer";
 import dbConnect from "@/lib/dbConnect";
 import DeliveryNote from "@/models/DeliveryNote";
 import CompanyDetails from "@/models/CompanyDetails";
+import Party from "@/models/Party";
 import { DeliveryNoteDocument } from "@/components/DeliveryNoteDocument";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 
@@ -37,18 +38,26 @@ export async function GET(
 
     await dbConnect();
 
-    // ✅ FIXED: Populate invoice data for "Against Invoice" display
+    // Ensure Party model is registered
+    const _ensureModels = [Party];
+
+    // ✅ Allow finding soft-deleted delivery notes for PDF generation
+    // ✅ Populate invoice data for "Against Invoice" display
     const deliveryNote = await DeliveryNote.findById(id)
       .setOptions({ includeDeleted: true })
       .populate({
         path: 'connectedDocuments.invoiceIds',
-        select: 'invoiceNumber grandTotal status customerName',
+        select: 'invoiceNumber grandTotal status',
         match: { isDeleted: false }
-      });
+      })
+      .populate('partyId');
 
     if (!deliveryNote) {
       return NextResponse.json({ message: "Delivery note not found" }, { status: 404 });
     }
+
+    // ✅ Delivery note already has snapshots, no need to populate
+    // Snapshots are the source of truth for PDF generation
 
     // Fetch Company Details
     let companyDetails = await CompanyDetails.findOne();
