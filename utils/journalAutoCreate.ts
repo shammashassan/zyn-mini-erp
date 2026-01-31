@@ -72,7 +72,16 @@ async function extractVoucherPartyAndItemInfo(voucher: any) {
     if (voucher.vendorName) {
       result.partyType = 'Vendor';
       result.partyName = voucher.vendorName;
-    } else {
+    }
+    // Check for Payee (Payee Name or ID)
+    else if (voucher.payeeName || voucher.payeeId) {
+      result.partyType = 'Payee';
+      result.partyName = voucher.payeeName;
+      if (voucher.payeeId) {
+        result.partyId = voucher.payeeId.toString();
+      }
+    }
+    else {
       // Default to Customer, but check party roles if available
       result.partyType = 'Customer';
 

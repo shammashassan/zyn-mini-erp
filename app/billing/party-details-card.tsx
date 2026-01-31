@@ -59,7 +59,7 @@ export function PartyDetailsCard({ payload, onFieldChange }: PartyDetailsProps) 
 
     // Set new values based on party type
     if (value.partyType === 'vendor') {
-      onFieldChange("vendorName", value.partyName || "");
+      onFieldChange("vendorName", value.partyName ?? "");
     } else if (value.partyType === 'payee') {
       if (party) {
         onFieldChange("payeeId", value.partyId);

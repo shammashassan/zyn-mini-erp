@@ -397,7 +397,7 @@ export function PartyContactSelector({
                     {selectedPartyType === 'vendor' ? (
                         <Input
                             placeholder="Enter vendor name..."
-                            value={value?.partyName || ''}
+                            value={value?.partyName ?? ''}
                             onChange={(e) => handleVendorNameChange(e.target.value)}
                             disabled={disabled}
                             className="w-full"

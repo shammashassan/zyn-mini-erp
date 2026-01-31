@@ -198,7 +198,7 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
                   }
 
                   // Set party name (from API or manual input)
-                  if (val.partyName) {
+                  if (val.partyName !== undefined) {
                     setSelectedParty(val.partyName);
                   } else if (party) {
                     setSelectedParty(party.company || party.name || "");

@@ -475,7 +475,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                         }
 
                         // Update partyName from component or party object
-                        if (val.partyName) {
+                        if (val.partyName !== undefined) {
                           setValue('partyName', val.partyName, { shouldDirty: true });
                         } else if (party) {
                           setValue('partyName', party.name || party.company || "Selected Party", { shouldDirty: true });

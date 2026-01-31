@@ -509,9 +509,9 @@ function LedgerPageContent() {
                             partyName: selectedPartyName
                           }}
                           onChange={(val) => {
-                            setSelectedPartyId(val.partyId || "");
+                            setSelectedPartyId(val.partyId ?? "");
                             setSelectedPartyType(val.partyType);
-                            setSelectedPartyName(val.partyName || "");
+                            setSelectedPartyName(val.partyName ?? "");
                           }}
                           showContactSelector={false}
                           layout="horizontal"
