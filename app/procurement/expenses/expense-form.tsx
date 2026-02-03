@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CalendarIcon, Banknote, Info, Users, Briefcase, Plane, Megaphone, Zap, Code, Cpu, Utensils, Home, DollarSign, Shield, Film, Boxes } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { IExpense } from "@/models/Expense";
@@ -179,6 +179,34 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 sm:space-y-6">
 
           {/* Main Top Grid */}
+          <Controller
+            name="type"
+            control={control}
+            defaultValue="single"
+            render={({ field }) => (
+              <Tabs
+                value={field.value}
+                onValueChange={field.onChange}
+                className="w-full"
+              >
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="single">Single Expense</TabsTrigger>
+                  <TabsTrigger value="period">Period Expense</TabsTrigger>
+                </TabsList>
+                <TabsContent value="single" className="mt-2">
+                  <p className="text-sm text-muted-foreground">
+                    One-time payment for goods or services
+                  </p>
+                </TabsContent>
+                <TabsContent value="period" className="mt-2">
+                  <p className="text-sm text-muted-foreground">
+                    Recurring expense or spanning a specific time
+                  </p>
+                </TabsContent>
+              </Tabs>
+            )}
+          />
+
           <div className={cn("grid grid-cols-1 gap-4", defaultValues ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
             {/* Party Selection */}
             <div className="space-y-2">
@@ -274,49 +302,7 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
             )}
           </div>
 
-          <Controller
-            name="type"
-            control={control}
-            defaultValue="single"
-            render={({ field }) => (
-              <RadioGroup
-                onValueChange={field.onChange}
-                value={field.value}
-                className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4"
-              >
-                <Label
-                  htmlFor="type-single"
-                  className={cn(
-                    "hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3 sm:p-4 cursor-pointer transition-colors",
-                    field.value === 'single' && "border-primary bg-primary/5 ring-1 ring-primary"
-                  )}
-                >
-                  <RadioGroupItem value="single" id="type-single" className="mt-1" />
-                  <div className="grid gap-1.5 leading-none">
-                    <span className="font-medium text-sm">Single Expense</span>
-                    <span className="text-muted-foreground text-xs">
-                      One-time payment for goods or services
-                    </span>
-                  </div>
-                </Label>
-                <Label
-                  htmlFor="type-period"
-                  className={cn(
-                    "hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3 sm:p-4 cursor-pointer transition-colors",
-                    field.value === 'period' && "border-primary bg-primary/5 ring-1 ring-primary"
-                  )}
-                >
-                  <RadioGroupItem value="period" id="type-period" className="mt-1" />
-                  <div className="grid gap-1.5 leading-none">
-                    <span className="font-medium text-sm">Period Expense</span>
-                    <span className="text-muted-foreground text-xs">
-                      Recurring expense or spanning a specific time
-                    </span>
-                  </div>
-                </Label>
-              </RadioGroup>
-            )}
-          />
+
 
           <Card>
             <CardHeader>
