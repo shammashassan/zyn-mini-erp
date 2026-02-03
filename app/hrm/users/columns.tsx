@@ -322,7 +322,7 @@ export const getColumns = (
       enableColumnFilter: true,
       filterFn: (row, id, value) => {
         const role = row.getValue(id) as string | undefined;
-        return value.includes(role || "user");
+        return value.some((val: string) => val.toLowerCase() === (role || "user").toLowerCase());
       },
     },
     {

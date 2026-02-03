@@ -327,7 +327,6 @@ function EmployeesPageContent() {
   const { table } = useDataTable({
     data: employees,
     columns,
-    pageCount: Math.ceil(employees.length / 10),
     initialState: {
       sorting: [{ id: "joinedDate", desc: true }],
       pagination: {

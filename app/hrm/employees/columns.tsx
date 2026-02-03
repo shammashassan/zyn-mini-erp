@@ -105,7 +105,8 @@ export const getColumns = (
   roleOptions: Array<{ label: string; value: string; count?: number }> = []
 ): ColumnDef<IEmployee>[] => [
     {
-      accessorKey: "firstName",
+      id: "name",
+      accessorFn: (row) => `${row.firstName} ${row.lastName}`,
       header: ({ column }) => (
         <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
           Employee
@@ -142,16 +143,6 @@ export const getColumns = (
         variant: "text",
       },
       enableColumnFilter: true,
-      filterFn: (row, id, value) => {
-        const employee = row.original;
-        const searchValue = value.toLowerCase();
-        return (
-          employee.firstName?.toLowerCase().includes(searchValue) ||
-          employee.lastName?.toLowerCase().includes(searchValue) ||
-          employee.email?.toLowerCase().includes(searchValue) ||
-          false
-        );
-      },
     },
     {
       id: "role",
@@ -179,10 +170,6 @@ export const getColumns = (
         options: roleOptions,
       },
       enableColumnFilter: true,
-      filterFn: (row, id, value) => {
-        const role = row.getValue(id) as string | undefined;
-        return value.includes(role || "user");
-      },
     },
     {
       accessorKey: "email",
