@@ -37,6 +37,14 @@ export async function GET(request: Request) {
 
       const baseFilter: any = { isDeleted: false };
 
+      // ✅ Handle 'partyName' filter for partySnapshot
+      const partyFilterIndex = filters.findIndex((f: any) => f.id === 'partyName');
+      if (partyFilterIndex !== -1) {
+        const partyFilter = filters[partyFilterIndex];
+        baseFilter['partySnapshot.displayName'] = { $regex: partyFilter.value, $options: 'i' };
+        filters.splice(partyFilterIndex, 1); // Remove from columnFilters as it's handled in baseFilter
+      }
+
       // Apply Date Range Filter using quotationDate
       if (startDateParam || endDateParam) {
         baseFilter.quotationDate = {};

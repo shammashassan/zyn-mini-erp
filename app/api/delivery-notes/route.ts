@@ -38,6 +38,14 @@ export async function GET(request: Request) {
 
       const baseFilter: any = { isDeleted: false };
 
+      // ✅ Handle 'partyName' filter for partySnapshot
+      const partyFilterIndex = filters.findIndex((f: any) => f.id === 'partyName');
+      if (partyFilterIndex !== -1) {
+        const partyFilter = filters[partyFilterIndex];
+        baseFilter['partySnapshot.displayName'] = { $regex: partyFilter.value, $options: 'i' };
+        filters.splice(partyFilterIndex, 1);
+      }
+
       if (startDateParam || endDateParam) {
         baseFilter.deliveryDate = {};
         if (startDateParam) {

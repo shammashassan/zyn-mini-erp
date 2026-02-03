@@ -69,8 +69,19 @@ export async function GET(request: Request) {
         if (Array.isArray(filters)) {
           filters.forEach((filter: any) => {
             if (filter?.id && filter?.value) {
+
+              // ✅ Handle 'vendor' filter (searches vendor OR payeeSnapshot.name)
+              if (filter.id === 'vendor') {
+                const searchRegex = { $regex: filter.value, $options: 'i' };
+                query.$or = [
+                  { vendor: searchRegex },
+                  { 'payeeSnapshot.name': searchRegex }
+                ];
+                return; // Skip default handling
+              }
+
               // Regex search for string fields
-              if (['referenceNumber', 'vendor', 'category', 'description', 'status', 'paymentStatus'].includes(filter.id)) {
+              if (['referenceNumber', 'category', 'description', 'status', 'paymentStatus'].includes(filter.id)) {
                 if (Array.isArray(filter.value)) {
                   query[filter.id] = { $in: filter.value };
                 } else {
