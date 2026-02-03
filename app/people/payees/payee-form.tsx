@@ -61,12 +61,12 @@ const PAYEE_TYPES = [
 ];
 
 export function PayeeForm({ isOpen, onClose, onSubmit, defaultValues }: PayeeFormProps) {
-  const { 
-    register, 
-    handleSubmit, 
-    reset, 
-    control, 
-    formState: { isSubmitting, isDirty } 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    control,
+    formState: { isSubmitting, isDirty }
   } = useForm<PayeeFormData>();
 
   React.useEffect(() => {
@@ -108,14 +108,14 @@ export function PayeeForm({ isOpen, onClose, onSubmit, defaultValues }: PayeeFor
             Fill in the details for the payee below.
           </DialogDescription>
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+
+        <form onSubmit={(e) => { e.stopPropagation(); handleSubmit(handleFormSubmit)(e); }} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Payee Name *</Label>
-              <Input 
-                id="name" 
-                {...register("name")} 
+              <Input
+                id="name"
+                {...register("name")}
               />
             </div>
 
@@ -185,8 +185,8 @@ export function PayeeForm({ isOpen, onClose, onSubmit, defaultValues }: PayeeFor
             <DialogClose asChild>
               <Button type="button" variant="outline">Cancel</Button>
             </DialogClose>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isSubmitting || (!!defaultValues && !isDirty)}
             >
               {isSubmitting ? (

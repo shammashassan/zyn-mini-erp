@@ -85,7 +85,6 @@ export function PartyDetailsCard({ payload, onFieldChange }: PartyDetailsProps) 
           showContactSelector={!isVoucher} // Only show contact selector for invoices/quotations
           showCreateButton={true}
           layout="vertical"
-          className="w-full"
         />
       </CardContent>
     </Card>

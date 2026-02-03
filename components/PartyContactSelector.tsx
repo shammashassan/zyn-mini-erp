@@ -1,10 +1,11 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, Loader2, Plus, PlusCircle } from "lucide-react"
+import { Check, ChevronsUpDown, Loader2, Plus } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { ButtonGroup } from "@/components/ui/button-group"
 import {
     Command,
     CommandEmpty,
@@ -28,23 +29,27 @@ import {
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
+import { PartyForm } from "@/app/people/parties/party-form"
+import { PayeeForm } from "@/app/people/payees/payee-form"
+import { ContactForm } from "@/app/people/contacts/contact-form"
+import type { IParty } from "@/models/Party"
 
 export type PartyType = 'customer' | 'supplier' | 'payee' | 'vendor'
 
 export interface PartyContactValue {
     partyType?: PartyType
     partyId?: string
-    partyName?: string // For vendor manual input
-    contactId?: string // Optional, as some parties might not have contacts or user might not select one
+    partyName?: string
+    contactId?: string
 }
 
 interface PartyContactSelectorProps {
     value?: PartyContactValue
     onChange: (value: PartyContactValue, party?: Party) => void
-    allowedRoles?: PartyType[] // New prop for dynamic party types
-    role?: PartyType // Legacy prop for backward compatibility
+    allowedRoles?: PartyType[]
+    role?: PartyType
     showContactSelector?: boolean
-    showCreateButton?: boolean // Control visibility of create party/payee button
+    showCreateButton?: boolean
     disabled?: boolean
     className?: string
     layout?: 'vertical' | 'horizontal' | 'responsive'
@@ -84,15 +89,14 @@ export function PartyContactSelector({
     value,
     onChange,
     allowedRoles,
-    role, // Legacy backward compatibility
+    role,
     showContactSelector = true,
-    showCreateButton = false, // Default to false for backward compatibility
+    showCreateButton = false,
     disabled = false,
     className,
     layout = 'responsive',
     showPartyLabel = true,
 }: PartyContactSelectorProps) {
-    // Determine effective allowed roles (new prop takes precedence over legacy)
     const effectiveAllowedRoles: PartyType[] = React.useMemo(() => {
         if (allowedRoles && allowedRoles.length > 0) {
             return allowedRoles
@@ -100,12 +104,11 @@ export function PartyContactSelector({
         if (role) {
             return [role]
         }
-        return ['customer'] // Default fallback
+        return ['customer']
     }, [allowedRoles, role])
 
     const showPartyTypeSelector = effectiveAllowedRoles.length > 1
 
-    // Initialize party type to first allowed role or value's party type
     const [selectedPartyType, setSelectedPartyType] = React.useState<PartyType>(
         value?.partyType || effectiveAllowedRoles[0]
     )
@@ -118,20 +121,20 @@ export function PartyContactSelector({
 
     const [loadingParties, setLoadingParties] = React.useState(false)
     const [loadingContacts, setLoadingContacts] = React.useState(false)
-    const [isCreating, setIsCreating] = React.useState(false)
 
     const [searchQuery, setSearchQuery] = React.useState("")
 
-    // Sync selected party type with value
+    const [isPartyFormOpen, setIsPartyFormOpen] = React.useState(false)
+    const [isPayeeFormOpen, setIsPayeeFormOpen] = React.useState(false)
+    const [isContactFormOpen, setIsContactFormOpen] = React.useState(false)
+
     React.useEffect(() => {
         if (value?.partyType && effectiveAllowedRoles.includes(value.partyType)) {
             setSelectedPartyType(value.partyType)
         }
     }, [value?.partyType, effectiveAllowedRoles])
 
-    // Fetch Parties or Payees based on selected party type
     const fetchParties = React.useCallback(async () => {
-        // Skip fetching for vendor (manual input)
         if (selectedPartyType === 'vendor') {
             setParties([])
             return
@@ -164,10 +167,8 @@ export function PartyContactSelector({
         fetchParties()
     }, [fetchParties])
 
-    // Fetch Contacts when Party changes
     React.useEffect(() => {
         const partyId = value?.partyId;
-        // Don't fetch contacts for vendor or payee
         if (!partyId || selectedPartyType === 'vendor' || selectedPartyType === 'payee') {
             setContacts([])
             return
@@ -190,7 +191,6 @@ export function PartyContactSelector({
         fetchContacts()
     }, [value?.partyId, selectedPartyType])
 
-    // Sync search query with party popover state
     React.useEffect(() => {
         if (openParty) {
             const selectedParty = parties.find((p) => p._id === value?.partyId)
@@ -200,7 +200,6 @@ export function PartyContactSelector({
 
     const handlePartyTypeChange = (newType: PartyType) => {
         setSelectedPartyType(newType)
-        // Reset selection when party type changes
         onChange({
             partyType: newType,
             partyId: undefined,
@@ -215,7 +214,6 @@ export function PartyContactSelector({
             return
         }
 
-        // Reset contact when party changes
         onChange({
             partyType: selectedPartyType,
             partyId: party._id,
@@ -242,92 +240,131 @@ export function PartyContactSelector({
         setOpenContact(false)
     }
 
-    const handleCreateParty = async () => {
-        if (!searchQuery.trim()) return
+    const handleOpenPartyForm = () => {
+        setOpenParty(false)
+        setIsPartyFormOpen(true)
+    }
 
-        setIsCreating(true)
+    const handleOpenPayeeForm = () => {
+        setOpenParty(false)
+        setIsPayeeFormOpen(true)
+    }
+
+    const handleOpenContactForm = () => {
+        setOpenContact(false)
+        setIsContactFormOpen(true)
+    }
+
+    const handlePartyFormSubmit = async (data: any, id?: string) => {
+        const url = id ? `/api/parties/${id}` : "/api/parties"
+        const method = id ? "PUT" : "POST"
+
         try {
-            if (selectedPartyType === 'payee') {
-                // Create Payee
-                const payeePayload = {
-                    name: searchQuery.trim(),
-                    type: 'individual', // Default type for payee
-                }
+            const response = await fetch(url, {
+                method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            })
 
-                const response = await fetch("/api/payees", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payeePayload),
-                })
+            if (response.ok) {
+                const newParty = await response.json()
+                toast.success(`${PARTY_TYPE_LABELS[selectedPartyType]} created successfully`)
 
-                if (response.ok) {
-                    const newPayee = await response.json()
-                    toast.success(`Payee "${searchQuery}" created`)
+                await fetchParties()
 
-                    // Refresh the parties list
-                    await fetchParties()
+                onChange({
+                    partyType: selectedPartyType,
+                    partyId: newParty._id,
+                    partyName: undefined,
+                    contactId: undefined
+                }, newParty)
 
-                    // Select the newly created payee
-                    onChange({
-                        partyType: 'payee',
-                        partyId: newPayee._id,
-                        partyName: undefined,
-                        contactId: undefined
-                    }, newPayee)
-
-                    setOpenParty(false)
-                    setSearchQuery("")
-                } else {
-                    const error = await response.json()
-                    toast.error(`Failed to create payee "${searchQuery}"`, {
-                        description: error.error || "Please try again"
-                    })
-                }
+                setIsPartyFormOpen(false)
             } else {
-                // Create Party (Customer or Supplier)
-                const partyPayload = {
-                    name: searchQuery.trim(),
-                    roles: {
-                        customer: selectedPartyType === 'customer',
-                        supplier: selectedPartyType === 'supplier',
-                    }
-                }
-
-                const response = await fetch("/api/parties", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(partyPayload),
+                const error = await response.json()
+                toast.error(`Failed to create ${PARTY_TYPE_LABELS[selectedPartyType].toLowerCase()}`, {
+                    description: error.error || "Please try again"
                 })
-
-                if (response.ok) {
-                    const newParty = await response.json()
-                    toast.success(`${PARTY_TYPE_LABELS[selectedPartyType]} "${searchQuery}" created`)
-
-                    // Refresh the parties list
-                    await fetchParties()
-
-                    // Select the newly created party
-                    onChange({
-                        partyType: selectedPartyType,
-                        partyId: newParty._id,
-                        partyName: undefined,
-                        contactId: undefined
-                    }, newParty)
-
-                    setOpenParty(false)
-                    setSearchQuery("")
-                } else {
-                    const error = await response.json()
-                    toast.error(`Failed to create ${PARTY_TYPE_LABELS[selectedPartyType].toLowerCase()} "${searchQuery}"`, {
-                        description: error.error || "Please try again"
-                    })
-                }
             }
         } catch (error) {
             console.error("Error creating party:", error)
             toast.error(`Failed to create ${selectedPartyType}`)
-        } finally {
-            setIsCreating(false)
+        }
+    }
+
+    const handlePayeeFormSubmit = async (data: any, id?: string) => {
+        const url = id ? `/api/payees/${id}` : "/api/payees"
+        const method = id ? "PUT" : "POST"
+
+        try {
+            const response = await fetch(url, {
+                method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            })
+
+            if (response.ok) {
+                const newPayee = await response.json()
+                toast.success("Payee created successfully")
+
+                await fetchParties()
+
+                onChange({
+                    partyType: 'payee',
+                    partyId: newPayee._id,
+                    partyName: undefined,
+                    contactId: undefined
+                }, newPayee)
+
+                setIsPayeeFormOpen(false)
+            } else {
+                const error = await response.json()
+                toast.error("Failed to create payee", {
+                    description: error.error || "Please try again"
+                })
+            }
+        } catch (error) {
+            console.error("Error creating payee:", error)
+            toast.error("Failed to create payee")
+        }
+    }
+
+    const handleContactFormSubmit = async (data: any, id?: string) => {
+        const url = id ? `/api/contacts/${id}` : "/api/contacts"
+        const method = id ? "PUT" : "POST"
+
+        try {
+            const response = await fetch(url, {
+                method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            })
+
+            if (response.ok) {
+                const newContact = await response.json()
+                toast.success("Contact created successfully")
+
+                if (value?.partyId) {
+                    const res = await fetch(`/api/contacts?partyId=${value.partyId}`)
+                    if (res.ok) {
+                        const data = await res.json()
+                        setContacts(data)
+                    }
+                }
+
+                const party = parties.find(p => p._id === value?.partyId)
+                onChange({ ...value!, contactId: newContact._id }, party)
+
+                setIsContactFormOpen(false)
+            } else {
+                const error = await response.json()
+                toast.error("Failed to create contact", {
+                    description: error.error || "Please try again"
+                })
+            }
+        } catch (error) {
+            console.error("Error creating contact:", error)
+            toast.error("Failed to create contact")
         }
     }
 
@@ -347,198 +384,227 @@ export function PartyContactSelector({
         layout === 'responsive' && "sm:flex-row sm:flex-1"
     )
 
-    // Determine if we should show contact selector for current party type
     const shouldShowContactSelector = showContactSelector &&
         (selectedPartyType === 'customer' || selectedPartyType === 'supplier') &&
         value?.partyId
 
-    // Check if party/payee already exists
-    const doesPartyExist = parties.some(
-        (p) => (p.company?.toLowerCase() === searchQuery.trim().toLowerCase()) ||
-            (p.name?.toLowerCase() === searchQuery.trim().toLowerCase())
-    )
-
     return (
-        <div className={containerClass}>
-            {/* Party Type Selector - only shown when multiple roles allowed */}
-            {showPartyTypeSelector && (
-                <div className={cn("space-y-2", (layout === 'horizontal' || layout === 'responsive') && "flex-1")}>
-                    <Label>Party Type</Label>
-                    <Select
-                        value={selectedPartyType}
-                        onValueChange={handlePartyTypeChange}
-                        disabled={disabled}
-                    >
-                        <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select party type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {effectiveAllowedRoles.map((type) => (
-                                <SelectItem key={type} value={type}>
-                                    {PARTY_TYPE_LABELS[type]}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            )}
-
-            {/* Party and Contact Selectors */}
-            <div className={partyContactClass}>
-                <div className="flex flex-col gap-2 w-full">
-                    {showPartyLabel && (
-                        <Label>
-                            {PARTY_TYPE_LABELS[selectedPartyType]}
-                            {!showPartyTypeSelector && ` (${selectedPartyType})`}
-                        </Label>
-                    )}
-
-                    {/* Vendor Manual Input */}
-                    {selectedPartyType === 'vendor' ? (
-                        <Input
-                            placeholder="Enter vendor name..."
-                            value={value?.partyName ?? ''}
-                            onChange={(e) => handleVendorNameChange(e.target.value)}
+        <>
+            <div className={containerClass}>
+                {showPartyTypeSelector && (
+                    <div className={cn("space-y-2", (layout === 'horizontal' || layout === 'responsive') && "flex-1")}>
+                        <Label>Party Type</Label>
+                        <Select
+                            value={selectedPartyType}
+                            onValueChange={handlePartyTypeChange}
                             disabled={disabled}
-                            className="w-full"
-                        />
-                    ) : (
-                        /* Party Dropdown for customer/supplier/payee */
-                        <Popover open={openParty} onOpenChange={setOpenParty}>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    aria-expanded={openParty}
-                                    className="w-full justify-between"
-                                    disabled={disabled}
-                                >
-                                    {selectedParty
-                                        ? (selectedParty.company || selectedParty.name)
-                                        : `Select ${PARTY_TYPE_LABELS[selectedPartyType].toLowerCase()}...`}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[300px] p-0">
-                                <Command>
-                                    <CommandInput
-                                        placeholder={`Search or create ${PARTY_TYPE_LABELS[selectedPartyType].toLowerCase()}...`}
-                                        value={searchQuery}
-                                        onValueChange={setSearchQuery}
-                                    />
-                                    <CommandList
-                                        className="max-h-[200px] overflow-y-auto"
-                                        onWheel={(e) => e.stopPropagation()}
-                                        onTouchStart={(e) => e.stopPropagation()}
-                                        onTouchMove={(e) => e.stopPropagation()}
-                                    >
-                                        <CommandEmpty>
-                                            No {PARTY_TYPE_LABELS[selectedPartyType].toLowerCase()} found.
-                                        </CommandEmpty>
-
-                                        {/* Existing Parties */}
-                                        {parties.length > 0 && (
-                                            <CommandGroup heading={`Existing ${PARTY_TYPE_LABELS[selectedPartyType]}s`}>
-                                                {parties.map((party) => (
-                                                    <CommandItem
-                                                        key={party._id}
-                                                        value={party.company || party.name}
-                                                        onSelect={() => handlePartySelect(party)}
-                                                    >
-                                                        <Check
-                                                            className={cn(
-                                                                "mr-2 h-4 w-4",
-                                                                value?.partyId === party._id ? "opacity-100" : "opacity-0"
-                                                            )}
-                                                        />
-                                                        {party.company || party.name}
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandGroup>
-                                        )}
-
-                                        {/* Create New Party/Payee */}
-                                        {showCreateButton && searchQuery.trim() && !doesPartyExist && (
-                                            <CommandGroup heading={`Create New ${PARTY_TYPE_LABELS[selectedPartyType]}`}>
-                                                <CommandItem
-                                                    onSelect={handleCreateParty}
-                                                    className="text-blue-600 dark:text-blue-400"
-                                                    value={`create-${searchQuery}`}
-                                                    disabled={isCreating}
-                                                >
-                                                    {isCreating ? (
-                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                    ) : (
-                                                        <PlusCircle className="mr-2 h-4 w-4" />
-                                                    )}
-                                                    Create "{searchQuery}"
-                                                </CommandItem>
-                                            </CommandGroup>
-                                        )}
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
-                    )}
-                </div>
-
-                {shouldShowContactSelector && (
-                    <div className="flex flex-col gap-2 w-full">
-                        <Label>Contact</Label>
-                        <Popover open={openContact} onOpenChange={setOpenContact}>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    aria-expanded={openContact}
-                                    className="w-full justify-between"
-                                    disabled={disabled || !value?.partyId}
-                                >
-                                    {loadingContacts ? (
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    ) : selectedContact ? (
-                                        selectedContact.name
-                                    ) : (
-                                        "Select contact..."
-                                    )}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[300px] p-0">
-                                <Command>
-                                    <CommandInput placeholder="Search contact..." />
-                                    <CommandList
-                                        className="max-h-[200px] overflow-y-auto"
-                                        onWheel={(e) => e.stopPropagation()}
-                                        onTouchStart={(e) => e.stopPropagation()}
-                                        onTouchMove={(e) => e.stopPropagation()}
-                                    >
-                                        <CommandEmpty>No contact found.</CommandEmpty>
-                                        <CommandGroup>
-                                            {contacts.map((contact) => (
-                                                <CommandItem
-                                                    key={contact._id}
-                                                    value={contact.name}
-                                                    onSelect={() => handleContactSelect(contact._id)}
-                                                >
-                                                    <Check
-                                                        className={cn(
-                                                            "mr-2 h-4 w-4",
-                                                            value?.contactId === contact._id ? "opacity-100" : "opacity-0"
-                                                        )}
-                                                    />
-                                                    {contact.name}
-                                                    {contact.isPrimary && <span className="ml-2 text-xs text-muted-foreground">(Primary)</span>}
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select party type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {effectiveAllowedRoles.map((type) => (
+                                    <SelectItem key={type} value={type}>
+                                        {PARTY_TYPE_LABELS[type]}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                 )}
+
+                <div className={partyContactClass}>
+                    <div className="flex flex-col gap-2 w-full">
+                        {showPartyLabel && (
+                            <Label>
+                                {PARTY_TYPE_LABELS[selectedPartyType]}
+                                {!showPartyTypeSelector && ` (${selectedPartyType})`}
+                            </Label>
+                        )}
+
+                        {selectedPartyType === 'vendor' ? (
+                            <Input
+                                placeholder="Enter vendor name..."
+                                value={value?.partyName ?? ''}
+                                onChange={(e) => handleVendorNameChange(e.target.value)}
+                                disabled={disabled}
+                                className="w-full"
+                            />
+                        ) : (
+                            <ButtonGroup className="w-full p-0">
+                                <Popover open={openParty} onOpenChange={setOpenParty}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            role="combobox"
+                                            aria-expanded={openParty}
+                                            className="flex-1 justify-between"
+                                            disabled={disabled}
+                                        >
+                                            {selectedParty
+                                                ? (selectedParty.company || selectedParty.name)
+                                                : `Select ${PARTY_TYPE_LABELS[selectedPartyType].toLowerCase()}...`}
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                        <Command>
+                                            <CommandInput
+                                                placeholder={`Search ${PARTY_TYPE_LABELS[selectedPartyType].toLowerCase()}...`}
+                                                value={searchQuery}
+                                                onValueChange={setSearchQuery}
+                                            />
+                                            <CommandList
+                                                className="max-h-[200px] overflow-y-auto"
+                                                onWheel={(e) => e.stopPropagation()}
+                                                onTouchStart={(e) => e.stopPropagation()}
+                                                onTouchMove={(e) => e.stopPropagation()}
+                                            >
+                                                <CommandEmpty>
+                                                    No {PARTY_TYPE_LABELS[selectedPartyType].toLowerCase()} found.
+                                                </CommandEmpty>
+
+                                                {parties.length > 0 && (
+                                                    <CommandGroup heading={`Existing ${PARTY_TYPE_LABELS[selectedPartyType]}s`}>
+                                                        {parties.map((party) => (
+                                                            <CommandItem
+                                                                key={party._id}
+                                                                value={party.company || party.name}
+                                                                onSelect={() => handlePartySelect(party)}
+                                                            >
+                                                                <Check
+                                                                    className={cn(
+                                                                        "mr-2 h-4 w-4",
+                                                                        value?.partyId === party._id ? "opacity-100" : "opacity-0"
+                                                                    )}
+                                                                />
+                                                                {party.company || party.name}
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                )}
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+
+                                {showCreateButton && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="shrink-0"
+                                        onClick={selectedPartyType === 'payee' ? handleOpenPayeeForm : handleOpenPartyForm}
+                                        disabled={disabled}
+                                    >
+                                        <Plus className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </ButtonGroup>
+                        )}
+                    </div>
+
+                    {shouldShowContactSelector && (
+                        <div className="flex flex-col gap-2 w-full">
+                            <Label>Contact</Label>
+                            <ButtonGroup className="w-full p-0">
+                                <Popover open={openContact} onOpenChange={setOpenContact}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            role="combobox"
+                                            aria-expanded={openContact}
+                                            className="flex-1 justify-between"
+                                            disabled={disabled || !value?.partyId}
+                                        >
+                                            {loadingContacts ? (
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            ) : selectedContact ? (
+                                                selectedContact.name
+                                            ) : (
+                                                "Select contact..."
+                                            )}
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                        <Command>
+                                            <CommandInput placeholder="Search contact..." />
+                                            <CommandList
+                                                className="max-h-[200px] overflow-y-auto"
+                                                onWheel={(e) => e.stopPropagation()}
+                                                onTouchStart={(e) => e.stopPropagation()}
+                                                onTouchMove={(e) => e.stopPropagation()}
+                                            >
+                                                <CommandEmpty>No contact found.</CommandEmpty>
+                                                <CommandGroup>
+                                                    {contacts.map((contact) => (
+                                                        <CommandItem
+                                                            key={contact._id}
+                                                            value={contact.name}
+                                                            onSelect={() => handleContactSelect(contact._id)}
+                                                        >
+                                                            <Check
+                                                                className={cn(
+                                                                    "mr-2 h-4 w-4",
+                                                                    value?.contactId === contact._id ? "opacity-100" : "opacity-0"
+                                                                )}
+                                                            />
+                                                            {contact.name}
+                                                            {contact.isPrimary && <span className="ml-2 text-xs text-muted-foreground">(Primary)</span>}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+
+                                {showCreateButton && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="shrink-0"
+                                        onClick={handleOpenContactForm}
+                                        disabled={disabled || !value?.partyId}
+                                    >
+                                        <Plus className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </ButtonGroup>
+                        </div>
+                    )}
+                </div>
             </div>
-        </div>
+
+            <PartyForm
+                isOpen={isPartyFormOpen}
+                onClose={() => setIsPartyFormOpen(false)}
+                onSubmit={handlePartyFormSubmit}
+                defaultValues={{
+                    roles: {
+                        customer: selectedPartyType === 'customer',
+                        supplier: selectedPartyType === 'supplier',
+                    }
+                } as any}
+            />
+
+            <PayeeForm
+                isOpen={isPayeeFormOpen}
+                onClose={() => setIsPayeeFormOpen(false)}
+                onSubmit={handlePayeeFormSubmit}
+                defaultValues={null}
+            />
+
+            <ContactForm
+                isOpen={isContactFormOpen}
+                onClose={() => setIsContactFormOpen(false)}
+                onSubmit={handleContactFormSubmit}
+                defaultValues={null}
+                parties={parties as IParty[]}
+                preselectedPartyId={value?.partyId}
+            />
+        </>
     )
 }

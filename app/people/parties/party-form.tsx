@@ -165,7 +165,7 @@ export function PartyForm({ isOpen, onClose, onSubmit, defaultValues }: PartyFor
                     </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+                <form onSubmit={(e) => { e.stopPropagation(); handleSubmit(handleFormSubmit)(e); }} className="space-y-6">
                     {/* Identity Section */}
                     <div className="space-y-4">
                         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
