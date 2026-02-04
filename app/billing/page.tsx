@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, redirect } from "next/navigation";
 import { BillingForm } from "./billing-form";
 import type { Item } from "@/lib/types";
 import type { IProduct } from "@/models/Product";
@@ -75,7 +75,7 @@ export default function CreateBillPage() {
     voucherDate: new Date(),
   });
 
-  const { permissions: { canCreate } } = useBillPermissions();
+  const { permissions: { canCreate }, session, isPending } = useBillPermissions();
 
   useEffect(() => {
     setIsMounted(true);
@@ -400,12 +400,16 @@ export default function CreateBillPage() {
     }
   };
 
-  if (!isMounted) {
+  if (!isMounted || isPending) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canCreate) {

@@ -9,6 +9,7 @@ import { useVoucherPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 interface DeletedReceipt {
     _id: string;
@@ -26,7 +27,8 @@ export default function ReceiptsTrashPage() {
     const [isMounted, setIsMounted] = useState(false);
     const {
         permissions: { canViewTrash },
-        isPending
+        isPending,
+        session
     } = useVoucherPermissions();
 
     useEffect(() => {
@@ -39,6 +41,10 @@ export default function ReceiptsTrashPage() {
                 <Spinner className="size-10" />
             </div>
         );
+    }
+
+    if (!session) {
+        redirect('/login');
     }
 
     if (!canViewTrash) {

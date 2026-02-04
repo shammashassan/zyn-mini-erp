@@ -34,6 +34,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
+import { redirect } from "next/navigation";
 
 type AdjustmentFormData = {
   materialId: string;
@@ -77,7 +78,8 @@ function StockAdjustmentPageContent() {
       canDelete,
       canViewTrash
     },
-    isPending: isPermissionsPending,
+    isPending,
+    session
   } = useStockAdjustmentPermissions();
 
   useEffect(() => {
@@ -131,9 +133,9 @@ function StockAdjustmentPageContent() {
       }
 
       const res = await fetch(`/api/stock-adjustments?${params.toString()}`);
-      
+
       if (!res.ok) throw new Error("Failed to fetch adjustment history");
-      
+
       const result = await res.json();
 
       if (result.data && result.pageCount !== undefined) {
@@ -174,7 +176,7 @@ function StockAdjustmentPageContent() {
     };
 
     window.addEventListener("focus", onFocus);
-    
+
     return () => {
       window.removeEventListener("focus", onFocus);
     };
@@ -232,7 +234,7 @@ function StockAdjustmentPageContent() {
   };
 
   const handleUndoSubmit = useCallback(async (adjustmentToRevert: IAdjustmentHistory) => {
-    if (!canCreate) return; 
+    if (!canCreate) return;
 
     toast.promise(
       fetch("/api/stock-adjustments", {
@@ -344,20 +346,24 @@ function StockAdjustmentPageContent() {
       setUrlState({ sort: sorting as ExtendedColumnSort<IAdjustmentHistory>[] });
     },
     onColumnFiltersChange: (filters) => {
-      setUrlState({ 
+      setUrlState({
         filters: filters as ExtendedColumnFilter<IAdjustmentHistory>[],
-        page: 1, 
+        page: 1,
       });
     },
     getRowId: (row) => row._id,
   });
 
-  if (!isMounted || isPermissionsPending) {
+  if (!isMounted || isPending) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canRead) {
@@ -370,7 +376,7 @@ function StockAdjustmentPageContent() {
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 px-4 lg:px-6 gap-4">
-              
+
               {/* Left: Title */}
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-primary/10 rounded-full">
@@ -388,7 +394,7 @@ function StockAdjustmentPageContent() {
 
               {/* Right: Actions & Filters Group */}
               <div className="flex flex-col gap-3 w-full lg:w-auto lg:items-end">
-                
+
                 {/* Row 1: Actions */}
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                   {canViewTrash && (

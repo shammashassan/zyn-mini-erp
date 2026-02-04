@@ -8,6 +8,7 @@ import { usePartyPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 interface DeletedParty {
     _id: string;
@@ -27,7 +28,8 @@ export default function PartiesTrashPage() {
     const [isMounted, setIsMounted] = useState(false);
     const {
         permissions: { canViewTrash },
-        isPending
+        isPending,
+        session
     } = usePartyPermissions();
 
     useEffect(() => {
@@ -40,6 +42,10 @@ export default function PartiesTrashPage() {
                 <Spinner className="size-10" />
             </div>
         );
+    }
+
+    if (!session) {
+        redirect('/login');
     }
 
     if (!canViewTrash) {

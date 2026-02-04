@@ -28,6 +28,7 @@ import { exportProfitLossToPDF, exportProfitLossToExcel, type CompanyDetails } f
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { redirect } from "next/navigation";
 
 interface ProfitLossSummary {
   totalRevenueExTax: number;
@@ -68,7 +69,7 @@ interface ApiResponse {
   summary: ProfitLossSummary;
   monthlyBreakdown: MonthlyBreakdown[];
   trends?: Trends;
-  incomeDetails?: any[]; 
+  incomeDetails?: any[];
   expenseDetails?: any[];
 }
 
@@ -129,7 +130,7 @@ function ProfitLossPageContent() {
     from: startOfMonth(subMonths(new Date(), 5)),
     to: endOfMonth(new Date())
   });
-   
+
   const [pdfUrl, setPdfUrl] = useState<string>("");
   const [isPdfViewerOpen, setIsPdfViewerOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -165,7 +166,7 @@ function ProfitLossPageContent() {
 
   const fetchData = useCallback(async (background = false) => {
     if (!canRead) return;
-    
+
     if (!dateRange?.from || !dateRange?.to) {
       return;
     }
@@ -189,7 +190,7 @@ function ProfitLossPageContent() {
 
       const apiData: ApiResponse = await response.json();
       const details = detailsRes.ok ? await detailsRes.json() : { income: [], expenses: [] };
-      
+
       setData(apiData);
       setDetailedData(details);
     } catch (error) {
@@ -255,22 +256,22 @@ function ProfitLossPageContent() {
 
     setDateRange({ from, to });
   };
-   
+
   const handleExportPDF = () => {
     if (!detailedData || !data || !dateRange?.from || !dateRange?.to) return;
     setIsExporting(true);
     try {
-      const totals = { 
-        income: data.summary.totalRevenueExTax, 
-        expenses: data.summary.totalExpenses, 
-        netProfit: data.summary.profit 
+      const totals = {
+        income: data.summary.totalRevenueExTax,
+        expenses: data.summary.totalExpenses,
+        netProfit: data.summary.profit
       };
-      
+
       const url = exportProfitLossToPDF(
-        detailedData.income, 
-        detailedData.expenses, 
-        totals, 
-        { from: dateRange.from, to: dateRange.to }, 
+        detailedData.income,
+        detailedData.expenses,
+        totals,
+        { from: dateRange.from, to: dateRange.to },
         companyDetails,
         'blob'
       );
@@ -285,22 +286,22 @@ function ProfitLossPageContent() {
   };
 
   const handleExportExcel = () => {
-     if (!detailedData || !dateRange?.from || !dateRange?.to) return;
-     setIsExporting(true);
-     try {
-       exportProfitLossToExcel(
-         detailedData.income, 
-         detailedData.expenses, 
-         { from: dateRange.from, to: dateRange.to },
-         companyDetails
-       );
-       toast.success("Excel exported");
-     } catch (e) {
-       console.error(e);
-       toast.error("Failed to export Excel");
-     } finally {
-       setIsExporting(false);
-     }
+    if (!detailedData || !dateRange?.from || !dateRange?.to) return;
+    setIsExporting(true);
+    try {
+      exportProfitLossToExcel(
+        detailedData.income,
+        detailedData.expenses,
+        { from: dateRange.from, to: dateRange.to },
+        companyDetails
+      );
+      toast.success("Excel exported");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to export Excel");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const formatDateRange = () => {
@@ -333,7 +334,7 @@ function ProfitLossPageContent() {
       const sign = value > 0 ? "+" : "";
       return `${sign}${value.toFixed(1)}%`;
     };
-    
+
     return [
       {
         name: "Total Revenue",
@@ -369,9 +370,13 @@ function ProfitLossPageContent() {
   if (!isMounted || isPending) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canRead) {
@@ -380,137 +385,137 @@ function ProfitLossPageContent() {
 
   return (
     <>
-    <div className="flex flex-1 flex-col">
-      <div className="@container/main flex flex-1 flex-col gap-2">
-        <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 px-4 lg:px-6 gap-4">
-            <div className="flex items-center gap-3">
-              <Calculator className="h-12 w-12 text-primary" />
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">Profit & Loss</h1>
-                <p className="text-muted-foreground">
-                  Analyze your business performance and profitability.
-                </p>
+      <div className="flex flex-1 flex-col">
+        <div className="@container/main flex flex-1 flex-col gap-2">
+          <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 px-4 lg:px-6 gap-4">
+              <div className="flex items-center gap-3">
+                <Calculator className="h-12 w-12 text-primary" />
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight">Profit & Loss</h1>
+                  <p className="text-muted-foreground">
+                    Analyze your business performance and profitability.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <UIButton
+                      variant="outline"
+                      className="w-full sm:w-[300px] justify-between px-3 font-normal"
+                    >
+                      <span className={cn("truncate", !dateRange && "text-muted-foreground")}>
+                        {dateRange?.from ? (
+                          dateRange.to ? (
+                            <>
+                              {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
+                            </>
+                          ) : (
+                            format(dateRange.from, "LLL dd, y")
+                          )
+                        ) : (
+                          "Pick a date range"
+                        )}
+                      </span>
+                      <CalendarIcon size={16} aria-hidden="true" />
+                    </UIButton>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={dateRange?.from}
+                      selected={dateRange}
+                      onSelect={setDateRange}
+                      captionLayout="dropdown"
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <Select onValueChange={handleQuickSelect}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="Quick select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="thisMonth">This Month</SelectItem>
+                    <SelectItem value="lastMonth">Last Month</SelectItem>
+                    <SelectItem value="last3Months">Last 3 Months</SelectItem>
+                    <SelectItem value="last6Months">Last 6 Months</SelectItem>
+                    <SelectItem value="thisYear">This Year</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <ExportMenu
+                  onExportPDF={handleExportPDF}
+                  onExportExcel={handleExportExcel}
+                  canExport={canExport ?? false}
+                  isExporting={isExporting}
+                />
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <UIButton
-                    variant="outline"
-                    className="w-full sm:w-[300px] justify-between px-3 font-normal"
-                  >
-                    <span className={cn("truncate", !dateRange && "text-muted-foreground")}>
-                      {dateRange?.from ? (
-                        dateRange.to ? (
-                          <>
-                            {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
-                          </>
-                        ) : (
-                          format(dateRange.from, "LLL dd, y")
-                        )
-                      ) : (
-                        "Pick a date range"
+            <div className="px-4 lg:px-6">
+              {/* ✅ UPDATED: Matching Tax Report transition */}
+              <div className={cn("transition-opacity duration-200", isLoading && !data ? "opacity-50" : "opacity-100")}>
+                {isLoading && !data ? (
+                  <ProfitLossSkeleton />
+                ) : (
+                  <>
+                    {/* Stats Cards */}
+                    <div className="mb-6">
+                      <StatsCards data={cardsData} columns={4} />
+                    </div>
+
+                    {/* Chart */}
+                    <div className="mb-6">
+                      {dateRange?.from && dateRange?.to && data && (
+                        <ProfitLossChart
+                          profit={data.summary.profit}
+                          expenses={data.summary.totalExpenses}
+                          purchases={data.summary.totalPurchasesExTax}
+                          netTax={data.summary.netTax}
+                          dateRange={{ from: dateRange.from, to: dateRange.to }}
+                        />
                       )}
-                    </span>
-                    <CalendarIcon size={16} aria-hidden="true" />
-                  </UIButton>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange?.from}
-                    selected={dateRange}
-                    onSelect={setDateRange}
-                    captionLayout="dropdown"
-                  />
-                </PopoverContent>
-              </Popover>
-
-              <Select onValueChange={handleQuickSelect}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Quick select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="thisMonth">This Month</SelectItem>
-                  <SelectItem value="lastMonth">Last Month</SelectItem>
-                  <SelectItem value="last3Months">Last 3 Months</SelectItem>
-                  <SelectItem value="last6Months">Last 6 Months</SelectItem>
-                  <SelectItem value="thisYear">This Year</SelectItem>
-                </SelectContent>
-              </Select>
-               
-              <ExportMenu 
-                 onExportPDF={handleExportPDF}
-                 onExportExcel={handleExportExcel}
-                 canExport={canExport ?? false}
-                 isExporting={isExporting}
-              />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className="px-4 lg:px-6">
-            {/* ✅ UPDATED: Matching Tax Report transition */}
-            <div className={cn("transition-opacity duration-200", isLoading && !data ? "opacity-50" : "opacity-100")}>
-              {isLoading && !data ? (
-                <ProfitLossSkeleton />
-              ) : (
-                <>
-                  {/* Stats Cards */}
-                  <div className="mb-6">
-                    <StatsCards data={cardsData} columns={4} />
-                  </div>
-
-                  {/* Chart */}
-                  <div className="mb-6">
-                    {dateRange?.from && dateRange?.to && data && (
-                      <ProfitLossChart
-                        profit={data.summary.profit}
-                        expenses={data.summary.totalExpenses}
-                        purchases={data.summary.totalPurchasesExTax}
-                        netTax={data.summary.netTax}
-                        dateRange={{ from: dateRange.from, to: dateRange.to }}
-                      />
+            <div className="px-4 lg:px-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Profit & Loss Report for {formatDateRange()}</CardTitle>
+                  <CardDescription>
+                    Monthly breakdown of financial performance (calculated from Journal entries)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {/* ✅ UPDATED: Table transition like Tax Report */}
+                  <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
+                    {isLoading && !data ? (
+                      <DataTableSkeleton columnCount={columns.length} rowCount={10} />
+                    ) : (
+                      <DataTable table={table}>
+                        <DataTableToolbar table={table} />
+                      </DataTable>
                     )}
                   </div>
-                </>
-              )}
+                </CardContent>
+              </Card>
             </div>
-          </div>
-
-          <div className="px-4 lg:px-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profit & Loss Report for {formatDateRange()}</CardTitle>
-                <CardDescription>
-                  Monthly breakdown of financial performance (calculated from Journal entries)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* ✅ UPDATED: Table transition like Tax Report */}
-                <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
-                  {isLoading && !data ? (
-                    <DataTableSkeleton columnCount={columns.length} rowCount={10} />
-                  ) : (
-                    <DataTable table={table}>
-                      <DataTableToolbar table={table} />
-                    </DataTable>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>
-    </div>
-    <PDFViewerModal 
-       isOpen={isPdfViewerOpen}
-       onClose={() => setIsPdfViewerOpen(false)}
-       pdfUrl={pdfUrl}
-       title={`Profit & Loss - ${dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : ''}`}
-    />
+      <PDFViewerModal
+        isOpen={isPdfViewerOpen}
+        onClose={() => setIsPdfViewerOpen(false)}
+        pdfUrl={pdfUrl}
+        title={`Profit & Loss - ${dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : ''}`}
+      />
     </>
   );
 }

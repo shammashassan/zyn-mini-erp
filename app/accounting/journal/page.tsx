@@ -45,6 +45,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useQueryStates, parseAsInteger } from "nuqs";
 import { getSortingStateParser, getFiltersStateParser } from "@/lib/data-table/parsers";
 import type { ExtendedColumnSort, ExtendedColumnFilter } from "@/types/data-table";
+import { redirect } from "next/navigation";
 
 function JournalPageContent() {
   const [journals, setJournals] = useState<IJournal[]>([]);
@@ -399,6 +400,10 @@ function JournalPageContent() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canRead) {

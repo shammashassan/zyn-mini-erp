@@ -9,6 +9,7 @@ import { useQuotationPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 interface DeletedQuotation {
   _id: string;
@@ -24,7 +25,8 @@ export default function QuotationsTrashPage() {
   const [isMounted, setIsMounted] = useState(false);
   const {
     permissions: { canViewTrash },
-    isPending
+    isPending,
+    session
   } = useQuotationPermissions();
 
   useEffect(() => {
@@ -37,6 +39,10 @@ export default function QuotationsTrashPage() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canViewTrash) {

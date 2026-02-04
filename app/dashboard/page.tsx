@@ -14,7 +14,7 @@ import { ChartAreaInteractive } from "./dashboard-chart";
 import { SectionCards, type CardData } from "@/components/section-cards";
 import { getColumns, type RecentSale } from "./columns";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
-import { useRouter, useSearchParams } from "next/navigation";
+import { redirect, useRouter, useSearchParams } from "next/navigation";
 import { formatCurrency, formatCompactCurrency } from "@/utils/formatters/currency";
 import { useDashboardPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
@@ -146,12 +146,6 @@ function DashboardContent() {
   useEffect(() => {
     setIsMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (isMounted && !isPending && !session) {
-      router.push("/login");
-    }
-  }, [session, isPending, router, isMounted]);
 
   // ✅ UPDATED: Added 'background' param for silent refreshes
   const fetchDashboardData = useCallback(async (background = false) => {
@@ -287,7 +281,7 @@ function DashboardContent() {
   }
 
   if (!session) {
-    return null;
+    redirect('/login');
   }
 
   if (!canRead) {

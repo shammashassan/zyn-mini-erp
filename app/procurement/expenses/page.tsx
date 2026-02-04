@@ -37,6 +37,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
+import { redirect } from "next/navigation";
 
 function ExpensesPageContent() {
   const [expenses, setExpenses] = useState<IExpense[]>([]);
@@ -44,13 +45,13 @@ function ExpensesPageContent() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [pageCount, setPageCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
-  
+
   // Modals
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<IExpense | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [expenseToView, setExpenseToView] = useState<IExpense | null>(null);
-  
+
   // PDF Modal State
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [pdfUrl, setPdfUrl] = useState("");
@@ -75,6 +76,7 @@ function ExpensesPageContent() {
       canViewTrash,
     },
     isPending,
+    session
   } = useExpensePermissions();
 
   const { permissions: { canRead: canViewReports } } = useReportPermissions();
@@ -104,7 +106,7 @@ function ExpensesPageContent() {
         pageSize: urlState.pageSize.toString(),
         populate: 'true',
       });
-      
+
       if (activeTab !== "all") {
         params.append("type", activeTab);
       }
@@ -129,7 +131,7 @@ function ExpensesPageContent() {
       if (!res.ok) throw new Error("Failed to fetch expenses");
 
       const result = await res.json();
-      
+
       if (result.data || result.expenses) {
         setExpenses(result.data || result.expenses || []);
         setPageCount(result.pageCount || 0);
@@ -174,7 +176,7 @@ function ExpensesPageContent() {
     };
 
     window.addEventListener("focus", onFocus);
-    
+
     return () => {
       window.removeEventListener("focus", onFocus);
     };
@@ -276,10 +278,10 @@ function ExpensesPageContent() {
   // View PDF Handler
   const handleViewPdf = (doc: any) => {
     if (!doc || !doc._id) return;
-    
+
     // Determine URL based on document type
-    const url = `/api/vouchers/${doc._id}/pdf?type=payment`; 
-    
+    const url = `/api/vouchers/${doc._id}/pdf?type=payment`;
+
     setPdfUrl(url);
     setPdfTitle(doc.invoiceNumber || "Payment Voucher");
     setIsPdfModalOpen(true);
@@ -345,15 +347,15 @@ function ExpensesPageContent() {
     handleOpenForm,
     handleViewExpense, // Use new handler that fetches full details
     (id: string) => {
-        const expenseToDelete = expenses.find(e => e._id === id);
-        if(expenseToDelete) handleDelete([expenseToDelete]);
+      const expenseToDelete = expenses.find(e => e._id === id);
+      if (expenseToDelete) handleDelete([expenseToDelete]);
     },
-    { 
-      canUpdate, 
-      canDelete, 
+    {
+      canUpdate,
+      canDelete,
       canCreatePayment: canUpdate,
-      canCreate 
-    }, 
+      canCreate
+    },
     fetchExpenses,
     handleViewPdf,
     canCreate ? handleDuplicate : undefined
@@ -397,6 +399,10 @@ function ExpensesPageContent() {
     );
   }
 
+  if (!session) {
+    redirect('/login');
+  }
+
   if (!canRead) {
     return <AccessDenied />
   }
@@ -407,7 +413,7 @@ function ExpensesPageContent() {
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <div className="flex flex-col lg:flex-row lg:justify-between px-4 lg:px-6 gap-4">
-              
+
               {/* Left: Title */}
               <div className="flex items-center gap-3 self-start lg:self-center">
                 <div className="p-3 bg-primary/10 rounded-full">
@@ -430,7 +436,7 @@ function ExpensesPageContent() {
 
               {/* Right: Actions & Filters Group */}
               <div className="flex flex-col gap-3 w-full lg:w-auto lg:items-end">
-                
+
                 {/* Row 1: Actions */}
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                   {canViewTrash && (
@@ -521,7 +527,7 @@ function ExpensesPageContent() {
                 </div>
 
                 <div className="mt-6">
-                   <Card>
+                  <Card>
                     <CardContent className="p-6">
                       {isInitialLoad ? (
                         <DataTableSkeleton columnCount={columns.length} rowCount={10} />
@@ -578,7 +584,7 @@ function ExpensesPageContent() {
         expense={expenseToView}
         onViewPdf={handleViewPdf}
       />
-      
+
       <PDFViewerModal
         isOpen={isPdfModalOpen}
         onClose={() => setIsPdfModalOpen(false)}

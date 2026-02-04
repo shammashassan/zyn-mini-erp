@@ -39,6 +39,7 @@ import { ExportMenu } from "@/components/export-menu";
 import { exportLedgerToPDF, exportLedgerToExcel, type CompanyDetails } from "@/utils/reportExports";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { redirect } from "next/navigation";
 
 interface LedgerData {
   account: IChartOfAccount;
@@ -352,6 +353,10 @@ function LedgerPageContent() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canRead) {

@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { toast } from "sonner";
-import { List, ListTree, Trash2 } from "lucide-react"; 
+import { List, ListTree, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,6 +23,7 @@ import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { redirect } from "next/navigation";
 
 // ✅ UPDATED: Skeleton matching Tax Report style and Toggle Size
 function COAPageSkeleton() {
@@ -122,7 +123,7 @@ function ChartOfAccountsPageContent() {
       if (!background) {
         setIsLoading(true);
       }
-      
+
       const res = await fetch("/api/chart-of-accounts");
       if (!res.ok) throw new Error("Failed to fetch chart of accounts");
       const data = await res.json();
@@ -233,13 +234,13 @@ function ChartOfAccountsPageContent() {
     }
 
     if (account.isActive && !canDeactivate) {
-       toast.error("You don't have permission to deactivate accounts");
-       return;
+      toast.error("You don't have permission to deactivate accounts");
+      return;
     }
 
     if (!account.isActive && !canActivate) {
-       toast.error("You don't have permission to activate accounts");
-       return;
+      toast.error("You don't have permission to activate accounts");
+      return;
     }
 
     try {
@@ -341,6 +342,10 @@ function ChartOfAccountsPageContent() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canRead) {

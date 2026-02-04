@@ -16,6 +16,7 @@ import type { IProduct } from "@/models/Product";
 import { Button } from "@/components/ui/button";
 import { Package, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { useProductPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
@@ -56,6 +57,7 @@ export default function ProductsPage() {
       canViewTrash
     },
     isPending,
+    session,
   } = useProductPermissions();
 
   useEffect(() => {
@@ -68,7 +70,7 @@ export default function ProductsPage() {
    */
   const fetchProducts = useCallback(async (background = false) => {
     if (!canRead) return;
-    
+
     try {
       // Only show loading spinner if not a background fetch
       if (!background) {
@@ -221,9 +223,13 @@ export default function ProductsPage() {
   if (!isMounted || isPending) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canRead) {

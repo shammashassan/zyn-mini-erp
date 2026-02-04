@@ -9,6 +9,7 @@ import { formatCurrency } from "@/utils/formatters/currency";
 import { useDebitNotePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 interface DeletedDebitNote {
   _id: string;
@@ -35,7 +36,8 @@ export default function DebitNotesTrashPage() {
   const [isMounted, setIsMounted] = useState(false);
   const {
     permissions: { canViewTrash },
-    isPending
+    isPending,
+    session
   } = useDebitNotePermissions();
 
   useEffect(() => {
@@ -48,6 +50,10 @@ export default function DebitNotesTrashPage() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canViewTrash) {

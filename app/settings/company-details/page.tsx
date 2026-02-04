@@ -27,6 +27,8 @@ import {
 import { ImageUploader } from "@/components/image-uploader";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
+
 
 type CompanyDetailsFormData = {
   companyName: string;
@@ -51,10 +53,11 @@ export default function CompanyDetailsPage() {
   const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
 
   // Safely destructure permissions with defaults to prevent undefined errors
-  const settingsPermissions = useCompanyDetailsPermissions();
-  const canRead = settingsPermissions?.permissions?.canRead ?? false;
-  const canUpdate = settingsPermissions?.permissions?.canUpdate ?? false;
-  const isPending = settingsPermissions?.isPending ?? false;
+  const {
+    permissions: { canRead, canUpdate },
+    session,
+    isPending
+  } = useCompanyDetailsPermissions();
 
   useEffect(() => {
     setIsMounted(true);
@@ -156,10 +159,14 @@ export default function CompanyDetailsPage() {
 
   if (isPending || !isMounted) {
     return (
-      <div className="flex flex-1 items-center justify-center min-h-screen">
+      <div className="flex flex-1 items-center justify-center">
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canRead) {

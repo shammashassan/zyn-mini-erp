@@ -35,6 +35,7 @@ import {
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { redirect } from "next/navigation";
 
 export interface AccountData {
   accountCode: string;
@@ -216,7 +217,7 @@ function FinancialStatementsPageContent() {
       if (!background) {
         setIsLoading(true);
       }
-      
+
       const params = new URLSearchParams();
       params.append('startDate', dateRange.from.toISOString());
       params.append('endDate', dateRange.to.toISOString());
@@ -381,6 +382,10 @@ function FinancialStatementsPageContent() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect("/company/select");
   }
 
   if (!canRead) {

@@ -17,6 +17,7 @@ import Link from "next/link";
 import { usePayeePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 type PayeeFormData = {
   name: string;
@@ -31,11 +32,11 @@ type PayeeFormData = {
 export default function PayeesPage() {
   const [payees, setPayees] = useState<IPayee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Form State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPayeeForEdit, setSelectedPayeeForEdit] = useState<IPayee | null>(null);
-  
+
   // View Modal State
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [payeeToView, setPayeeToView] = useState<IPayee | null>(null);
@@ -50,7 +51,8 @@ export default function PayeesPage() {
       canDelete,
       canViewTrash
     },
-    isPending: isPermissionsPending,
+    isPending,
+    session
   } = usePayeePermissions();
 
   useEffect(() => {
@@ -169,12 +171,16 @@ export default function PayeesPage() {
     getRowId: (row) => row._id,
   });
 
-  if (!isMounted || isPermissionsPending) {
+  if (!isMounted || isPending) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canRead) {

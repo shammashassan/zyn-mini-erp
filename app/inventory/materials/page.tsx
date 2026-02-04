@@ -17,6 +17,7 @@ import type { IMaterial } from "@/models/Material";
 import { Button } from "@/components/ui/button";
 import { Layers, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { useMaterialPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
@@ -63,6 +64,7 @@ export default function MaterialsPage() {
       canViewTrash
     },
     isPending,
+    session,
   } = useMaterialPermissions();
 
   useEffect(() => {
@@ -75,7 +77,7 @@ export default function MaterialsPage() {
    */
   const fetchMaterials = useCallback(async (background = false) => {
     if (!canRead) return;
-    
+
     try {
       // Only show loading spinner if not a background fetch
       if (!background) {
@@ -246,9 +248,13 @@ export default function MaterialsPage() {
   if (!isMounted || isPending) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canRead) {

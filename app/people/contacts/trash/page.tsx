@@ -8,6 +8,7 @@ import { useContactPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 interface DeletedContact {
     _id: string;
@@ -29,7 +30,8 @@ export default function ContactsTrashPage() {
     const [isMounted, setIsMounted] = useState(false);
     const {
         permissions: { canViewTrash },
-        isPending
+        isPending,
+        session
     } = useContactPermissions();
 
     useEffect(() => {
@@ -42,6 +44,10 @@ export default function ContactsTrashPage() {
                 <Spinner className="size-10" />
             </div>
         );
+    }
+
+    if (!session) {
+        redirect('/login');
     }
 
     if (!canViewTrash) {

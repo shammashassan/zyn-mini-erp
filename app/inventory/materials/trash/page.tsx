@@ -9,6 +9,7 @@ import { useMaterialPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 interface DeletedMaterial {
   _id: string;
@@ -22,9 +23,10 @@ interface DeletedMaterial {
 
 export default function MaterialsTrashPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const { 
-    permissions: { canViewTrash }, 
-    isPending 
+  const {
+    permissions: { canViewTrash },
+    isPending,
+    session
   } = useMaterialPermissions();
 
   useEffect(() => {
@@ -34,9 +36,13 @@ export default function MaterialsTrashPage() {
   if (!isMounted || isPending) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canViewTrash) {
@@ -54,7 +60,7 @@ export default function MaterialsTrashPage() {
       backUrl="../materials"
       backLabel="Back to Materials"
       getItemName={(item) => item.name || "Unnamed Material"}
-      getItemDescription={(item) => 
+      getItemDescription={(item) =>
         `Stock: ${item.currentStock || 0} ${item.unit || ''} • ${formatCurrency(item.pricePerUnit || 0.00)}/unit`
       }
     />

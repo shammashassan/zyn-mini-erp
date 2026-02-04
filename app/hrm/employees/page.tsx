@@ -21,6 +21,7 @@ import { useEmployeePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { redirect } from "next/navigation";
 
 const useMediaQuery = (query: string) => {
   const [matches, setMatches] = useState(false);
@@ -340,35 +341,14 @@ function EmployeesPageContent() {
   // Show loading state while checking permissions
   if (!isMounted || isPending) {
     return (
-      <div className="flex flex-1 flex-col">
-        <div className="@container/main flex flex-1 flex-col gap-2">
-          <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 px-4 lg:px-6 gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <Briefcase className="h-8 w-8 text-primary" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold tracking-tight">
-                    Employees
-                  </h1>
-                  <p className="text-muted-foreground">
-                    Loading...
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
-              <Card>
-                <CardContent className="p-6">
-                  <DataTableSkeleton columnCount={6} rowCount={10} />
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
+      <div className="flex flex-1 items-center justify-center">
+        <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect("/login");
   }
 
   // If user doesn't have read permission, show access denied

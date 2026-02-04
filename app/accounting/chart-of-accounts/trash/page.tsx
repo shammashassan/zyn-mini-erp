@@ -8,6 +8,7 @@ import { useChartOfAccountsPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 interface DeletedCOA {
   _id: string;
@@ -22,9 +23,10 @@ interface DeletedCOA {
 
 export default function COATrashPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const { 
-    permissions: { canViewTrash }, 
-    isPending 
+  const {
+    permissions: { canViewTrash },
+    isPending,
+    session
   } = useChartOfAccountsPermissions();
 
   useEffect(() => {
@@ -37,6 +39,10 @@ export default function COATrashPage() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canViewTrash) {
@@ -53,10 +59,10 @@ export default function COATrashPage() {
       deleteEndpoint="/api/chart-of-accounts/trash/delete"
       backUrl="/accounting/chart-of-accounts"
       backLabel="Back to COA"
-      getItemName={(item) => 
+      getItemName={(item) =>
         `${item.accountCode} - ${item.accountName}`
       }
-      getItemDescription={(item) => 
+      getItemDescription={(item) =>
         `${item.groupName} › ${item.subGroup} • ${item.nature}`
       }
     />

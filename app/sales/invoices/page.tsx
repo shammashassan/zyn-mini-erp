@@ -35,6 +35,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
+import { redirect } from "next/navigation";
 
 function InvoicesPageContent() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -63,6 +64,7 @@ function InvoicesPageContent() {
   const {
     permissions: rawPermissions,
     isPending,
+    session
   } = useInvoicePermissions();
 
   const permissions = useMemo(() => rawPermissions, [rawPermissions]);
@@ -156,7 +158,7 @@ function InvoicesPageContent() {
     };
 
     window.addEventListener("focus", onFocus);
-    
+
     return () => {
       window.removeEventListener("focus", onFocus);
     };
@@ -389,6 +391,10 @@ function InvoicesPageContent() {
     );
   }
 
+  if (!session) {
+    redirect('/login');
+  }
+
   if (!canRead) {
     return <AccessDenied />
   }
@@ -399,7 +405,7 @@ function InvoicesPageContent() {
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <div className="flex flex-col lg:flex-row lg:justify-between px-4 lg:px-6 gap-4">
-              
+
               <div className="flex items-center gap-3 self-start lg:self-center">
                 <div className="p-3 bg-primary/10 rounded-full">
                   <FileText className="h-8 w-8 text-primary" />
@@ -420,7 +426,7 @@ function InvoicesPageContent() {
               </div>
 
               <div className="flex flex-col gap-3 w-full lg:w-auto lg:items-end">
-                
+
                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                   {canViewTrash && (
                     <Link href="./invoices/trash" className="w-full sm:w-auto">

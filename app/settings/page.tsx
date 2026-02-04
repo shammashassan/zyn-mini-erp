@@ -3,7 +3,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import {
   Item,
@@ -24,6 +23,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSettingsPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
+import { redirect } from "next/navigation";
+import { Spinner } from "@/components/ui/spinner";
 
 type RoleType = "user" | "admin" | "manager" | "owner";
 
@@ -70,12 +71,12 @@ const SETTINGS_ITEMS: SettingsItem[] = [
 ];
 
 export default function SettingsPage() {
-  const router = useRouter();
-  const { data: session, isPending } = authClient.useSession();
   const [isMounted, setIsMounted] = React.useState(false);
 
   const {
     permissions: { canRead },
+    session,
+    isPending
   } = useSettingsPermissions();
 
   React.useEffect(() => {
@@ -107,35 +108,20 @@ export default function SettingsPage() {
   }, [session, isPending, isMounted]);
 
   const handleNavigate = (href: string) => {
-    router.push(href);
+    redirect(href);
   };
 
   // Loading state
   if (!isMounted || isPending) {
     return (
-      <div className="flex flex-1 flex-col">
-        <div className="@container/main flex flex-1 flex-col gap-2">
-          <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 px-4 lg:px-6 gap-4">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-14 w-14 rounded-full" />
-                <div className="space-y-2">
-                  <Skeleton className="h-8 w-48" />
-                  <Skeleton className="h-4 w-64" />
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
-              <div className="max-w-4xl mx-auto w-full space-y-3">
-                <Skeleton className="h-24 w-full rounded-lg" />
-                <Skeleton className="h-24 w-full rounded-lg" />
-                <Skeleton className="h-24 w-full rounded-lg" />
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="flex flex-1 items-center justify-center">
+        <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect("/login");
   }
 
   if (!canRead) {

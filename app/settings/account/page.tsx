@@ -26,6 +26,7 @@ export default function AccountPage() {
   const {
     permissions: { canRead },
     isPending,
+    session
   } = useAccountPermissions();
 
   useState(() => {
@@ -38,6 +39,10 @@ export default function AccountPage() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canRead) {

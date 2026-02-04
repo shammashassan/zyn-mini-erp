@@ -9,6 +9,7 @@ import { formatCurrency } from "@/utils/formatters/currency";
 import { useExpensePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 interface DeletedExpense {
   _id: string;
@@ -34,9 +35,10 @@ const getDeletedByUsername = (expense: DeletedExpense): string => {
 
 export default function ExpensesTrashPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const { 
-    permissions: { canViewTrash }, 
-    isPending 
+  const {
+    permissions: { canViewTrash },
+    isPending,
+    session
   } = useExpensePermissions();
 
   useEffect(() => {
@@ -46,9 +48,13 @@ export default function ExpensesTrashPage() {
   if (!isMounted || isPending) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canViewTrash) {
@@ -65,9 +71,9 @@ export default function ExpensesTrashPage() {
       deleteEndpoint="/api/expenses/trash/delete"
       backUrl="../expenses"
       backLabel="Back to Expenses"
-      getItemName={(item) => 
-        item.referenceNumber || 
-        item.description || 
+      getItemName={(item) =>
+        item.referenceNumber ||
+        item.description ||
         "Unnamed Expense"
       }
       getItemDescription={(item) => {

@@ -9,6 +9,7 @@ import { formatCurrency } from "@/utils/formatters/currency";
 import { useReturnNotePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 interface DeletedSalesReturn {
   _id: string;
@@ -35,6 +36,7 @@ export default function SalesReturnsTrashPage() {
   const {
     permissions: { canViewTrash },
     isPending,
+    session
   } = useReturnNotePermissions();
 
   useEffect(() => {
@@ -47,6 +49,10 @@ export default function SalesReturnsTrashPage() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canViewTrash) {

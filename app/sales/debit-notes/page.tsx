@@ -36,6 +36,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
+import { redirect } from "next/navigation";
 
 function DebitNotesPageContent() {
   const [debitNotes, setDebitNotes] = useState<DebitNote[]>([]);
@@ -440,6 +441,10 @@ function DebitNotesPageContent() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canRead) {

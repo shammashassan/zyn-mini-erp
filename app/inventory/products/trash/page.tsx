@@ -9,6 +9,7 @@ import { useProductPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 interface DeletedProduct {
   _id: string;
@@ -21,9 +22,10 @@ interface DeletedProduct {
 
 export default function ProductsTrashPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const { 
-    permissions: { canViewTrash }, 
-    isPending 
+  const {
+    permissions: { canViewTrash },
+    isPending,
+    session
   } = useProductPermissions();
 
   useEffect(() => {
@@ -33,9 +35,13 @@ export default function ProductsTrashPage() {
   if (!isMounted || isPending) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canViewTrash) {
@@ -53,7 +59,7 @@ export default function ProductsTrashPage() {
       backUrl="../products"
       backLabel="Back to Products"
       getItemName={(item) => item.name || "Unnamed Product"}
-      getItemDescription={(item) => 
+      getItemDescription={(item) =>
         `${item.category || 'Uncategorized'} • ${formatCurrency(item.price || 0.00)}`
       }
     />

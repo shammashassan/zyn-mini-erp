@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef, useCallback, Suspense } from "react";
-import { useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { getColumns } from "./columns";
@@ -590,33 +590,14 @@ function UsersPageContent() {
   // Show loading state while checking permissions
   if (!isMounted || isPending) {
     return (
-      <div className="flex flex-1 flex-col">
-        <div className="@container/main flex flex-1 flex-col gap-2">
-          <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 px-4 lg:px-6 gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <BookUser className="h-8 w-8 text-primary" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-                  <p className="text-muted-foreground">
-                    Loading...
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
-              <Card>
-                <CardContent className="p-6">
-                  <DataTableSkeleton columnCount={7} rowCount={10} />
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
+      <div className="flex flex-1 items-center justify-center">
+        <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect("/login");
   }
 
   // If user doesn't have list permission, show access denied

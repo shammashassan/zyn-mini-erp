@@ -35,6 +35,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
+import { redirect } from "next/navigation";
 
 function PurchasesPageContent() {
   const [purchases, setPurchases] = useState<IPurchase[]>([]);
@@ -481,6 +482,10 @@ function PurchasesPageContent() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canRead) {

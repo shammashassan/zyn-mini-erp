@@ -35,6 +35,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
+import { redirect } from "next/navigation";
 
 function SalesReturnsPageContent() {
   const [salesReturns, setSalesReturns] = useState<SalesReturn[]>([]);
@@ -234,7 +235,7 @@ function SalesReturnsPageContent() {
       setSelectedReturn(null);
 
       const savedReturn = result.returnNote || result;
-      
+
       setSelectedPdfUrl(`/api/return-notes/${savedReturn._id}/pdf`);
       setSelectedPdfTitle(savedReturn.returnNumber || "Sales Return");
       setIsModalOpen(true);
@@ -405,6 +406,10 @@ function SalesReturnsPageContent() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canRead) {

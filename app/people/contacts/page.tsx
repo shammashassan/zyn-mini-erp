@@ -22,7 +22,7 @@ import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, redirect } from "next/navigation";
 
 function ContactsPageSkeleton() {
     return (
@@ -348,6 +348,10 @@ function ContactsPageContent() {
                 <Spinner className="size-10" />
             </div>
         );
+    }
+
+    if (!session) {
+        redirect('/login');
     }
 
     if (!canRead) {

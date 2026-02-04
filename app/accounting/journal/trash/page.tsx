@@ -10,6 +10,7 @@ import { useJournalPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 interface DeletedJournal {
   _id: string;
@@ -26,9 +27,10 @@ interface DeletedJournal {
 
 export default function JournalTrashPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const { 
-    permissions: { canViewTrash }, 
-    isPending 
+  const {
+    permissions: { canViewTrash },
+    isPending,
+    session
   } = useJournalPermissions();
 
   useEffect(() => {
@@ -41,6 +43,10 @@ export default function JournalTrashPage() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canViewTrash) {
@@ -57,7 +63,7 @@ export default function JournalTrashPage() {
       deleteEndpoint="/api/journal/trash/delete"
       backUrl="/accounting/journal"
       backLabel="Back to Journal"
-      getItemName={(item) => 
+      getItemName={(item) =>
         `${item.journalNumber} - ${item.narration}`
       }
       getItemDescription={(item) => {

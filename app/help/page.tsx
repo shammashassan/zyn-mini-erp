@@ -38,6 +38,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useHelpPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
+import { redirect } from "next/navigation";
+import { Spinner } from "@/components/ui/spinner";
 
 interface HelpResource {
   id: string;
@@ -123,12 +125,13 @@ const FAQ_ITEMS = [
 ];
 
 export default function GetHelpPage() {
-  const { data: session, isPending } = authClient.useSession();
   const [isMounted, setIsMounted] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
 
   const {
     permissions: { canRead },
+    session,
+    isPending
   } = useHelpPermissions();
 
   React.useEffect(() => {
@@ -157,28 +160,14 @@ export default function GetHelpPage() {
   // Loading state
   if (!isMounted || isPending) {
     return (
-      <div className="flex flex-1 flex-col">
-        <div className="@container/main flex flex-1 flex-col gap-2">
-          <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 px-4 lg:px-6 gap-4">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-14 w-14 rounded-full" />
-                <div className="space-y-2">
-                  <Skeleton className="h-8 w-48" />
-                  <Skeleton className="h-4 w-64" />
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
-              <div className="max-w-5xl mx-auto w-full space-y-4">
-                <Skeleton className="h-64 w-full rounded-lg" />
-                <Skeleton className="h-96 w-full rounded-lg" />
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="flex flex-1 items-center justify-center">
+        <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   const currentUser = session?.user;

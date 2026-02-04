@@ -39,6 +39,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
+import { redirect } from "next/navigation";
 
 function PaymentsPageContent() {
     const [payments, setPayments] = useState<Payment[]>([]);
@@ -79,6 +80,7 @@ function PaymentsPageContent() {
             canViewTrash,
         },
         isPending,
+        session
     } = useVoucherPermissions();
 
     const { permissions: { canRead: canViewReports } } = useReportPermissions();
@@ -374,6 +376,10 @@ function PaymentsPageContent() {
                 <Spinner className="size-10" />
             </div>
         );
+    }
+
+    if (!session) {
+        redirect('/login');
     }
 
     if (!canRead) {

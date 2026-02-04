@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ratelimit } from "@/utils/rateLimit";
 
 // Define public routes that don't require authentication
-const PUBLIC_ROUTES = ['/login', '/register', '/forgot-password'];
+const PUBLIC_ROUTES = ['/login'];
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;

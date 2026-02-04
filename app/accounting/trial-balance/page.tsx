@@ -25,6 +25,7 @@ import { exportTrialBalanceToPDF, exportTrialBalanceToExcel, type CompanyDetails
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { redirect } from "next/navigation";
 
 interface TrialBalanceSummary {
   totalDebits: number;
@@ -264,6 +265,10 @@ function TrialBalancePageContent() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canRead) {

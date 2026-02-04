@@ -10,6 +10,7 @@ import { useStockAdjustmentPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 interface DeletedAdjustment {
   _id: string;
@@ -28,9 +29,10 @@ interface DeletedAdjustment {
 
 export default function StockAdjustmentTrashPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const { 
-    permissions: { canViewTrash }, 
-    isPending 
+  const {
+    permissions: { canViewTrash },
+    isPending,
+    session
   } = useStockAdjustmentPermissions();
 
   useEffect(() => {
@@ -40,9 +42,13 @@ export default function StockAdjustmentTrashPage() {
   if (!isMounted || isPending) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
-        <Spinner className="size-10"/>
+        <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canViewTrash) {
@@ -62,38 +68,38 @@ export default function StockAdjustmentTrashPage() {
       getItemName={(item) => item.materialName || "Unknown Material"}
       getItemDescription={(item) => {
         const parts: string[] = [];
-        
+
         // Add date information
         if (item.createdAt) {
           const date = new Date(item.createdAt);
           parts.push(`${formatDisplayDate(date)} at ${formatTime(date)}`);
         }
-        
+
         // Add adjustment details
         const hasStockChange = (item.value ?? 0) > 0;
-        const unitCostChanged = 
-          typeof item.oldUnitCost === 'number' && 
-          typeof item.newUnitCost === 'number' && 
+        const unitCostChanged =
+          typeof item.oldUnitCost === 'number' &&
+          typeof item.newUnitCost === 'number' &&
           item.oldUnitCost !== item.newUnitCost;
-        
+
         if (hasStockChange) {
-          const stockChange = item.adjustmentType === 'decrement' 
-            ? `-${item.value}` 
+          const stockChange = item.adjustmentType === 'decrement'
+            ? `-${item.value}`
             : `+${item.value}`;
           parts.push(`Stock: ${stockChange}`);
         }
-        
+
         if (unitCostChanged) {
           parts.push(
             `Price: ${formatCurrency(item.oldUnitCost!)} → ${formatCurrency(item.newUnitCost!)}`
           );
         }
-        
+
         // Add reason if available
         if (item.adjustmentReason) {
           parts.push(`Reason: ${item.adjustmentReason}`);
         }
-        
+
         return parts.join(' • ');
       }}
     />

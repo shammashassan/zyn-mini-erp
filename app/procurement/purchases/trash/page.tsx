@@ -9,6 +9,7 @@ import { formatCurrency } from "@/utils/formatters/currency";
 import { usePurchasePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 interface DeletedPurchase {
   _id: string;
@@ -38,7 +39,8 @@ export default function PurchasesTrashPage() {
   const [isMounted, setIsMounted] = useState(false);
   const {
     permissions: { canViewTrash },
-    isPending
+    isPending,
+    session
   } = usePurchasePermissions();
 
   useEffect(() => {
@@ -51,6 +53,10 @@ export default function PurchasesTrashPage() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canViewTrash) {

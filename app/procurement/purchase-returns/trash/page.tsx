@@ -8,6 +8,7 @@ import { PackageX, Redo2 } from "lucide-react";
 import { useReturnNotePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
+import { redirect } from "next/navigation";
 
 interface DeletedPurchaseReturn {
   _id: string;
@@ -33,6 +34,7 @@ export default function PurchaseReturnsTrashPage() {
   const {
     permissions: { canViewTrash },
     isPending,
+    session
   } = useReturnNotePermissions();
 
   useEffect(() => {
@@ -45,6 +47,10 @@ export default function PurchaseReturnsTrashPage() {
         <Spinner className="size-10" />
       </div>
     );
+  }
+
+  if (!session) {
+    redirect('/login');
   }
 
   if (!canViewTrash) {
