@@ -25,7 +25,7 @@ import { useReportPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 interface PaymentsSummary {
   totalCashIn: number;
@@ -95,6 +95,7 @@ export default function PaymentsReportPage() {
  * The main page component content
  */
 function PaymentsReportPageContent() {
+  const pathname = usePathname();
   const [data, setData] = useState<ApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
@@ -274,7 +275,7 @@ function PaymentsReportPageContent() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

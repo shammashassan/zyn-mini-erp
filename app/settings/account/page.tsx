@@ -1,7 +1,7 @@
 // app/settings/account/page.tsx
 "use client";
 
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { getUserInfo } from "@/lib/auth-helpers";
@@ -17,6 +17,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { AccessDenied } from "@/components/access-denied";
 
 export default function AccountPage() {
+  const pathname = usePathname();
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isSessionsModalOpen, setIsSessionsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -42,7 +43,7 @@ export default function AccountPage() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

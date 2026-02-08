@@ -9,7 +9,7 @@ import { useVoucherPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 interface DeletedPayment {
     _id: string;
@@ -24,6 +24,7 @@ interface DeletedPayment {
 }
 
 export default function PaymentsTrashPage() {
+    const pathname = usePathname();
     const [isMounted, setIsMounted] = useState(false);
     const {
         permissions: { canViewTrash },
@@ -44,7 +45,7 @@ export default function PaymentsTrashPage() {
     }
 
     if (!session) {
-        redirect('/login');
+        redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
     }
 
     if (!canViewTrash) {

@@ -22,7 +22,7 @@ import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useSearchParams, redirect } from "next/navigation";
+import { useSearchParams, redirect, usePathname } from "next/navigation";
 
 function ContactsPageSkeleton() {
     return (
@@ -69,6 +69,7 @@ export default function ContactsPage() {
 }
 
 function ContactsPageContent() {
+    const pathname = usePathname();
     const searchParams = useSearchParams();
     const partyIdFromUrl = searchParams.get('partyId');
 
@@ -351,7 +352,7 @@ function ContactsPageContent() {
     }
 
     if (!session) {
-        redirect('/login');
+        redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
     }
 
     if (!canRead) {

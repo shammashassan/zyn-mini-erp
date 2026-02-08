@@ -17,7 +17,7 @@ import Link from "next/link";
 import { usePayeePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 type PayeeFormData = {
   name: string;
@@ -30,6 +30,7 @@ type PayeeFormData = {
 };
 
 export default function PayeesPage() {
+  const pathname = usePathname();
   const [payees, setPayees] = useState<IPayee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -180,7 +181,7 @@ export default function PayeesPage() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

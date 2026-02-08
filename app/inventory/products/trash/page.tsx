@@ -9,7 +9,7 @@ import { useProductPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 interface DeletedProduct {
   _id: string;
@@ -21,6 +21,7 @@ interface DeletedProduct {
 }
 
 export default function ProductsTrashPage() {
+  const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
   const {
     permissions: { canViewTrash },
@@ -41,7 +42,7 @@ export default function ProductsTrashPage() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canViewTrash) {

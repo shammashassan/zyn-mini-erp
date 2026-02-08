@@ -39,7 +39,7 @@ import { ExportMenu } from "@/components/export-menu";
 import { exportLedgerToPDF, exportLedgerToExcel, type CompanyDetails } from "@/utils/reportExports";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 interface LedgerData {
   account: IChartOfAccount;
@@ -74,8 +74,8 @@ function LedgerSkeleton() {
 }
 
 function LedgerPageContent() {
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-
   const [accounts, setAccounts] = useState<IChartOfAccount[]>([]);
   const [selectedAccountCode, setSelectedAccountCode] = useState<string>("");
   const [ledgerData, setLedgerData] = useState<LedgerData | null>(null);
@@ -356,7 +356,7 @@ function LedgerPageContent() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

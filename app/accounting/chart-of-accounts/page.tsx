@@ -23,7 +23,7 @@ import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 // ✅ UPDATED: Skeleton matching Tax Report style and Toggle Size
 function COAPageSkeleton() {
@@ -90,6 +90,7 @@ export default function ChartOfAccountsPage() {
 }
 
 function ChartOfAccountsPageContent() {
+  const pathname = usePathname();
   const [accounts, setAccounts] = useState<IChartOfAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -345,7 +346,7 @@ function ChartOfAccountsPageContent() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

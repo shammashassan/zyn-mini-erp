@@ -37,9 +37,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 function ExpensesPageContent() {
+  const pathname = usePathname();
   const [expenses, setExpenses] = useState<IExpense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -400,7 +401,7 @@ function ExpensesPageContent() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

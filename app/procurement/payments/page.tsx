@@ -39,9 +39,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 function PaymentsPageContent() {
+    const pathname = usePathname();
     const [payments, setPayments] = useState<Payment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -379,7 +380,7 @@ function PaymentsPageContent() {
     }
 
     if (!session) {
-        redirect('/login');
+        redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
     }
 
     if (!canRead) {

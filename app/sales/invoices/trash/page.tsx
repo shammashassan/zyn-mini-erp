@@ -9,7 +9,7 @@ import { useInvoicePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 interface DeletedInvoice {
   _id: string;
@@ -22,6 +22,7 @@ interface DeletedInvoice {
 }
 
 export default function InvoicesTrashPage() {
+  const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
   const {
     permissions: { canViewTrash },
@@ -42,7 +43,7 @@ export default function InvoicesTrashPage() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canViewTrash) {

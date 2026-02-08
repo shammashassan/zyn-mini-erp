@@ -16,7 +16,7 @@ import type { IProduct } from "@/models/Product";
 import { Button } from "@/components/ui/button";
 import { Package, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 import { useProductPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
@@ -41,6 +41,7 @@ type ProductFormData = {
 };
 
 export default function ProductsPage() {
+  const pathname = usePathname();
   const [products, setProducts] = useState<IProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -229,7 +230,7 @@ export default function ProductsPage() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

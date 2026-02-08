@@ -45,9 +45,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { useQueryStates, parseAsInteger } from "nuqs";
 import { getSortingStateParser, getFiltersStateParser } from "@/lib/data-table/parsers";
 import type { ExtendedColumnSort, ExtendedColumnFilter } from "@/types/data-table";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 function JournalPageContent() {
+  const pathname = usePathname();
   const [journals, setJournals] = useState<IJournal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -403,7 +404,7 @@ function JournalPageContent() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

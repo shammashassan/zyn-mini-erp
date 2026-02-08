@@ -9,7 +9,7 @@ import { formatCurrency } from "@/utils/formatters/currency";
 import { useReturnNotePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 interface DeletedSalesReturn {
   _id: string;
@@ -32,6 +32,7 @@ interface DeletedSalesReturn {
 }
 
 export default function SalesReturnsTrashPage() {
+  const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
   const {
     permissions: { canViewTrash },
@@ -52,7 +53,7 @@ export default function SalesReturnsTrashPage() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canViewTrash) {

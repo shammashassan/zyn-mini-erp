@@ -17,7 +17,7 @@ import type { IMaterial } from "@/models/Material";
 import { Button } from "@/components/ui/button";
 import { Layers, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 import { useMaterialPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
@@ -48,6 +48,7 @@ type MaterialFormData = {
  * @returns {JSX.Element} The rendered component.
  */
 export default function MaterialsPage() {
+  const pathname = usePathname();
   const [materials, setMaterials] = useState<IMaterial[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -254,7 +255,7 @@ export default function MaterialsPage() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

@@ -26,7 +26,7 @@ import { useReportPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 interface TaxSummary {
   totalSalesTax: number;
@@ -96,6 +96,7 @@ export default function TaxReportPage() {
  * The main page component content
  */
 function TaxReportPageContent() {
+  const pathname = usePathname();
   const [data, setData] = useState<ApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [taxView, setTaxView] = useState<"sales" | "purchase">("sales");
@@ -282,7 +283,7 @@ function TaxReportPageContent() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

@@ -38,7 +38,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useHelpPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 
 interface HelpResource {
@@ -125,6 +125,7 @@ const FAQ_ITEMS = [
 ];
 
 export default function GetHelpPage() {
+  const pathname = usePathname();
   const [isMounted, setIsMounted] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
 
@@ -167,7 +168,7 @@ export default function GetHelpPage() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   const currentUser = session?.user;

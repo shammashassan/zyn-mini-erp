@@ -8,7 +8,7 @@ import { PackageX, Redo2 } from "lucide-react";
 import { useReturnNotePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 interface DeletedPurchaseReturn {
   _id: string;
@@ -30,6 +30,7 @@ interface DeletedPurchaseReturn {
 }
 
 export default function PurchaseReturnsTrashPage() {
+  const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
   const {
     permissions: { canViewTrash },
@@ -50,7 +51,7 @@ export default function PurchaseReturnsTrashPage() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canViewTrash) {

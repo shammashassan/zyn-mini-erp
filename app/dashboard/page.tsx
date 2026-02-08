@@ -14,7 +14,7 @@ import { ChartAreaInteractive } from "./dashboard-chart";
 import { SectionCards, type CardData } from "@/components/section-cards";
 import { getColumns, type RecentSale } from "./columns";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
-import { redirect, useRouter, useSearchParams } from "next/navigation";
+import { redirect, useRouter, useSearchParams, usePathname } from "next/navigation";
 import { formatCurrency, formatCompactCurrency } from "@/utils/formatters/currency";
 import { useDashboardPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
@@ -126,6 +126,7 @@ function DashboardSkeleton({ isBasicUser }: { isBasicUser: boolean }) {
 }
 
 function DashboardContent() {
+  const pathname = usePathname();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -281,7 +282,7 @@ function DashboardContent() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

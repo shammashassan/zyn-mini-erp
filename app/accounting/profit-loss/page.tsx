@@ -28,7 +28,7 @@ import { exportProfitLossToPDF, exportProfitLossToExcel, type CompanyDetails } f
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 interface ProfitLossSummary {
   totalRevenueExTax: number;
@@ -120,6 +120,7 @@ export default function ProfitLossPage() {
 }
 
 function ProfitLossPageContent() {
+  const pathname = usePathname();
   const [data, setData] = useState<ApiResponse | null>(null);
   const [detailedData, setDetailedData] = useState<any>(null);
   const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
@@ -376,7 +377,7 @@ function ProfitLossPageContent() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

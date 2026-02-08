@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import { useRouter, redirect } from "next/navigation";
+import { useRouter, redirect, usePathname } from "next/navigation";
 import { BillingForm } from "./billing-form";
 import type { Item } from "@/lib/types";
 import type { IProduct } from "@/models/Product";
@@ -47,6 +47,7 @@ interface BillPayload {
 
 export default function CreateBillPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(false);
   const isSubmittingRef = useRef(false);
 
@@ -409,7 +410,7 @@ export default function CreateBillPage() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canCreate) {

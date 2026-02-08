@@ -25,7 +25,7 @@ import { useReportPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 interface CategoryData {
   category: string;
@@ -109,6 +109,7 @@ export default function ExpenseReportPage() {
  * The main page component content
  */
 function ExpenseReportPageContent() {
+  const pathname = usePathname();
   const [data, setData] = useState<ApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
@@ -296,7 +297,7 @@ function ExpenseReportPageContent() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

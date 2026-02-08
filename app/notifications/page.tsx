@@ -7,9 +7,10 @@ import { AccessDenied } from "@/components/access-denied";
 import { Bell } from "lucide-react";
 import { EmptyNotificationState } from "@/components/empty-notification-state";
 import { useNotificationPermissions } from "@/hooks/use-permissions";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 export default function NotificationsPage() {
+  const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
@@ -33,7 +34,7 @@ export default function NotificationsPage() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   // 2. Access Control (Access Denied)

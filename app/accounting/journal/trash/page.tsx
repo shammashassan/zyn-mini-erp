@@ -10,7 +10,7 @@ import { useJournalPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 interface DeletedJournal {
   _id: string;
@@ -26,6 +26,7 @@ interface DeletedJournal {
 }
 
 export default function JournalTrashPage() {
+  const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
   const {
     permissions: { canViewTrash },
@@ -46,7 +47,7 @@ export default function JournalTrashPage() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canViewTrash) {

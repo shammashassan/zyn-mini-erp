@@ -10,7 +10,7 @@ import { useStockAdjustmentPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 interface DeletedAdjustment {
   _id: string;
@@ -28,6 +28,7 @@ interface DeletedAdjustment {
 }
 
 export default function StockAdjustmentTrashPage() {
+  const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
   const {
     permissions: { canViewTrash },
@@ -48,7 +49,7 @@ export default function StockAdjustmentTrashPage() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canViewTrash) {

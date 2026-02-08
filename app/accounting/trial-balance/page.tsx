@@ -25,7 +25,7 @@ import { exportTrialBalanceToPDF, exportTrialBalanceToExcel, type CompanyDetails
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 interface TrialBalanceSummary {
   totalDebits: number;
@@ -71,6 +71,7 @@ export default function TrialBalancePage() {
 }
 
 function TrialBalancePageContent() {
+  const pathname = usePathname();
   const [trialBalance, setTrialBalance] = useState<TrialBalanceItem[]>([]);
   const [summary, setSummary] = useState<TrialBalanceSummary | null>(null);
   const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
@@ -268,7 +269,7 @@ function TrialBalancePageContent() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

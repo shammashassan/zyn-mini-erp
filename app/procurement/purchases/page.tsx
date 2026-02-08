@@ -35,9 +35,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 function PurchasesPageContent() {
+  const pathname = usePathname();
   const [purchases, setPurchases] = useState<IPurchase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -485,7 +486,7 @@ function PurchasesPageContent() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

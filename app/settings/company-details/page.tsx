@@ -27,7 +27,7 @@ import {
 import { ImageUploader } from "@/components/image-uploader";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 
 type CompanyDetailsFormData = {
@@ -42,6 +42,7 @@ type CompanyDetailsFormData = {
 };
 
 export default function CompanyDetailsPage() {
+  const pathname = usePathname();
   const { register, handleSubmit, reset, watch, formState: { isSubmitting, isDirty } } = useForm<CompanyDetailsFormData>();
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
@@ -166,7 +167,7 @@ export default function CompanyDetailsPage() {
   }
 
   if (!session) {
-    redirect('/login');
+    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
   }
 
   if (!canRead) {

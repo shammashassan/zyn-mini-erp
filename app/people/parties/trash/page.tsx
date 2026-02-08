@@ -8,7 +8,7 @@ import { usePartyPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect } from "next/navigation";
+import { redirect, usePathname } from "next/navigation";
 
 interface DeletedParty {
     _id: string;
@@ -25,6 +25,7 @@ interface DeletedParty {
 }
 
 export default function PartiesTrashPage() {
+    const pathname = usePathname();
     const [isMounted, setIsMounted] = useState(false);
     const {
         permissions: { canViewTrash },
@@ -45,7 +46,7 @@ export default function PartiesTrashPage() {
     }
 
     if (!session) {
-        redirect('/login');
+        redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
     }
 
     if (!canViewTrash) {
