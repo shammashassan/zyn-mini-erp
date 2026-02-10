@@ -46,6 +46,7 @@ import type { Quotation } from "./columns";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 import { Spinner } from "@/components/ui/spinner";
+import { ItemsTable } from "@/components/ItemsTable";
 
 import { PartyContactSelector, PartyContactValue } from "@/components/PartyContactSelector";
 
@@ -102,8 +103,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
 
   const [products, setProducts] = useState<IProduct[]>([]);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
-  const [productPopovers, setProductPopovers] = useState<Record<number, boolean>>({});
-  const [productSearchQueries, setProductSearchQueries] = useState<Record<number, string>>({});
+
 
   // Responsive check
   const [isDesktop, setIsDesktop] = useState(true);
@@ -165,59 +165,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
     }
   }, [isOpen, defaultValues, reset]);
 
-  const handleProductSelect = (index: number, product: IProduct) => {
-    setValue(`items.${index}.description`, product.name, { shouldDirty: true });
-    setValue(`items.${index}.rate`, product.price, { shouldDirty: true });
 
-    const quantity = Number(watchedItems[index].quantity) || 1;
-    setValue(`items.${index}.total`, quantity * product.price, { shouldDirty: true });
-
-    setProductPopovers(prev => ({ ...prev, [index]: false }));
-    setProductSearchQueries(prev => ({ ...prev, [index]: "" }));
-  };
-
-  const handleCreateCustomProduct = (index: number) => {
-    const searchQuery = productSearchQueries[index] || "";
-    if (searchQuery.trim()) {
-      setValue(`items.${index}.description`, searchQuery.trim(), { shouldDirty: true });
-      setValue(`items.${index}.shouldCreateProduct`, false, { shouldDirty: true });
-      setProductPopovers(prev => ({ ...prev, [index]: false }));
-      setProductSearchQueries(prev => ({ ...prev, [index]: "" }));
-    }
-  };
-
-  const handleMarkForProductCreation = (index: number) => {
-    const searchQuery = productSearchQueries[index] || "";
-    if (searchQuery.trim()) {
-      setValue(`items.${index}.description`, searchQuery.trim(), { shouldDirty: true });
-      setValue(`items.${index}.shouldCreateProduct`, true, { shouldDirty: true });
-      setProductPopovers(prev => ({ ...prev, [index]: false }));
-      setProductSearchQueries(prev => ({ ...prev, [index]: "" }));
-      toast.info(`"${searchQuery}" will be created as a product when quotation is submitted`);
-    }
-  };
-
-  const handleQuantityChange = (index: number, value: string) => {
-    const quantity = parseFloat(value);
-    const rate = Number(watchedItems[index].rate) || 0;
-    if (!isNaN(quantity)) {
-      setValue(`items.${index}.total`, quantity * rate, { shouldDirty: true });
-    } else {
-      setValue(`items.${index}.total`, 0, { shouldDirty: true });
-    }
-  };
-
-  const handleRateChange = (index: number, value: string) => {
-    const rate = parseFloat(value);
-    const quantity = Number(watchedItems[index].quantity) || 0;
-    if (!isNaN(rate)) {
-      setValue(`items.${index}.rate`, rate, { shouldDirty: true });
-      setValue(`items.${index}.total`, quantity * rate, { shouldDirty: true });
-    } else {
-      setValue(`items.${index}.rate`, 0, { shouldDirty: true });
-      setValue(`items.${index}.total`, 0, { shouldDirty: true });
-    }
-  };
 
   const handleFormSubmit = async (data: QuotationFormData) => {
     // Validation
@@ -363,284 +311,20 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
               <CardTitle className="text-base">Items</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {isDesktop ? (
-                <div className="w-full overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-3 font-medium text-sm w-[40px]">#</th>
-                        <th className="text-left p-3 font-medium text-sm min-w-[250px]">Description</th>
-                        <th className="text-left p-3 font-medium text-sm w-[100px]">Qty</th>
-                        <th className="text-left p-3 font-medium text-sm w-[100px]">Rate</th>
-                        <th className="text-right p-3 font-medium text-sm w-[100px]">Total</th>
-                        <th className="text-center p-3 font-medium text-sm w-[60px]">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {fields.map((field, index) => (
-                        <tr key={field.id} className="border-b hover:bg-muted/50">
-                          <td className="p-3 text-sm text-muted-foreground">{index + 1}</td>
-                          <td className="p-3">
-                            <Controller
-                              name={`items.${index}.description`}
-                              control={control}
-                              render={({ field }) => (
-                                <Popover
-                                  open={productPopovers[index]}
-                                  onOpenChange={(open) => setProductPopovers(prev => ({ ...prev, [index]: open }))}
-                                >
-                                  <PopoverTrigger asChild>
-                                    <Button type="button" variant="outline" role="combobox" className="w-full justify-between h-10 font-normal">
-                                      <span className="truncate">{field.value || "Select or type product..."}</span>
-                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                                    <Command shouldFilter={false}>
-                                      <CommandInput
-                                        placeholder="Search products..."
-                                        value={productSearchQueries[index] || ""}
-                                        onValueChange={(value) => setProductSearchQueries(prev => ({ ...prev, [index]: value }))}
-                                      />
-                                      <CommandList
-                                        className="max-h-[200px] overflow-y-auto"
-                                        onWheel={(e) => e.stopPropagation()}
-                                        onTouchStart={(e) => e.stopPropagation()}
-                                        onTouchMove={(e) => e.stopPropagation()}
-                                      >
-                                        <CommandEmpty>No product found.</CommandEmpty>
-
-                                        {/* Existing Products */}
-                                        {products.filter(p =>
-                                          !productSearchQueries[index] ||
-                                          p.name.toLowerCase().includes((productSearchQueries[index] || "").toLowerCase())
-                                        ).length > 0 && (
-                                            <CommandGroup heading="Existing Products">
-                                              {products
-                                                .filter(p =>
-                                                  !productSearchQueries[index] ||
-                                                  p.name.toLowerCase().includes((productSearchQueries[index] || "").toLowerCase())
-                                                )
-                                                .map((product) => (
-                                                  <CommandItem key={String(product._id)} value={product.name} onSelect={() => handleProductSelect(index, product)}>
-                                                    <Check className={cn("mr-2 h-4 w-4", field.value === product.name ? "opacity-100" : "opacity-0")} />
-                                                    <div>
-                                                      <div>{product.name}</div>
-                                                      <div className="text-xs text-muted-foreground">{formatCurrency(product.price)}</div>
-                                                    </div>
-                                                  </CommandItem>
-                                                ))}
-                                            </CommandGroup>
-                                          )}
-
-                                        {/* Use/Create Custom Item */}
-                                        {productSearchQueries[index]?.trim() &&
-                                          !products.some(p => p.name.toLowerCase() === (productSearchQueries[index] || "").toLowerCase()) && (
-                                            <CommandGroup heading="Add Custom Item">
-                                              <CommandItem
-                                                onSelect={() => handleCreateCustomProduct(index)}
-                                                className="text-primary"
-                                                value={productSearchQueries[index]}
-                                              >
-                                                <Plus className="mr-2 h-4 w-4" />
-                                                Use "{productSearchQueries[index]}"
-                                              </CommandItem>
-                                              <CommandItem
-                                                onSelect={() => handleMarkForProductCreation(index)}
-                                                className="text-green-600 dark:text-green-400"
-                                                value={`create-${productSearchQueries[index]}`}
-                                              >
-                                                <PlusCircle className="mr-2 h-4 w-4" />
-                                                Create "{productSearchQueries[index]}"
-                                              </CommandItem>
-                                            </CommandGroup>
-                                          )}
-                                      </CommandList>
-                                    </Command>
-                                  </PopoverContent>
-                                </Popover>
-                              )}
-                            />
-                          </td>
-                          <td className="p-3">
-                            <Input
-                              type="number"
-                              step="any"
-                              min="0"
-                              className="h-10"
-                              {...register(`items.${index}.quantity`, {
-                                onChange: (e) => handleQuantityChange(index, e.target.value)
-                              })}
-                            />
-                          </td>
-                          <td className="p-3">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              className="h-10 text-left"
-                              {...register(`items.${index}.rate`, {
-                                onChange: (e) => handleRateChange(index, e.target.value)
-                              })}
-                            />
-                          </td>
-                          <td className="p-3 text-right font-semibold tabular-nums">
-                            {formatCurrency(watchedItems[index]?.total || 0)}
-                          </td>
-                          <td className="p-3 text-center">
-                            {fields.length > 1 && (
-                              <Button type="button" variant="ghost" size="sm" onClick={() => remove(index)} className="h-8 w-8 p-0 text-destructive">
-                                <X className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {fields.map((field, index) => (
-                    <Card key={field.id} className="border-2">
-                      <CardHeader className="pb-2">
-                        <div className="flex justify-between items-center">
-                          <CardTitle className="text-sm">Item #{index + 1}</CardTitle>
-                          {fields.length > 1 && (
-                            <Button type="button" variant="ghost" size="sm" onClick={() => remove(index)} className="h-8 w-8 p-0 text-destructive">
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">Description</Label>
-                          <Controller
-                            name={`items.${index}.description`}
-                            control={control}
-                            render={({ field }) => (
-                              <Popover
-                                open={productPopovers[index]}
-                                onOpenChange={(open) => setProductPopovers(prev => ({ ...prev, [index]: open }))}
-                              >
-                                <PopoverTrigger asChild>
-                                  <Button type="button" variant="outline" role="combobox" className="w-full justify-between h-9 text-sm font-normal">
-                                    <span className="truncate">{field.value || "Select..."}</span>
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[300px] p-0" align="start">
-                                  <Command shouldFilter={false}>
-                                    <CommandInput
-                                      placeholder="Search..."
-                                      value={productSearchQueries[index] || ""}
-                                      onValueChange={(value) => setProductSearchQueries(prev => ({ ...prev, [index]: value }))}
-                                    />
-                                    <CommandList
-                                      className="max-h-[200px] overflow-y-auto"
-                                      onWheel={(e) => e.stopPropagation()}
-                                      onTouchStart={(e) => e.stopPropagation()}
-                                      onTouchMove={(e) => e.stopPropagation()}
-                                    >
-                                      <CommandEmpty>No product found.</CommandEmpty>
-
-                                      {products.filter(p =>
-                                        !productSearchQueries[index] ||
-                                        p.name.toLowerCase().includes((productSearchQueries[index] || "").toLowerCase())
-                                      ).length > 0 && (
-                                          <CommandGroup heading="Existing Products">
-                                            {products
-                                              .filter(p =>
-                                                !productSearchQueries[index] ||
-                                                p.name.toLowerCase().includes((productSearchQueries[index] || "").toLowerCase())
-                                              )
-                                              .map((product) => (
-                                                <CommandItem key={String(product._id)} value={product.name} onSelect={() => handleProductSelect(index, product)}>
-                                                  <Check className={cn("mr-2 h-4 w-4", field.value === product.name ? "opacity-100" : "opacity-0")} />
-                                                  <div className="flex-1 min-w-0">
-                                                    <div className="truncate">{product.name}</div>
-                                                    <div className="text-xs text-muted-foreground">{formatCurrency(product.price)}</div>
-                                                  </div>
-                                                </CommandItem>
-                                              ))}
-                                          </CommandGroup>
-                                        )}
-
-                                      {productSearchQueries[index]?.trim() &&
-                                        !products.some(p => p.name.toLowerCase() === (productSearchQueries[index] || "").toLowerCase()) && (
-                                          <CommandGroup heading="Add Custom Item">
-                                            <CommandItem
-                                              onSelect={() => handleCreateCustomProduct(index)}
-                                              className="text-primary"
-                                              value={productSearchQueries[index]}
-                                            >
-                                              <Plus className="mr-2 h-4 w-4" />
-                                              Use "{productSearchQueries[index]}"
-                                            </CommandItem>
-                                            <CommandItem
-                                              onSelect={() => handleMarkForProductCreation(index)}
-                                              className="text-green-600 dark:text-green-400"
-                                              value={`create-${productSearchQueries[index]}`}
-                                            >
-                                              <PlusCircle className="mr-2 h-4 w-4" />
-                                              Create "{productSearchQueries[index]}"
-                                            </CommandItem>
-                                          </CommandGroup>
-                                        )}
-                                    </CommandList>
-                                  </Command>
-                                </PopoverContent>
-                              </Popover>
-                            )}
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground">Qty</Label>
-                            <Input
-                              type="number"
-                              step="any"
-                              min="0"
-                              className="h-9"
-                              {...register(`items.${index}.quantity`, {
-                                onChange: (e) => handleQuantityChange(index, e.target.value)
-                              })}
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground">Rate</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              className="h-9 text-left"
-                              {...register(`items.${index}.rate`, {
-                                onChange: (e) => handleRateChange(index, e.target.value)
-                              })}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex justify-between items-center pt-2 border-t">
-                          <span className="text-xs font-medium">Total</span>
-                          <span className="text-sm font-bold">{formatCurrency(watchedItems[index]?.total || 0)}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => append({ description: "", quantity: 1, rate: 0, total: 0 })}
-                className="w-full gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Add Item
-              </Button>
+              <ItemsTable
+                itemType="product"
+                items={products}
+                fields={fields}
+                control={control}
+                register={register}
+                watch={watch}
+                setValue={setValue}
+                onAppendItem={() => append({ description: "", quantity: 1, rate: 0, total: 0 })}
+                onRemoveItem={remove}
+                fieldName="items"
+                isDesktop={isDesktop}
+                priceLabel="Rate"
+              />
             </CardContent>
           </Card>
 

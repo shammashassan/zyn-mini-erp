@@ -58,6 +58,7 @@ import type { IMaterial } from "@/models/Material";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 import { Spinner } from "@/components/ui/spinner";
+import { ItemsTable } from "@/components/ItemsTable";
 import { PartyContactSelector } from "@/components/PartyContactSelector";
 
 type DebitNoteMode = 'items' | 'manual';
@@ -132,7 +133,6 @@ export function DebitNoteForm({
   const [materials, setMaterials] = useState<IMaterial[]>([]);
   const [returnNotes, setReturnNotes] = useState<any[]>([]);
   const [returnNotePopoverOpen, setReturnNotePopoverOpen] = useState(false);
-  const [materialPopovers, setMaterialPopovers] = useState<Record<number, boolean>>({});
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
 
@@ -319,39 +319,7 @@ export function DebitNoteForm({
     setValue("debitType", 'return');
   };
 
-  const handleMaterialSelect = (index: number, materialId: string) => {
-    const material = materials.find(m => m._id === materialId);
-    if (material) {
-      setValue(`items.${index}.materialId`, materialId);
-      setValue(`items.${index}.materialName`, material.name);
-      setValue(`items.${index}.unitCost`, material.unitCost);
 
-      const quantity = parseFloat(String(watchedItems[index].quantity)) || 1;
-      setValue(`items.${index}.total`, quantity * material.unitCost, { shouldDirty: true });
-
-      setMaterialPopovers(prev => ({ ...prev, [index]: false }));
-    }
-  };
-
-  const handleQuantityChange = (index: number, value: string) => {
-    const quantity = parseFloat(value);
-    const unitCost = Number(watchedItems[index].unitCost) || 0;
-    if (!isNaN(quantity)) {
-      setValue(`items.${index}.total`, quantity * unitCost, { shouldDirty: true });
-    } else {
-      setValue(`items.${index}.total`, 0, { shouldDirty: true });
-    }
-  };
-
-  const handleUnitCostChange = (index: number, value: string) => {
-    const unitCost = parseFloat(value);
-    const quantity = Number(watchedItems[index].quantity) || 0;
-    if (!isNaN(unitCost)) {
-      setValue(`items.${index}.total`, quantity * unitCost, { shouldDirty: true });
-    } else {
-      setValue(`items.${index}.total`, 0, { shouldDirty: true });
-    }
-  };
 
   const handleFormSubmit = async (data: DebitNoteFormData) => {
     // ✅ Validation
@@ -748,314 +716,23 @@ export function DebitNoteForm({
                 </div>
               )}
 
-              {/* Items Mode - Desktop Table */}
-              {debitMode === 'items' && isDesktop && (
-                <div className="animate-in fade-in-50 duration-300 space-y-4">
-                  <div className="w-full overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left p-3 font-medium text-sm w-[40px]">#</th>
-                          <th className="text-left p-3 font-medium text-sm min-w-[250px]">
-                            Material <span className="text-destructive">*</span>
-                          </th>
-                          <th className="text-left p-3 font-medium text-sm w-[100px]">Quantity</th>
-                          <th className="text-left p-3 font-medium text-sm w-[120px]">Unit Cost</th>
-                          <th className="text-right p-3 font-medium text-sm w-[100px]">Total</th>
-                          <th className="text-center p-3 font-medium text-sm w-[60px]">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {fields.map((field, index) => {
-                          const material = materials.find(m => m._id === watchedItems[index]?.materialId);
-
-                          return (
-                            <tr key={field.id} className="border-b hover:bg-muted/50">
-                              <td className="p-3 text-sm text-muted-foreground">{index + 1}</td>
-                              <td className="p-3">
-                                <Controller
-                                  name={`items.${index}.materialId`}
-                                  control={control}
-                                  render={({ field }) => (
-                                    <Popover
-                                      open={materialPopovers[index]}
-                                      onOpenChange={(open) =>
-                                        setMaterialPopovers(prev => ({ ...prev, [index]: open }))
-                                      }
-                                    >
-                                      <PopoverTrigger asChild>
-                                        <Button
-                                          ref={field.ref}
-                                          type="button"
-                                          variant="outline"
-                                          role="combobox"
-                                          className="w-full justify-between h-10"
-                                          disabled={isFromReturnNote || !!selectedReturnNoteId}
-                                        >
-                                          <span className="truncate">
-                                            {material?.name || "Select material..."}
-                                          </span>
-                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                                        <Command>
-                                          <CommandInput
-                                            placeholder="Search materials..."
-                                            value={watchedItems[index]?.materialName || ""}
-                                            onValueChange={(val) =>
-                                              setValue(`items.${index}.materialName`, val)
-                                            }
-                                          />
-                                          <CommandList
-                                            className="max-h-[200px] overflow-y-auto"
-                                            onWheel={(e) => e.stopPropagation()}
-                                            onTouchStart={(e) => e.stopPropagation()}
-                                            onTouchMove={(e) => e.stopPropagation()}
-                                          >
-                                            <CommandEmpty>No material found.</CommandEmpty>
-                                            <CommandGroup>
-                                              {materials.map((mat) => (
-                                                <CommandItem
-                                                  key={mat._id}
-                                                  value={mat.name}
-                                                  onSelect={() => handleMaterialSelect(index, mat._id)}
-                                                >
-                                                  <Check
-                                                    className={cn(
-                                                      "mr-2 h-4 w-4",
-                                                      field.value === mat._id ? "opacity-100" : "opacity-0"
-                                                    )}
-                                                  />
-                                                  <div className="flex-1">
-                                                    <div>{mat.name}</div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                      {mat.type} • {mat.unitCost}/{mat.unit}
-                                                    </div>
-                                                  </div>
-                                                </CommandItem>
-                                              ))}
-                                            </CommandGroup>
-                                          </CommandList>
-                                        </Command>
-                                      </PopoverContent>
-                                    </Popover>
-                                  )}
-                                />
-                              </td>
-                              <td className="p-3">
-                                <Input
-                                  type="number"
-                                  step="any"
-                                  min="0"
-                                  className="h-10"
-                                  {...register(`items.${index}.quantity`, {
-                                    onChange: (e) => handleQuantityChange(index, e.target.value)
-                                  })}
-                                />
-                              </td>
-                              <td className="p-3">
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  className="h-10 text-left"
-                                  {...register(`items.${index}.unitCost`, {
-                                    onChange: (e) => handleUnitCostChange(index, e.target.value)
-                                  })}
-                                />
-                              </td>
-                              <td className="p-3 text-right font-semibold tabular-nums">
-                                {formatCurrency(watchedItems[index]?.total || 0)}
-                              </td>
-                              <td className="p-3 text-center">
-                                {fields.length > 1 && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => remove(index)}
-                                    className="h-8 w-8 p-0 text-destructive"
-                                    disabled={isFromReturnNote || !!selectedReturnNoteId}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  {!isFromReturnNote && !selectedReturnNoteId && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        append({ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 })
-                      }
-                      className="w-full gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add Material
-                    </Button>
-                  )}
-                </div>
-              )}
-
-              {/* Items Mode - Mobile Cards */}
-              {debitMode === 'items' && !isDesktop && (
-                <div className="animate-in fade-in-50 duration-300 space-y-4">
-                  <div className="space-y-4">
-                    {fields.map((field, index) => {
-                      const material = materials.find(m => m._id === watchedItems[index]?.materialId);
-
-                      return (
-                        <Card key={field.id} className="border-2">
-                          <CardHeader className="pb-2">
-                            <div className="flex justify-between items-center">
-                              <CardTitle className="text-sm">Material #{index + 1}</CardTitle>
-                              {fields.length > 1 && !isFromReturnNote && !selectedReturnNoteId && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => remove(index)}
-                                  className="h-8 w-8 p-0 text-destructive"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-3">
-                            <div className="space-y-1.5">
-                              <Label className="text-xs text-muted-foreground">
-                                Material <span className="text-destructive">*</span>
-                              </Label>
-                              <Controller
-                                name={`items.${index}.materialId`}
-                                control={control}
-                                render={({ field }) => (
-                                  <Popover
-                                    open={materialPopovers[index]}
-                                    onOpenChange={(open) =>
-                                      setMaterialPopovers(prev => ({ ...prev, [index]: open }))
-                                    }
-                                  >
-                                    <PopoverTrigger asChild>
-                                      <Button
-                                        ref={field.ref}
-                                        type="button"
-                                        variant="outline"
-                                        role="combobox"
-                                        className="w-full justify-between h-9 text-sm"
-                                        disabled={isFromReturnNote || !!selectedReturnNoteId}
-                                      >
-                                        <span className="truncate">
-                                          {material?.name || "Select material..."}
-                                        </span>
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[300px] p-0" align="start">
-                                      <Command>
-                                        <CommandInput
-                                          placeholder="Search materials..."
-                                          value={watchedItems[index]?.materialName || ""}
-                                          onValueChange={(val) =>
-                                            setValue(`items.${index}.materialName`, val)
-                                          }
-                                        />
-                                        <CommandList
-                                          className="max-h-[200px] overflow-y-auto"
-                                          onWheel={(e) => e.stopPropagation()}
-                                          onTouchStart={(e) => e.stopPropagation()}
-                                          onTouchMove={(e) => e.stopPropagation()}
-                                        >
-                                          <CommandEmpty>No material found.</CommandEmpty>
-                                          <CommandGroup>
-                                            {materials.map((mat) => (
-                                              <CommandItem
-                                                key={mat._id}
-                                                value={mat.name}
-                                                onSelect={() => handleMaterialSelect(index, mat._id)}
-                                              >
-                                                <Check
-                                                  className={cn(
-                                                    "mr-2 h-4 w-4",
-                                                    field.value === mat._id ? "opacity-100" : "opacity-0"
-                                                  )}
-                                                />
-                                                <div className="flex-1 min-w-0">
-                                                  <div className="truncate">{mat.name}</div>
-                                                  <div className="text-xs text-muted-foreground truncate">
-                                                    {mat.type} • {mat.unitCost}/{mat.unit}
-                                                  </div>
-                                                </div>
-                                              </CommandItem>
-                                            ))}
-                                          </CommandGroup>
-                                        </CommandList>
-                                      </Command>
-                                    </PopoverContent>
-                                  </Popover>
-                                )}
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-1.5">
-                                <Label className="text-xs text-muted-foreground">Qty</Label>
-                                <Input
-                                  type="number"
-                                  step="any"
-                                  min="0"
-                                  className="h-9"
-                                  {...register(`items.${index}.quantity`, {
-                                    onChange: (e) => handleQuantityChange(index, e.target.value)
-                                  })}
-                                />
-                              </div>
-                              <div className="space-y-1.5">
-                                <Label className="text-xs text-muted-foreground">Unit Cost</Label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  className="h-9"
-                                  {...register(`items.${index}.unitCost`, {
-                                    onChange: (e) => handleUnitCostChange(index, e.target.value)
-                                  })}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex justify-between items-center pt-2 border-t">
-                              <span className="text-xs font-medium">Total</span>
-                              <span className="text-sm font-bold">
-                                {formatCurrency(watchedItems[index]?.total || 0)}
-                              </span>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                  {!isFromReturnNote && !selectedReturnNoteId && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        append({ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 })
-                      }
-                      className="w-full gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add Material
-                    </Button>
-                  )}
+              {/* Items Mode - Using ItemsTable */}
+              {debitMode === 'items' && (
+                <div className="animate-in fade-in-50 duration-300">
+                  <ItemsTable
+                    itemType="material"
+                    items={materials}
+                    fields={fields}
+                    control={control}
+                    register={register}
+                    watch={watch}
+                    setValue={setValue}
+                    onAppendItem={() => append({ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 })}
+                    onRemoveItem={remove}
+                    fieldName="items"
+                    isDesktop={isDesktop}
+                    priceLabel="Unit Cost"
+                  />
                 </div>
               )}
             </CardContent>
