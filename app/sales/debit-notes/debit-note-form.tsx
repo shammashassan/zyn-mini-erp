@@ -473,7 +473,7 @@ export function DebitNoteForm({
                       field.onChange(val.partyId);
                       setValue('contactId', val.contactId);
                     }}
-                    allowedRoles={['customer', 'supplier']}
+                    allowedRoles={['supplier', 'customer']}
                     showCreateButton={true}
                     className="w-full"
                     layout="vertical"
