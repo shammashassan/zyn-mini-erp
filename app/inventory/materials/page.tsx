@@ -22,6 +22,7 @@ import { useMaterialPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { MaterialViewModal } from "./MaterialViewModal";
 
 const useMediaQuery = (query: string) => {
   const [matches, setMatches] = useState(false);
@@ -53,6 +54,7 @@ export default function MaterialsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<IMaterial | null>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const isSmallScreen = useMediaQuery("(max-width: 640px)");
   const [isMounted, setIsMounted] = useState(false);
 
@@ -133,6 +135,11 @@ export default function MaterialsPage() {
     setIsFormOpen(true);
   };
 
+  const handleView = (material: IMaterial) => {
+    setSelectedMaterial(material);
+    setIsViewModalOpen(true);
+  };
+
   /**
    * Handles the submission of the material form (create or update).
    * @param {MaterialFormData} data - The form data.
@@ -200,7 +207,8 @@ export default function MaterialsPage() {
         handleDelete([materialToDelete]);
       }
     },
-    { canUpdate, canDelete }
+    { canUpdate, canDelete },
+    handleView
   ), [materials, canUpdate, canDelete]);
 
   const columnsWithOptions = useMemo(() => {
@@ -355,6 +363,15 @@ export default function MaterialsPage() {
         defaultValues={selectedMaterial}
         existingTypes={existingTypes}
         existingUnits={existingUnits}
+      />
+
+      <MaterialViewModal
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedMaterial(null);
+        }}
+        material={selectedMaterial}
       />
     </>
   );

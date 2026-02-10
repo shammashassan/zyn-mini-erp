@@ -21,6 +21,7 @@ import { useProductPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { ProductViewModal } from "./ProductViewModal";
 
 const useMediaQuery = (query: string) => {
   const [matches, setMatches] = useState(false);
@@ -46,6 +47,7 @@ export default function ProductsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<IProduct | null>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const isSmallScreen = useMediaQuery("(max-width: 640px)");
   const [isMounted, setIsMounted] = useState(false);
 
@@ -126,6 +128,11 @@ export default function ProductsPage() {
     setIsFormOpen(true);
   };
 
+  const handleView = (product: IProduct) => {
+    setSelectedProduct(product);
+    setIsViewModalOpen(true);
+  };
+
   const handleFormSubmit = async (data: ProductFormData, id?: string) => {
     const url = id ? `/api/products/${id}` : "/api/products";
     const method = id ? "PUT" : "POST";
@@ -182,7 +189,8 @@ export default function ProductsPage() {
         handleDelete([productToDelete]);
       }
     },
-    { canUpdate, canDelete }
+    { canUpdate, canDelete },
+    handleView
   ), [products, canUpdate, canDelete]);
 
   const columnsWithOptions = useMemo(() => {
@@ -329,6 +337,15 @@ export default function ProductsPage() {
         onSubmit={handleFormSubmit}
         defaultValues={selectedProduct}
         existingTypes={existingTypes}
+      />
+
+      <ProductViewModal
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedProduct(null);
+        }}
+        product={selectedProduct}
       />
     </>
   );

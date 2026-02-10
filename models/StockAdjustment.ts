@@ -13,12 +13,14 @@ export interface IStockAdjustment extends Document {
   oldUnitCost?: number;
   newUnitCost?: number;
   adjustmentReason?: string;
-  
+  referenceId?: mongoose.Types.ObjectId;
+  referenceModel?: 'Invoice' | 'Purchase' | 'ReturnNote';
+
   // Soft delete fields
   isDeleted: boolean;
   deletedAt: Date | null;
   deletedBy: string | null;
-  
+
   createdAt: Date;
 }
 
@@ -32,12 +34,14 @@ const stockAdjustmentSchema: Schema<IStockAdjustment> = new Schema({
   oldUnitCost: { type: Number },
   newUnitCost: { type: Number },
   adjustmentReason: { type: String, trim: true },
-  
+  referenceId: { type: Schema.Types.ObjectId, required: false },
+  referenceModel: { type: String, required: false, enum: ['Invoice', 'Purchase', 'ReturnNote'] },
+
   // Soft delete fields
   isDeleted: { type: Boolean, default: false, index: true },
   deletedAt: { type: Date, default: null },
   deletedBy: { type: String, default: null },
-  
+
   createdAt: { type: Date, required: true, default: Date.now },
 });
 
@@ -45,13 +49,13 @@ const stockAdjustmentSchema: Schema<IStockAdjustment> = new Schema({
 stockAdjustmentSchema.index({ isDeleted: 1, createdAt: -1 });
 
 // Add a pre-find hook to exclude soft-deleted records by default
-stockAdjustmentSchema.pre(/^find/, function(this: Query<any, any>, next) {
+stockAdjustmentSchema.pre(/^find/, function (this: Query<any, any>, next) {
   const options = this.getOptions();
-  
+
   if (!options.includeDeleted) {
     this.find({ isDeleted: false });
   }
-  
+
   next();
 });
 

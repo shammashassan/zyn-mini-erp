@@ -10,6 +10,12 @@ import DebitNote from "@/models/DebitNote";
 import StockAdjustment from "@/models/StockAdjustment";
 import { softDelete } from "@/utils/softDelete";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
+import {
+  reverseStockForSalesReturn,
+  deductStockForInvoice,
+  removeStockForPurchaseReturn,
+  addStockForPurchaseReturn
+} from "@/utils/inventoryManager";
 
 interface RequestContext {
   params: Promise<{
@@ -118,7 +124,6 @@ export async function PUT(request: Request, context: RequestContext) {
 
     // Handle status change to 'approved'
     if (oldStatus !== 'approved' && newStatus === 'approved') {
-      console.log(`📦 Approving ${returnType} return note ${currentReturnNote.returnNumber}...`);
 
       if (returnType === 'purchaseReturn') {
         // Handle purchase return approval
@@ -149,37 +154,18 @@ export async function PUT(request: Request, context: RequestContext) {
 
         await purchase.save();
 
-        // Reduce material stock
-        for (const returnItem of currentReturnNote.items) {
-          const material = await Material.findById(returnItem.materialId);
-          if (material) {
-            const oldStock = material.stock;
-            const newStock = oldStock - returnItem.returnQuantity;
+        // Reduce material stock using helper function
+        await removeStockForPurchaseReturn(
+          currentReturnNote._id,
+          currentReturnNote.items,
+          currentReturnNote.returnNumber
+        );
 
-            await Material.findByIdAndUpdate(returnItem.materialId, { stock: newStock });
-
-            const newAdjustment = new StockAdjustment({
-              materialId: returnItem.materialId,
-              materialName: returnItem.materialName,
-              adjustmentType: 'decrement',
-              value: returnItem.returnQuantity,
-              oldStock,
-              newStock,
-              oldUnitCost: material.unitCost,
-              newUnitCost: material.unitCost,
-              adjustmentReason: `Return Note ${currentReturnNote.returnNumber} approved`,
-              createdAt: new Date(),
-            });
-
-            await newAdjustment.save();
-          }
-        }
-
-        console.log(`✅ Stock reduced for purchase return ${currentReturnNote.returnNumber}`);
       } else if (returnType === 'salesReturn') {
-        // Handle sales return approval (NO stock adjustment)
+        // Handle sales return approval - REVERSE STOCK VIA BOM
         const invoice = await Invoice.findById(currentReturnNote.connectedDocuments.invoiceId);
         if (invoice && !invoice.isDeleted) {
+          // Update invoice returned quantities
           for (const returnItem of currentReturnNote.items) {
             const invoiceItemIndex = invoice.items.findIndex(
               (ii: any) => ii.description === returnItem.productName
@@ -196,17 +182,26 @@ export async function PUT(request: Request, context: RequestContext) {
             user.username || user.name
           );
           await invoice.save();
-        }
 
-        console.log(`✅ Sales return ${currentReturnNote.returnNumber} approved - invoice returned quantities updated`);
+          // ✅ REVERSE STOCK: Increment material stock based on BOM
+          try {
+            await reverseStockForSalesReturn(
+              currentReturnNote._id,
+              currentReturnNote.items
+            );
+          } catch (stockError: any) {
+            console.error(`❌ Stock reversal failed:`, stockError);
+            return NextResponse.json({
+              error: `Cannot approve sales return: ${stockError.message}`
+            }, { status: 400 });
+          }
+        }
       }
       // Manual returns: no document updates needed
     }
 
     // Handle status change from 'approved' to other status
     if (oldStatus === 'approved' && newStatus !== 'approved') {
-      console.log(`🔄 Reversing ${returnType} return note ${currentReturnNote.returnNumber}...`);
-
       if (returnType === 'purchaseReturn') {
         const purchase = await Purchase.findById(currentReturnNote.connectedDocuments.purchaseId);
         if (purchase && !purchase.isDeleted) {
@@ -231,33 +226,12 @@ export async function PUT(request: Request, context: RequestContext) {
           await purchase.save();
         }
 
-        // Add material stock back
-        for (const returnItem of currentReturnNote.items) {
-          const material = await Material.findById(returnItem.materialId);
-          if (material) {
-            const oldStock = material.stock;
-            const newStock = oldStock + returnItem.returnQuantity;
-
-            await Material.findByIdAndUpdate(returnItem.materialId, { stock: newStock });
-
-            const newAdjustment = new StockAdjustment({
-              materialId: returnItem.materialId,
-              materialName: returnItem.materialName,
-              adjustmentType: 'increment',
-              value: returnItem.returnQuantity,
-              oldStock,
-              newStock,
-              oldUnitCost: material.unitCost,
-              newUnitCost: material.unitCost,
-              adjustmentReason: `Return Note ${currentReturnNote.returnNumber} reversed`,
-              createdAt: new Date(),
-            });
-
-            await newAdjustment.save();
-          }
-        }
-
-        console.log(`✅ Stock restored for purchase return ${currentReturnNote.returnNumber}`);
+        // Add material stock back using helper function
+        await addStockForPurchaseReturn(
+          currentReturnNote._id,
+          currentReturnNote.items,
+          currentReturnNote.returnNumber
+        );
       } else if (returnType === 'salesReturn') {
         const invoice = await Invoice.findById(currentReturnNote.connectedDocuments.invoiceId);
         if (invoice && !invoice.isDeleted) {
@@ -277,9 +251,22 @@ export async function PUT(request: Request, context: RequestContext) {
             user.username || user.name
           );
           await invoice.save();
+          console.log(`  ✅ Invoice updated`);
+        } else {
+          console.log(`  ⚠️ Invoice not found or deleted`);
         }
 
-        console.log(`✅ Sales return ${currentReturnNote.returnNumber} reversed - invoice returned quantities restored`);
+        // ✅ STOCK DEDUCTION: Deduct materials (reverse the addition from approval)
+        try {
+          await deductStockForInvoice(
+            currentReturnNote.connectedDocuments.invoiceId,
+            currentReturnNote.items
+          );
+        } catch (stockError: any) {
+          console.error(`❌ Stock deduction failed:`, stockError);
+          console.error(`  Error details:`, stockError.message, stockError.stack);
+          // Don't fail the status change if stock deduction fails, but log it
+        }
       }
     }
 
@@ -335,7 +322,6 @@ export async function DELETE(request: Request, context: RequestContext) {
 
     // If the return note was approved, reverse the changes
     if (returnNote.status === 'approved') {
-      console.log(`🔄 Reversing approved ${returnType} return note ${returnNote.returnNumber}...`);
 
       if (returnType === 'purchaseReturn') {
         const purchase = await Purchase.findById(returnNote.connectedDocuments.purchaseId);
@@ -370,31 +356,12 @@ export async function DELETE(request: Request, context: RequestContext) {
           await purchase.save();
         }
 
-        // Add material stock back
-        for (const returnItem of returnNote.items) {
-          const material = await Material.findById(returnItem.materialId);
-          if (material) {
-            const oldStock = material.stock;
-            const newStock = oldStock + returnItem.returnQuantity;
-
-            await Material.findByIdAndUpdate(returnItem.materialId, { stock: newStock });
-
-            const newAdjustment = new StockAdjustment({
-              materialId: returnItem.materialId,
-              materialName: returnItem.materialName,
-              adjustmentType: 'increment',
-              value: returnItem.returnQuantity,
-              oldStock,
-              newStock,
-              oldUnitCost: material.unitCost,
-              newUnitCost: material.unitCost,
-              adjustmentReason: `Return Note ${returnNote.returnNumber} deleted`,
-              createdAt: new Date(),
-            });
-
-            await newAdjustment.save();
-          }
-        }
+        // Add material stock back using helper function
+        await addStockForPurchaseReturn(
+          returnNote._id,
+          returnNote.items,
+          returnNote.returnNumber
+        );
       } else if (returnType === 'salesReturn') {
         const invoice = await Invoice.findById(returnNote.connectedDocuments.invoiceId);
         if (invoice && !invoice.isDeleted) {
@@ -424,6 +391,22 @@ export async function DELETE(request: Request, context: RequestContext) {
           );
 
           await invoice.save();
+
+          // ✅ REVERSE THE STOCK REVERSAL: Deduct materials again (since return is being deleted)
+          // When return was approved, stock was added back. Now we need to remove it again.
+          try {
+            await deductStockForInvoice(
+              returnNote._id, // Using returnNote ID for the adjustment reference
+              returnNote.items.map((item: any) => ({
+                productId: item.productId,
+                quantity: item.returnQuantity
+              }))
+            );
+            console.log(`✅ Stock deducted for deleted sales return ${returnNote.returnNumber}`);
+          } catch (stockError: any) {
+            console.error(`❌ Stock deduction failed:`, stockError);
+            // Don't fail the delete if stock deduction fails, but log it
+          }
         }
       }
     } else {

@@ -302,65 +302,86 @@ export function MaterialForm({
               <Controller
                 control={control}
                 name="unit"
-                render={({ field }) => (
-                  <Popover open={isUnitPopoverOpen} onOpenChange={setIsUnitPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                      >
-                        {field.value || "Select unit..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                      <Command shouldFilter={false}>
-                        <CommandInput
-                          placeholder="Search or add unit..."
-                          value={customUnit}
-                          onValueChange={setCustomUnit}
-                        />
-                        <CommandList
-                          className="max-h-[200px] overflow-y-auto"
-                          onWheel={(e) => e.stopPropagation()}
-                          onTouchStart={(e) => e.stopPropagation()}
-                          onTouchMove={(e) => e.stopPropagation()}
-                        >
-                          <CommandGroup heading="Select Unit">
-                            {allUnits.filter(u => !customUnit || u.toLowerCase().includes(customUnit.toLowerCase())).map((u) => (
-                              <CommandItem
-                                key={u}
-                                value={u}
-                                onSelect={() => {
-                                  field.onChange(u);
-                                  setIsUnitPopoverOpen(false);
-                                  setCustomUnit("");
-                                }}
-                              >
-                                <Check className={cn("mr-2 h-4 w-4", field.value === u ? "opacity-100" : "opacity-0")} />
-                                {u}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
+                render={({ field }) => {
+                  const isUnitLocked = defaultValues?.baseUnitLocked;
 
-                          {customUnit.trim() && !allUnits.some(u => u.toLowerCase() === customUnit.trim().toLowerCase()) && (
-                            <CommandGroup heading="Create New">
-                              <CommandItem
-                                onSelect={() => handleAddCustomUnit(field)}
-                                className="text-primary"
-                                value={customUnit}
-                              >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Create "{customUnit.trim()}"
-                              </CommandItem>
+                  if (isUnitLocked) {
+                    // Show read-only field when unit is locked
+                    return (
+                      <div className="relative">
+                        <Input
+                          value={field.value || ""}
+                          readOnly
+                          disabled
+                          className="opacity-70 cursor-not-allowed"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Unit locked after stock movement
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <Popover open={isUnitPopoverOpen} onOpenChange={setIsUnitPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="w-full justify-between"
+                        >
+                          {field.value || "Select unit..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                        <Command shouldFilter={false}>
+                          <CommandInput
+                            placeholder="Search or add unit..."
+                            value={customUnit}
+                            onValueChange={setCustomUnit}
+                          />
+                          <CommandList
+                            className="max-h-[200px] overflow-y-auto"
+                            onWheel={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onTouchMove={(e) => e.stopPropagation()}
+                          >
+                            <CommandGroup heading="Select Unit">
+                              {allUnits.filter(u => !customUnit || u.toLowerCase().includes(customUnit.toLowerCase())).map((u) => (
+                                <CommandItem
+                                  key={u}
+                                  value={u}
+                                  onSelect={() => {
+                                    field.onChange(u);
+                                    setIsUnitPopoverOpen(false);
+                                    setCustomUnit("");
+                                  }}
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", field.value === u ? "opacity-100" : "opacity-0")} />
+                                  {u}
+                                </CommandItem>
+                              ))}
                             </CommandGroup>
-                          )}
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                )}
+
+                            {customUnit.trim() && !allUnits.some(u => u.toLowerCase() === customUnit.trim().toLowerCase()) && (
+                              <CommandGroup heading="Create New">
+                                <CommandItem
+                                  onSelect={() => handleAddCustomUnit(field)}
+                                  className="text-primary"
+                                  value={customUnit}
+                                >
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  Create "{customUnit.trim()}"
+                                </CommandItem>
+                              </CommandGroup>
+                            )}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  );
+                }}
               />
             </div>
           </div>

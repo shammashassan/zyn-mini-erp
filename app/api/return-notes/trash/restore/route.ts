@@ -9,6 +9,10 @@ import Material from "@/models/Material";
 import StockAdjustment from "@/models/StockAdjustment";
 import { restore } from "@/utils/softDelete";
 import { requireAuthAndPermission, validateRequiredFields } from "@/lib/auth-utils";
+import {
+  reverseStockForSalesReturn,
+  removeStockForPurchaseReturn
+} from "@/utils/inventoryManager";
 
 export async function POST(request: Request) {
   try {
@@ -78,31 +82,12 @@ export async function POST(request: Request) {
           await purchase.save();
         }
 
-        // Reduce material stock again
-        for (const returnItem of returnNoteToRestore.items) {
-          const material = await Material.findById(returnItem.materialId);
-          if (material) {
-            const oldStock = material.stock;
-            const newStock = oldStock - returnItem.returnQuantity;
-
-            await Material.findByIdAndUpdate(returnItem.materialId, { stock: newStock });
-
-            const newAdjustment = new StockAdjustment({
-              materialId: returnItem.materialId,
-              materialName: returnItem.materialName,
-              adjustmentType: 'decrement',
-              value: returnItem.returnQuantity,
-              oldStock,
-              newStock,
-              oldUnitCost: material.unitCost,
-              newUnitCost: material.unitCost,
-              adjustmentReason: `Return Note ${returnNoteToRestore.returnNumber} restored`,
-              createdAt: new Date(),
-            });
-
-            await newAdjustment.save();
-          }
-        }
+        // Reduce material stock again using helper function
+        await removeStockForPurchaseReturn(
+          returnNoteToRestore._id,
+          returnNoteToRestore.items,
+          returnNoteToRestore.returnNumber
+        );
       } else if (returnType === 'salesReturn') {
         const invoice = await Invoice.findById(returnNoteToRestore.connectedDocuments.invoiceId);
         if (invoice && !invoice.isDeleted) {
@@ -133,9 +118,24 @@ export async function POST(request: Request) {
           );
 
           await invoice.save();
+
+          // ✅ STOCK RESTORATION: Add materials back to stock (reverse the deduction)
+          try {
+            await reverseStockForSalesReturn(
+              returnNoteToRestore._id,
+              returnNoteToRestore.items
+            );
+            console.log(`✅ Stock restored for sales return ${returnNoteToRestore.returnNumber}`);
+          } catch (stockError: any) {
+            console.error(`❌ Stock restoration failed:`, stockError);
+            // Fail the restore if stock restoration fails
+            return NextResponse.json({
+              error: `Cannot restore sales return: ${stockError.message}`
+            }, { status: 400 });
+          }
         }
 
-        console.log(`✅ Sales return restored - invoice returned quantities updated`);
+        console.log(`✅ Sales return restored - invoice returned quantities updated and stock restored`);
       }
     } else {
       // Even if not approved, re-add to connected documents

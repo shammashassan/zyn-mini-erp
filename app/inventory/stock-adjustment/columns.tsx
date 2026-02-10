@@ -1,7 +1,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal, ArrowUpCircle, ArrowDownCircle, Tag, Trash2 } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, ArrowUpCircle, ArrowDownCircle, Tag, Trash2, Eye } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -47,15 +47,15 @@ interface StockAdjustmentPermissions {
 interface RowActionsProps {
   adjustment: IAdjustmentHistory;
   onDelete: (adjustment: IAdjustmentHistory) => void;
+  onView: (adjustment: IAdjustmentHistory) => void;
   permissions: StockAdjustmentPermissions;
 }
 
-const RowActions = ({ adjustment, onDelete, permissions }: RowActionsProps) => {
+const RowActions = ({ adjustment, onDelete, onView, permissions }: RowActionsProps) => {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const { canDelete } = permissions;
 
-  if (!canDelete) return null;
-
+  // Always show dropdown - View is available to everyone
   return (
     <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
       <DropdownMenu>
@@ -67,17 +67,27 @@ const RowActions = ({ adjustment, onDelete, permissions }: RowActionsProps) => {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-destructive cursor-pointer"
-            onSelect={(e) => {
-              e.preventDefault();
-              setIsDeleteOpen(true);
-            }}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
+
+          <DropdownMenuItem onClick={() => onView(adjustment)}>
+            <Eye className="mr-2 h-4 w-4" />
+            View
           </DropdownMenuItem>
+
+          {canDelete && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive cursor-pointer"
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setIsDeleteOpen(true);
+                }}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <AlertDialogContent>
@@ -107,7 +117,8 @@ const RowActions = ({ adjustment, onDelete, permissions }: RowActionsProps) => {
 
 export const getAdjustmentHistoryColumns = (
   onDelete: (adjustment: IAdjustmentHistory) => void,
-  permissions: StockAdjustmentPermissions
+  permissions: StockAdjustmentPermissions,
+  onView: (adjustment: IAdjustmentHistory) => void
 ): ColumnDef<IAdjustmentHistory>[] => [
     {
       accessorKey: "createdAt",
@@ -192,6 +203,7 @@ export const getAdjustmentHistoryColumns = (
         <RowActions
           adjustment={row.original}
           onDelete={onDelete}
+          onView={onView}
           permissions={permissions}
         />
       ),

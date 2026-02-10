@@ -35,6 +35,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { redirect, usePathname } from "next/navigation";
+import { StockAdjustmentViewModal } from "./StockAdjustmentViewModal";
 
 type AdjustmentFormData = {
   materialId: string;
@@ -52,6 +53,8 @@ function StockAdjustmentPageContent() {
   // ✅ Initial load state for the table specifically
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [selectedAdjustment, setSelectedAdjustment] = useState<IAdjustmentHistory | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
   // ✅ Server-side pagination state
@@ -278,6 +281,11 @@ function StockAdjustmentPageContent() {
     }
   };
 
+  const handleView = (adjustment: IAdjustmentHistory) => {
+    setSelectedAdjustment(adjustment);
+    setIsViewModalOpen(true);
+  };
+
   const handleQuickSelect = (period: string) => {
     const now = new Date();
     let from: Date;
@@ -321,7 +329,8 @@ function StockAdjustmentPageContent() {
         handleDelete([adjustmentToDelete]);
       }
     },
-    { canDelete }
+    { canDelete },
+    handleView
   ), [adjustmentHistory, canDelete]);
 
   // ✅ Configured useDataTable
@@ -518,6 +527,15 @@ function StockAdjustmentPageContent() {
         onSubmit={handleFormSubmit}
         materials={materials}
         isLoadingMaterials={false} // Materials loaded on mount
+      />
+
+      <StockAdjustmentViewModal
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedAdjustment(null);
+        }}
+        adjustment={selectedAdjustment}
       />
     </>
   );

@@ -9,6 +9,7 @@ export interface IMaterial extends Document {
   unit: string;
   stock: number;
   unitCost: number;
+  baseUnitLocked: boolean;
   
   // Soft delete fields
   isDeleted: boolean;
@@ -25,6 +26,7 @@ const materialSchema: Schema<IMaterial> = new Schema({
   unit: { type: String, required: true, default: 'pieces' },
   stock: { type: Number, default: 0, min: 0 },
   unitCost: { type: Number, required: true, default: 0, min: 0 },
+  baseUnitLocked: { type: Boolean, default: false },
   
   // Soft delete fields
   isDeleted: { type: Boolean, default: false, index: true },

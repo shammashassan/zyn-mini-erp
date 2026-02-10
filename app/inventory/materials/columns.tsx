@@ -3,7 +3,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, ArrowUpDown, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, Pencil, Trash2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -41,10 +41,11 @@ interface RowActionsProps {
   material: IMaterial;
   onEdit: (material: IMaterial) => void;
   onDelete: (id: string) => void;
+  onView: (material: IMaterial) => void;
   permissions: MaterialPermissions;
 }
 
-const RowActions = ({ material, onEdit, onDelete, permissions }: RowActionsProps) => {
+const RowActions = ({ material, onEdit, onDelete, onView, permissions }: RowActionsProps) => {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const { canUpdate, canDelete } = permissions;
 
@@ -59,6 +60,11 @@ const RowActions = ({ material, onEdit, onDelete, permissions }: RowActionsProps
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
+
+          <DropdownMenuItem onClick={() => onView(material)}>
+            <Eye className="mr-2 h-4 w-4" />
+            View
+          </DropdownMenuItem>
 
           {canUpdate && (
             <DropdownMenuItem onClick={() => onEdit(material)}>
@@ -111,7 +117,8 @@ const RowActions = ({ material, onEdit, onDelete, permissions }: RowActionsProps
 export const getColumns = (
   onEdit: (material: IMaterial) => void,
   onDelete: (id: string) => void,
-  permissions: MaterialPermissions
+  permissions: MaterialPermissions,
+  onView: (material: IMaterial) => void
 ): ColumnDef<IMaterial>[] => [
 
     {
@@ -161,6 +168,7 @@ export const getColumns = (
           material={row.original}
           onEdit={onEdit}
           onDelete={onDelete}
+          onView={onView}
           permissions={permissions}
         />
       ),

@@ -9,6 +9,7 @@ import { restore } from "@/utils/softDelete";
 import { getVoidedJournalsForReference, createJournalWithDate } from "@/utils/journalManager";
 import { getUserInfo } from "@/lib/auth-helpers";
 import { requireAuthAndPermission, validateRequiredFields } from "@/lib/auth-utils";
+import { addStockForPurchase } from "@/utils/inventoryManager";
 
 /**
  * Helper to get actual received quantity for an item based on inventory status
@@ -111,39 +112,25 @@ export async function POST(request: Request) {
     if (purchaseToRestore.inventoryStatus === 'received' || purchaseToRestore.inventoryStatus === 'partially received') {
       console.log(`📦 Re-adding stock for ${purchaseToRestore.inventoryStatus} purchase`);
 
-      for (const item of purchaseToRestore.items) {
-        const qtyToAdd = getReceivedQuantity(item, purchaseToRestore.inventoryStatus);
+      const itemsWithQty = purchaseToRestore.items
+        .map((item: any) => ({
+          materialId: item.materialId,
+          materialName: item.materialName,
+          quantity: getReceivedQuantity(item, purchaseToRestore.inventoryStatus)
+        }))
+        .filter((item: any) => item.quantity > 0);
 
-        if (qtyToAdd > 0) {
-          const material = await Material.findById(item.materialId);
-          if (material) {
-            const oldStock = material.stock;
-            const newStock = oldStock + qtyToAdd;
+      const reason = purchaseToRestore.inventoryStatus === 'received'
+        ? 'Purchase restored (fully received)'
+        : 'Purchase restored (partially received)';
 
-            await Material.findByIdAndUpdate(item.materialId, { stock: newStock });
+      await addStockForPurchase(
+        purchaseToRestore._id,
+        itemsWithQty,
+        reason
+      );
 
-            const adjustmentReason = purchaseToRestore.inventoryStatus === 'received'
-              ? `Purchase restored (fully received)`
-              : `Purchase restored (partially received: ${qtyToAdd} of ${item.quantity} total)`;
-
-            const newAdjustment = new StockAdjustment({
-              materialId: item.materialId,
-              materialName: item.materialName,
-              adjustmentType: 'increment',
-              value: qtyToAdd,
-              oldStock,
-              newStock,
-              oldUnitCost: material.unitCost,
-              newUnitCost: material.unitCost,
-              adjustmentReason,
-              createdAt: new Date(),
-            });
-
-            await newAdjustment.save();
-            console.log(`  ✅ Added ${qtyToAdd} units of ${item.materialName} to stock`);
-          }
-        }
-      }
+      console.log(`✅ Stock re-added for ${itemsWithQty.length} material(s)`);
     }
 
     // Restore the purchase

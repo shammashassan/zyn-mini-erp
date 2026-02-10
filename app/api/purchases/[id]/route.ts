@@ -14,6 +14,7 @@ import { createJournalForPurchase } from '@/utils/journalAutoCreate';
 import { voidJournalsForReference } from '@/utils/journalManager';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { createPartySnapshot } from "@/utils/partySnapshot";
+import { addStockForPurchase, removeStockForPurchase } from "@/utils/inventoryManager";
 
 interface RequestContext {
   params: Promise<{
@@ -128,15 +129,27 @@ function detectChanges(oldPurchase: any, newData: any) {
  * Helper to check if items have structurally changed
  */
 function haveItemsChanged(oldItems: any[], newItems: any[]) {
-  if (oldItems.length !== newItems.length) return true;
+  if (oldItems.length !== newItems.length) {
+    return true;
+  }
 
   for (let i = 0; i < oldItems.length; i++) {
     const oldItem = oldItems[i];
     const newItem = newItems.find((item: any) => item.materialId === oldItem.materialId);
 
-    if (!newItem) return true;
-    if (oldItem.quantity !== newItem.quantity) return true;
-    if (oldItem.unitCost !== newItem.unitCost) return true;
+    if (!newItem) {
+      return true;
+    }
+    if (oldItem.quantity !== newItem.quantity) {
+      return true;
+    }
+    if (oldItem.unitCost !== newItem.unitCost) {
+      return true;
+    }
+    // Check receivedQuantity changes
+    if ((oldItem.receivedQuantity || 0) !== (newItem.receivedQuantity || 0)) {
+      return true;
+    }
   }
 
   return false;
@@ -163,8 +176,6 @@ async function processItemChanges(
   purchaseRef: string,
   oldInventoryStatus: string
 ) {
-  console.log('\n📦 Processing item changes...');
-  console.log(`   Old inventory status: ${oldInventoryStatus}`);
 
   const oldItemsMap = new Map(oldItems.map(item => [item.materialId, item]));
   const newItemsMap = new Map(newItems.map(item => [item.materialId, item]));
@@ -304,7 +315,6 @@ export async function PUT(request: Request, context: RequestContext) {
 
     // ✅ FIXED: Handle party/contact changes - update snapshots
     if (body.partyId && body.partyId !== currentPurchase.partyId.toString()) {
-      console.log(`🔄 Party changed for purchase ${id}, updating snapshots`);
 
       const { partySnapshot, contactSnapshot } = await createPartySnapshot(
         body.partyId,
@@ -313,13 +323,9 @@ export async function PUT(request: Request, context: RequestContext) {
 
       body.partySnapshot = partySnapshot;
       body.contactSnapshot = contactSnapshot;
-
-      console.log(`   Old Party: ${currentPurchase.partySnapshot?.displayName || 'N/A'}`);
-      console.log(`   New Party: ${partySnapshot.displayName}`);
     }
     // ✅ If only contact changed (same party)
     else if (body.contactId && body.contactId !== currentPurchase.contactId?.toString()) {
-      console.log(`🔄 Contact changed for purchase ${id}, updating contact snapshot`);
 
       const { contactSnapshot } = await createPartySnapshot(
         currentPurchase.partyId.toString(),
@@ -338,15 +344,19 @@ export async function PUT(request: Request, context: RequestContext) {
 
     const itemsChanged = body.items && haveItemsChanged(currentPurchase.items, body.items);
 
-    console.log(`\n🔍 Purchase Update: ${currentPurchase.referenceNumber}`);
-    console.log(`   Old Purchase Status: ${oldPurchaseStatus}, New: ${newPurchaseStatus}`);
-    console.log(`   Old Inventory Status: ${oldInventoryStatus}, New: ${newInventoryStatus}`);
-    console.log(`   Old Payment Status: ${oldPaymentStatus}`);
-    console.log(`   Items Changed: ${itemsChanged}`);
-
     // SCENARIO 1: Editing items while inventory status is received or partially received
-    if ((oldInventoryStatus === 'received' || oldInventoryStatus === 'partially received') && itemsChanged) {
-      console.log(`\n🔧 Editing ${oldInventoryStatus} purchase...`);
+    // Only run if items were structurally changed (added/removed/qty/cost changed)
+    // BUT NOT if only receivedQuantity changed (that's handled by SCENARIO 1.5)
+    const structuralItemChanges = itemsChanged && body.items && (
+      currentPurchase.items.length !== body.items.length ||
+      currentPurchase.items.some((oldItem: any) => {
+        const newItem = body.items.find((ni: any) => ni.materialId === oldItem.materialId);
+        if (!newItem) return true; // Item removed
+        return oldItem.quantity !== newItem.quantity || oldItem.unitCost !== newItem.unitCost;
+      })
+    );
+
+    if ((oldInventoryStatus === 'received' || oldInventoryStatus === 'partially received') && structuralItemChanges) {
 
       // 1. Void existing journal if inventory status was received
       if (oldInventoryStatus === 'received') {
@@ -373,41 +383,93 @@ export async function PUT(request: Request, context: RequestContext) {
       body.inventoryStatus = newDeterminedInventoryStatus;
     }
 
+    // SCENARIO 1.5: Received quantity edits when status unchanged
+    // When status is already received/partially received and items were edited,
+    // check if receivedQuantity changed and adjust stock accordingly
+    if ((oldInventoryStatus === 'received' || oldInventoryStatus === 'partially received') &&
+      (newInventoryStatus === oldInventoryStatus) &&
+      itemsChanged) {
+
+      const itemsToAdjust: Array<{ materialId: string; materialName: string; quantity: number }> = [];
+
+      for (const newItem of body.items) {
+        const oldItem = currentPurchase.items.find((i: any) => i.materialId === newItem.materialId);
+        if (!oldItem) continue; // New items are handled by processItemChanges
+
+        const oldReceivedQty = getReceivedQuantity(oldItem, oldInventoryStatus);
+        const newReceivedQty = getReceivedQuantity(newItem, newInventoryStatus);
+        const qtyDifference = newReceivedQty - oldReceivedQty;
+
+        if (qtyDifference !== 0) {
+          itemsToAdjust.push({
+            materialId: newItem.materialId,
+            materialName: newItem.materialName,
+            quantity: Math.abs(qtyDifference)
+          });
+
+        }
+      }
+
+      // Apply stock adjustments
+      if (itemsToAdjust.length > 0) {
+        for (const item of itemsToAdjust) {
+          const newItem = body.items.find((i: any) => i.materialId === item.materialId);
+          const oldItem = currentPurchase.items.find((i: any) => i.materialId === item.materialId);
+
+          const oldReceivedQty = getReceivedQuantity(oldItem, oldInventoryStatus);
+          const newReceivedQty = getReceivedQuantity(newItem, newInventoryStatus);
+          const qtyDifference = newReceivedQty - oldReceivedQty;
+
+          if (qtyDifference > 0) {
+            // Increase stock
+            await addStockForPurchase(
+              currentPurchase._id,
+              [item],
+              `Purchase received quantity increased (${oldReceivedQty} → ${newReceivedQty})`
+            );
+          } else if (qtyDifference < 0) {
+            // Decrease stock
+            await removeStockForPurchase(
+              currentPurchase._id,
+              [item],
+              `Purchase received quantity decreased (${oldReceivedQty} → ${newReceivedQty})`
+            );
+          }
+        }
+      }
+    }
+
     // SCENARIO 2: Inventory status change
-    if (oldInventoryStatus !== newInventoryStatus && !itemsChanged) {
+    if (oldInventoryStatus !== newInventoryStatus) {
+
       // TO Received
       if (newInventoryStatus === 'received' && oldInventoryStatus !== 'received') {
-        const itemsToUse = body.items || currentPurchase.items;
-        for (const item of itemsToUse) {
-          const previouslyReceived = getReceivedQuantity(item, oldInventoryStatus);
-          const remainingToAdd = item.quantity - previouslyReceived;
+        // CRITICAL: Use currentPurchase.items to get OLD receivedQuantity values
+        // body.items has NEW values which would make previouslyReceived wrong!
+        const itemsToUse = currentPurchase.items;
 
-          if (remainingToAdd > 0) {
-            const material = await Material.findById(item.materialId);
-            if (material) {
-              const oldStock = material.stock;
-              const newStock = oldStock + remainingToAdd;
-              await Material.findByIdAndUpdate(item.materialId, { stock: newStock });
+        const itemsWithQty = itemsToUse
+          .map((item: any) => {
+            const previouslyReceived = getReceivedQuantity(item, oldInventoryStatus);
+            const remainingToAdd = item.quantity - previouslyReceived;
 
-              const adjustmentReason = previouslyReceived > 0
-                ? `Purchase fully received (${item.quantity} of ${item.quantity} total)`
-                : `Purchase fully received`;
+            return {
+              materialId: item.materialId,
+              materialName: item.materialName,
+              quantity: remainingToAdd
+            };
+          })
+          .filter((item: any) => {
+            const willAdd = item.quantity > 0;
+            return willAdd;
+          });
 
-              const newAdjustment = new StockAdjustment({
-                materialId: item.materialId,
-                materialName: item.materialName,
-                adjustmentType: 'increment',
-                value: remainingToAdd,
-                oldStock,
-                newStock,
-                oldUnitCost: material.unitCost,
-                newUnitCost: material.unitCost,
-                adjustmentReason,
-                createdAt: new Date(),
-              });
-              await newAdjustment.save();
-            }
-          }
+        if (itemsWithQty.length > 0) {
+          await addStockForPurchase(
+            currentPurchase._id,
+            itemsWithQty,
+            'Purchase fully received'
+          );
         }
       }
 
@@ -453,30 +515,28 @@ export async function PUT(request: Request, context: RequestContext) {
       // FROM Received/Partially Received TO Pending
       if ((oldInventoryStatus === 'received' || oldInventoryStatus === 'partially received') &&
         newInventoryStatus === 'pending') {
-        for (const item of currentPurchase.items) {
-          const qtyToRemove = getReceivedQuantity(item, oldInventoryStatus);
-          if (qtyToRemove > 0) {
-            const material = await Material.findById(item.materialId);
-            if (material) {
-              const oldStock = material.stock;
-              const newStock = oldStock - qtyToRemove;
-              await Material.findByIdAndUpdate(item.materialId, { stock: newStock });
 
-              const newAdjustment = new StockAdjustment({
-                materialId: item.materialId,
-                materialName: item.materialName,
-                adjustmentType: 'decrement',
-                value: qtyToRemove,
-                oldStock,
-                newStock,
-                oldUnitCost: material.unitCost,
-                newUnitCost: material.unitCost,
-                adjustmentReason: `Inventory status changed to ${newInventoryStatus}`,
-                createdAt: new Date(),
-              });
-              await newAdjustment.save();
-            }
-          }
+        const itemsWithQty = currentPurchase.items
+          .map((item: any) => {
+            const qtyToRemove = getReceivedQuantity(item, oldInventoryStatus);
+
+            return {
+              materialId: item.materialId,
+              materialName: item.materialName,
+              quantity: qtyToRemove
+            };
+          })
+          .filter((item: any) => {
+            const willRemove = item.quantity > 0;
+            return willRemove;
+          });
+
+        if (itemsWithQty.length > 0) {
+          await removeStockForPurchase(
+            currentPurchase._id,
+            itemsWithQty,
+            `Inventory status changed to ${newInventoryStatus}`
+          );
         }
       }
     }
@@ -505,13 +565,6 @@ export async function PUT(request: Request, context: RequestContext) {
       const isTaxPayable = body.isTaxPayable !== undefined ? body.isTaxPayable : currentPurchase.isTaxPayable;
       const vatAmount = isTaxPayable ? (subtotal * 0.05) : 0;
       const grandTotal = subtotal + vatAmount;
-
-      console.log(`\n📊 Purchase Update Calculation:`);
-      console.log(`   Gross Total: ${grossTotal.toFixed(2)}`);
-      console.log(`   Discount: ${discount.toFixed(2)}`);
-      console.log(`   Subtotal: ${subtotal.toFixed(2)}`);
-      console.log(`   VAT (5%): ${vatAmount.toFixed(2)}`);
-      console.log(`   Grand Total: ${grandTotal.toFixed(2)}`);
 
       updateData.totalAmount = grossTotal;
       updateData.discount = discount;

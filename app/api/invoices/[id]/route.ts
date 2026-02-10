@@ -12,6 +12,7 @@ import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 import { getUserInfo } from "@/lib/auth-helpers";
 import { createPartySnapshot } from "@/utils/partySnapshot";
+import { deductStockForInvoice, reverseStockForInvoice } from "@/utils/inventoryManager";
 
 interface RequestContext {
   params: Promise<{
@@ -179,6 +180,38 @@ export async function PUT(request: Request, context: RequestContext) {
     if (statusChanged) {
       console.log(`📊 Status change detected: ${oldStatus} → ${body.status}`);
 
+      // ✅ STOCK DEDUCTION: Deduct stock when invoice is approved
+      if (body.status === 'approved' && oldStatus !== 'approved') {
+        try {
+          console.log(`🔄 Deducting stock for invoice ${id}...`);
+          await deductStockForInvoice(
+            currentInvoice._id,
+            currentInvoice.items
+          );
+          console.log(`✅ Stock deducted successfully for invoice ${id}`);
+        } catch (stockError: any) {
+          console.error(`❌ Stock deduction failed:`, stockError);
+          return NextResponse.json({
+            error: `Cannot approve invoice: ${stockError.message}`
+          }, { status: 400 });
+        }
+      }
+
+      // ✅ STOCK REVERSAL: Restore stock when invoice status changes from approved
+      if (oldStatus === 'approved' && body.status !== 'approved') {
+        try {
+          console.log(`🔄 Reversing stock for invoice ${id} (status changed from approved to ${body.status})...`);
+          await reverseStockForInvoice(
+            currentInvoice._id,
+            currentInvoice.items
+          );
+          console.log(`✅ Stock reversed successfully for invoice ${id}`);
+        } catch (stockError: any) {
+          console.error(`❌ Stock reversal failed:`, stockError);
+          // Don't fail the status change if stock reversal fails, but log it
+        }
+      }
+
       await handleInvoiceStatusChange(
         currentInvoice.toObject(),
         oldStatus,
@@ -264,6 +297,18 @@ export async function DELETE(request: Request, context: RequestContext) {
       user.username || user.name,
       `Invoice soft deleted`
     );
+
+    // ✅ Reverse stock deduction if invoice was approved
+    if (invoice.status === 'approved') {
+      try {
+        console.log(`🔄 Reversing stock for approved invoice ${invoice.invoiceNumber}`);
+        await reverseStockForInvoice(invoice._id, invoice.items);
+        console.log(`✅ Stock reversed successfully`);
+      } catch (stockError) {
+        console.error('Error reversing stock:', stockError);
+        // Don't fail the delete if stock reversal fails, but log it
+      }
+    }
 
     invoice.addAuditEntry(
       'Soft Deleted',

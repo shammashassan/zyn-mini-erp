@@ -3,7 +3,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, ArrowUpDown, Trash2, Pencil } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, Trash2, Pencil, Eye } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -38,10 +38,11 @@ interface RowActionsProps {
   product: IProduct;
   onEdit: (product: IProduct) => void;
   onDelete: (id: string) => void;
+  onView: (product: IProduct) => void;
   permissions: ProductPermissions;
 }
 
-const RowActions = ({ product, onEdit, onDelete, permissions }: RowActionsProps) => {
+const RowActions = ({ product, onEdit, onDelete, onView, permissions }: RowActionsProps) => {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const { canUpdate, canDelete } = permissions;
 
@@ -56,6 +57,11 @@ const RowActions = ({ product, onEdit, onDelete, permissions }: RowActionsProps)
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
+
+          <DropdownMenuItem onClick={() => onView(product)}>
+            <Eye className="mr-2 h-4 w-4" />
+            View
+          </DropdownMenuItem>
 
           {canUpdate && (
             <DropdownMenuItem onClick={() => onEdit(product)}>
@@ -111,7 +117,8 @@ const RowActions = ({ product, onEdit, onDelete, permissions }: RowActionsProps)
 export const getColumns = (
   onEdit: (product: IProduct) => void,
   onDelete: (id: string) => void,
-  permissions: ProductPermissions
+  permissions: ProductPermissions,
+  onView: (product: IProduct) => void
 ): ColumnDef<IProduct>[] => [
     {
       accessorKey: "name",
@@ -157,6 +164,7 @@ export const getColumns = (
           product={row.original}
           onEdit={onEdit}
           onDelete={onDelete}
+          onView={onView}
           permissions={permissions} />,
     },
   ];

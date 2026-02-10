@@ -26,7 +26,7 @@ export async function PUT(request: Request, context: RequestContext) {
     await dbConnect();
     const { id } = await context.params;
     const body = await request.json();
-    
+
     // Get the current material to compare stock changes
     const currentMaterial = await Material.findById(id);
     if (!currentMaterial) {
@@ -35,29 +35,43 @@ export async function PUT(request: Request, context: RequestContext) {
 
     // Check if the material is soft-deleted
     if (currentMaterial.isDeleted) {
-      return NextResponse.json({ 
-        error: "Cannot update a deleted material. Please restore it first." 
+      return NextResponse.json({
+        error: "Cannot update a deleted material. Please restore it first."
       }, { status: 400 });
     }
 
+    // UNIT LOCKING: Prevent unit changes if locked
+    if (body.unit && body.unit !== currentMaterial.unit) {
+      if (currentMaterial.baseUnitLocked) {
+        return NextResponse.json({
+          error: "Cannot change unit after stock movements have been recorded. Unit is locked."
+        }, { status: 400 });
+      }
+    }
+
     const updatedMaterial = await Material.findByIdAndUpdate(
-      id, 
+      id,
       { ...body, updatedBy: session.user.id },
       { new: true }
     );
-    
+
     // Check if stock has changed
     const oldStock = currentMaterial.stock;
     const newStock = updatedMaterial.stock;
     const oldUnitCost = currentMaterial.unitCost;
     const newUnitCost = updatedMaterial.unitCost;
-    
+
     if (oldStock !== newStock || oldUnitCost !== newUnitCost) {
+      // AUTO-LOCK: Lock unit on first stock movement
+      if (!currentMaterial.baseUnitLocked && newStock > 0) {
+        await Material.findByIdAndUpdate(id, { baseUnitLocked: true });
+      }
+
       // Create a stock adjustment record
       const stockDifference = newStock - oldStock;
       const adjustmentType = stockDifference >= 0 ? 'increment' : 'decrement';
       const adjustmentValue = Math.abs(stockDifference);
-      
+
       const newAdjustment = new StockAdjustment({
         materialId: id,
         materialName: updatedMaterial.name,
@@ -71,10 +85,10 @@ export async function PUT(request: Request, context: RequestContext) {
         createdAt: new Date(),
         createdBy: session.user.id,
       });
-      
+
       await newAdjustment.save();
     }
-    
+
     return NextResponse.json(updatedMaterial);
   } catch (error) {
     const params = await context.params;
@@ -95,17 +109,17 @@ export async function DELETE(request: Request, context: RequestContext) {
 
     await dbConnect();
     const { id } = await context.params;
-    
+
     // softDelete utility automatically gets Better Auth user ID
     const deletedMaterial = await softDelete(Material, id, session.user.id);
-    
+
     if (!deletedMaterial) {
       return NextResponse.json({ error: "Material not found" }, { status: 404 });
     }
-    
-    return NextResponse.json({ 
+
+    return NextResponse.json({
       message: "Material soft deleted successfully",
-      material: deletedMaterial 
+      material: deletedMaterial
     });
   } catch (error) {
     const params = await context.params;
