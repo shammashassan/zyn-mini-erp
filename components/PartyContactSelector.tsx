@@ -51,6 +51,8 @@ interface PartyContactSelectorProps {
     showContactSelector?: boolean
     showCreateButton?: boolean
     disabled?: boolean
+    disablePartyTypeSelector?: boolean
+    disablePartySelector?: boolean
     className?: string
     layout?: 'vertical' | 'horizontal' | 'responsive'
     showPartyLabel?: boolean
@@ -93,6 +95,8 @@ export function PartyContactSelector({
     showContactSelector = true,
     showCreateButton = false,
     disabled = false,
+    disablePartyTypeSelector = false,
+    disablePartySelector = false,
     className,
     layout = 'responsive',
     showPartyLabel = true,
@@ -388,6 +392,9 @@ export function PartyContactSelector({
         (selectedPartyType === 'customer' || selectedPartyType === 'supplier') &&
         value?.partyId
 
+    const isPartyDisabled = disabled || disablePartySelector
+    const isContactDisabled = disabled
+
     return (
         <>
             <div className={containerClass}>
@@ -397,7 +404,7 @@ export function PartyContactSelector({
                         <Select
                             value={selectedPartyType}
                             onValueChange={handlePartyTypeChange}
-                            disabled={disabled}
+                            disabled={disabled || disablePartyTypeSelector}
                         >
                             <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Select party type" />
@@ -418,7 +425,6 @@ export function PartyContactSelector({
                         {showPartyLabel && (
                             <Label>
                                 {PARTY_TYPE_LABELS[selectedPartyType]}
-                                {!showPartyTypeSelector && ` (${selectedPartyType})`}
                             </Label>
                         )}
 
@@ -427,7 +433,7 @@ export function PartyContactSelector({
                                 placeholder="Enter vendor name..."
                                 value={value?.partyName ?? ''}
                                 onChange={(e) => handleVendorNameChange(e.target.value)}
-                                disabled={disabled}
+                                disabled={isPartyDisabled}
                                 className="w-full"
                             />
                         ) : (
@@ -439,7 +445,7 @@ export function PartyContactSelector({
                                             role="combobox"
                                             aria-expanded={openParty}
                                             className="flex-1 justify-between"
-                                            disabled={disabled}
+                                            disabled={isPartyDisabled}
                                         >
                                             {selectedParty
                                                 ? (selectedParty.company || selectedParty.name)
@@ -488,14 +494,13 @@ export function PartyContactSelector({
                                     </PopoverContent>
                                 </Popover>
 
-                                {showCreateButton && (
+                                {showCreateButton && !isPartyDisabled && (
                                     <Button
                                         type="button"
                                         variant="outline"
                                         size="icon"
                                         className="shrink-0"
                                         onClick={selectedPartyType === 'payee' ? handleOpenPayeeForm : handleOpenPartyForm}
-                                        disabled={disabled}
                                     >
                                         <Plus className="h-4 w-4" />
                                     </Button>
@@ -515,7 +520,7 @@ export function PartyContactSelector({
                                             role="combobox"
                                             aria-expanded={openContact}
                                             className="flex-1 justify-between"
-                                            disabled={disabled || !value?.partyId}
+                                            disabled={isContactDisabled || !value?.partyId}
                                         >
                                             {loadingContacts ? (
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -560,14 +565,14 @@ export function PartyContactSelector({
                                     </PopoverContent>
                                 </Popover>
 
-                                {showCreateButton && (
+                                {showCreateButton && !isContactDisabled && (
                                     <Button
                                         type="button"
                                         variant="outline"
                                         size="icon"
                                         className="shrink-0"
                                         onClick={handleOpenContactForm}
-                                        disabled={disabled || !value?.partyId}
+                                        disabled={!value?.partyId}
                                     >
                                         <Plus className="h-4 w-4" />
                                     </Button>

@@ -28,7 +28,7 @@ type ExpenseFormData = {
   amount: number | undefined;
   category: string;
   type: 'single' | 'period';
-  expenseDate: Date; // ✅ UPDATED: Changed from date to expenseDate
+  expenseDate: Date; // UPDATED: Changed from date to expenseDate
   partyType: 'vendor' | 'payee';
   notes?: string;
   status?: 'pending' | 'approved' | 'cancelled';
@@ -76,6 +76,8 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
   const watchedAmount = watch('amount');
   const watchedPartyType = watch('partyType');
   const watchedCategory = watch('category');
+
+  const isEditMode = !!defaultValues?._id;
 
   const selectedCategoryIcon = EXPENSE_CATEGORIES.find(c => c.value === watchedCategory)?.icon || Briefcase;
   const CategoryIcon = selectedCategoryIcon;
@@ -235,6 +237,8 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
                 layout="vertical"
                 showContactSelector={false}
                 showCreateButton={true}
+                // disablePartyTypeSelector={isEditMode}
+                // disablePartySelector={isEditMode}
                 className="w-full"
               />
             </div>

@@ -142,9 +142,14 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
   useEffect(() => {
     if (isOpen) {
       if (defaultValues) {
+        // ✅ Extract party/contact IDs correctly
+        const partyIdValue = typeof defaultValues.partyId === 'object'
+          ? defaultValues.partyId._id
+          : defaultValues.partyId;
+
         reset({
-          partyId: (defaultValues as any).partyId?.toString() || "",
-          contactId: (defaultValues as any).contactId?.toString() || undefined,
+          partyId: partyIdValue || "",
+          contactId: defaultValues.contactId?.toString() || undefined,
           items: defaultValues.items || [{ description: "", quantity: 1, rate: 0, total: 0 }],
           discount: defaultValues.discount || 0,
           notes: defaultValues.notes || "",
@@ -233,12 +238,14 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                     value={{ partyId: field.value, contactId: watch('contactId') }}
                     onChange={(val) => {
                       field.onChange(val.partyId);
-                      setValue('contactId', val.contactId);
+                      setValue('contactId', val.contactId, { shouldDirty: true });
                     }}
                     allowedRoles={['customer']}
                     showCreateButton={true}
                     className="w-full"
                     layout="vertical"
+                  // disablePartyTypeSelector={isEditMode}
+                  // disablePartySelector={isEditMode}
                   />
                 )}
               />

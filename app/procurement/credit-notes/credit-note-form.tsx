@@ -484,12 +484,14 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                     value={{ partyId: field.value, contactId: watch('contactId') }}
                     onChange={(val) => {
                       field.onChange(val.partyId);
-                      setValue('contactId', val.contactId);
+                      setValue('contactId', val.contactId, { shouldDirty: true });
                     }}
                     allowedRoles={['customer', 'supplier']}
                     showCreateButton={true}
                     className="w-full"
                     layout="vertical"
+                  // disablePartyTypeSelector={isEditMode}
+                  // disablePartySelector={isEditMode}
                   />
                 )}
               />

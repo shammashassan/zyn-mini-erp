@@ -441,7 +441,8 @@ export function PurchaseReturnForm({
                     }
                   }
                 }}
-                disabled={isEditMode}
+                disablePartyTypeSelector={isEditMode}
+                disablePartySelector={isEditMode}
                 className="w-full"
                 layout="vertical"
               />

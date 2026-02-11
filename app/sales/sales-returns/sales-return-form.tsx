@@ -437,7 +437,8 @@ export function SalesReturnForm({
                     setReturnQuantities({});
                   }
                 }}
-                disabled={isEditMode}
+                disablePartyTypeSelector={isEditMode}
+                disablePartySelector={isEditMode}
                 className="w-full"
                 layout="vertical"
               />

@@ -147,10 +147,18 @@ export function DeliveryNoteForm({
   useEffect(() => {
     if (isOpen) {
       if (defaultValues) {
-        // Edit mode
+        // Edit mode - Extract party/contact IDs correctly
+        const partyIdValue = typeof defaultValues.partyId === 'object'
+          ? (defaultValues.partyId as any)._id
+          : defaultValues.partyId;
+
+        const contactIdValue = typeof defaultValues.contactId === 'object'
+          ? (defaultValues.contactId as any)._id
+          : defaultValues.contactId;
+
         reset({
-          partyId: (defaultValues as any).partyId?.toString() || "",
-          contactId: (defaultValues as any).contactId?.toString() || undefined,
+          partyId: partyIdValue || "",
+          contactId: contactIdValue?.toString() || undefined,
           invoiceId: (defaultValues.connectedDocuments?.invoiceIds?.[0] as any)?._id || "",
           deliveryDate: defaultValues.deliveryDate ? new Date(defaultValues.deliveryDate) : new Date(),
           status: defaultValues.status || 'pending',
@@ -255,9 +263,9 @@ export function DeliveryNoteForm({
                     onChange={(val, party) => {
                       const isPartyChange = val.partyId !== field.value;
                       field.onChange(val.partyId);
-                      setValue('contactId', val.contactId);
+                      setValue('contactId', val.contactId, { shouldDirty: true });
                       // Reset invoice selection when party changes
-                      if (isPartyChange) {
+                      if (!isEditMode && isPartyChange) {
                         setInvoices([]);
                         setValue("invoiceId", "");
                         setValue("notes", "");
@@ -267,7 +275,7 @@ export function DeliveryNoteForm({
                     allowedRoles={['customer']}
                     className="w-full"
                     layout="vertical"
-                    disabled={isEditMode}
+                    disablePartySelector={isEditMode}
                   />
                 )}
               />
@@ -325,7 +333,7 @@ export function DeliveryNoteForm({
                                 <div>
                                   <div className="font-medium">{invoice.invoiceNumber}</div>
                                   <div className="text-xs text-muted-foreground">
-                                    {invoice.items.length} items • {formatCurrency(invoice.grandTotal)}
+                                    {invoice.items.length} items â€¢ {formatCurrency(invoice.grandTotal)}
                                   </div>
                                 </div>
                               </CommandItem>
@@ -545,7 +553,7 @@ export function DeliveryNoteForm({
               )}
             />
             <p className="text-xs text-muted-foreground">
-              💡 If left empty, a default note will be generated automatically
+              ðŸ’¡ If left empty, a default note will be generated automatically
             </p>
           </div>
 
