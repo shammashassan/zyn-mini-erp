@@ -333,7 +333,7 @@ export function DeliveryNoteForm({
                                 <div>
                                   <div className="font-medium">{invoice.invoiceNumber}</div>
                                   <div className="text-xs text-muted-foreground">
-                                    {invoice.items.length} items â€¢ {formatCurrency(invoice.grandTotal)}
+                                    {invoice.items.length} items • {formatCurrency(invoice.grandTotal)}
                                   </div>
                                 </div>
                               </CommandItem>

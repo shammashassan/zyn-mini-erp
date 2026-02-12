@@ -170,7 +170,7 @@ export function ProductForm({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] lg:max-w-1xl max-h-[90vh] overflow-y-auto sidebar-scroll">
+      <DialogContent className="max-w-[95vw] lg:max-w-2xl max-h-[90vh] overflow-y-auto sidebar-scroll">
         <DialogHeader>
           <DialogTitle>{defaultValues ? "Edit Product" : "Add New Product"}</DialogTitle>
           <DialogDescription>
@@ -293,7 +293,7 @@ export function ProductForm({
                   return (
                     <div key={field.id} className="p-3 border rounded-lg bg-muted/30">
                       {/* Desktop Layout - Horizontal */}
-                      <div className="hidden md:flex items-end gap-3">
+                      <div className="hidden md:flex items-start gap-3">
                         <div className="flex-1 space-y-2">
                           <Label className="text-sm">Material *</Label>
                           <Controller
@@ -319,7 +319,7 @@ export function ProductForm({
                                   ) : (
                                     materials.map((material) => (
                                       <SelectItem key={material._id} value={material._id}>
-                                        {material.name} ({material.unit})
+                                        {material.name}
                                       </SelectItem>
                                     ))
                                   )}
@@ -350,15 +350,18 @@ export function ProductForm({
                           />
                         </div>
 
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => remove(index)}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="space-y-2">
+                          <Label className="text-sm opacity-0">Action</Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => remove(index)}
+                            className="text-secondary hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
 
                       {/* Mobile Layout - Card (matching invoice-form.tsx pattern) */}
