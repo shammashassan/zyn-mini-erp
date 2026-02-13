@@ -1,4 +1,4 @@
-// app/inventory/materials/material-form.tsx - UPDATED: Sync search input with selection
+// app/inventory/materials/material-form.tsx - FIXED: Event propagation
 
 "use client";
 
@@ -198,7 +198,7 @@ export function MaterialForm({
             Fill in the details for the material below.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+        <form onSubmit={(e) => { e.stopPropagation(); handleSubmit(handleFormSubmit)(e); }} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Material Name *</Label>
             <Input

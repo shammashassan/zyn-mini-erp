@@ -1,4 +1,4 @@
-// app/procurement/purchases/purchase-form.tsx - FINAL: Using PartyContactSelector, no legacy fields
+// app/procurement/purchases/purchase-form.tsx - MINIMAL CHANGES: Event propagation fix + Self-contained ItemsTable
 
 "use client";
 
@@ -28,16 +28,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList
-} from "@/components/ui/command";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarIcon, ChevronsUpDown, Check, Plus, PlusCircle, X, ShoppingCart } from "lucide-react";
+import { CalendarIcon, ShoppingCart } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -102,8 +94,9 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
   });
 
   const [materials, setMaterials] = useState<IMaterial[]>([]);
+  const [materialTypes, setMaterialTypes] = useState<string[]>([]); // ✅ ADDED
+  const [materialUnits, setMaterialUnits] = useState<string[]>([]); // ✅ ADDED
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
-
   const [isDesktop, setIsDesktop] = useState(true);
 
   useEffect(() => {
@@ -126,22 +119,30 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
   const grandTotal = subtotal + vatAmount;
   const totalItems = watchedItems.filter(item => item.materialId).length;
 
-  useEffect(() => {
-    const fetchMaterials = async () => {
-      try {
-        const materialsRes = await fetch("/api/materials");
-        if (materialsRes.ok) setMaterials(await materialsRes.json());
-      } catch (error) {
-        console.error("Failed to fetch materials:", error);
+  // ✅ UPDATED: Extract types and units
+  const fetchMaterials = async () => {
+    try {
+      const materialsRes = await fetch("/api/materials");
+      if (materialsRes.ok) {
+        const materialsData = await materialsRes.json();
+        setMaterials(materialsData);
+        const types = Array.from(new Set(materialsData.map((m: IMaterial) => m.type).filter(Boolean))) as string[];
+        const units = Array.from(new Set(materialsData.map((m: IMaterial) => m.unit).filter(Boolean))) as string[];
+        setMaterialTypes(types);
+        setMaterialUnits(units);
       }
-    };
+    } catch (error) {
+      console.error("Failed to fetch materials:", error);
+    }
+  };
+
+  useEffect(() => {
     fetchMaterials();
   }, []);
 
   useEffect(() => {
     if (isOpen) {
       if (defaultValues) {
-        // ✅ Extract party/contact IDs correctly
         const partyIdValue = typeof defaultValues.partyId === 'object'
           ? (defaultValues.partyId as any)._id
           : defaultValues.partyId;
@@ -169,10 +170,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
     }
   }, [isOpen, defaultValues, reset]);
 
-
-
   const handleFormSubmit = async (data: PurchaseFormData) => {
-    // ✅ Validation
     if (!data.partyId) {
       toast.error("Please select a supplier (Party)");
       return;
@@ -195,7 +193,6 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
       return;
     }
 
-    // Validate discount
     const itemsGrossTotal = validItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
     const discountAmount = Number(data.discount) || 0;
 
@@ -207,55 +204,6 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
     if (discountAmount > itemsGrossTotal) {
       toast.error("Discount cannot exceed gross total");
       return;
-    }
-
-    // ✅ Create materials for items marked for creation (only on new purchases)
-    if (!isEditMode) {
-      const itemsWithMaterialIds = await Promise.all(
-        validItems.map(async (item) => {
-          if (item.shouldCreateMaterial && item.materialName && !item.materialId) {
-            try {
-              const materialPayload = {
-                name: item.materialName.trim(),
-                type: "General",
-                unit: "pieces",
-                unitCost: Number(item.unitCost) || 0,
-                stock: 0,
-              };
-
-              const response = await fetch("/api/materials", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(materialPayload),
-              });
-
-              if (response.ok) {
-                const newMaterial = await response.json();
-                toast.success(`Material "${item.materialName}" created`);
-                return {
-                  ...item,
-                  materialId: newMaterial._id,
-                  shouldCreateMaterial: false,
-                };
-              } else {
-                const error = await response.json();
-                toast.error(`Failed to create material "${item.materialName}"`, {
-                  description: error.error || "Continuing with custom item"
-                });
-                return { ...item, shouldCreateMaterial: false };
-              }
-            } catch (error) {
-              console.error("Error creating material:", error);
-              toast.error(`Failed to create material "${item.materialName}"`);
-              return { ...item, shouldCreateMaterial: false };
-            }
-          }
-          return item;
-        })
-      );
-
-      // Use the processed items
-      validItems.splice(0, validItems.length, ...itemsWithMaterialIds);
     }
 
     // Calculate amounts with discount
@@ -298,10 +246,8 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-          {/* Main Top Grid */}
+        <form onSubmit={(e) => { e.stopPropagation(); handleSubmit(handleFormSubmit)(e); }} className="space-y-6">
           <div className={cn("grid grid-cols-1 gap-4", isEditMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
-            {/* ✅ Supplier Field - PartyContactSelector */}
             <div>
               <Controller
                 name="partyId"
@@ -423,6 +369,9 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
               <ItemsTable
                 itemType="material"
                 items={materials}
+                onRefreshItems={fetchMaterials}
+                existingTypes={materialTypes}
+                existingUnits={materialUnits}
                 fields={fields}
                 control={control}
                 register={register}

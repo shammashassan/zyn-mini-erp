@@ -177,7 +177,7 @@ export function ProductForm({
             Fill in the details for the product below.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+        <form onSubmit={(e) => { e.stopPropagation(); handleSubmit(handleFormSubmit)(e); }} className="space-y-6">
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Product Name <span className="text-destructive">*</span></Label>

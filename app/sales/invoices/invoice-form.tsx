@@ -1,4 +1,4 @@
-// app/sales/invoices/invoice-form.tsx - FINAL: Using PartyContactSelector, no legacy fields
+// app/sales/invoices/invoice-form.tsx - MINIMAL CHANGES: Event propagation fix + Self-contained ItemsTable
 
 "use client";
 
@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronsUpDown, Check, Plus, PlusCircle, X, FileText, CalendarIcon } from "lucide-react";
+import { ChevronsUpDown, Check, FileText, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -111,6 +111,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
   });
 
   const [products, setProducts] = useState<IProduct[]>([]);
+  const [productTypes, setProductTypes] = useState<string[]>([]); // ✅ ADDED
   const [quotations, setQuotations] = useState<ConnectedQuotation[]>([]);
   const [quotationPopoverOpen, setQuotationPopoverOpen] = useState(false);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
@@ -138,15 +139,24 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
   const grandTotal = subTotal + vatAmount;
   const totalItems = watchedItems.filter(item => item.description).length;
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const productsRes = await fetch("/api/products");
-        if (productsRes.ok) setProducts(await productsRes.json());
-      } catch (error) {
-        console.error("Failed to fetch products:", error);
+  // ✅ UPDATED: Extract types
+  const fetchProducts = async () => {
+    try {
+      const productsRes = await fetch("/api/products");
+      if (productsRes.ok) {
+        const productsData = await productsRes.json();
+        setProducts(productsData);
+
+        // ✅ ADDED: Extract unique types
+        const types = Array.from(new Set(productsData.map((p: IProduct) => p.type).filter(Boolean))) as string[];
+        setProductTypes(types);
       }
-    };
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+    }
+  };
+
+  useEffect(() => {
     fetchProducts();
   }, []);
 
@@ -180,7 +190,6 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
   useEffect(() => {
     if (isOpen) {
       if (defaultValues) {
-        // ✅ Extract party/contact IDs correctly
         const partyIdValue = typeof defaultValues.partyId === 'object'
           ? defaultValues.partyId._id
           : defaultValues.partyId;
@@ -218,20 +227,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     toast.success(`Linked quotation ${quotation.invoiceNumber}`);
   };
 
-
-
-
-
-
-
-
-
-
-
-
-
   const handleFormSubmit = async (data: InvoiceFormData) => {
-    // ✅ Validation
     if (!data.partyId) {
       toast.error("Please select a customer (Party)");
       return;
@@ -252,53 +248,6 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     if (data.discount > calculatedGrossTotal) {
       toast.error("Discount cannot exceed gross total");
       return;
-    }
-
-    // ✅ Create products for items marked for creation (only on new invoices)
-    if (!isEditMode) {
-      const itemsWithProductIds = await Promise.all(
-        validItems.map(async (item) => {
-          if (item.shouldCreateProduct && item.description && !item.productId) {
-            try {
-              const productPayload = {
-                name: item.description.trim(),
-                type: "General",
-                price: Number(item.rate) || 0,
-              };
-
-              const response = await fetch("/api/products", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(productPayload),
-              });
-
-              if (response.ok) {
-                const newProduct = await response.json();
-                toast.success(`Product "${item.description}" created`);
-                return {
-                  ...item,
-                  productId: newProduct._id,
-                  shouldCreateProduct: false,
-                };
-              } else {
-                const error = await response.json();
-                toast.error(`Failed to create product "${item.description}"`, {
-                  description: error.error || "Continuing with custom item"
-                });
-                return { ...item, shouldCreateProduct: false };
-              }
-            } catch (error) {
-              console.error("Error creating product:", error);
-              toast.error(`Failed to create product "${item.description}"`);
-              return { ...item, shouldCreateProduct: false };
-            }
-          }
-          return item;
-        })
-      );
-
-      // Use the processed items
-      validItems.splice(0, validItems.length, ...itemsWithProductIds);
     }
 
     const submitData = {
@@ -332,10 +281,8 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-          {/* Main Top Grid */}
+        <form onSubmit={(e) => { e.stopPropagation(); handleSubmit(handleFormSubmit)(e); }} className="space-y-6">
           <div className={cn("grid grid-cols-1 gap-4", isEditMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
-            {/* ✅ Customer Field - PartyContactSelector */}
             <div>
               <Controller
                 name="partyId"
@@ -489,6 +436,8 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
               <ItemsTable
                 itemType="product"
                 items={products}
+                onRefreshItems={fetchProducts}
+                existingTypes={productTypes}
                 fields={fields}
                 control={control}
                 register={register}

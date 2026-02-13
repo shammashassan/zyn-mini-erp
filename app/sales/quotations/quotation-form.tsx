@@ -1,4 +1,4 @@
-// app/sales/quotations/quotation-form.tsx - FINAL: No legacy fields, party snapshots only
+// app/sales/quotations/quotation-form.tsx - MINIMAL CHANGES: Event propagation fix + Self-contained ItemsTable
 
 "use client";
 
@@ -21,14 +21,6 @@ import {
   PopoverContent
 } from "@/components/ui/popover";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList
-} from "@/components/ui/command";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -37,7 +29,7 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronsUpDown, Check, Plus, PlusCircle, X, FileText, CalendarIcon } from "lucide-react";
+import { FileText, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -46,11 +38,11 @@ import type { Quotation } from "./columns";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 import { Spinner } from "@/components/ui/spinner";
+import { PartyContactSelector } from "@/components/PartyContactSelector";
 import { ItemsTable } from "@/components/ItemsTable";
 
-import { PartyContactSelector, PartyContactValue } from "@/components/PartyContactSelector";
-
 type QuotationItem = {
+  productId?: string;
   description: string;
   quantity: number;
   rate: number;
@@ -65,7 +57,7 @@ type QuotationFormData = {
   discount: number;
   notes: string;
   quotationDate: Date;
-  status: 'pending' | 'approved' | 'sent' | 'cancelled' | 'converted';
+  status: 'pending' | 'sent' | 'approved' | 'cancelled' | 'converted';
 };
 
 interface QuotationFormProps {
@@ -86,9 +78,9 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
     formState: { isSubmitting, isDirty }
   } = useForm<QuotationFormData>({
     defaultValues: {
-      partyId: '',
+      partyId: "",
       contactId: undefined,
-      items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
+      items: [{ productId: "", description: "", quantity: 1, rate: 0, total: 0 }],
       discount: 0,
       notes: "",
       quotationDate: new Date(),
@@ -102,10 +94,8 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
   });
 
   const [products, setProducts] = useState<IProduct[]>([]);
+  const [productTypes, setProductTypes] = useState<string[]>([]); // ✅ ADDED
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
-
-
-  // Responsive check
   const [isDesktop, setIsDesktop] = useState(true);
 
   useEffect(() => {
@@ -117,32 +107,36 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
 
   const watchedItems = watch("items");
   const discount = watch("discount");
-
   const isEditMode = !!defaultValues?._id;
 
-  // Calculate totals
   const grossTotal = watchedItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
   const subTotal = Math.max(grossTotal - (Number(discount) || 0), 0);
   const vatAmount = subTotal * (UAE_VAT_PERCENTAGE / 100);
   const grandTotal = subTotal + vatAmount;
   const totalItems = watchedItems.filter(item => item.description).length;
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const productsRes = await fetch("/api/products");
-        if (productsRes.ok) setProducts(await productsRes.json());
-      } catch (error) {
-        console.error("Failed to fetch products:", error);
+  // ✅ UPDATED: Extract types
+  const fetchProducts = async () => {
+    try {
+      const productsRes = await fetch("/api/products");
+      if (productsRes.ok) {
+        const productsData = await productsRes.json();
+        setProducts(productsData);
+        const types = Array.from(new Set(productsData.map((p: IProduct) => p.type).filter(Boolean))) as string[];
+        setProductTypes(types);
       }
-    };
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+    }
+  };
+
+  useEffect(() => {
     fetchProducts();
   }, []);
 
   useEffect(() => {
     if (isOpen) {
       if (defaultValues) {
-        // ✅ Extract party/contact IDs correctly
         const partyIdValue = typeof defaultValues.partyId === 'object'
           ? defaultValues.partyId._id
           : defaultValues.partyId;
@@ -150,7 +144,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
         reset({
           partyId: partyIdValue || "",
           contactId: defaultValues.contactId?.toString() || undefined,
-          items: defaultValues.items || [{ description: "", quantity: 1, rate: 0, total: 0 }],
+          items: defaultValues.items || [{ productId: "", description: "", quantity: 1, rate: 0, total: 0 }],
           discount: defaultValues.discount || 0,
           notes: defaultValues.notes || "",
           quotationDate: defaultValues.quotationDate ? new Date(defaultValues.quotationDate) : new Date(),
@@ -160,7 +154,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
         reset({
           partyId: "",
           contactId: undefined,
-          items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
+          items: [{ productId: "", description: "", quantity: 1, rate: 0, total: 0 }],
           discount: 0,
           notes: "",
           quotationDate: new Date(),
@@ -170,12 +164,9 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
     }
   }, [isOpen, defaultValues, reset]);
 
-
-
   const handleFormSubmit = async (data: QuotationFormData) => {
-    // Validation
     if (!data.partyId) {
-      toast.error("Please select a customer");
+      toast.error("Please select a customer (Party)");
       return;
     }
 
@@ -199,10 +190,12 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
     const submitData = {
       partyId: data.partyId,
       contactId: data.contactId,
-      quotationDate: data.quotationDate.toISOString(),
+      quotationDate: data.quotationDate,
       items: validItems.map(item => ({
-        ...item,
+        productId: item.productId || '',
+        description: item.description,
         quantity: Number(item.quantity) || 0,
+        rate: Number(item.rate) || 0,
         total: Number(item.total) || 0
       })),
       discount: Number(data.discount) || 0,
@@ -224,11 +217,8 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-
-          {/* Main Top Grid */}
+        <form onSubmit={(e) => { e.stopPropagation(); handleSubmit(handleFormSubmit)(e); }} className="space-y-6">
           <div className={cn("grid grid-cols-1 gap-4", isEditMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
-            {/* Customer Field */}
             <div>
               <Controller
                 name="partyId"
@@ -253,7 +243,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
 
             {/* Date Field */}
             <div className="space-y-2">
-              <Label>Quotation Date <span className="text-destructive">*</span></Label>
+              <Label>Quotation Date</Label>
               <Controller
                 name="quotationDate"
                 control={control}
@@ -321,12 +311,14 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
               <ItemsTable
                 itemType="product"
                 items={products}
+                onRefreshItems={fetchProducts}
+                existingTypes={productTypes}
                 fields={fields}
                 control={control}
                 register={register}
                 watch={watch}
                 setValue={setValue}
-                onAppendItem={() => append({ description: "", quantity: 1, rate: 0, total: 0 })}
+                onAppendItem={() => append({ productId: "", description: "", quantity: 1, rate: 0, total: 0 })}
                 onRemoveItem={remove}
                 fieldName="items"
                 isDesktop={isDesktop}

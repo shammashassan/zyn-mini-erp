@@ -1,4 +1,4 @@
-// components/ItemsTable.tsx - Reusable items table for products and materials
+// components/ItemsTable.tsx - Self-contained items table with internal create dialogs
 
 "use client";
 
@@ -26,6 +26,10 @@ import { ChevronsUpDown, Check, Plus, PlusCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatCurrency } from "@/utils/formatters/currency";
+import { ProductForm } from "@/app/inventory/products/product-form";
+import { MaterialForm } from "@/app/inventory/materials/material-form";
+import type { IProduct } from "@/models/Product";
+import type { IMaterial } from "@/models/Material";
 
 export type ItemType = 'product' | 'material';
 
@@ -36,7 +40,6 @@ export interface ProductItem {
     rate?: number;
     price?: number;
     total: number;
-    shouldCreateProduct?: boolean;
 }
 
 export interface MaterialItem {
@@ -45,7 +48,6 @@ export interface MaterialItem {
     quantity: number;
     unitCost: number;
     total: number;
-    shouldCreateMaterial?: boolean;
 }
 
 export type GenericItem = ProductItem | MaterialItem;
@@ -63,6 +65,7 @@ interface ItemsTableProps<T extends GenericItem> {
     // Item configuration
     itemType: ItemType;
     items: ItemData[];
+    onRefreshItems?: () => Promise<void>;
 
     // Form control
     fields: Record<"id", string>[];
@@ -87,11 +90,16 @@ interface ItemsTableProps<T extends GenericItem> {
     itemLabel?: string;
     quantityLabel?: string;
     priceLabel?: string;
+
+    // For product/material forms
+    existingTypes?: string[];
+    existingUnits?: string[];
 }
 
 export function ItemsTable<T extends GenericItem>({
     itemType,
     items,
+    onRefreshItems,
     fields,
     control,
     register,
@@ -106,9 +114,17 @@ export function ItemsTable<T extends GenericItem>({
     itemLabel,
     quantityLabel = "Qty",
     priceLabel,
+    existingTypes = [],
+    existingUnits = [],
 }: ItemsTableProps<T>) {
     const [itemPopovers, setItemPopovers] = React.useState<Record<number, boolean>>({});
     const [itemSearchQueries, setItemSearchQueries] = React.useState<Record<number, string>>({});
+
+    // Internal dialog state
+    const [isProductFormOpen, setIsProductFormOpen] = React.useState(false);
+    const [isMaterialFormOpen, setIsMaterialFormOpen] = React.useState(false);
+    const [pendingItemName, setPendingItemName] = React.useState("");
+    const [pendingItemIndex, setPendingItemIndex] = React.useState<number | null>(null);
 
     const watchedItems = watch(fieldName);
 
@@ -116,7 +132,6 @@ export function ItemsTable<T extends GenericItem>({
     const idField = itemType === 'product' ? 'productId' : 'materialId';
     const nameField = itemType === 'product' ? 'description' : 'materialName';
     const priceField = itemType === 'product' ? (priceLabel === 'Rate' ? 'rate' : 'price') : 'unitCost';
-    const shouldCreateField = itemType === 'product' ? 'shouldCreateProduct' : 'shouldCreateMaterial';
 
     const effectiveItemLabel = itemLabel || (itemType === 'product' ? 'Product' : 'Material');
     const effectivePriceLabel = priceLabel || (itemType === 'product' ? 'Rate' : 'Unit Cost');
@@ -138,28 +153,110 @@ export function ItemsTable<T extends GenericItem>({
         setItemSearchQueries(prev => ({ ...prev, [index]: "" }));
     };
 
-    const handleCreateCustomItem = (index: number, itemName: string) => {
+    const handleOpenCreateDialog = (index: number, itemName: string) => {
         if (!itemName.trim()) return;
 
-        setValue(`${fieldName}.${index}.${idField}`, "", { shouldDirty: true });
-        setValue(`${fieldName}.${index}.${nameField}`, itemName.trim(), { shouldDirty: true });
-        setValue(`${fieldName}.${index}.${shouldCreateField}`, false, { shouldDirty: true });
+        setPendingItemName(itemName.trim());
+        setPendingItemIndex(index);
+
+        if (itemType === 'product') {
+            setIsProductFormOpen(true);
+        } else {
+            setIsMaterialFormOpen(true);
+        }
 
         setItemPopovers(prev => ({ ...prev, [index]: false }));
         setItemSearchQueries(prev => ({ ...prev, [index]: "" }));
     };
 
-    const handleMarkForCreation = (index: number, itemName: string) => {
-        if (!itemName.trim()) return;
+    const handleProductFormSubmit = async (data: any, id?: string) => {
+        const url = id ? `/api/products/${id}` : "/api/products";
+        const method = id ? "PUT" : "POST";
 
-        setValue(`${fieldName}.${index}.${idField}`, "", { shouldDirty: true });
-        setValue(`${fieldName}.${index}.${nameField}`, itemName.trim(), { shouldDirty: true });
-        setValue(`${fieldName}.${index}.${shouldCreateField}`, true, { shouldDirty: true });
+        try {
+            const response = await fetch(url, {
+                method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
 
-        setItemPopovers(prev => ({ ...prev, [index]: false }));
-        setItemSearchQueries(prev => ({ ...prev, [index]: "" }));
+            if (response.ok) {
+                const newProduct: IProduct = await response.json();
+                toast.success("Product created successfully");
 
-        toast.info(`"${itemName}" will be created as a ${itemType} when submitted`);
+                // Refresh the items list if callback provided
+                if (onRefreshItems) {
+                    await onRefreshItems();
+                }
+
+                // Auto-populate the row that triggered the creation
+                if (pendingItemIndex !== null) {
+                    setValue(`${fieldName}.${pendingItemIndex}.productId`, newProduct._id, { shouldDirty: true });
+                    setValue(`${fieldName}.${pendingItemIndex}.description`, newProduct.name, { shouldDirty: true });
+                    setValue(`${fieldName}.${pendingItemIndex}.${priceField}`, newProduct.price || 0, { shouldDirty: true });
+
+                    const quantity = watchedItems[pendingItemIndex]?.quantity || 1;
+                    setValue(`${fieldName}.${pendingItemIndex}.total`, quantity * (newProduct.price || 0), { shouldDirty: true });
+                }
+
+                setIsProductFormOpen(false);
+                setPendingItemName("");
+                setPendingItemIndex(null);
+            } else {
+                const error = await response.json();
+                toast.error("Failed to create product", {
+                    description: error.error || "Please try again"
+                });
+            }
+        } catch (error) {
+            console.error("Error creating product:", error);
+            toast.error("Failed to create product");
+        }
+    };
+
+    const handleMaterialFormSubmit = async (data: any, id?: string) => {
+        const url = id ? `/api/materials/${id}` : "/api/materials";
+        const method = id ? "PUT" : "POST";
+
+        try {
+            const response = await fetch(url, {
+                method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
+
+            if (response.ok) {
+                const newMaterial: IMaterial = await response.json();
+                toast.success("Material created successfully");
+
+                // Refresh the items list if callback provided
+                if (onRefreshItems) {
+                    await onRefreshItems();
+                }
+
+                // Auto-populate the row that triggered the creation
+                if (pendingItemIndex !== null) {
+                    setValue(`${fieldName}.${pendingItemIndex}.materialId`, newMaterial._id, { shouldDirty: true });
+                    setValue(`${fieldName}.${pendingItemIndex}.materialName`, newMaterial.name, { shouldDirty: true });
+                    setValue(`${fieldName}.${pendingItemIndex}.unitCost`, newMaterial.unitCost || 0, { shouldDirty: true });
+
+                    const quantity = watchedItems[pendingItemIndex]?.quantity || 1;
+                    setValue(`${fieldName}.${pendingItemIndex}.total`, quantity * (newMaterial.unitCost || 0), { shouldDirty: true });
+                }
+
+                setIsMaterialFormOpen(false);
+                setPendingItemName("");
+                setPendingItemIndex(null);
+            } else {
+                const error = await response.json();
+                toast.error("Failed to create material", {
+                    description: error.error || "Please try again"
+                });
+            }
+        } catch (error) {
+            console.error("Error creating material:", error);
+            toast.error("Failed to create material");
+        }
     };
 
     const handleQuantityChange = (index: number, value: string) => {
@@ -285,18 +382,10 @@ export function ItemsTable<T extends GenericItem>({
                             )}
 
                             {showCreateOptions && isNewItem && (
-                                <CommandGroup heading="Add Custom Item">
+                                <CommandGroup heading={`Create New ${effectiveItemLabel}`}>
                                     <CommandItem
-                                        onSelect={() => handleCreateCustomItem(index, searchQuery)}
+                                        onSelect={() => handleOpenCreateDialog(index, searchQuery)}
                                         className="text-primary"
-                                        value={searchQuery}
-                                    >
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Use "{searchQuery}"
-                                    </CommandItem>
-                                    <CommandItem
-                                        onSelect={() => handleMarkForCreation(index, searchQuery)}
-                                        className="text-green-600 dark:text-green-400"
                                         value={`create-${searchQuery}`}
                                     >
                                         <PlusCircle className="mr-2 h-4 w-4" />
@@ -311,96 +400,93 @@ export function ItemsTable<T extends GenericItem>({
         );
     };
 
-    if (isDesktop) {
-        return (
-            <div className="space-y-4">
-                <div className="w-full overflow-x-auto">
-                    <table className="w-full border-collapse">
-                        <thead>
-                            <tr className="border-b">
-                                <th className="text-left p-3 font-medium text-sm w-[40px]">#</th>
-                                <th className="text-left p-3 font-medium text-sm min-w-[250px]">
-                                    {effectiveItemLabel} <span className="text-destructive">*</span>
-                                </th>
-                                <th className="text-left p-3 font-medium text-sm w-[100px]">{quantityLabel}</th>
-                                <th className="text-left p-3 font-medium text-sm w-[100px]">{effectivePriceLabel}</th>
-                                <th className="text-right p-3 font-medium text-sm w-[100px]">Total</th>
-                                <th className="text-center p-3 font-medium text-sm w-[60px]">Actions</th>
+    const desktopView = (
+        <div className="space-y-4">
+            <div className="w-full overflow-x-auto">
+                <table className="w-full border-collapse">
+                    <thead>
+                        <tr className="border-b">
+                            <th className="text-left p-3 font-medium text-sm w-[40px]">#</th>
+                            <th className="text-left p-3 font-medium text-sm min-w-[250px]">
+                                {effectiveItemLabel} <span className="text-destructive">*</span>
+                            </th>
+                            <th className="text-left p-3 font-medium text-sm w-[100px]">{quantityLabel}</th>
+                            <th className="text-left p-3 font-medium text-sm w-[100px]">{effectivePriceLabel}</th>
+                            <th className="text-right p-3 font-medium text-sm w-[100px]">Total</th>
+                            <th className="text-center p-3 font-medium text-sm w-[60px]">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {fields.map((field, index) => (
+                            <tr key={field.id} className="border-b hover:bg-muted/50">
+                                <td className="p-3 text-sm text-muted-foreground">{index + 1}</td>
+                                <td className="p-3">
+                                    <Controller
+                                        name={`${fieldName}.${index}.${idField}`}
+                                        control={control}
+                                        render={({ field }) => renderItemSelector(index, field)}
+                                    />
+                                </td>
+                                <td className="p-3">
+                                    <Input
+                                        type="number"
+                                        step="any"
+                                        min="0"
+                                        className="h-10"
+                                        {...register(`${fieldName}.${index}.quantity`, {
+                                            onChange: (e) => handleQuantityChange(index, e.target.value)
+                                        })}
+                                    />
+                                </td>
+                                <td className="p-3">
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        className="h-10 text-left"
+                                        {...register(`${fieldName}.${index}.${priceField}`, {
+                                            onChange: (e) => handlePriceChange(index, e.target.value)
+                                        })}
+                                    />
+                                </td>
+                                <td className="p-3 text-right font-semibold tabular-nums">
+                                    {formatCurrency(watchedItems[index]?.total || 0)}
+                                </td>
+                                <td className="p-3 text-center">
+                                    {fields.length > 1 && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => onRemoveItem(index)}
+                                            className="h-8 w-8 p-0 text-destructive"
+                                            disabled={disabled}
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {fields.map((field, index) => (
-                                <tr key={field.id} className="border-b hover:bg-muted/50">
-                                    <td className="p-3 text-sm text-muted-foreground">{index + 1}</td>
-                                    <td className="p-3">
-                                        <Controller
-                                            name={`${fieldName}.${index}.${idField}`}
-                                            control={control}
-                                            render={({ field }) => renderItemSelector(index, field)}
-                                        />
-                                    </td>
-                                    <td className="p-3">
-                                        <Input
-                                            type="number"
-                                            step="any"
-                                            min="0"
-                                            className="h-10"
-                                            {...register(`${fieldName}.${index}.quantity`, {
-                                                onChange: (e) => handleQuantityChange(index, e.target.value)
-                                            })}
-                                        />
-                                    </td>
-                                    <td className="p-3">
-                                        <Input
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            className="h-10 text-left"
-                                            {...register(`${fieldName}.${index}.${priceField}`, {
-                                                onChange: (e) => handlePriceChange(index, e.target.value)
-                                            })}
-                                        />
-                                    </td>
-                                    <td className="p-3 text-right font-semibold tabular-nums">
-                                        {formatCurrency(watchedItems[index]?.total || 0)}
-                                    </td>
-                                    <td className="p-3 text-center">
-                                        {fields.length > 1 && (
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => onRemoveItem(index)}
-                                                className="h-8 w-8 p-0 text-destructive"
-                                                disabled={disabled}
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </Button>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={onAppendItem}
-                    className="w-full gap-2"
-                    disabled={disabled}
-                >
-                    <Plus className="h-4 w-4" />
-                    Add {effectiveItemLabel}
-                </Button>
+                        ))}
+                    </tbody>
+                </table>
             </div>
-        );
-    }
 
-    // Mobile card view
-    return (
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onAppendItem}
+                className="w-full gap-2"
+                disabled={disabled}
+            >
+                <Plus className="h-4 w-4" />
+                Add {effectiveItemLabel}
+            </Button>
+        </div>
+    );
+
+    const mobileView = (
         <div className="space-y-4">
             {fields.map((field, index) => (
                 <Card key={field.id} className="border-2">
@@ -480,5 +566,38 @@ export function ItemsTable<T extends GenericItem>({
                 Add {effectiveItemLabel}
             </Button>
         </div>
+    );
+
+    return (
+        <>
+            {isDesktop ? desktopView : mobileView}
+
+            {/* Product Creation Dialog */}
+            <ProductForm
+                isOpen={isProductFormOpen}
+                onClose={() => {
+                    setIsProductFormOpen(false);
+                    setPendingItemName("");
+                    setPendingItemIndex(null);
+                }}
+                onSubmit={handleProductFormSubmit}
+                defaultValues={pendingItemName ? { name: pendingItemName, type: "", price: 0 } as any : null}
+                existingTypes={existingTypes}
+            />
+
+            {/* Material Creation Dialog */}
+            <MaterialForm
+                isOpen={isMaterialFormOpen}
+                onClose={() => {
+                    setIsMaterialFormOpen(false);
+                    setPendingItemName("");
+                    setPendingItemIndex(null);
+                }}
+                onSubmit={handleMaterialFormSubmit}
+                defaultValues={pendingItemName ? { name: pendingItemName, type: "", unit: "piece", stock: 0, unitCost: 0 } as any : null}
+                existingTypes={existingTypes}
+                existingUnits={existingUnits}
+            />
+        </>
     );
 }

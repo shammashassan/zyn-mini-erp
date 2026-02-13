@@ -1,4 +1,4 @@
-// app/sales/debit-notes/debit-note-form.tsx - FINAL: Using PartyContactSelector, no legacy fields
+// app/sales/debit-notes/debit-note-form.tsx - UPDATED: ItemsTable integration & Event Propagation
 
 "use client";
 
@@ -43,8 +43,6 @@ import {
   CalendarIcon,
   ChevronsUpDown,
   Check,
-  Plus,
-  X,
   FileText,
   AlertCircle,
   List,
@@ -131,6 +129,8 @@ export function DebitNoteForm({
   });
 
   const [materials, setMaterials] = useState<IMaterial[]>([]);
+  const [materialTypes, setMaterialTypes] = useState<string[]>([]);
+  const [materialUnits, setMaterialUnits] = useState<string[]>([]);
   const [returnNotes, setReturnNotes] = useState<any[]>([]);
   const [returnNotePopoverOpen, setReturnNotePopoverOpen] = useState(false);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
@@ -163,16 +163,27 @@ export function DebitNoteForm({
   const grandTotal = subtotal + vatAmount;
   const totalItems = debitMode === 'items' ? watchedItems.filter(item => item.materialId).length : 1;
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const materialsRes = await fetch("/api/materials");
-        if (materialsRes.ok) setMaterials(await materialsRes.json());
-      } catch (error) {
-        console.error("Failed to fetch materials:", error);
+  // Fetch materials and extract types/units
+  const fetchMaterials = async () => {
+    try {
+      const materialsRes = await fetch("/api/materials");
+      if (materialsRes.ok) {
+        const materialsData = await materialsRes.json();
+        setMaterials(materialsData);
+
+        // Extract unique types and units for the creation form
+        const types = Array.from(new Set(materialsData.map((m: IMaterial) => m.type).filter(Boolean))) as string[];
+        const units = Array.from(new Set(materialsData.map((m: IMaterial) => m.unit).filter(Boolean))) as string[];
+        setMaterialTypes(types);
+        setMaterialUnits(units);
       }
-    };
-    fetchData();
+    } catch (error) {
+      console.error("Failed to fetch materials:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchMaterials();
   }, []);
 
   // Fetch approved return notes when party is selected
@@ -319,8 +330,6 @@ export function DebitNoteForm({
     setValue("debitType", 'return');
   };
 
-
-
   const handleFormSubmit = async (data: DebitNoteFormData) => {
     // ✅ Validation
     if (!data.partyId) {
@@ -442,7 +451,7 @@ export function DebitNoteForm({
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+        <form onSubmit={(e) => { e.stopPropagation(); handleSubmit(handleFormSubmit)(e); }} className="space-y-6">
           {isFromReturnNote && (
             <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
               <div className="flex items-start gap-2">
@@ -724,6 +733,9 @@ export function DebitNoteForm({
                   <ItemsTable
                     itemType="material"
                     items={materials}
+                    onRefreshItems={fetchMaterials}
+                    existingTypes={materialTypes}
+                    existingUnits={materialUnits}
                     fields={fields}
                     control={control}
                     register={register}

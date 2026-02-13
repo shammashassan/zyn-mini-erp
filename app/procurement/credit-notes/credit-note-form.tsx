@@ -1,4 +1,4 @@
-// app/procurement/credit-notes/credit-note-form.tsx - FINAL: Using PartyContactSelector, no legacy fields
+// app/procurement/credit-notes/credit-note-form.tsx - UPDATED: ItemsTable integration & Event Propagation
 
 "use client";
 
@@ -43,13 +43,10 @@ import {
   CalendarIcon,
   ChevronsUpDown,
   Check,
-  Plus,
-  X,
   FileText,
   AlertCircle,
   List,
-  Calculator,
-  PlusCircle
+  Calculator
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -125,10 +122,9 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
   });
 
   const [products, setProducts] = useState<IProduct[]>([]);
+  const [productTypes, setProductTypes] = useState<string[]>([]);
   const [returnNotes, setReturnNotes] = useState<any[]>([]);
   const [returnNotePopoverOpen, setReturnNotePopoverOpen] = useState(false);
-  const [productPopovers, setProductPopovers] = useState<Record<number, boolean>>({});
-  const [productSearchQueries, setProductSearchQueries] = useState<Record<number, string>>({});
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
 
@@ -159,19 +155,25 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
   const grandTotal = subtotal + vatAmount;
   const totalItems = creditMode === 'items' ? watchedItems.filter(item => item.productId).length : 1;
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [productsRes] = await Promise.all([
-          fetch("/api/products")
-        ]);
+  // Fetch products and extract types
+  const fetchProducts = async () => {
+    try {
+      const productsRes = await fetch("/api/products");
+      if (productsRes.ok) {
+        const productsData = await productsRes.json();
+        setProducts(productsData);
 
-        if (productsRes.ok) setProducts(await productsRes.json());
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
+        // Extract unique types
+        const types = Array.from(new Set(productsData.map((p: IProduct) => p.type).filter(Boolean))) as string[];
+        setProductTypes(types);
       }
-    };
-    fetchData();
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
   }, []);
 
   // ✅ FIX: Fetch approved sales return notes based on partyId
@@ -455,7 +457,7 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+        <form onSubmit={(e) => { e.stopPropagation(); handleSubmit(handleFormSubmit)(e); }} className="space-y-6">
           {isFromReturnNote && (
             <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
               <div className="flex items-start gap-2">
@@ -725,6 +727,8 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                   <ItemsTable
                     itemType="product"
                     items={products}
+                    onRefreshItems={fetchProducts}
+                    existingTypes={productTypes}
                     fields={fields}
                     control={control}
                     register={register}
