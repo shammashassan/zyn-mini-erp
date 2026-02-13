@@ -127,9 +127,13 @@ export function SalesReturnViewModal({
 
   const documentRef = invoice?.invoiceNumber;
 
+  const connectedCreditNote = typeof salesReturn.connectedDocuments?.creditNoteId === 'object'
+    ? salesReturn.connectedDocuments.creditNoteId as any
+    : null;
+
   const hasConnectedDocuments =
     (salesReturn.connectedDocuments?.invoiceId && typeof salesReturn.connectedDocuments.invoiceId === 'object') ||
-    (salesReturn.connectedDocuments?.creditNoteId && typeof salesReturn.connectedDocuments.creditNoteId === 'object');
+    (connectedCreditNote && connectedCreditNote.status === 'approved');
 
   const party = salesReturn.partyId as any;
   const partySnapshot = salesReturn.partySnapshot as any;

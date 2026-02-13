@@ -129,9 +129,13 @@ export function PurchaseReturnViewModal({
 
   const documentRef = purchase?.referenceNumber;
 
+  const connectedDebitNote = typeof purchaseReturn.connectedDocuments?.debitNoteId === 'object'
+    ? purchaseReturn.connectedDocuments.debitNoteId as any
+    : null;
+
   const hasConnectedDocuments =
     (purchaseReturn.connectedDocuments?.purchaseId && typeof purchaseReturn.connectedDocuments.purchaseId === 'object') ||
-    (purchaseReturn.connectedDocuments?.debitNoteId && typeof purchaseReturn.connectedDocuments.debitNoteId === 'object');
+    (connectedDebitNote && connectedDebitNote.status === 'approved');
 
   const party = purchaseReturn.partyId as any;
   const partySnapshot = purchaseReturn.partySnapshot as any;

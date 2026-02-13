@@ -88,7 +88,7 @@ export function ConnectedDocumentsBadges({
         </Badge>
       )}
 
-      {creditNote && (
+      {creditNote && creditNote.status === 'approved' && (
         <Badge
           variant="orange"
           appearance="outline"
