@@ -327,14 +327,14 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({
               <View style={styles.amountWordsRow}>
                 <Text style={styles.amountWordsLabel}>Amount in Words: </Text>
                 <Text style={styles.amountWordsText}>
-                  Rupees {numberToWords(grandTotal)} Only
+                  Dhirhams {numberToWords(grandTotal)} Only
                 </Text>
               </View>
               {vatAmount > 0 && (
                 <View style={styles.amountWordsRow}>
                   <Text style={styles.amountWordsLabel}>VAT Amount: </Text>
                   <Text style={styles.amountWordsText}>
-                    Rupees {numberToWords(vatAmount)} Only
+                    Dhirhams {numberToWords(vatAmount)} Only
                   </Text>
                 </View>
               )}

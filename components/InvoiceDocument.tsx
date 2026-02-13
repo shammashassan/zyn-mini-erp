@@ -265,14 +265,14 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, co
               <View style={{ marginBottom: 8 }}>
                 <Text style={styles.amountWordsLabel}>The Sum of:</Text>
                 <Text style={styles.amountWordsText}>
-                  Rupees {numberToWords(grandTotal)} Only
+                  Dhirhams {numberToWords(grandTotal)} Only
                 </Text>
               </View>
               {vatAmount > 0 && (
                 <View>
                   <Text style={styles.amountWordsLabel}>VAT Amount:</Text>
                   <Text style={styles.amountWordsText}>
-                    Rupees {numberToWords(vatAmount)} Only
+                    Dhirhams {numberToWords(vatAmount)} Only
                   </Text>
                 </View>
               )}
