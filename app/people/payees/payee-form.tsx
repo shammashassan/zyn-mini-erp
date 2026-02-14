@@ -126,7 +126,7 @@ export function PayeeForm({ isOpen, onClose, onSubmit, defaultValues }: PayeeFor
                 control={control}
                 render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select type...">
                         {field.value && (
                           <div className="flex items-center gap-2">

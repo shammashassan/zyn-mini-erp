@@ -444,160 +444,162 @@ export function SalesReturnForm({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>
-                Invoice <span className="text-destructive">*</span>
-              </Label>
-              <Popover open={invoicePopoverOpen} onOpenChange={setInvoicePopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between"
-                    disabled={isEditMode || !selectedCustomerId || invoices.length === 0 || isLoadingInvoice}
-                  >
-                    <div className="truncate">
-                      {isLoadingInvoice ? (
-                        "Loading..."
-                      ) : selectedInvoice ? (
-                        selectedInvoice.invoiceNumber
-                      ) : !selectedCustomerId ? (
-                        "Select customer first..."
-                      ) : invoices.length === 0 ? (
-                        "No eligible invoices"
-                      ) : (
-                        "Select invoice..."
-                      )}
-                    </div>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search invoices..." />
-                    <CommandList
-                      className="max-h-[200px] overflow-y-auto"
-                      onWheel={(e) => e.stopPropagation()}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onTouchMove={(e) => e.stopPropagation()}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>
+                  Invoice <span className="text-destructive">*</span>
+                </Label>
+                <Popover open={invoicePopoverOpen} onOpenChange={setInvoicePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                      disabled={isEditMode || !selectedCustomerId || invoices.length === 0 || isLoadingInvoice}
                     >
-                      <CommandEmpty>No invoices found.</CommandEmpty>
-                      <CommandGroup>
-                        {invoices.map((invoice) => (
-                          <CommandItem
-                            key={invoice._id}
-                            value={invoice.invoiceNumber}
-                            onSelect={() => handleInvoiceSelect(invoice)}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                selectedInvoice?._id === invoice._id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium">
-                                {invoice.invoiceNumber}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {invoice.status} • {invoice.items?.length || 0} items
-                              </div>
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Return Date</Label>
-              <Controller
-                name="returnDate"
-                control={control}
-                render={({ field }) => (
-                  <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        ref={field.ref}
-                        type="button"
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !field.value && "text-muted-foreground"
+                      <div className="truncate">
+                        {isLoadingInvoice ? (
+                          "Loading..."
+                        ) : selectedInvoice ? (
+                          selectedInvoice.invoiceNumber
+                        ) : !selectedCustomerId ? (
+                          "Select customer first..."
+                        ) : invoices.length === 0 ? (
+                          "No eligible invoices"
+                        ) : (
+                          "Select invoice..."
                         )}
+                      </div>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search invoices..." />
+                      <CommandList
+                        className="max-h-[200px] overflow-y-auto"
+                        onWheel={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchMove={(e) => e.stopPropagation()}
                       >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {field.value ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={(date) => {
-                          field.onChange(date);
-                          setDatePopoverOpen(false);
-                        }}
-                        captionLayout="dropdown"
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                )}
-              />
-            </div>
-          </div>
+                        <CommandEmpty>No invoices found.</CommandEmpty>
+                        <CommandGroup>
+                          {invoices.map((invoice) => (
+                            <CommandItem
+                              key={invoice._id}
+                              value={invoice.invoiceNumber}
+                              onSelect={() => handleInvoiceSelect(invoice)}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedInvoice?._id === invoice._id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex-1">
+                                <div className="font-medium">
+                                  {invoice.invoiceNumber}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {invoice.status} • {invoice.items?.length || 0} items
+                                </div>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-          <div className={cn("flex flex-col gap-4", isEditMode && "sm:flex-row")}>
-            <div className="flex-1 space-y-2">
-              <Label htmlFor="reason">
-                Reason <span className="text-destructive">*</span>
-              </Label>
-              <Controller
-                name="reason"
-                control={control}
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select reason for return" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {RETURN_REASONS.map((reason) => (
-                        <SelectItem key={reason} value={reason}>
-                          {reason}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
-
-            {isEditMode && (
-              <div className="space-y-2 w-full sm:w-[200px]">
-                <Label>Status</Label>
+              <div className="space-y-2">
+                <Label htmlFor="reason">
+                  Reason <span className="text-destructive">*</span>
+                </Label>
                 <Controller
-                  name="status"
+                  name="reason"
                   control={control}
                   render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select status" />
+                        <SelectValue placeholder="Select reason for return" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="approved">Approved</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                        {RETURN_REASONS.map((reason) => (
+                          <SelectItem key={reason} value={reason}>
+                            {reason}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   )}
                 />
               </div>
-            )}
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Return Date</Label>
+                <Controller
+                  name="returnDate"
+                  control={control}
+                  render={({ field }) => (
+                    <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          ref={field.ref}
+                          type="button"
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {field.value ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={(date) => {
+                            field.onChange(date);
+                            setDatePopoverOpen(false);
+                          }}
+                          captionLayout="dropdown"
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                />
+              </div>
+
+              {isEditMode && (
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Controller
+                    name="status"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="approved">Approved</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           {selectedInvoice && (
