@@ -24,11 +24,8 @@ const styles = StyleSheet.create({
   entityDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
   labelRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 },
   inlineLabel: { fontSize: 9, color: pdfColors.primary, marginRight: 6, fontWeight: 'bold' },
-
-  // New Styles for label-only layout
   labelOnly: { marginBottom: 4 },
   standAloneLabel: { fontSize: 9, color: pdfColors.primary, fontWeight: 'bold' },
-
   dateInfo: { alignItems: 'flex-end' },
   dateLabel: { fontSize: 7, color: pdfColors.textMuted, marginBottom: 2 },
   dateValue: { fontSize: 10, fontWeight: 'bold', color: pdfColors.primary },
@@ -37,108 +34,118 @@ const styles = StyleSheet.create({
     backgroundColor: pdfColors.secondary,
     border: `1.5 solid ${pdfColors.primary}`,
     borderRadius: 4,
-    padding: 10,
+    padding: 12,
     marginBottom: 15,
   },
-  reasonLabel: {
-    fontSize: 8,
-    color: pdfColors.primary,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    textTransform: 'uppercase'
-  },
+  reasonLabel: { fontSize: 8, color: pdfColors.primary, fontWeight: 'bold', marginBottom: 4, textTransform: 'uppercase' },
   reasonText: { fontSize: 8.5, color: pdfColors.textDark, lineHeight: 1.4 },
 
-  summaryContainer: { marginTop: 20 },
-  summaryRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 15 },
-  totalsBox: {
-    width: '42%',
+  unifiedBox: {
+    position: 'absolute',
+    bottom: 80,
+    left: 25,
+    right: 25,
     backgroundColor: pdfColors.white,
     border: `1.5 solid ${pdfColors.primary}`,
     borderRadius: 4,
     overflow: 'hidden',
   },
-  totalRow: {
+
+  termsRow: {
+    padding: 10,
+    borderBottomWidth: 1.5,
+    borderBottomColor: pdfColors.primary,
+  },
+  sectionTitle: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: pdfColors.primary,
+    marginBottom: 5,
+    textTransform: 'uppercase',
+  },
+  termsText: {
+    fontSize: 7.5,
+    color: pdfColors.textDark,
+    lineHeight: 1.3,
+  },
+
+  row2: {
+    flexDirection: 'row',
+    borderBottomWidth: 1.5,
+    borderBottomColor: pdfColors.primary,
+  },
+  bankSection: {
+    flex: 1,
+    padding: 10,
+    borderRightWidth: 1.5,
+    borderRightColor: pdfColors.primary,
+  },
+  bankText: {
+    fontSize: 7.5,
+    color: pdfColors.textDark,
+    lineHeight: 1.3,
+  },
+  amountSummarySection: {
+    width: '35%',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: '5 10',
+    borderBottomWidth: 0.5,
+    borderBottomColor: pdfColors.border,
+  },
+  summaryLabel: { fontSize: 8, color: pdfColors.textDark },
+  summaryValue: { fontSize: 8, color: pdfColors.textDark, fontWeight: 'bold' },
+  grandTotalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: '6 10',
-    borderBottomWidth: 0.5,
-    borderBottomColor: pdfColors.border
-  },
-  grandTotalRow: {
     backgroundColor: pdfColors.primary,
-    padding: '8 10',
-    flexDirection: 'row',
-    justifyContent: 'space-between'
   },
-  totalLabel: { fontSize: 8.5, color: pdfColors.textDark },
-  totalValue: { fontSize: 8.5, color: pdfColors.textDark, fontWeight: 'bold' },
-  grandTotalLabel: { fontSize: 10, fontWeight: 'bold', color: pdfColors.white },
-  grandTotalValue: { fontSize: 11, fontWeight: 'bold', color: pdfColors.accent },
+  grandTotalLabel: { fontSize: 9, fontWeight: 'bold', color: pdfColors.white },
+  grandTotalValue: { fontSize: 10, fontWeight: 'bold', color: pdfColors.accent },
 
-  amountInWordsBox: {
-    backgroundColor: pdfColors.secondary,
-    border: `1.5 solid ${pdfColors.primary}`,
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 15,
+  amountWordsRow: {
+    padding: 10,
+    borderBottomWidth: 1.5,
+    borderBottomColor: pdfColors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  amountWordsRow: { marginBottom: 8 },
   amountWordsLabel: {
+    fontSize: 7.5,
+    color: pdfColors.primary,
+    fontWeight: 'bold',
+    marginRight: 5,
+  },
+  amountWordsText: {
+    fontSize: 7.5,
+    color: pdfColors.textDark,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+
+  signatureRow: {
+    flexDirection: 'row',
+    height: 50,
+  },
+  signatureCell: {
+    flex: 1,
+    padding: 8,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  signatureDivider: {
+    width: 1.5,
+    backgroundColor: pdfColors.primary,
+  },
+  signatureLabel: {
     fontSize: 7,
     color: pdfColors.primary,
     fontWeight: 'bold',
-    marginBottom: 3,
-    textTransform: 'uppercase'
+    textAlign: 'center',
   },
-  amountWordsText: {
-    fontSize: 8,
-    color: pdfColors.textDark,
-    backgroundColor: pdfColors.white,
-    padding: '5 8',
-    borderRadius: 3,
-    border: `0.5 solid ${pdfColors.border}`
-  },
-
-  bottomSection: { flexDirection: 'row', gap: 15, marginBottom: 10 },
-  bankBox: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    border: `1 solid ${pdfColors.border}`,
-    borderRadius: 4,
-    padding: 10
-  },
-  termsBox: {
-    flex: 1,
-    backgroundColor: pdfColors.warning,
-    border: `1 solid ${pdfColors.warningBorder}`,
-    borderRadius: 4,
-    padding: 10
-  },
-  boxTitle: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: pdfColors.primary,
-    marginBottom: 6,
-    textTransform: 'uppercase'
-  },
-  boxContent: { fontSize: 8, color: pdfColors.textDark, lineHeight: 1.4 },
-
-  notesBox: {
-    backgroundColor: pdfColors.warning,
-    border: `1 solid ${pdfColors.warningBorder}`,
-    borderRadius: 4,
-    padding: 10,
-    marginBottom: 10
-  },
-  notesTitle: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: pdfColors.primary,
-    marginBottom: 6,
-    textTransform: 'uppercase'
-  },
-  notesContent: { fontSize: 8, color: pdfColors.textDark, lineHeight: 1.4 },
 });
 
 interface PopulatedReturnNote {
@@ -155,13 +162,9 @@ interface DebitNoteDocumentProps {
   companyDetails: ICompanyDetails | null;
 }
 
-export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({
-  debitNote,
-  companyDetails
-}) => {
+export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({ debitNote, companyDetails }) => {
   registerPdfFonts();
 
-  // Extract connected return note info
   const returnNote = typeof debitNote.connectedDocuments?.returnNoteId === 'object'
     ? debitNote.connectedDocuments.returnNoteId as PopulatedReturnNote
     : null;
@@ -174,11 +177,8 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({
   const discount = debitNote.discount || 0;
   const grandTotal = debitNote.grandTotal || 0;
 
-  // Use snapshots for PDF (immutable legal truth)
   const partyName = debitNote.partySnapshot.displayName;
   const partyAddress = debitNote.partySnapshot.address;
-  // const partyVAT = debitNote.partySnapshot.taxIdentifiers?.vatNumber;
-
   const contactName = debitNote.contactSnapshot?.name;
   const contactPhone = debitNote.contactSnapshot?.phone;
   const contactEmail = debitNote.contactSnapshot?.email;
@@ -186,7 +186,6 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({
 
   const isManualEntry = debitNote.items?.length === 1 && !debitNote.items[0].materialId;
 
-  // Check if there's any additional info beyond party name
   const hasAdditionalInfo = contactName || contactPhone || contactEmail ||
     (partyAddress && (partyAddress.street || partyAddress.city || partyAddress.state ||
       partyAddress.postalCode || partyAddress.country));
@@ -195,7 +194,6 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({
     <Document>
       <Page size="A4" style={commonStyles.page}>
         <Text style={commonStyles.watermark}>DEBIT NOTE</Text>
-
         <PDFHeader companyDetails={companyDetails} />
 
         <View style={commonStyles.titleSection}>
@@ -206,7 +204,6 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({
         <View style={commonStyles.infoBar}>
           <View style={{ flex: 1 }}>
             {hasAdditionalInfo ? (
-              /* Has Contact Info or Address */
               <>
                 <View style={styles.labelRow}>
                   <Text style={styles.inlineLabel}>Party:</Text>
@@ -221,18 +218,11 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({
                 {contactEmail && <Text style={styles.entityDetail}>{contactEmail}</Text>}
                 {partyAddress && (
                   <Text style={styles.entityDetail}>
-                    {[
-                      partyAddress.street,
-                      partyAddress.city,
-                      partyAddress.state,
-                      partyAddress.postalCode,
-                      partyAddress.country
-                    ].filter(Boolean).join(', ')}
+                    {[partyAddress.street, partyAddress.city, partyAddress.state, partyAddress.postalCode, partyAddress.country].filter(Boolean).join(', ')}
                   </Text>
                 )}
               </>
             ) : (
-              /* Only Party Name - No Additional Info */
               <>
                 <View style={styles.labelOnly}>
                   <Text style={styles.standAloneLabel}>Party:</Text>
@@ -241,7 +231,6 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({
               </>
             )}
           </View>
-
           <View style={styles.dateInfo}>
             <Text style={styles.dateLabel}>Debit Note Date</Text>
             <Text style={styles.dateValue}>{formatDisplayDate(debitNote.debitDate)}</Text>
@@ -284,85 +273,87 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({
                 <View style={commonStyles.tableRow} key={index}>
                   <Text style={[commonStyles.tableCell, styles.descCol]}>{item.materialName}</Text>
                   <Text style={[commonStyles.tableCell, styles.qtyCol]}>{item.quantity}</Text>
-                  <Text style={[commonStyles.tableCell, styles.rateCol]}>
-                    {formatCurrency(item.unitCost || 0)}
-                  </Text>
-                  <Text style={[commonStyles.tableCell, styles.totalCol]}>
-                    {formatCurrency(item.total || 0)}
-                  </Text>
+                  <Text style={[commonStyles.tableCell, styles.rateCol]}>{formatCurrency(item.unitCost || 0)}</Text>
+                  <Text style={[commonStyles.tableCell, styles.totalCol]}>{formatCurrency(item.total || 0)}</Text>
                 </View>
               ))}
             </View>
           )}
+        </View>
 
-          <View style={styles.summaryContainer}>
-            <View style={styles.summaryRow}>
-              <View style={styles.totalsBox}>
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>Gross Total</Text>
-                  <Text style={styles.totalValue}>{formatCurrency(grossTotal)}</Text>
-                </View>
-                {discount > 0 && (
-                  <View style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>Discount</Text>
-                    <Text style={styles.totalValue}>- {formatCurrency(discount)}</Text>
-                  </View>
-                )}
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>Subtotal</Text>
-                  <Text style={styles.totalValue}>{formatCurrency(subtotal)}</Text>
-                </View>
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>VAT ({UAE_VAT_PERCENTAGE}%) </Text>
-                  <Text style={styles.totalValue}>{formatCurrency(vatAmount)}</Text>
-                </View>
-                <View style={styles.grandTotalRow}>
-                  <Text style={styles.grandTotalLabel}>Grand Total</Text>
-                  <Text style={styles.grandTotalValue}>{formatCurrency(grandTotal)}</Text>
-                </View>
+        {/* Unified Bottom Box */}
+        <View style={styles.unifiedBox}>
+          {/* Row 1: Terms & Conditions */}
+          <View style={styles.termsRow}>
+            <Text style={styles.sectionTitle}>Terms and Conditions</Text>
+            <Text style={styles.termsText}>
+              • These examples are for illustrative purposes only{'\n'}
+              • Consulting a legal professional is recommended{'\n'}
+              • Terms should remain clear, concise, and transparent
+            </Text>
+          </View>
+
+          {/* Row 2: Bank Details | Amount Summary */}
+          <View style={styles.row2}>
+            {companyDetails?.bankDetails ? (
+              <View style={styles.bankSection}>
+                <Text style={styles.sectionTitle}>Bank Details</Text>
+                <Text style={styles.bankText}>{companyDetails.bankDetails}</Text>
               </View>
-            </View>
-
-            <View style={styles.amountInWordsBox}>
-              <View style={styles.amountWordsRow}>
-                <Text style={styles.amountWordsLabel}>Amount in Words: </Text>
-                <Text style={styles.amountWordsText}>
-                  Dhirhams {numberToWords(grandTotal)} Only
+            ) : (
+              <View style={[styles.bankSection, { justifyContent: 'center' }]}>
+                <Text style={[styles.sectionTitle, { marginBottom: 0, textAlign: 'center' }]}>
+                  {companyDetails?.companyName || 'Company Name'}
                 </Text>
-              </View>
-              {vatAmount > 0 && (
-                <View style={styles.amountWordsRow}>
-                  <Text style={styles.amountWordsLabel}>VAT Amount: </Text>
-                  <Text style={styles.amountWordsText}>
-                    Dhirhams {numberToWords(vatAmount)} Only
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.bottomSection}>
-              {companyDetails?.bankDetails && (
-                <View style={styles.bankBox}>
-                  <Text style={styles.boxTitle}>Bank Details</Text>
-                  <Text style={styles.boxContent}>{companyDetails.bankDetails}</Text>
-                </View>
-              )}
-              <View style={styles.termsBox}>
-                <Text style={styles.boxTitle}>Terms & Conditions</Text>
-                <Text style={styles.boxContent}>
-                  • These examples are for illustrative purposes only.{'\n'}
-                  • Consulting a legal professional is recommended.{'\n'}
-                  • Terms should remain clear, concise, and transparent.
-                </Text>
-              </View>
-            </View>
-
-            {debitNote.notes && (
-              <View style={styles.notesBox}>
-                <Text style={styles.notesTitle}>Additional Notes</Text>
-                <Text style={styles.notesContent}>{debitNote.notes}</Text>
               </View>
             )}
+            <View style={styles.amountSummarySection}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Gross Total</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(grossTotal)}</Text>
+              </View>
+              {discount > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Discount</Text>
+                  <Text style={styles.summaryValue}>{formatCurrency(discount)}</Text>
+                </View>
+              )}
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Subtotal</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(subtotal)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Vat</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(vatAmount)}</Text>
+              </View>
+              <View style={styles.grandTotalRow}>
+                <Text style={styles.grandTotalLabel}>Grandtotal</Text>
+                <Text style={styles.grandTotalValue}>{formatCurrency(grandTotal)}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Row 3: Amount in Words */}
+          <View style={styles.amountWordsRow}>
+            <Text style={styles.amountWordsLabel}>Amount Chargeable in words :</Text>
+            <Text style={styles.amountWordsText}>{numberToWords(grandTotal)}</Text>
+          </View>
+
+          {/* Row 4: VAT in Words */}
+          <View style={styles.amountWordsRow}>
+            <Text style={styles.amountWordsLabel}>VAT Chargeable in words :</Text>
+            <Text style={styles.amountWordsText}>{numberToWords(vatAmount)}</Text>
+          </View>
+
+          {/* Row 5: Signature */}
+          <View style={styles.signatureRow}>
+            <View style={styles.signatureCell}>
+              <Text style={styles.signatureLabel}>Customer Signature</Text>
+            </View>
+            <View style={styles.signatureDivider} />
+            <View style={styles.signatureCell}>
+              <Text style={styles.signatureLabel}>For {companyDetails?.companyName || 'Company'}</Text>
+            </View>
           </View>
         </View>
 

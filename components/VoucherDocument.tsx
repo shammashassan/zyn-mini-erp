@@ -237,7 +237,7 @@ export const VoucherDocument: React.FC<VoucherDocumentProps> = ({ bill, companyD
           <View style={styles.amountBox}>
             <View style={styles.amountWordsSection}>
               <Text style={styles.amountLabel}>The Sum of:</Text>
-              <Text style={styles.amountWords}>{numberToWords(amount)} Dirhams Only</Text>
+              <Text style={styles.amountWords}>{numberToWords(amount)} Only</Text>
             </View>
             <View style={styles.amountValueSection}>
               <Text style={styles.amountValue}>{formatCurrency(amount)}</Text>

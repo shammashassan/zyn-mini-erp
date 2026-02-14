@@ -25,7 +25,7 @@ export function numberToWords(num: number): string {
   const [integerPart, decimalPart] = String(num.toFixed(2)).split('.');
   let words = inWords(Number(integerPart));
   if (decimalPart && Number(decimalPart) > 0) {
-    words += 'and ' + inWords(Number(decimalPart)) + 'fils ';
+    words += ' dirhams and ' + inWords(Number(decimalPart)) + 'fils ';
   }
   return words.trim().replace(/\s\s+/g, ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }

@@ -9,17 +9,12 @@ import { UAE_VAT_PERCENTAGE } from '@/utils/constants';
 import { formatCurrency } from '@/utils/formatters/currency';
 import { formatDisplayDate } from '@/utils/formatters/date';
 
-// Shared Components
 import { commonStyles, registerPdfFonts, pdfColors } from './pdf/styles';
 import { PDFHeader } from './pdf/Header';
 import { PDFFooter } from './pdf/Footer';
 
 const styles = StyleSheet.create({
-  // Invoice specific overrides
-  content: {
-    padding: '15 25 25 25',
-    flexGrow: 1,
-  },
+  content: { padding: '15 25 25 25', flexGrow: 1 },
   descCol: { width: '40%' },
   qtyCol: { width: '15%', textAlign: 'center' },
   rateCol: { width: '20%', textAlign: 'right' },
@@ -29,102 +24,118 @@ const styles = StyleSheet.create({
   entityDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
   labelRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 },
   inlineLabel: { fontSize: 9, color: pdfColors.primary, marginRight: 6, fontWeight: 'bold' },
-
-  // New Styles for label-only layout
   labelOnly: { marginBottom: 4 },
   standAloneLabel: { fontSize: 9, color: pdfColors.primary, fontWeight: 'bold' },
+  dateInfo: { alignItems: 'flex-end' },
+  dateLabel: { fontSize: 7, color: pdfColors.textMuted, marginBottom: 2 },
+  dateValue: { fontSize: 10, fontWeight: 'bold', color: pdfColors.primary },
 
-  dateInfo: {
-    alignItems: 'flex-end',
-  },
-  dateLabel: {
-    fontSize: 7,
-    color: pdfColors.textMuted,
-    marginBottom: 2,
-  },
-  dateValue: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: pdfColors.primary,
-  },
-
-  summaryContainer: { marginTop: 20 },
-  summaryRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 15 },
-
-  totalsBox: {
-    width: '42%',
+  unifiedBox: {
+    position: 'absolute',
+    bottom: 80,
+    left: 25,
+    right: 25,
     backgroundColor: pdfColors.white,
     border: `1.5 solid ${pdfColors.primary}`,
     borderRadius: 4,
     overflow: 'hidden',
   },
-  totalRow: {
+
+  termsRow: {
+    padding: 10,
+    borderBottomWidth: 1.5,
+    borderBottomColor: pdfColors.primary,
+  },
+  sectionTitle: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: pdfColors.primary,
+    marginBottom: 5,
+    textTransform: 'uppercase',
+  },
+  termsText: {
+    fontSize: 7.5,
+    color: pdfColors.textDark,
+    lineHeight: 1.3,
+  },
+
+  row2: {
+    flexDirection: 'row',
+    borderBottomWidth: 1.5,
+    borderBottomColor: pdfColors.primary,
+  },
+  bankSection: {
+    flex: 1,
+    padding: 10,
+    borderRightWidth: 1.5,
+    borderRightColor: pdfColors.primary,
+  },
+  bankText: {
+    fontSize: 7.5,
+    color: pdfColors.textDark,
+    lineHeight: 1.3,
+  },
+  amountSummarySection: {
+    width: '35%',
+  },
+  summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: '6 10',
+    padding: '5 10',
     borderBottomWidth: 0.5,
     borderBottomColor: pdfColors.border,
   },
+  summaryLabel: { fontSize: 8, color: pdfColors.textDark },
+  summaryValue: { fontSize: 8, color: pdfColors.textDark, fontWeight: 'bold' },
   grandTotalRow: {
-    backgroundColor: pdfColors.primary,
-    padding: '8 10',
-    borderBottomWidth: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    padding: '6 10',
+    backgroundColor: pdfColors.primary,
   },
-  totalLabel: { fontSize: 8.5, color: pdfColors.textDark },
-  totalValue: { fontSize: 8.5, color: pdfColors.textDark, fontWeight: 'bold' },
-  grandTotalLabel: { fontSize: 10, fontWeight: 'bold', color: pdfColors.white },
-  grandTotalValue: { fontSize: 11, fontWeight: 'bold', color: pdfColors.accent },
+  grandTotalLabel: { fontSize: 9, fontWeight: 'bold', color: pdfColors.white },
+  grandTotalValue: { fontSize: 10, fontWeight: 'bold', color: pdfColors.accent },
 
-  amountInWordsBox: {
-    backgroundColor: pdfColors.secondary,
-    border: `1.5 solid ${pdfColors.primary}`,
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 15,
+  amountWordsRow: {
+    padding: 10,
+    borderBottomWidth: 1.5,
+    borderBottomColor: pdfColors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   amountWordsLabel: {
+    fontSize: 7.5,
+    color: pdfColors.primary,
+    fontWeight: 'bold',
+    marginRight: 5,
+  },
+  amountWordsText: {
+    fontSize: 7.5,
+    color: pdfColors.textDark,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+
+  signatureRow: {
+    flexDirection: 'row',
+    height: 50,
+  },
+  signatureCell: {
+    flex: 1,
+    padding: 8,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  signatureDivider: {
+    width: 1.5,
+    backgroundColor: pdfColors.primary,
+  },
+  signatureLabel: {
     fontSize: 7,
     color: pdfColors.primary,
     fontWeight: 'bold',
-    marginBottom: 3,
-    textTransform: 'uppercase',
+    textAlign: 'center',
   },
-  amountWordsText: {
-    fontSize: 8,
-    color: pdfColors.textDark,
-    backgroundColor: pdfColors.white,
-    padding: '5 8',
-    borderRadius: 3,
-    border: `0.5 solid ${pdfColors.border}`,
-  },
-
-  bottomSection: { flexDirection: 'row', gap: 15, marginBottom: 10 },
-  bankBox: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    border: `1 solid ${pdfColors.border}`,
-    borderRadius: 4,
-    padding: 10,
-  },
-  termsBox: {
-    flex: 1,
-    backgroundColor: pdfColors.warning,
-    border: `1 solid ${pdfColors.warningBorder}`,
-    borderRadius: 4,
-    padding: 10,
-  },
-  boxTitle: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: pdfColors.primary,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  boxContent: { fontSize: 8, color: pdfColors.textDark, lineHeight: 1.4 },
-  validityItem: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 3 },
-  bulletPoint: { fontSize: 8, color: pdfColors.primary, marginRight: 5, fontWeight: 'bold' },
 });
 
 interface InvoiceDocumentProps {
@@ -143,17 +154,13 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, co
   const grandTotal = bill.grandTotal || 0;
   const documentTitle = type.toUpperCase().replace(/_/g, ' ');
 
-  // Use snapshots for PDF (immutable legal truth)
   const partyName = bill.partySnapshot.displayName;
   const partyAddress = bill.partySnapshot.address;
-  // const partyVAT = bill.partySnapshot.taxIdentifiers?.vatNumber;
-
   const contactName = bill.contactSnapshot?.name;
   const contactPhone = bill.contactSnapshot?.phone;
   const contactEmail = bill.contactSnapshot?.email;
   const contactDesignation = bill.contactSnapshot?.designation;
 
-  // Check if there's any additional info beyond party name
   const hasAdditionalInfo = contactName || contactPhone || contactEmail ||
     (partyAddress && (partyAddress.street || partyAddress.city || partyAddress.state ||
       partyAddress.postalCode || partyAddress.country));
@@ -162,7 +169,6 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, co
     <Document>
       <Page size="A4" style={commonStyles.page}>
         <Text style={commonStyles.watermark}>INVOICE</Text>
-
         <PDFHeader companyDetails={companyDetails} />
 
         <View style={commonStyles.titleSection}>
@@ -173,7 +179,6 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, co
         <View style={commonStyles.infoBar}>
           <View style={{ flex: 1 }}>
             {hasAdditionalInfo ? (
-              /* Has Contact Info or Address */
               <>
                 <View style={styles.labelRow}>
                   <Text style={styles.inlineLabel}>Billed To:</Text>
@@ -188,18 +193,11 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, co
                 {contactEmail && <Text style={styles.entityDetail}>{contactEmail}</Text>}
                 {partyAddress && (
                   <Text style={styles.entityDetail}>
-                    {[
-                      partyAddress.street,
-                      partyAddress.city,
-                      partyAddress.state,
-                      partyAddress.postalCode,
-                      partyAddress.country
-                    ].filter(Boolean).join(', ')}
+                    {[partyAddress.street, partyAddress.city, partyAddress.state, partyAddress.postalCode, partyAddress.country].filter(Boolean).join(', ')}
                   </Text>
                 )}
               </>
             ) : (
-              /* No Contact Info - Just Party */
               <>
                 <View style={styles.labelOnly}>
                   <Text style={styles.standAloneLabel}>Billed To:</Text>
@@ -208,7 +206,6 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, co
               </>
             )}
           </View>
-
           <View style={styles.dateInfo}>
             <Text style={styles.dateLabel}>Invoice Date</Text>
             <Text style={styles.dateValue}>{formatDisplayDate(bill.invoiceDate)}</Text>
@@ -232,74 +229,80 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ bill, type, co
               </View>
             ))}
           </View>
+        </View>
 
-          <View style={styles.summaryContainer}>
-            <View style={styles.summaryRow}>
-              <View style={styles.totalsBox}>
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>Gross Total</Text>
-                  <Text style={styles.totalValue}>{formatCurrency(grossTotal)}</Text>
-                </View>
-                {discount > 0 && (
-                  <View style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>Discount</Text>
-                    <Text style={styles.totalValue}>- {formatCurrency(discount)}</Text>
-                  </View>
-                )}
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>Subtotal</Text>
-                  <Text style={styles.totalValue}>{formatCurrency(subtotal)}</Text>
-                </View>
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>VAT ({UAE_VAT_PERCENTAGE}%)</Text>
-                  <Text style={styles.totalValue}>{formatCurrency(vatAmount)}</Text>
-                </View>
-                <View style={styles.grandTotalRow}>
-                  <Text style={styles.grandTotalLabel}>Grand Total</Text>
-                  <Text style={styles.grandTotalValue}>{formatCurrency(grandTotal)}</Text>
-                </View>
+        {/* Unified Bottom Box */}
+        <View style={styles.unifiedBox}>
+          {/* Row 1: Terms & Conditions */}
+          <View style={styles.termsRow}>
+            <Text style={styles.sectionTitle}>Terms and Conditions</Text>
+            <Text style={styles.termsText}>
+              • These examples are for illustrative purposes only{'\n'}
+              • Consulting a legal professional is recommended{'\n'}
+              • Terms should remain clear and transparent
+            </Text>
+          </View>
+
+          {/* Row 2: Bank Details | Amount Summary */}
+          <View style={styles.row2}>
+            {companyDetails?.bankDetails ? (
+              <View style={styles.bankSection}>
+                <Text style={styles.sectionTitle}>Bank Details</Text>
+                <Text style={styles.bankText}>{companyDetails.bankDetails}</Text>
               </View>
-            </View>
-
-            <View style={styles.amountInWordsBox}>
-              <View style={{ marginBottom: 8 }}>
-                <Text style={styles.amountWordsLabel}>The Sum of:</Text>
-                <Text style={styles.amountWordsText}>
-                  Dhirhams {numberToWords(grandTotal)} Only
+            ) : (
+              <View style={[styles.bankSection, { justifyContent: 'center' }]}>
+                <Text style={[styles.sectionTitle, { marginBottom: 0, textAlign: 'center' }]}>
+                  {companyDetails?.companyName || 'Company Name'}
                 </Text>
               </View>
-              {vatAmount > 0 && (
-                <View>
-                  <Text style={styles.amountWordsLabel}>VAT Amount:</Text>
-                  <Text style={styles.amountWordsText}>
-                    Dhirhams {numberToWords(vatAmount)} Only
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.bottomSection}>
-              {companyDetails?.bankDetails && (
-                <View style={styles.bankBox}>
-                  <Text style={styles.boxTitle}>Bank Details</Text>
-                  <Text style={styles.boxContent}>{companyDetails.bankDetails}</Text>
-                </View>
-              )}
-              <View style={styles.termsBox}>
-                <Text style={styles.boxTitle}>Terms & Conditions</Text>
-                <View style={styles.validityItem}>
-                  <Text style={styles.bulletPoint}>•</Text>
-                  <Text style={styles.boxContent}>These examples are for illustrative purposes only.</Text>
-                </View>
-                <View style={styles.validityItem}>
-                  <Text style={styles.bulletPoint}>•</Text>
-                  <Text style={styles.boxContent}>Consulting a legal professional is recommended.</Text>
-                </View>
-                <View style={styles.validityItem}>
-                  <Text style={styles.bulletPoint}>•</Text>
-                  <Text style={styles.boxContent}>Terms should remain clear and transparent.</Text>
-                </View>
+            )}
+            <View style={styles.amountSummarySection}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Gross Total</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(grossTotal)}</Text>
               </View>
+              {discount > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Discount</Text>
+                  <Text style={styles.summaryValue}>{formatCurrency(discount)}</Text>
+                </View>
+              )}
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Subtotal</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(subtotal)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Vat</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(vatAmount)}</Text>
+              </View>
+              <View style={styles.grandTotalRow}>
+                <Text style={styles.grandTotalLabel}>Grandtotal</Text>
+                <Text style={styles.grandTotalValue}>{formatCurrency(grandTotal)}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Row 3: Amount in Words */}
+          <View style={styles.amountWordsRow}>
+            <Text style={styles.amountWordsLabel}>Amount Chargeable in words :</Text>
+            <Text style={styles.amountWordsText}>{numberToWords(grandTotal)}</Text>
+          </View>
+
+          {/* Row 4: VAT in Words */}
+          <View style={styles.amountWordsRow}>
+            <Text style={styles.amountWordsLabel}>VAT Chargeable in words :</Text>
+            <Text style={styles.amountWordsText}>{numberToWords(vatAmount)}</Text>
+          </View>
+
+          {/* Row 5: Signature */}
+          <View style={styles.signatureRow}>
+            <View style={styles.signatureCell}>
+              <Text style={styles.signatureLabel}>Customer Signature</Text>
+            </View>
+            <View style={styles.signatureDivider} />
+            <View style={styles.signatureCell}>
+              <Text style={styles.signatureLabel}>For {companyDetails?.companyName || 'Company'}</Text>
             </View>
           </View>
         </View>

@@ -7,7 +7,6 @@ import type { ICompanyDetails } from '@/models/CompanyDetails';
 import { formatCurrency } from '@/utils/formatters/currency';
 import { formatDisplayDate } from '@/utils/formatters/date';
 
-// Shared Components
 import { commonStyles, registerPdfFonts, pdfColors } from './pdf/styles';
 import { PDFHeader } from './pdf/Header';
 import { PDFFooter } from './pdf/Footer';
@@ -16,7 +15,6 @@ import { TruckIcon } from './pdf/Icons';
 const styles = StyleSheet.create({
   content: { padding: '15 25', flexGrow: 1 },
 
-  // Column Widths (Standardized)
   colDesc: { width: '40%' },
   colQty: { width: '20%', textAlign: 'center' },
   colRate: { width: '20%', textAlign: 'right' },
@@ -26,90 +24,61 @@ const styles = StyleSheet.create({
   entityDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
   labelRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 },
   inlineLabel: { fontSize: 9, color: pdfColors.primary, marginRight: 6, fontWeight: 'bold' },
-
-  // New Styles for label-only layout
   labelOnly: { marginBottom: 4 },
   standAloneLabel: { fontSize: 9, color: pdfColors.primary, fontWeight: 'bold' },
-
   dateSection: { alignItems: 'flex-end' },
   dateLabel: { fontSize: 7, color: pdfColors.textMuted, marginBottom: 2 },
   dateValue: { fontSize: 10, fontWeight: 'bold', color: pdfColors.primary },
 
-  // Layout for Bottom Section
-  bottomContainer: {
-    marginTop: 20,
-    flexDirection: 'row',
-    gap: 15,
-  },
-
-  // Terms Box
-  termsBox: {
-    flex: 1,
-    backgroundColor: pdfColors.warning,
-    border: `1 solid ${pdfColors.warningBorder}`,
-    borderRadius: 4,
-    padding: 10,
-  },
-  boxTitle: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: pdfColors.primary,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  boxContent: {
-    fontSize: 8,
-    color: pdfColors.textDark,
-    lineHeight: 1.4,
-  },
-
-  // Notes Box (Right side if terms exist, or full width)
-  notesBox: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    border: `1 solid ${pdfColors.border}`,
-    borderRadius: 4,
-    padding: 10,
-  },
-  notesTitle: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: pdfColors.primary,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  notesText: {
-    fontSize: 8.5,
-    color: pdfColors.textDark,
-    lineHeight: 1.4,
-  },
-
-  // Signature Section (Sticky Bottom)
-  signatureSection: {
+  // Unified Bottom Box
+  unifiedBox: {
     position: 'absolute',
     bottom: 80,
     left: 25,
     right: 25,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 15,
-  },
-  signatureBox: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: pdfColors.white,
     border: `1.5 solid ${pdfColors.primary}`,
     borderRadius: 4,
-    height: 80,
+    overflow: 'hidden',
+  },
+
+  termsRow: {
     padding: 10,
-    flexDirection: 'column',
+    borderBottomWidth: 1.5,
+    borderBottomColor: pdfColors.primary,
+  },
+  sectionTitle: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: pdfColors.primary,
+    marginBottom: 5,
+    textTransform: 'uppercase',
+  },
+  termsText: {
+    fontSize: 7.5,
+    color: pdfColors.textDark,
+    lineHeight: 1.3,
+  },
+
+  signatureRow: {
+    flexDirection: 'row',
+    height: 50,
+  },
+  signatureCell: {
+    flex: 1,
+    padding: 8,
     justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  signatureDivider: {
+    width: 1.5,
+    backgroundColor: pdfColors.primary,
   },
   signatureLabel: {
     fontSize: 7,
     color: pdfColors.primary,
     fontWeight: 'bold',
     textAlign: 'center',
-    textTransform: 'uppercase',
   },
 });
 
@@ -121,24 +90,19 @@ interface DeliveryNoteProps {
 export const DeliveryNoteDocument: React.FC<DeliveryNoteProps> = ({ bill, companyDetails }) => {
   registerPdfFonts();
 
-  // Use snapshots for PDF (immutable legal truth)
   const partyName = bill.partySnapshot.displayName;
   const partyAddress = bill.partySnapshot.address;
-  // const partyVAT = bill.partySnapshot.taxIdentifiers?.vatNumber;
-
   const contactName = bill.contactSnapshot?.name;
   const contactPhone = bill.contactSnapshot?.phone;
   const contactEmail = bill.contactSnapshot?.email;
   const contactDesignation = bill.contactSnapshot?.designation;
 
-  // Extract invoice number from populated connectedDocuments
   const invoiceIds = bill.connectedDocuments?.invoiceIds;
   const firstInvoice = (Array.isArray(invoiceIds) && invoiceIds.length > 0) ? invoiceIds[0] : null;
   const invoiceNumber = (typeof firstInvoice === 'object' && firstInvoice !== null && 'invoiceNumber' in firstInvoice)
     ? (firstInvoice as any).invoiceNumber
     : null;
 
-  // Check if there's any additional info beyond party name
   const hasAdditionalInfo = contactName || contactPhone || contactEmail ||
     (partyAddress && (partyAddress.street || partyAddress.city || partyAddress.state ||
       partyAddress.postalCode || partyAddress.country));
@@ -147,7 +111,6 @@ export const DeliveryNoteDocument: React.FC<DeliveryNoteProps> = ({ bill, compan
     <Document>
       <Page size="A4" style={commonStyles.page}>
         <Text style={commonStyles.watermark}>DELIVERY</Text>
-
         <PDFHeader companyDetails={companyDetails} />
 
         <View style={commonStyles.titleSection}>
@@ -161,7 +124,6 @@ export const DeliveryNoteDocument: React.FC<DeliveryNoteProps> = ({ bill, compan
         <View style={commonStyles.infoBar}>
           <View style={{ flex: 1 }}>
             {hasAdditionalInfo ? (
-              /* Has Contact Info or Address */
               <>
                 <View style={styles.labelRow}>
                   <Text style={styles.inlineLabel}>Delivered To:</Text>
@@ -176,18 +138,11 @@ export const DeliveryNoteDocument: React.FC<DeliveryNoteProps> = ({ bill, compan
                 {contactEmail && <Text style={styles.entityDetail}>{contactEmail}</Text>}
                 {partyAddress && (
                   <Text style={styles.entityDetail}>
-                    {[
-                      partyAddress.street,
-                      partyAddress.city,
-                      partyAddress.state,
-                      partyAddress.postalCode,
-                      partyAddress.country
-                    ].filter(Boolean).join(', ')}
+                    {[partyAddress.street, partyAddress.city, partyAddress.state, partyAddress.postalCode, partyAddress.country].filter(Boolean).join(', ')}
                   </Text>
                 )}
               </>
             ) : (
-              /* No Contact Info - Just Party */
               <>
                 <View style={styles.labelOnly}>
                   <Text style={styles.standAloneLabel}>Delivered To:</Text>
@@ -196,7 +151,6 @@ export const DeliveryNoteDocument: React.FC<DeliveryNoteProps> = ({ bill, compan
               </>
             )}
           </View>
-
           <View style={styles.dateSection}>
             <Text style={styles.dateLabel}>Delivery Date</Text>
             <Text style={styles.dateValue}>{formatDisplayDate(bill.deliveryDate)}</Text>
@@ -226,35 +180,29 @@ export const DeliveryNoteDocument: React.FC<DeliveryNoteProps> = ({ bill, compan
               </View>
             ))}
           </View>
-
-          {/* Bottom Section: Terms & Notes */}
-          <View style={styles.bottomContainer}>
-            <View style={styles.termsBox}>
-              <Text style={styles.boxTitle}>Terms & Conditions</Text>
-              <Text style={styles.boxContent}>
-                • Received the above goods in good order and condition.{'\n'}
-                • Please report any discrepancies within 24 hours of receipt.{'\n'}
-                • Goods remain the property of the seller until paid in full.
-              </Text>
-            </View>
-
-            {bill.notes ? (
-              <View style={styles.notesBox}>
-                <Text style={styles.notesTitle}>Delivery Notes</Text>
-                <Text style={styles.notesText}>{bill.notes}</Text>
-              </View>
-            ) : (
-              <View style={{ flex: 1 }} />
-            )}
-          </View>
         </View>
 
-        <View style={styles.signatureSection}>
-          <View style={styles.signatureBox}>
-            <Text style={styles.signatureLabel}>Received By{'\n'}(Name, Signature & Date)</Text>
+        {/* Unified Bottom Box */}
+        <View style={styles.unifiedBox}>
+          {/* Row 1: Terms & Conditions */}
+          <View style={styles.termsRow}>
+            <Text style={styles.sectionTitle}>Terms and Conditions</Text>
+            <Text style={styles.termsText}>
+              • Received the above goods in good order and condition.{'\n'}
+              • Please report any discrepancies within 24 hours of receipt.{'\n'}
+              • Goods remain the property of the seller until paid in full.
+            </Text>
           </View>
-          <View style={styles.signatureBox}>
-            <Text style={styles.signatureLabel}>Delivered By{'\n'}(Name, Signature & Date)</Text>
+
+          {/* Row 2: Signature */}
+          <View style={styles.signatureRow}>
+            <View style={styles.signatureCell}>
+              <Text style={styles.signatureLabel}>Received By</Text>
+            </View>
+            <View style={styles.signatureDivider} />
+            <View style={styles.signatureCell}>
+              <Text style={styles.signatureLabel}>For {companyDetails?.companyName || 'Company'}</Text>
+            </View>
           </View>
         </View>
 
