@@ -135,6 +135,7 @@ export function DebitNoteForm({
   const [returnNotePopoverOpen, setReturnNotePopoverOpen] = useState(false);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
+  const [selectedPartyType, setSelectedPartyType] = useState<'customer' | 'supplier'>('supplier');
 
   useEffect(() => {
     const checkIsDesktop = () => setIsDesktop(window.innerWidth >= 1024);
@@ -245,6 +246,7 @@ export function DebitNoteForm({
           ? returnNoteData.partyId._id
           : returnNoteData.partyId;
 
+        setSelectedPartyType('supplier');
         reset({
           partyId: partyIdValue || "",
           contactId: returnNoteData.contactId?.toString() || undefined,
@@ -268,6 +270,14 @@ export function DebitNoteForm({
           ? (defaultValues.partyId as any)._id
           : defaultValues.partyId;
 
+        // Infer party type from the populated partyId.roles object
+        const partyRoles = typeof defaultValues.partyId === 'object' && defaultValues.partyId !== null
+          ? (defaultValues.partyId as any).roles
+          : null;
+        const inferredPartyType: 'customer' | 'supplier' =
+          partyRoles?.customer ? 'customer' : 'supplier';
+        setSelectedPartyType(inferredPartyType);
+
         reset({
           partyId: partyIdValue || "",
           contactId: defaultValues.contactId?.toString() || undefined,
@@ -290,6 +300,7 @@ export function DebitNoteForm({
         });
       } else {
         // Creating new debit note
+        setSelectedPartyType('supplier');
         reset({
           partyId: "",
           contactId: undefined,
@@ -403,6 +414,7 @@ export function DebitNoteForm({
 
     const submitData: any = {
       partyId: data.partyId,
+      partyType: selectedPartyType,
       contactId: data.contactId,
       items: validItems.map(item => ({
         ...item,
@@ -477,17 +489,16 @@ export function DebitNoteForm({
                 control={control}
                 render={({ field }) => (
                   <PartyContactSelector
-                    value={{ partyId: field.value, contactId: watch('contactId') }}
+                    value={{ partyId: field.value, contactId: watch('contactId'), partyType: selectedPartyType }}
                     onChange={(val) => {
                       field.onChange(val.partyId);
                       setValue('contactId', val.contactId, { shouldDirty: true });
+                      if (val.partyType) setSelectedPartyType(val.partyType as 'customer' | 'supplier');
                     }}
                     allowedRoles={['supplier', 'customer']}
                     showCreateButton={true}
                     className="w-full"
                     layout="vertical"
-                  // disablePartyTypeSelector={isEditMode}
-                  // disablePartySelector={isEditMode}
                   />
                 )}
               />

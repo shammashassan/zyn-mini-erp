@@ -127,6 +127,7 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
   const [returnNotePopoverOpen, setReturnNotePopoverOpen] = useState(false);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
+  const [selectedPartyType, setSelectedPartyType] = useState<'customer' | 'supplier'>('customer');
 
   useEffect(() => {
     const checkIsDesktop = () => setIsDesktop(window.innerWidth >= 1024);
@@ -235,6 +236,7 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
           ? returnNoteData.partyId._id
           : returnNoteData.partyId;
 
+        setSelectedPartyType('customer');
         reset({
           partyId: partyIdValue || "",
           contactId: returnNoteData.contactId?.toString() || undefined,
@@ -258,6 +260,14 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
           ? (defaultValues.partyId as any)._id
           : defaultValues.partyId;
 
+        // Infer party type from the populated partyId.roles object
+        const partyRoles = typeof defaultValues.partyId === 'object' && defaultValues.partyId !== null
+          ? (defaultValues.partyId as any).roles
+          : null;
+        const inferredPartyType: 'customer' | 'supplier' =
+          partyRoles?.supplier ? 'supplier' : 'customer';
+        setSelectedPartyType(inferredPartyType);
+
         reset({
           partyId: partyIdValue || "",
           contactId: defaultValues.contactId?.toString() || undefined,
@@ -280,6 +290,7 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
         });
       } else {
         // Creating new credit note
+        setSelectedPartyType('customer');
         reset({
           partyId: "",
           contactId: undefined,
@@ -407,6 +418,7 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
 
     const submitData: any = {
       partyId: data.partyId,
+      partyType: selectedPartyType,
       contactId: data.contactId,
       items: validItems.map(item => ({
         ...item,
@@ -483,17 +495,16 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                 control={control}
                 render={({ field }) => (
                   <PartyContactSelector
-                    value={{ partyId: field.value, contactId: watch('contactId') }}
+                    value={{ partyId: field.value, contactId: watch('contactId'), partyType: selectedPartyType }}
                     onChange={(val) => {
                       field.onChange(val.partyId);
                       setValue('contactId', val.contactId, { shouldDirty: true });
+                      if (val.partyType) setSelectedPartyType(val.partyType as 'customer' | 'supplier');
                     }}
                     allowedRoles={['customer', 'supplier']}
                     showCreateButton={true}
                     className="w-full"
                     layout="vertical"
-                  // disablePartyTypeSelector={isEditMode}
-                  // disablePartySelector={isEditMode}
                   />
                 )}
               />
