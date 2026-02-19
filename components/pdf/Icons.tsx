@@ -1,5 +1,5 @@
 import React from 'react';
-import { Svg, Path } from '@react-pdf/renderer';
+import { Svg, Path, Circle } from '@react-pdf/renderer';
 import { pdfColors } from './styles';
 
 interface IconProps {
@@ -8,40 +8,65 @@ interface IconProps {
   strokeWidth?: string;
 }
 
-export const MapPinIcon = ({ size = 10, color = pdfColors.stroke, strokeWidth = "2" }: IconProps) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth}>
-    <Path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-    <Path d="M12 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
+export const MapPinIcon = ({
+  size = 10,
+  color = pdfColors.textMuted,
+  strokeWidth = "1.75"
+}: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path
+      d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+    />
+    <Circle cx="12" cy="9" r="2.5" fill="none" stroke={color} strokeWidth={strokeWidth} />
   </Svg>
 );
 
-export const PhoneIcon = ({ size = 10, color = pdfColors.stroke, strokeWidth = "2" }: IconProps) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth}>
-    <Path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+export const PhoneIcon = ({
+  size = 10,
+  color = pdfColors.textMuted,
+  strokeWidth = "1.75"
+}: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path
+      d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1C9.61 21 3 14.39 3 6.5a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2z"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+    />
   </Svg>
 );
 
-export const MailIcon = ({ size = 10, color = pdfColors.stroke, strokeWidth = "2" }: IconProps) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth}>
-    <Path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-    <Path d="M22 6l-10 7L2 6" />
+export const MailIcon = ({
+  size = 10,
+  color = pdfColors.textMuted,
+  strokeWidth = "1.75"
+}: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path
+      d="M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+    />
   </Svg>
 );
 
-export const FileTextIcon = ({ size = 12, color = "#ffffff", strokeWidth = "2" }: IconProps) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth}>
-    <Path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <Path d="M14 2v6h6" />
-    <Path d="M16 13H8" />
-    <Path d="M16 17H8" />
-    <Path d="M10 9H8" />
+export const GlobeIcon = ({
+  size = 10,
+  color = pdfColors.textMuted,
+  strokeWidth = "1.75"
+}: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Circle cx="12" cy="12" r="10" fill="none" stroke={color} strokeWidth={strokeWidth} />
+    <Path d="M2 12h20" fill="none" stroke={color} strokeWidth={strokeWidth} />
+    <Path
+      d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+    />
   </Svg>
-);
-
-export const TruckIcon = ({ size = 12, color = "#ffffff", strokeWidth = "2" }: IconProps) => (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth}>
-        <Path d="M1 3h15v13H1z" />
-        <Path d="M16 8h3l3 3v5h-6V8z" />
-        <Path d="M5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" />
-    </Svg>
 );

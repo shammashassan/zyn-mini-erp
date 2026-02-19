@@ -1,152 +1,18 @@
-// components/DebitNoteDocument.tsx - FINAL: Using party snapshots for PDF generation
-
 import React from 'react';
-import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
+import { Page, Text, Document, View } from '@react-pdf/renderer';
 import type { IDebitNote } from '@/models/DebitNote';
 import type { ICompanyDetails } from '@/models/CompanyDetails';
 import { numberToWords } from '@/lib/numberToWords';
-import { UAE_VAT_PERCENTAGE } from '@/utils/constants';
-import { formatCurrency } from '@/utils/formatters/currency';
-import { formatDisplayDate } from '@/utils/formatters/date';
 
-import { commonStyles, registerPdfFonts, pdfColors } from './pdf/styles';
-import { PDFHeader } from './pdf/Header';
-import { PDFFooter } from './pdf/Footer';
-
-const styles = StyleSheet.create({
-  content: { padding: '15 25 25 25', flexGrow: 1 },
-  descCol: { width: '40%' },
-  qtyCol: { width: '15%', textAlign: 'center' },
-  rateCol: { width: '20%', textAlign: 'right' },
-  totalCol: { width: '25%', textAlign: 'right', fontWeight: 'bold' },
-
-  entityName: { fontSize: 11, fontWeight: 'bold', color: pdfColors.textMain, marginBottom: 2 },
-  entityDetail: { fontSize: 8, color: pdfColors.textDark, marginBottom: 1 },
-  labelRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 2 },
-  inlineLabel: { fontSize: 9, color: pdfColors.primary, marginRight: 6, fontWeight: 'bold' },
-  labelOnly: { marginBottom: 4 },
-  standAloneLabel: { fontSize: 9, color: pdfColors.primary, fontWeight: 'bold' },
-  dateInfo: { alignItems: 'flex-end' },
-  dateLabel: { fontSize: 7, color: pdfColors.textMuted, marginBottom: 2 },
-  dateValue: { fontSize: 10, fontWeight: 'bold', color: pdfColors.primary },
-
-  reasonBox: {
-    backgroundColor: pdfColors.secondary,
-    border: `1.5 solid ${pdfColors.primary}`,
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 15,
-  },
-  reasonLabel: { fontSize: 8, color: pdfColors.primary, fontWeight: 'bold', marginBottom: 4, textTransform: 'uppercase' },
-  reasonText: { fontSize: 8.5, color: pdfColors.textDark, lineHeight: 1.4 },
-
-  unifiedBox: {
-    position: 'absolute',
-    bottom: 80,
-    left: 25,
-    right: 25,
-    backgroundColor: pdfColors.white,
-    border: `1.5 solid ${pdfColors.primary}`,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-
-  termsRow: {
-    padding: 10,
-    borderBottomWidth: 1.5,
-    borderBottomColor: pdfColors.primary,
-  },
-  sectionTitle: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    color: pdfColors.primary,
-    marginBottom: 5,
-    textTransform: 'uppercase',
-  },
-  termsText: {
-    fontSize: 7.5,
-    color: pdfColors.textDark,
-    lineHeight: 1.3,
-  },
-
-  row2: {
-    flexDirection: 'row',
-    borderBottomWidth: 1.5,
-    borderBottomColor: pdfColors.primary,
-  },
-  bankSection: {
-    flex: 1,
-    padding: 10,
-    borderRightWidth: 1.5,
-    borderRightColor: pdfColors.primary,
-  },
-  bankText: {
-    fontSize: 7.5,
-    color: pdfColors.textDark,
-    lineHeight: 1.3,
-  },
-  amountSummarySection: {
-    width: '35%',
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: '5 10',
-    borderBottomWidth: 0.5,
-    borderBottomColor: pdfColors.border,
-  },
-  summaryLabel: { fontSize: 8, color: pdfColors.textDark },
-  summaryValue: { fontSize: 8, color: pdfColors.textDark, fontWeight: 'bold' },
-  grandTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: '6 10',
-    backgroundColor: pdfColors.primary,
-  },
-  grandTotalLabel: { fontSize: 9, fontWeight: 'bold', color: pdfColors.white },
-  grandTotalValue: { fontSize: 10, fontWeight: 'bold', color: pdfColors.accent },
-
-  amountWordsRow: {
-    padding: 10,
-    borderBottomWidth: 1.5,
-    borderBottomColor: pdfColors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  amountWordsLabel: {
-    fontSize: 7.5,
-    color: pdfColors.primary,
-    fontWeight: 'bold',
-    marginRight: 5,
-  },
-  amountWordsText: {
-    fontSize: 7.5,
-    color: pdfColors.textDark,
-    fontWeight: 'bold',
-    flex: 1,
-  },
-
-  signatureRow: {
-    flexDirection: 'row',
-    height: 50,
-  },
-  signatureCell: {
-    flex: 1,
-    padding: 8,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  signatureDivider: {
-    width: 1.5,
-    backgroundColor: pdfColors.primary,
-  },
-  signatureLabel: {
-    fontSize: 7,
-    color: pdfColors.primary,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-});
+import { commonStyles, registerPdfFonts } from './pdf/styles';
+import { DocumentHeader } from './pdf/DocumentHeader';
+import { DocumentTitle } from './pdf/DocumentTitle';
+import { PartySection } from './pdf/PartySection';
+import { ItemsTable } from './pdf/ItemsTable';
+import { buildInvoiceSummary } from './pdf/SummaryBlock';
+import { BottomSection } from './pdf/BottomSection';
+import { ReasonBox, InlineNote } from './pdf/DocumentSections';
+import { DocumentFooter } from './pdf/DocumentFooter';
 
 interface PopulatedReturnNote {
   _id: string;
@@ -162,202 +28,85 @@ interface DebitNoteDocumentProps {
   companyDetails: ICompanyDetails | null;
 }
 
-export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({ debitNote, companyDetails }) => {
+const DEBIT_NOTE_TERMS = [
+  'This debit note is issued against returned materials',
+  'Amount will be adjusted in your account within 5 business days',
+  'Please retain this document for your records',
+];
+
+export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({
+  debitNote,
+  companyDetails
+}) => {
   registerPdfFonts();
 
   const returnNote = typeof debitNote.connectedDocuments?.returnNoteId === 'object'
     ? debitNote.connectedDocuments.returnNoteId as PopulatedReturnNote
     : null;
 
-  const returnNoteNumber = returnNote?.returnNumber;
-
   const grossTotal = debitNote.totalAmount || 0;
   const vatAmount = debitNote.vatAmount || 0;
-  const subtotal = grossTotal - debitNote.discount;
   const discount = debitNote.discount || 0;
   const grandTotal = debitNote.grandTotal || 0;
 
-  const partyName = debitNote.partySnapshot.displayName;
-  const partyAddress = debitNote.partySnapshot.address;
-  const contactName = debitNote.contactSnapshot?.name;
-  const contactPhone = debitNote.contactSnapshot?.phone;
-  const contactEmail = debitNote.contactSnapshot?.email;
-  const contactDesignation = debitNote.contactSnapshot?.designation;
+  const summaryItems = buildInvoiceSummary({ grossTotal, discount, vatAmount, grandTotal });
 
   const isManualEntry = debitNote.items?.length === 1 && !debitNote.items[0].materialId;
-
-  const hasAdditionalInfo = contactName || contactPhone || contactEmail ||
-    (partyAddress && (partyAddress.street || partyAddress.city || partyAddress.state ||
-      partyAddress.postalCode || partyAddress.country));
 
   return (
     <Document>
       <Page size="A4" style={commonStyles.page}>
         <Text style={commonStyles.watermark}>DEBIT NOTE</Text>
-        <PDFHeader companyDetails={companyDetails} />
 
-        <View style={commonStyles.titleSection}>
-          <Text style={commonStyles.documentTitle}>DEBIT NOTE</Text>
-          <Text style={commonStyles.documentNumber}>{debitNote.debitNoteNumber}</Text>
-        </View>
+        <View>
+          <DocumentHeader companyDetails={companyDetails} />
 
-        <View style={commonStyles.infoBar}>
-          <View style={{ flex: 1 }}>
-            {hasAdditionalInfo ? (
-              <>
-                <View style={styles.labelRow}>
-                  <Text style={styles.inlineLabel}>Party:</Text>
-                  <Text style={styles.entityName}>{partyName}</Text>
-                </View>
-                {contactName && (
-                  <Text style={styles.entityDetail}>
-                    {contactName}{contactDesignation && ` (${contactDesignation})`}
-                  </Text>
-                )}
-                {contactPhone && <Text style={styles.entityDetail}>{contactPhone}</Text>}
-                {contactEmail && <Text style={styles.entityDetail}>{contactEmail}</Text>}
-                {partyAddress && (
-                  <Text style={styles.entityDetail}>
-                    {[partyAddress.street, partyAddress.city, partyAddress.state, partyAddress.postalCode, partyAddress.country].filter(Boolean).join(', ')}
-                  </Text>
-                )}
-              </>
-            ) : (
-              <>
-                <View style={styles.labelOnly}>
-                  <Text style={styles.standAloneLabel}>Party:</Text>
-                </View>
-                <Text style={styles.entityName}>{partyName}</Text>
-              </>
-            )}
-          </View>
-          <View style={styles.dateInfo}>
-            <Text style={styles.dateLabel}>Debit Note Date</Text>
-            <Text style={styles.dateValue}>{formatDisplayDate(debitNote.debitDate)}</Text>
-            {returnNoteNumber && (
-              <>
-                <Text style={[styles.dateLabel, { marginTop: 8 }]}>Against Purchase Return</Text>
-                <Text style={styles.dateValue}>{returnNoteNumber}</Text>
-              </>
-            )}
-          </View>
-        </View>
+          <DocumentTitle title="DEBIT NOTE" />
 
-        <View style={styles.content}>
-          {(debitNote.reason || isManualEntry) && (
-            <View style={styles.reasonBox}>
-              {isManualEntry && (
-                <View style={{ marginBottom: debitNote.reason ? 10 : 0 }}>
-                  <Text style={styles.reasonLabel}>Description: </Text>
-                  <Text style={styles.reasonText}>{debitNote.items[0].materialName}</Text>
-                </View>
-              )}
-              {debitNote.reason && (
-                <View>
-                  <Text style={styles.reasonLabel}>Reason: </Text>
-                  <Text style={styles.reasonText}>{debitNote.reason}</Text>
-                </View>
-              )}
-            </View>
+          <PartySection
+            partyLabel="Party"
+            party={debitNote.partySnapshot}
+            contact={debitNote.contactSnapshot}
+            documentNumber={debitNote.debitNoteNumber}
+            documentDate={debitNote.debitDate}
+            referenceNumber={returnNote?.returnNumber}
+            referenceLabel="Against Purchase Return"
+          />
+
+          {isManualEntry && debitNote.items[0].materialName && (
+            <ReasonBox title="Description" content={debitNote.items[0].materialName} />
+          )}
+
+          {debitNote.reason && (
+            <ReasonBox title="Reason for Debit" content={debitNote.reason} />
           )}
 
           {!isManualEntry && debitNote.items && debitNote.items.length > 0 && (
-            <View style={commonStyles.table}>
-              <View style={commonStyles.tableHeader}>
-                <Text style={[commonStyles.tableHeaderText, styles.descCol]}>Material</Text>
-                <Text style={[commonStyles.tableHeaderText, styles.qtyCol]}>Qty</Text>
-                <Text style={[commonStyles.tableHeaderText, styles.rateCol]}>Unit Cost</Text>
-                <Text style={[commonStyles.tableHeaderText, styles.totalCol]}>Total</Text>
-              </View>
-              {debitNote.items.map((item, index) => (
-                <View style={commonStyles.tableRow} key={index}>
-                  <Text style={[commonStyles.tableCell, styles.descCol]}>{item.materialName}</Text>
-                  <Text style={[commonStyles.tableCell, styles.qtyCol]}>{item.quantity}</Text>
-                  <Text style={[commonStyles.tableCell, styles.rateCol]}>{formatCurrency(item.unitCost || 0)}</Text>
-                  <Text style={[commonStyles.tableCell, styles.totalCol]}>{formatCurrency(item.total || 0)}</Text>
-                </View>
-              ))}
-            </View>
+            <ItemsTable
+              columns={[
+                { header: 'Material', field: 'materialName', width: '40%', align: 'left' },
+                { header: 'Qty', field: 'quantity', width: '15%', align: 'center' },
+                { header: 'Unit Cost', field: 'unitCost', width: '20%', align: 'right', format: (v) => `AED ${v?.toFixed(2) || '0.00'}` },
+                { header: 'Total', field: 'total', width: '25%', align: 'right', format: (v) => `AED ${v?.toFixed(2) || '0.00'}` },
+              ]}
+              items={debitNote.items}
+            />
           )}
+
+          {debitNote.notes && <InlineNote content={debitNote.notes} />}
         </View>
 
-        {/* Unified Bottom Box */}
-        <View style={styles.unifiedBox}>
-          {/* Row 1: Terms & Conditions */}
-          <View style={styles.termsRow}>
-            <Text style={styles.sectionTitle}>Terms and Conditions</Text>
-            <Text style={styles.termsText}>
-              • These examples are for illustrative purposes only{'\n'}
-              • Consulting a legal professional is recommended{'\n'}
-              • Terms should remain clear, concise, and transparent
-            </Text>
-          </View>
+        <BottomSection
+          summaryItems={summaryItems}
+          grandTotal={{ label: 'Debit Amount', value: grandTotal }}
+          amountInWords={numberToWords(grandTotal)}
+          vatInWords={numberToWords(vatAmount)}
+          notes={DEBIT_NOTE_TERMS}
+          bankDetails={companyDetails?.bankDetails}
+          companyName={companyDetails?.companyName}
+        />
 
-          {/* Row 2: Bank Details | Amount Summary */}
-          <View style={styles.row2}>
-            {companyDetails?.bankDetails ? (
-              <View style={styles.bankSection}>
-                <Text style={styles.sectionTitle}>Bank Details</Text>
-                <Text style={styles.bankText}>{companyDetails.bankDetails}</Text>
-              </View>
-            ) : (
-              <View style={[styles.bankSection, { justifyContent: 'center' }]}>
-                <Text style={[styles.sectionTitle, { marginBottom: 0, textAlign: 'center' }]}>
-                  {companyDetails?.companyName || 'Company Name'}
-                </Text>
-              </View>
-            )}
-            <View style={styles.amountSummarySection}>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Gross Total</Text>
-                <Text style={styles.summaryValue}>{formatCurrency(grossTotal)}</Text>
-              </View>
-              {discount > 0 && (
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Discount</Text>
-                  <Text style={styles.summaryValue}>{formatCurrency(discount)}</Text>
-                </View>
-              )}
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Subtotal</Text>
-                <Text style={styles.summaryValue}>{formatCurrency(subtotal)}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Vat</Text>
-                <Text style={styles.summaryValue}>{formatCurrency(vatAmount)}</Text>
-              </View>
-              <View style={styles.grandTotalRow}>
-                <Text style={styles.grandTotalLabel}>Grandtotal</Text>
-                <Text style={styles.grandTotalValue}>{formatCurrency(grandTotal)}</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Row 3: Amount in Words */}
-          <View style={styles.amountWordsRow}>
-            <Text style={styles.amountWordsLabel}>Amount Chargeable in words :</Text>
-            <Text style={styles.amountWordsText}>{numberToWords(grandTotal)}</Text>
-          </View>
-
-          {/* Row 4: VAT in Words */}
-          <View style={styles.amountWordsRow}>
-            <Text style={styles.amountWordsLabel}>VAT Chargeable in words :</Text>
-            <Text style={styles.amountWordsText}>{numberToWords(vatAmount)}</Text>
-          </View>
-
-          {/* Row 5: Signature */}
-          <View style={styles.signatureRow}>
-            <View style={styles.signatureCell}>
-              <Text style={styles.signatureLabel}>Customer Signature</Text>
-            </View>
-            <View style={styles.signatureDivider} />
-            <View style={styles.signatureCell}>
-              <Text style={styles.signatureLabel}>For {companyDetails?.companyName || 'Company'}</Text>
-            </View>
-          </View>
-        </View>
-
-        <PDFFooter companyDetails={companyDetails} />
+        <DocumentFooter companyDetails={companyDetails} />
       </Page>
     </Document>
   );
