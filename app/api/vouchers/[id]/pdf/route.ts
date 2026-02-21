@@ -13,7 +13,7 @@ import "@/models/DebitNote";
 import "@/models/CreditNote";
 import Party from "@/models/Party";
 
-import { VoucherDocument } from "@/components/VoucherDocument";
+import { VoucherDocument } from "@/components/pdf/VoucherDocument";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 
 interface RequestContext {

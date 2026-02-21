@@ -1,10 +1,10 @@
-// app/accounting/profit-loss/page.tsx - UPDATED: Uniform loading with Tax Report
+// app/accounting/profit-loss/page.tsx
 
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { toast } from "sonner";
-import { TrendingUp, CalendarIcon, Calculator } from "lucide-react";
+import { CalendarIcon, Calculator } from "lucide-react";
 import { Button as UIButton } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,14 +17,14 @@ import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { cn } from "@/lib/utils";
 import { ProfitLossChart } from "./profit-loss-chart";
 import { StatsCards, type StatItem } from "@/components/stats-cards";
-import { getColumns, type ProfitLossData } from "./columns";
+import { getColumns } from "./columns";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
-import { formatCurrency, formatCompactCurrency } from "@/utils/formatters/currency";
+import { formatCompactCurrency } from "@/utils/formatters/currency";
 import { useProfitLossPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { ExportMenu } from "@/components/export-menu";
-import { exportProfitLossToPDF, exportProfitLossToExcel, type CompanyDetails } from "@/utils/reportExports";
+import { exportProfitLossToExcel } from "@/utils/reportExports";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -73,11 +73,9 @@ interface ApiResponse {
   expenseDetails?: any[];
 }
 
-// ✅ UPDATED: Skeleton matching Tax Report style
 function ProfitLossSkeleton() {
   return (
     <div className="space-y-6 animate-in fade-in-50">
-      {/* Stats Cards Skeleton */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
           <Card key={`stat-${i}`} className="p-6 py-4">
@@ -92,8 +90,6 @@ function ProfitLossSkeleton() {
           </Card>
         ))}
       </div>
-
-      {/* Chart Card Skeleton */}
       <Card>
         <CardHeader>
           <Skeleton className="h-6 w-48 mb-2" />
@@ -123,7 +119,6 @@ function ProfitLossPageContent() {
   const pathname = usePathname();
   const [data, setData] = useState<ApiResponse | null>(null);
   const [detailedData, setDetailedData] = useState<any>(null);
-  const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -142,52 +137,23 @@ function ProfitLossPageContent() {
     isPending,
   } = useProfitLossPermissions();
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
-    const fetchCompanyDetails = async () => {
-      if (!canRead) return;
-      try {
-        const res = await fetch("/api/company-details");
-        if (res.ok) {
-          const data = await res.json();
-          setCompanyDetails(data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch company details:", error);
-      }
-    };
-
-    if (canRead) {
-      fetchCompanyDetails();
-    }
-  }, [canRead]);
+  useEffect(() => { setIsMounted(true); }, []);
 
   const fetchData = useCallback(async (background = false) => {
-    if (!canRead) return;
-
-    if (!dateRange?.from || !dateRange?.to) {
-      return;
-    }
-
-    if (!background) {
-      setIsLoading(true);
-    }
-
+    if (!canRead || !dateRange?.from || !dateRange?.to) return;
+    if (!background) setIsLoading(true);
     try {
       const params = new URLSearchParams({
         startDate: dateRange.from.toISOString(),
         endDate: dateRange.to.toISOString()
       });
 
-      const response = await fetch(`/api/profit-loss?${params}`);
-      const detailsRes = await fetch(`/api/financial-statements?${params}`);
+      const [response, detailsRes] = await Promise.all([
+        fetch(`/api/profit-loss?${params}`),
+        fetch(`/api/financial-statements?${params}`)
+      ]);
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch profit & loss data");
-      }
+      if (!response.ok) throw new Error("Failed to fetch profit & loss data");
 
       const apiData: ApiResponse = await response.json();
       const details = detailsRes.ok ? await detailsRes.json() : { income: [], expenses: [] };
@@ -197,9 +163,7 @@ function ProfitLossPageContent() {
     } catch (error) {
       if (!background) toast.error(error instanceof Error ? error.message : "Failed to load data");
     } finally {
-      if (!background) {
-        setIsLoading(false);
-      }
+      if (!background) setIsLoading(false);
     }
   }, [dateRange, canRead]);
 
@@ -215,77 +179,50 @@ function ProfitLossPageContent() {
   }, [isMounted, canRead, isPending, dateRange, fetchData]);
 
   useEffect(() => {
-    const onFocus = () => {
-      if (isMounted && canRead) {
-        fetchData(true);
-      }
-    };
-
+    const onFocus = () => { if (isMounted && canRead) fetchData(true); };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [fetchData, isMounted, canRead]);
 
   const handleQuickSelect = (period: string) => {
     const now = new Date();
-    let from: Date;
-    let to: Date;
-
-    switch (period) {
-      case "thisMonth":
-        from = startOfMonth(now);
-        to = endOfMonth(now);
-        break;
-      case "lastMonth":
-        from = startOfMonth(subMonths(now, 1));
-        to = endOfMonth(subMonths(now, 1));
-        break;
-      case "last3Months":
-        from = startOfMonth(subMonths(now, 2));
-        to = endOfMonth(now);
-        break;
-      case "last6Months":
-        from = startOfMonth(subMonths(now, 5));
-        to = endOfMonth(now);
-        break;
-      case "thisYear":
-        from = new Date(now.getFullYear(), 0, 1);
-        to = new Date(now.getFullYear(), 11, 31);
-        break;
-      default:
-        return;
-    }
-
-    setDateRange({ from, to });
+    const map: Record<string, { from: Date; to: Date }> = {
+      thisMonth: { from: startOfMonth(now), to: endOfMonth(now) },
+      lastMonth: { from: startOfMonth(subMonths(now, 1)), to: endOfMonth(subMonths(now, 1)) },
+      last3Months: { from: startOfMonth(subMonths(now, 2)), to: endOfMonth(now) },
+      last6Months: { from: startOfMonth(subMonths(now, 5)), to: endOfMonth(now) },
+      thisYear: { from: new Date(now.getFullYear(), 0, 1), to: new Date(now.getFullYear(), 11, 31) },
+    };
+    if (map[period]) setDateRange(map[period]);
   };
 
-  const handleExportPDF = () => {
-    if (!detailedData || !data || !dateRange?.from || !dateRange?.to) return;
+  // ── PDF: call API route, stream react-pdf result ──────────────────────────
+  const handleExportPDF = async () => {
+    if (!data || !dateRange?.from || !dateRange?.to) return;
     setIsExporting(true);
     try {
-      const totals = {
-        income: data.summary.totalRevenueExTax,
-        expenses: data.summary.totalExpenses,
-        netProfit: data.summary.profit
-      };
-
-      const url = exportProfitLossToPDF(
-        detailedData.income,
-        detailedData.expenses,
-        totals,
-        { from: dateRange.from, to: dateRange.to },
-        companyDetails,
-        'blob'
-      );
+      const params = new URLSearchParams({
+        startDate: dateRange.from.toISOString(),
+        endDate: dateRange.to.toISOString(),
+      });
+      const res = await fetch(`/api/profit-loss/pdf?${params}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "PDF generation failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
       setPdfUrl(url);
       setIsPdfViewerOpen(true);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast.error("Failed to generate PDF");
+      toast.error(e.message || "Failed to generate PDF");
     } finally {
       setIsExporting(false);
     }
   };
 
+  // ── Excel: stays client-side ───────────────────────────────────────────────
   const handleExportExcel = () => {
     if (!detailedData || !dateRange?.from || !dateRange?.to) return;
     setIsExporting(true);
@@ -294,7 +231,7 @@ function ProfitLossPageContent() {
         detailedData.income,
         detailedData.expenses,
         { from: dateRange.from, to: dateRange.to },
-        companyDetails
+        null
       );
       toast.success("Excel exported");
     } catch (e) {
@@ -317,25 +254,18 @@ function ProfitLossPageContent() {
     columns,
     initialState: {
       sorting: [{ id: "period", desc: true }],
-      pagination: {
-        pageSize: 10,
-        pageIndex: 0
-      },
+      pagination: { pageSize: 10, pageIndex: 0 },
     },
     getRowId: (row) => row.period,
   });
 
   const cardsData: StatItem[] = useMemo(() => {
     if (!data) return [];
-
     const { summary, trends } = data;
-
     const formatTrend = (value: number | undefined) => {
       if (value === undefined) return "0%";
-      const sign = value > 0 ? "+" : "";
-      return `${sign}${value.toFixed(1)}%`;
+      return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
     };
-
     return [
       {
         name: "Total Revenue",
@@ -369,56 +299,38 @@ function ProfitLossPageContent() {
   }, [data]);
 
   if (!isMounted || isPending) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner className="size-10" />
-      </div>
-    );
+    return <div className="flex flex-1 items-center justify-center"><Spinner className="size-10" /></div>;
   }
 
-  if (!session) {
-    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
-  }
-
-  if (!canRead) {
-    return <AccessDenied />
-  }
+  if (!session) redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
+  if (!canRead) return <AccessDenied />;
 
   return (
     <>
       <div className="flex flex-1 flex-col">
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+
+            {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 px-4 lg:px-6 gap-4">
               <div className="flex items-center gap-3">
                 <Calculator className="h-12 w-12 text-primary" />
                 <div>
                   <h1 className="text-3xl font-bold tracking-tight">Profit & Loss</h1>
-                  <p className="text-muted-foreground">
-                    Analyze your business performance and profitability.
-                  </p>
+                  <p className="text-muted-foreground">Analyze your business performance and profitability.</p>
                 </div>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <UIButton
-                      variant="outline"
-                      className="w-full sm:w-[300px] justify-between px-3 font-normal"
-                    >
+                    <UIButton variant="outline" className="w-full sm:w-[300px] justify-between px-3 font-normal">
                       <span className={cn("truncate", !dateRange && "text-muted-foreground")}>
                         {dateRange?.from ? (
-                          dateRange.to ? (
-                            <>
-                              {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
-                            </>
-                          ) : (
-                            format(dateRange.from, "LLL dd, y")
-                          )
-                        ) : (
-                          "Pick a date range"
-                        )}
+                          dateRange.to
+                            ? <>{format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}</>
+                            : format(dateRange.from, "LLL dd, y")
+                        ) : "Pick a date range"}
                       </span>
                       <CalendarIcon size={16} aria-hidden="true" />
                     </UIButton>
@@ -457,19 +369,16 @@ function ProfitLossPageContent() {
               </div>
             </div>
 
+            {/* Stats + Chart */}
             <div className="px-4 lg:px-6">
-              {/* ✅ UPDATED: Matching Tax Report transition */}
               <div className={cn("transition-opacity duration-200", isLoading && !data ? "opacity-50" : "opacity-100")}>
                 {isLoading && !data ? (
                   <ProfitLossSkeleton />
                 ) : (
                   <>
-                    {/* Stats Cards */}
                     <div className="mb-6">
                       <StatsCards data={cardsData} columns={4} />
                     </div>
-
-                    {/* Chart */}
                     <div className="mb-6">
                       {dateRange?.from && dateRange?.to && data && (
                         <ProfitLossChart
@@ -486,6 +395,7 @@ function ProfitLossPageContent() {
               </div>
             </div>
 
+            {/* Monthly breakdown table */}
             <div className="px-4 lg:px-6">
               <Card>
                 <CardHeader>
@@ -495,7 +405,6 @@ function ProfitLossPageContent() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {/* ✅ UPDATED: Table transition like Tax Report */}
                   <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
                     {isLoading && !data ? (
                       <DataTableSkeleton columnCount={columns.length} rowCount={10} />
@@ -508,14 +417,20 @@ function ProfitLossPageContent() {
                 </CardContent>
               </Card>
             </div>
+
           </div>
         </div>
       </div>
+
       <PDFViewerModal
         isOpen={isPdfViewerOpen}
-        onClose={() => setIsPdfViewerOpen(false)}
+        onClose={() => {
+          setIsPdfViewerOpen(false);
+          if (pdfUrl.startsWith("blob:")) URL.revokeObjectURL(pdfUrl);
+          setPdfUrl("");
+        }}
         pdfUrl={pdfUrl}
-        title={`Profit & Loss - ${dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : ''}`}
+        title={`Profit & Loss - ${dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : ""}`}
       />
     </>
   );

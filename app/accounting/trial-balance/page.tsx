@@ -1,4 +1,4 @@
-// app/accounting/trial-balance/page.tsx - UPDATED: Uniform loading with Tax Report
+// app/accounting/trial-balance/page.tsx
 
 "use client";
 
@@ -21,7 +21,7 @@ import { columns, type TrialBalanceItem } from "./columns";
 import { useTrialBalancePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { ExportMenu } from "@/components/export-menu";
-import { exportTrialBalanceToPDF, exportTrialBalanceToExcel, type CompanyDetails } from "@/utils/reportExports";
+import { exportTrialBalanceToExcel, type CompanyDetails } from "@/utils/reportExports";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,11 +35,9 @@ interface TrialBalanceSummary {
   accountsCount: number;
 }
 
-// ✅ UPDATED: Skeleton matching Tax Report style
 function TrialBalanceSkeleton() {
   return (
     <div className="space-y-6 animate-in fade-in-50">
-      {/* Stats Cards Skeleton */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
           <Card key={`stat-${i}`} className="p-6 py-4">
@@ -74,7 +72,6 @@ function TrialBalancePageContent() {
   const pathname = usePathname();
   const [trialBalance, setTrialBalance] = useState<TrialBalanceItem[]>([]);
   const [summary, setSummary] = useState<TrialBalanceSummary | null>(null);
-  const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [asOfDate, setAsOfDate] = useState<Date>(new Date());
   const [isMounted, setIsMounted] = useState(false);
@@ -89,51 +86,19 @@ function TrialBalancePageContent() {
     isPending,
   } = useTrialBalancePermissions();
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
-    const fetchCompanyDetails = async () => {
-      if (!canRead) return;
-      try {
-        const res = await fetch("/api/company-details");
-        if (res.ok) {
-          const data = await res.json();
-          setCompanyDetails(data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch company details:", error);
-      }
-    };
-
-    if (canRead) {
-      fetchCompanyDetails();
-    }
-  }, [canRead]);
+  useEffect(() => { setIsMounted(true); }, []);
 
   const fetchTrialBalance = useCallback(async (background = false) => {
     if (!canRead) return;
-
     try {
-      if (!background) {
-        setIsLoading(true);
-      }
-
-      const params = new URLSearchParams();
-      if (asOfDate) {
-        params.append('asOfDate', asOfDate.toISOString());
-      }
-
-      const res = await fetch(`/api/trial-balance?${params.toString()}`);
-
+      if (!background) setIsLoading(true);
+      const params = new URLSearchParams({ asOfDate: asOfDate.toISOString() });
+      const res = await fetch(`/api/trial-balance?${params}`);
       if (res.status === 403) {
         if (!background) toast.error("You don't have permission to view trial balance");
         return;
       }
-
       if (!res.ok) throw new Error("Failed to fetch trial balance");
-
       const data = await res.json();
       setTrialBalance(data.accounts);
       setSummary(data.summary);
@@ -141,9 +106,7 @@ function TrialBalancePageContent() {
       console.error("Error fetching trial balance:", error);
       if (!background) toast.error("Could not load trial balance");
     } finally {
-      if (!background) {
-        setIsLoading(false);
-      }
+      if (!background) setIsLoading(false);
     }
   }, [canRead, asOfDate]);
 
@@ -159,36 +122,40 @@ function TrialBalancePageContent() {
   }, [isMounted, canRead, isPending, asOfDate, fetchTrialBalance]);
 
   useEffect(() => {
-    const onFocus = () => {
-      if (isMounted && canRead) {
-        fetchTrialBalance(true);
-      }
-    };
-
+    const onFocus = () => { if (isMounted && canRead) fetchTrialBalance(true); };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [fetchTrialBalance, isMounted, canRead]);
 
-  const handleExportPDF = () => {
+  // ── PDF: call API route, stream react-pdf result ──────────────────────────
+  const handleExportPDF = async () => {
     if (!trialBalance.length) return;
     setIsExporting(true);
     try {
-      const url = exportTrialBalanceToPDF(trialBalance, summary, asOfDate, companyDetails, 'blob');
+      const params = new URLSearchParams({ asOfDate: asOfDate.toISOString() });
+      const res = await fetch(`/api/trial-balance/pdf?${params}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "PDF generation failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
       setPdfUrl(url);
       setIsPdfViewerOpen(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Failed to generate PDF");
+      toast.error(error.message || "Failed to generate PDF");
     } finally {
       setIsExporting(false);
     }
   };
 
+  // ── Excel: stays client-side ───────────────────────────────────────────────
   const handleExportExcel = () => {
     if (!trialBalance.length) return;
     setIsExporting(true);
     try {
-      exportTrialBalanceToExcel(trialBalance, asOfDate, companyDetails);
+      exportTrialBalanceToExcel(trialBalance, asOfDate, null);
       toast.success("Exported to Excel");
     } catch (error) {
       console.error(error);
@@ -200,7 +167,6 @@ function TrialBalancePageContent() {
 
   const summaryCards: StatItem[] = useMemo(() => {
     if (!summary) return [];
-
     return [
       {
         name: "Total Debits",
@@ -252,35 +218,25 @@ function TrialBalancePageContent() {
     columns: columnsWithOptions,
     initialState: {
       sorting: [{ id: "accountCode", desc: false }],
-      pagination: {
-        pageSize: 20,
-        pageIndex: 0
-      },
+      pagination: { pageSize: 20, pageIndex: 0 },
     },
     getRowId: (row) => row.accountCode,
   });
 
   if (!isMounted || isPending) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner className="size-10" />
-      </div>
-    );
+    return <div className="flex flex-1 items-center justify-center"><Spinner className="size-10" /></div>;
   }
 
-  if (!session) {
-    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
-  }
-
-  if (!canRead) {
-    return <AccessDenied />
-  }
+  if (!session) redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
+  if (!canRead) return <AccessDenied />;
 
   return (
     <>
       <div className="flex flex-1 flex-col">
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+
+            {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 px-4 lg:px-6 gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-primary/10 rounded-full">
@@ -288,21 +244,13 @@ function TrialBalancePageContent() {
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold tracking-tight">Trial Balance</h1>
-                  <p className="text-muted-foreground">
-                    Validation report ensuring accounting integrity
-                  </p>
+                  <p className="text-muted-foreground">Validation report ensuring accounting integrity</p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "justify-start text-left font-normal",
-                        !asOfDate && "text-muted-foreground"
-                      )}
-                    >
+                    <Button variant="outline" className={cn("justify-start text-left font-normal", !asOfDate && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {asOfDate ? format(asOfDate, "PPP") : <span>Pick a date</span>}
                     </Button>
@@ -327,8 +275,8 @@ function TrialBalancePageContent() {
               </div>
             </div>
 
+            {/* Stats */}
             <div className="px-4 lg:px-6">
-              {/* ✅ UPDATED: Matching Tax Report transition */}
               <div className={cn("transition-opacity duration-200", isLoading && !summary ? "opacity-50" : "opacity-100")}>
                 {isLoading && !summary ? (
                   <TrialBalanceSkeleton />
@@ -338,8 +286,8 @@ function TrialBalancePageContent() {
               </div>
             </div>
 
+            {/* Table */}
             <div className="px-4 lg:px-6">
-              {/* ✅ UPDATED: Smooth table transition */}
               <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
                 {trialBalance.length === 0 && !isLoading ? (
                   <Card>
@@ -374,14 +322,20 @@ function TrialBalancePageContent() {
                 )}
               </div>
             </div>
+
           </div>
         </div>
       </div>
+
       <PDFViewerModal
         isOpen={isPdfViewerOpen}
-        onClose={() => setIsPdfViewerOpen(false)}
+        onClose={() => {
+          setIsPdfViewerOpen(false);
+          if (pdfUrl.startsWith("blob:")) URL.revokeObjectURL(pdfUrl);
+          setPdfUrl("");
+        }}
         pdfUrl={pdfUrl}
-        title={`Trial Balance - ${format(asOfDate, 'yyyy-MM-dd')}`}
+        title={`Trial Balance - ${format(asOfDate, "yyyy-MM-dd")}`}
       />
     </>
   );

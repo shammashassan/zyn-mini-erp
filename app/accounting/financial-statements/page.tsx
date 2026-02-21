@@ -1,4 +1,4 @@
-// app/accounting/financial-statements/page.tsx - UPDATED: Uniform loading with Tax Report
+// app/accounting/financial-statements/page.tsx
 
 "use client";
 
@@ -27,9 +27,9 @@ import { useFinancialStatementsPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { ExportMenu } from "@/components/export-menu";
 import {
-  exportProfitLossToPDF, exportProfitLossToExcel,
-  exportBalanceSheetToPDF, exportBalanceSheetToExcel,
-  exportCashFlowToPDF, exportCashFlowToExcel,
+  exportProfitLossToExcel,
+  exportBalanceSheetToExcel,
+  exportCashFlowToExcel,
   type CompanyDetails
 } from "@/utils/reportExports";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
@@ -85,11 +85,9 @@ interface BSData {
   };
 }
 
-// ✅ UPDATED: Skeleton matching Tax Report style
 function FinancialReportSkeleton() {
   return (
     <div className="space-y-6 animate-in fade-in-50">
-      {/* Stats Cards Skeleton */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
           <Card key={`stat-${i}`} className="p-6 py-4">
@@ -104,8 +102,6 @@ function FinancialReportSkeleton() {
           </Card>
         ))}
       </div>
-
-      {/* Account Sections Skeleton */}
       {[...Array(3)].map((_, i) => (
         <Card key={`section-${i}`} className="mb-4">
           <div className="p-4 flex items-center justify-between border-b">
@@ -131,8 +127,6 @@ function FinancialReportSkeleton() {
           </div>
         </Card>
       ))}
-
-      {/* Bottom Summary Card Skeleton */}
       <Card className="border-2">
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
@@ -186,37 +180,26 @@ function FinancialStatementsPageContent() {
     isPending,
   } = useFinancialStatementsPermissions();
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  useEffect(() => { setIsMounted(true); }, []);
 
   useEffect(() => {
     const fetchCompanyDetails = async () => {
       if (!canRead) return;
       try {
         const res = await fetch("/api/company-details");
-        if (res.ok) {
-          const data = await res.json();
-          setCompanyDetails(data);
-        }
+        if (res.ok) setCompanyDetails(await res.json());
       } catch (error) {
         console.error("Failed to fetch company details:", error);
       }
     };
-
-    if (canRead) {
-      fetchCompanyDetails();
-    }
+    if (canRead) fetchCompanyDetails();
   }, [canRead]);
 
   const fetchFinancialData = useCallback(async (background = false) => {
-    if (!canRead) return;
-    if (!dateRange?.from || !dateRange?.to) return;
+    if (!canRead || !dateRange?.from || !dateRange?.to) return;
 
     try {
-      if (!background) {
-        setIsLoading(true);
-      }
+      if (!background) setIsLoading(true);
 
       const params = new URLSearchParams();
       params.append('startDate', dateRange.from.toISOString());
@@ -224,29 +207,19 @@ function FinancialStatementsPageContent() {
 
       const res = await fetch(`/api/financial-statements?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch financial data");
-      const result = await res.json();
-      setData(result);
+      setData(await res.json());
 
       const cfRes = await fetch(`/api/financial-statements/cash-flow?${params.toString()}`);
-      if (cfRes.ok) {
-        const cfResult = await cfRes.json();
-        setCashFlowData(cfResult);
-      }
+      if (cfRes.ok) setCashFlowData(await cfRes.json());
 
-      const bsParams = new URLSearchParams();
-      bsParams.append('asOfDate', dateRange.to.toISOString());
+      const bsParams = new URLSearchParams({ asOfDate: dateRange.to.toISOString() });
       const bsRes = await fetch(`/api/financial-statements/balance-sheet?${bsParams.toString()}`);
-      if (bsRes.ok) {
-        const bsResult = await bsRes.json();
-        setBalanceSheetData(bsResult);
-      }
+      if (bsRes.ok) setBalanceSheetData(await bsRes.json());
     } catch (error) {
       console.error("Error fetching financial data:", error);
       if (!background) toast.error("Could not load financial statements");
     } finally {
-      if (!background) {
-        setIsLoading(false);
-      }
+      if (!background) setIsLoading(false);
     }
   }, [canRead, dateRange]);
 
@@ -262,12 +235,7 @@ function FinancialStatementsPageContent() {
   }, [isMounted, canRead, isPending, dateRange, fetchFinancialData]);
 
   useEffect(() => {
-    const onFocus = () => {
-      if (isMounted && canRead) {
-        fetchFinancialData(true);
-      }
-    };
-
+    const onFocus = () => { if (isMounted && canRead) fetchFinancialData(true); };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [fetchFinancialData, isMounted, canRead]);
@@ -276,121 +244,97 @@ function FinancialStatementsPageContent() {
     const now = new Date();
     let from: Date;
     let to: Date;
-
     switch (period) {
-      case 'thisMonth':
-        from = startOfMonth(now);
-        to = endOfMonth(now);
-        break;
-      case 'lastMonth':
-        from = startOfMonth(subMonths(now, 1));
-        to = endOfMonth(subMonths(now, 1));
-        break;
-      case 'thisQuarter':
+      case 'thisMonth': from = startOfMonth(now); to = endOfMonth(now); break;
+      case 'lastMonth': from = startOfMonth(subMonths(now, 1)); to = endOfMonth(subMonths(now, 1)); break;
+      case 'thisQuarter': {
         const quarter = Math.floor(now.getMonth() / 3);
         from = new Date(now.getFullYear(), quarter * 3, 1);
         to = endOfMonth(new Date(now.getFullYear(), quarter * 3 + 2, 1));
         break;
-      case 'thisYear':
-        from = startOfYear(now);
-        to = endOfMonth(now);
-        break;
-      default:
-        return;
+      }
+      case 'thisYear': from = startOfYear(now); to = endOfMonth(now); break;
+      default: return;
     }
     setDateRange({ from, to });
   };
 
-  const totalIncome = useMemo(() =>
-    data?.income.reduce((sum, item) => sum + item.amount, 0) || 0,
-    [data]
-  );
-
-  const totalExpenses = useMemo(() =>
-    data?.expenses.reduce((sum, item) => sum + item.amount, 0) || 0,
-    [data]
-  );
-
+  const totalIncome = useMemo(() => data?.income.reduce((sum, item) => sum + item.amount, 0) || 0, [data]);
+  const totalExpenses = useMemo(() => data?.expenses.reduce((sum, item) => sum + item.amount, 0) || 0, [data]);
   const netProfit = totalIncome - totalExpenses;
 
-  const handleExportPDF = () => {
+  // ── PDF export: calls API route, streams react-pdf result ──────────────────
+  const handleExportPDF = async () => {
     if (!dateRange?.from || !dateRange?.to) return;
     setIsExporting(true);
     try {
-      let url = "";
-      if (activeReport === "profit-loss" && data) {
-        url = exportProfitLossToPDF(
-          data.income,
-          data.expenses,
-          { income: totalIncome, expenses: totalExpenses, netProfit },
-          { from: dateRange.from, to: dateRange.to },
-          companyDetails,
-          'blob'
-        );
-      } else if (activeReport === "balance-sheet" && balanceSheetData) {
-        url = exportBalanceSheetToPDF(balanceSheetData, dateRange.to, companyDetails, 'blob');
-      } else if (activeReport === "cash-flow" && cashFlowData) {
-        url = exportCashFlowToPDF(cashFlowData, { from: dateRange.from, to: dateRange.to }, companyDetails, 'blob');
+      let apiUrl = '';
+      const params = new URLSearchParams();
+
+      if (activeReport === 'profit-loss') {
+        params.set('startDate', dateRange.from.toISOString());
+        params.set('endDate', dateRange.to.toISOString());
+        apiUrl = `/api/profit-loss/pdf?${params}`;
+      } else if (activeReport === 'balance-sheet') {
+        params.set('asOfDate', dateRange.to.toISOString());
+        apiUrl = `/api/financial-statements/balance-sheet/pdf?${params}`;
+      } else if (activeReport === 'cash-flow') {
+        params.set('startDate', dateRange.from.toISOString());
+        params.set('endDate', dateRange.to.toISOString());
+        apiUrl = `/api/financial-statements/cash-flow/pdf?${params}`;
       } else {
-        toast.info("Data not ready or export not available.");
-        setIsExporting(false);
+        toast.info('Export not available for this report');
         return;
       }
 
+      const res = await fetch(apiUrl);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'PDF generation failed');
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
       setPdfUrl(url);
       setIsPdfViewerOpen(true);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast.error("Export failed");
+      toast.error(e.message || 'Export failed');
     } finally {
       setIsExporting(false);
     }
   };
 
+  // ── Excel export: stays client-side via reportExports ─────────────────────
   const handleExportExcel = () => {
     if (!dateRange?.from || !dateRange?.to) return;
     setIsExporting(true);
     try {
-      if (activeReport === "profit-loss" && data) {
-        exportProfitLossToExcel(
-          data.income,
-          data.expenses,
-          { from: dateRange.from, to: dateRange.to },
-          companyDetails
-        );
-      } else if (activeReport === "balance-sheet" && balanceSheetData) {
+      if (activeReport === 'profit-loss' && data) {
+        exportProfitLossToExcel(data.income, data.expenses, { from: dateRange.from, to: dateRange.to }, companyDetails);
+      } else if (activeReport === 'balance-sheet' && balanceSheetData) {
         exportBalanceSheetToExcel(balanceSheetData, dateRange.to, companyDetails);
-      } else if (activeReport === "cash-flow" && cashFlowData) {
+      } else if (activeReport === 'cash-flow' && cashFlowData) {
         exportCashFlowToExcel(cashFlowData, { from: dateRange.from, to: dateRange.to }, companyDetails);
       } else {
-        toast.info("Data not ready or export not available.");
-        setIsExporting(false);
+        toast.info('Data not ready or export not available.');
         return;
       }
-      toast.success("Excel exported successfully");
+      toast.success('Excel exported successfully');
     } catch (e) {
       console.error(e);
-      toast.error("Export failed");
+      toast.error('Export failed');
     } finally {
       setIsExporting(false);
     }
   };
 
   if (!isMounted || isPending) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner className="size-10" />
-      </div>
-    );
+    return <div className="flex flex-1 items-center justify-center"><Spinner className="size-10" /></div>;
   }
 
-  if (!session) {
-    redirect("/company/select");
-  }
-
-  if (!canRead) {
-    return <AccessDenied />
-  }
+  if (!session) redirect("/company/select");
+  if (!canRead) return <AccessDenied />;
 
   return (
     <>
@@ -432,7 +376,9 @@ function FinancialStatementsPageContent() {
                   </PopoverContent>
                 </Popover>
                 <Select onValueChange={handleQuickSelect}>
-                  <SelectTrigger className="w-[100px] sm:w-[140px] text-xs sm:text-sm"><SelectValue placeholder="Quick" /></SelectTrigger>
+                  <SelectTrigger className="w-[100px] sm:w-[140px] text-xs sm:text-sm">
+                    <SelectValue placeholder="Quick" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="thisMonth">This Month</SelectItem>
                     <SelectItem value="lastMonth">Last Month</SelectItem>
@@ -470,7 +416,6 @@ function FinancialStatementsPageContent() {
                 </div>
 
                 <TabsContent value="profit-loss">
-                  {/* ✅ UPDATED: Matching Tax Report transition */}
                   <div className={cn("transition-opacity duration-200", isLoading && !data ? "opacity-50" : "opacity-100")}>
                     {isLoading && !data ? (
                       <FinancialReportSkeleton />
@@ -491,10 +436,7 @@ function FinancialStatementsPageContent() {
                     {isLoading && !balanceSheetData ? (
                       <FinancialReportSkeleton />
                     ) : (
-                      <BalanceSheetReport
-                        balanceSheetData={balanceSheetData}
-                        dateRange={dateRange}
-                      />
+                      <BalanceSheetReport balanceSheetData={balanceSheetData} dateRange={dateRange} />
                     )}
                   </div>
                 </TabsContent>
@@ -504,10 +446,7 @@ function FinancialStatementsPageContent() {
                     {isLoading && !cashFlowData ? (
                       <FinancialReportSkeleton />
                     ) : (
-                      <CashFlowReport
-                        cashFlowData={cashFlowData}
-                        dateRange={dateRange}
-                      />
+                      <CashFlowReport cashFlowData={cashFlowData} dateRange={dateRange} />
                     )}
                   </div>
                 </TabsContent>
@@ -516,9 +455,15 @@ function FinancialStatementsPageContent() {
           </div>
         </div>
       </div>
+
       <PDFViewerModal
         isOpen={isPdfViewerOpen}
-        onClose={() => setIsPdfViewerOpen(false)}
+        onClose={() => {
+          setIsPdfViewerOpen(false);
+          // Revoke blob URL to free memory
+          if (pdfUrl.startsWith('blob:')) URL.revokeObjectURL(pdfUrl);
+          setPdfUrl('');
+        }}
         pdfUrl={pdfUrl}
         title={`${activeReport === 'profit-loss' ? 'Profit & Loss' : activeReport === 'balance-sheet' ? 'Balance Sheet' : 'Cash Flow'} - ${dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : ''}`}
       />

@@ -5,7 +5,7 @@ import dbConnect from "@/lib/dbConnect";
 import Quotation from "@/models/Quotation";
 import CompanyDetails from "@/models/CompanyDetails";
 import Party from "@/models/Party";
-import { QuotationDocument } from "@/components/QuotationDocument";
+import { QuotationDocument } from "@/components/pdf/QuotationDocument";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 
 interface RequestContext {

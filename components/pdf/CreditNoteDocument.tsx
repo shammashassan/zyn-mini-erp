@@ -4,15 +4,15 @@ import type { ICreditNote } from '@/models/CreditNote';
 import type { ICompanyDetails } from '@/models/CompanyDetails';
 import { numberToWords } from '@/lib/numberToWords';
 
-import { commonStyles, registerPdfFonts } from './pdf/styles';
-import { DocumentHeader } from './pdf/DocumentHeader';
-import { DocumentTitle } from './pdf/DocumentTitle';
-import { PartySection } from './pdf/PartySection';
-import { ItemsTable } from './pdf/ItemsTable';
-import { buildInvoiceSummary } from './pdf/SummaryBlock';
-import { BottomSection } from './pdf/BottomSection';
-import { ReasonBox, InlineNote } from './pdf/DocumentSections';
-import { DocumentFooter } from './pdf/DocumentFooter';
+import { commonStyles, registerPdfFonts } from './shared/styles';
+import { DocumentHeader } from './shared/DocumentHeader';
+import { DocumentTitle } from './shared/DocumentTitle';
+import { PartySection } from './shared/PartySection';
+import { ItemsTable } from './shared/ItemsTable';
+import { buildInvoiceSummary } from './shared/SummaryBlock';
+import { BottomSection } from './shared/BottomSection';
+import { ReasonBox, InlineNote } from './shared/DocumentSections';
+import { DocumentFooter } from './shared/DocumentFooter';
 
 interface PopulatedReturnNote {
   _id: string;

@@ -10,7 +10,7 @@ interface DocumentHeaderProps {
 
 export const DocumentHeader: React.FC<DocumentHeaderProps> = ({ companyDetails }) => {
   return (
-    <View style={commonStyles.header}>
+    <View style={commonStyles.header} fixed>
       {/* Logo Section */}
       {companyDetails?.logoUrl ? (
         <Image style={commonStyles.headerLogo} src={companyDetails.logoUrl} />

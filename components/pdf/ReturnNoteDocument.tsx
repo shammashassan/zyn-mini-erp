@@ -4,13 +4,13 @@ import type { IReturnNote } from '@/models/ReturnNote';
 import type { ICompanyDetails } from '@/models/CompanyDetails';
 import { formatCurrency } from '@/utils/formatters/currency';
 
-import { commonStyles, registerPdfFonts } from './pdf/styles';
-import { DocumentHeader } from './pdf/DocumentHeader';
-import { DocumentTitle } from './pdf/DocumentTitle';
-import { PartySection } from './pdf/PartySection';
-import { ItemsTable, SalesReturnTableColumns, PurchaseReturnTableColumns } from './pdf/ItemsTable';
-import { NotesSection, SignatureSection, ReasonBox, InlineNote } from './pdf/DocumentSections';
-import { DocumentFooter } from './pdf/DocumentFooter';
+import { commonStyles, registerPdfFonts } from './shared/styles';
+import { DocumentHeader } from './shared/DocumentHeader';
+import { DocumentTitle } from './shared/DocumentTitle';
+import { PartySection } from './shared/PartySection';
+import { ItemsTable, SalesReturnTableColumns, PurchaseReturnTableColumns } from './shared/ItemsTable';
+import { NotesSection, SignatureSection, ReasonBox, InlineNote } from './shared/DocumentSections';
+import { DocumentFooter } from './shared/DocumentFooter';
 
 interface PopulatedPurchase {
   _id: string;

@@ -10,7 +10,7 @@ interface DocumentFooterProps {
 
 export const DocumentFooter: React.FC<DocumentFooterProps> = ({ companyDetails }) => {
   return (
-    <View style={[commonStyles.footer, { backgroundColor: pdfColors.secondary }]}>
+    <View style={[commonStyles.footer, { backgroundColor: pdfColors.secondary }]} fixed>
       <Text style={commonStyles.footerText}>
         Generated: {formatDateTime(new Date())}
       </Text>

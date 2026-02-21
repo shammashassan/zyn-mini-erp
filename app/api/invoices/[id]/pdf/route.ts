@@ -7,7 +7,7 @@ import dbConnect from "@/lib/dbConnect";
 import Invoice from "@/models/Invoice";
 import CompanyDetails from "@/models/CompanyDetails";
 import Party from "@/models/Party";
-import { InvoiceDocument } from "@/components/InvoiceDocument";
+import { InvoiceDocument } from "@/components/pdf/InvoiceDocument";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 
 interface RequestContext {

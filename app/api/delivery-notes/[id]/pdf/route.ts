@@ -7,7 +7,7 @@ import dbConnect from "@/lib/dbConnect";
 import DeliveryNote from "@/models/DeliveryNote";
 import CompanyDetails from "@/models/CompanyDetails";
 import Party from "@/models/Party";
-import { DeliveryNoteDocument } from "@/components/DeliveryNoteDocument";
+import { DeliveryNoteDocument } from "@/components/pdf/DeliveryNoteDocument";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 
 interface RequestContext {

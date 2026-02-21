@@ -6,7 +6,7 @@ import { renderToStream } from "@react-pdf/renderer";
 import dbConnect from "@/lib/dbConnect";
 import ReturnNote from "@/models/ReturnNote";
 import CompanyDetails from "@/models/CompanyDetails";
-import { ReturnNoteDocument } from "@/components/ReturnNoteDocument";
+import { ReturnNoteDocument } from "@/components/pdf/ReturnNoteDocument";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 
 interface RequestContext {

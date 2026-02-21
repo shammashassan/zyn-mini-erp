@@ -3,13 +3,13 @@ import { Page, Text, Document, View } from '@react-pdf/renderer';
 import type { IDeliveryNote } from '@/models/DeliveryNote';
 import type { ICompanyDetails } from '@/models/CompanyDetails';
 
-import { commonStyles, registerPdfFonts } from './pdf/styles';
-import { DocumentHeader } from './pdf/DocumentHeader';
-import { DocumentTitle } from './pdf/DocumentTitle';
-import { PartySection } from './pdf/PartySection';
-import { ItemsTable, InvoiceTableColumns } from './pdf/ItemsTable';
-import { NotesSection, SignatureSection, InlineNote } from './pdf/DocumentSections';
-import { DocumentFooter } from './pdf/DocumentFooter';
+import { commonStyles, registerPdfFonts } from './shared/styles';
+import { DocumentHeader } from './shared/DocumentHeader';
+import { DocumentTitle } from './shared/DocumentTitle';
+import { PartySection } from './shared/PartySection';
+import { ItemsTable, InvoiceTableColumns } from './shared/ItemsTable';
+import { NotesSection, SignatureSection, InlineNote } from './shared/DocumentSections';
+import { DocumentFooter } from './shared/DocumentFooter';
 
 interface DeliveryNoteProps {
   bill: IDeliveryNote;

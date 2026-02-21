@@ -7,7 +7,7 @@ import dbConnect from "@/lib/dbConnect";
 import CreditNote from "@/models/CreditNote";
 import CompanyDetails from "@/models/CompanyDetails";
 import Party from "@/models/Party";
-import { CreditNoteDocument } from "@/components/CreditNoteDocument";
+import { CreditNoteDocument } from "@/components/pdf/CreditNoteDocument";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 
 interface RequestContext {

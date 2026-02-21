@@ -1,10 +1,10 @@
-// app/accounting/ledger/page.tsx - UPDATED: Uniform loading with Tax Report
+// app/accounting/ledger/page.tsx
 
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { toast } from "sonner";
-import { BookOpen, CalendarIcon, X, ChevronsUpDown, Check, Book } from "lucide-react";
+import { CalendarIcon, ChevronsUpDown, Check, Book } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -29,14 +29,14 @@ import { useSearchParams } from "next/navigation";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { getLedgerColumns, type LedgerEntry } from "./columns";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
-import { PartyContactSelector, type PartyContactValue } from "@/components/PartyContactSelector";
+import { PartyContactSelector } from "@/components/PartyContactSelector";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
 import { StatsCards, type StatItem } from "@/components/stats-cards";
 import { useLedgerPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { ExportMenu } from "@/components/export-menu";
-import { exportLedgerToPDF, exportLedgerToExcel, type CompanyDetails } from "@/utils/reportExports";
+import { exportLedgerToExcel } from "@/utils/reportExports";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { redirect, usePathname } from "next/navigation";
@@ -50,11 +50,9 @@ interface LedgerData {
   totalCredit: number;
 }
 
-// ✅ UPDATED: Skeleton matching Tax Report style
 function LedgerSkeleton() {
   return (
     <div className="space-y-6 animate-in fade-in-50">
-      {/* Stats Cards Skeleton */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
           <Card key={`stat-${i}`} className="p-6 py-4">
@@ -79,7 +77,6 @@ function LedgerPageContent() {
   const [accounts, setAccounts] = useState<IChartOfAccount[]>([]);
   const [selectedAccountCode, setSelectedAccountCode] = useState<string>("");
   const [ledgerData, setLedgerData] = useState<LedgerData | null>(null);
-  const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -93,9 +90,8 @@ function LedgerPageContent() {
   });
 
   const [accountPopoverOpen, setAccountPopoverOpen] = useState(false);
-  // Export State
   const [isExporting, setIsExporting] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string>("");
   const [isPdfViewerOpen, setIsPdfViewerOpen] = useState(false);
 
   const {
@@ -104,81 +100,39 @@ function LedgerPageContent() {
     isPending,
   } = useLedgerPermissions();
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  useEffect(() => { setIsMounted(true); }, []);
 
   useEffect(() => {
     const fetchAccounts = async () => {
       if (!canRead) return;
       try {
         const res = await fetch("/api/chart-of-accounts?isActive=true");
-        if (res.ok) {
-          const data = await res.json();
-          setAccounts(data);
-        }
+        if (res.ok) setAccounts(await res.json());
       } catch (error) {
         console.error("Failed to fetch accounts:", error);
       }
     };
-
-    if (canRead) {
-      fetchAccounts();
-    }
-  }, [canRead]);
-
-  useEffect(() => {
-    const fetchCompanyDetails = async () => {
-      if (!canRead) return;
-      try {
-        const res = await fetch("/api/company-details");
-        if (res.ok) {
-          const data = await res.json();
-          setCompanyDetails(data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch company details:", error);
-      }
-    };
-
-    if (canRead) {
-      fetchCompanyDetails();
-    }
+    if (canRead) fetchAccounts();
   }, [canRead]);
 
   useEffect(() => {
     const code = searchParams.get('accountCode');
-    if (code && accounts.length > 0) {
-      setSelectedAccountCode(code);
-    }
+    if (code && accounts.length > 0) setSelectedAccountCode(code);
   }, [searchParams, accounts]);
 
   const fetchLedger = useCallback(async (background = false) => {
-    if (!canRead) return;
-
-    if (!selectedAccountCode) {
-      return;
-    }
-
-    if (!dateRange?.from || !dateRange?.to) {
-      if (!background) toast.error("Please select a date range");
-      return;
-    }
-
+    if (!canRead || !selectedAccountCode || !dateRange?.from || !dateRange?.to) return;
     try {
       if (!background) setIsLoading(true);
-
-      const params = new URLSearchParams();
-      params.append('accountCode', selectedAccountCode);
-      params.append('startDate', dateRange.from.toISOString());
-      params.append('endDate', dateRange.to.toISOString());
+      const params = new URLSearchParams({
+        accountCode: selectedAccountCode,
+        startDate: dateRange.from.toISOString(),
+        endDate: dateRange.to.toISOString(),
+      });
       if (selectedPartyId) params.append("partyId", selectedPartyId);
-
-      const res = await fetch(`/api/ledger?${params.toString()}`);
+      const res = await fetch(`/api/ledger?${params}`);
       if (!res.ok) throw new Error("Failed to fetch ledger");
-
-      const data = await res.json();
-      setLedgerData(data);
+      setLedgerData(await res.json());
     } catch (error) {
       console.error("Error fetching ledger:", error);
       if (!background) toast.error("Could not load ledger data");
@@ -194,74 +148,57 @@ function LedgerPageContent() {
   }, [selectedAccountCode, dateRange, selectedPartyId, canRead, fetchLedger]);
 
   useEffect(() => {
-    const onFocus = () => {
-      if (isMounted && canRead && selectedAccountCode) {
-        fetchLedger(true);
-      }
-    };
-
+    const onFocus = () => { if (isMounted && canRead && selectedAccountCode) fetchLedger(true); };
     window.addEventListener("focus", onFocus);
-
-    return () => {
-      window.removeEventListener("focus", onFocus);
-    };
+    return () => window.removeEventListener("focus", onFocus);
   }, [fetchLedger, isMounted, canRead, selectedAccountCode]);
-
-
 
   const handleQuickSelect = (period: string) => {
     const now = new Date();
-    let from: Date;
-    let to: Date;
-
-    switch (period) {
-      case "thisMonth":
-        from = startOfMonth(now);
-        to = endOfMonth(now);
-        break;
-      case "lastMonth":
-        from = startOfMonth(subMonths(now, 1));
-        to = endOfMonth(subMonths(now, 1));
-        break;
-      case "last3Months":
-        from = startOfMonth(subMonths(now, 2));
-        to = endOfMonth(now);
-        break;
-      case "last6Months":
-        from = startOfMonth(subMonths(now, 5));
-        to = endOfMonth(now);
-        break;
-      case "thisYear":
-        from = new Date(now.getFullYear(), 0, 1);
-        to = new Date(now.getFullYear(), 11, 31);
-        break;
-      default:
-        return;
-    }
-
-    setDateRange({ from, to });
+    const map: Record<string, { from: Date; to: Date }> = {
+      thisMonth: { from: startOfMonth(now), to: endOfMonth(now) },
+      lastMonth: { from: startOfMonth(subMonths(now, 1)), to: endOfMonth(subMonths(now, 1)) },
+      last3Months: { from: startOfMonth(subMonths(now, 2)), to: endOfMonth(now) },
+      last6Months: { from: startOfMonth(subMonths(now, 5)), to: endOfMonth(now) },
+      thisYear: { from: new Date(now.getFullYear(), 0, 1), to: new Date(now.getFullYear(), 11, 31) },
+    };
+    if (map[period]) setDateRange(map[period]);
   };
 
-  const handleExportPDF = () => {
+  // ── PDF: call API route, stream react-pdf result ──────────────────────────
+  const handleExportPDF = async () => {
     if (!ledgerData || !dateRange?.from || !dateRange?.to) return;
     setIsExporting(true);
     try {
-      const url = exportLedgerToPDF(ledgerData, dateRange.from, dateRange.to, companyDetails, 'blob');
+      const params = new URLSearchParams({
+        accountCode: selectedAccountCode,
+        startDate: dateRange.from.toISOString(),
+        endDate: dateRange.to.toISOString(),
+      });
+      if (selectedPartyId) params.append("partyId", selectedPartyId);
+      const res = await fetch(`/api/ledger/pdf?${params}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "PDF generation failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
       setPdfUrl(url);
       setIsPdfViewerOpen(true);
-    } catch (err) {
-      toast.error("Failed to generate PDF");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate PDF");
       console.error(err);
     } finally {
       setIsExporting(false);
     }
   };
 
+  // ── Excel: stays client-side ───────────────────────────────────────────────
   const handleExportExcel = () => {
     if (!ledgerData || !dateRange?.from || !dateRange?.to) return;
     setIsExporting(true);
     try {
-      exportLedgerToExcel(ledgerData, dateRange.from, dateRange.to, companyDetails);
+      exportLedgerToExcel(ledgerData, dateRange.from, dateRange.to, null);
       toast.success("Excel exported successfully");
     } catch (err) {
       toast.error("Failed to generate Excel");
@@ -291,7 +228,6 @@ function LedgerPageContent() {
         { label: "Adjustment", value: "Adjustment", count: ledgerData.entries.filter(e => e.referenceType === "Adjustment").length },
       ].filter(opt => opt.count > 0)
       : [];
-
     return columns.map((col: any) => {
       if (col.accessorKey === "referenceType") {
         return { ...col, meta: { ...col.meta, options: typeOptions } };
@@ -305,20 +241,15 @@ function LedgerPageContent() {
     columns: columnsWithOptions,
     initialState: {
       sorting: [{ id: "date", desc: true }],
-      pagination: {
-        pageSize: 10,
-        pageIndex: 0
-      },
+      pagination: { pageSize: 10, pageIndex: 0 },
     },
     getRowId: (row) => row.journalId || row.journalNumber,
   });
 
   const statsData: StatItem[] = useMemo(() => {
     if (!ledgerData) return [];
-
     const debitCount = ledgerData.entries.filter(e => e.debit > 0).length;
     const creditCount = ledgerData.entries.filter(e => e.credit > 0).length;
-
     return [
       {
         name: "Opening Balance",
@@ -348,26 +279,19 @@ function LedgerPageContent() {
   }, [ledgerData]);
 
   if (!isMounted || isPending) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner className="size-10" />
-      </div>
-    );
+    return <div className="flex flex-1 items-center justify-center"><Spinner className="size-10" /></div>;
   }
 
-  if (!session) {
-    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
-  }
-
-  if (!canRead) {
-    return <AccessDenied />
-  }
+  if (!session) redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
+  if (!canRead) return <AccessDenied />;
 
   return (
     <>
       <div className="flex flex-1 flex-col">
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+
+            {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 px-4 lg:px-6 gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-primary/10 rounded-full">
@@ -375,12 +299,9 @@ function LedgerPageContent() {
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold tracking-tight">Ledger</h1>
-                  <p className="text-muted-foreground">
-                    Account-wise transaction history
-                  </p>
+                  <p className="text-muted-foreground">Account-wise transaction history</p>
                 </div>
               </div>
-
               <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                 <ExportMenu
                   onExportPDF={handleExportPDF}
@@ -392,19 +313,17 @@ function LedgerPageContent() {
               </div>
             </div>
 
+            {/* Filters */}
             <div className="px-4 lg:px-6">
               <Card>
                 <CardContent className="p-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Account selector */}
                     <div className="space-y-2 md:col-span-1">
                       <Label>Account</Label>
                       <Popover open={accountPopoverOpen} onOpenChange={setAccountPopoverOpen}>
                         <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            className="w-full justify-between"
-                          >
+                          <Button variant="outline" role="combobox" className="w-full justify-between">
                             <span className="truncate">
                               {selectedAccount
                                 ? `${selectedAccount.accountCode} - ${selectedAccount.accountName}`
@@ -451,26 +370,18 @@ function LedgerPageContent() {
                       </Popover>
                     </div>
 
+                    {/* Date range */}
                     <div className="space-y-2 md:col-span-1">
                       <Label>Date Range</Label>
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-between px-3 font-normal"
-                          >
+                          <Button variant="outline" className="w-full justify-between px-3 font-normal">
                             <span className={cn("truncate", !dateRange && "text-muted-foreground")}>
                               {dateRange?.from ? (
-                                dateRange.to ? (
-                                  <>
-                                    {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
-                                  </>
-                                ) : (
-                                  format(dateRange.from, "LLL dd, y")
-                                )
-                              ) : (
-                                "Pick a date range"
-                              )}
+                                dateRange.to
+                                  ? <>{format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}</>
+                                  : format(dateRange.from, "LLL dd, y")
+                              ) : "Pick a date range"}
                             </span>
                             <CalendarIcon size={16} aria-hidden="true" />
                           </Button>
@@ -488,6 +399,7 @@ function LedgerPageContent() {
                       </Popover>
                     </div>
 
+                    {/* Quick select */}
                     <div className="space-y-2 md:col-span-1">
                       <Label>Quick Select</Label>
                       <Select onValueChange={handleQuickSelect}>
@@ -504,15 +416,12 @@ function LedgerPageContent() {
                       </Select>
                     </div>
 
+                    {/* Party filter */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t md:col-span-3">
                       <div className="space-y-2">
                         <PartyContactSelector
                           allowedRoles={['customer', 'supplier', 'payee', 'vendor']}
-                          value={{
-                            partyId: selectedPartyId,
-                            partyType: selectedPartyType,
-                            partyName: selectedPartyName
-                          }}
+                          value={{ partyId: selectedPartyId, partyType: selectedPartyType, partyName: selectedPartyName }}
                           onChange={(val) => {
                             setSelectedPartyId(val.partyId ?? "");
                             setSelectedPartyType(val.partyType);
@@ -529,6 +438,7 @@ function LedgerPageContent() {
               </Card>
             </div>
 
+            {/* Account header + stats + table */}
             {ledgerData && (
               <div className="px-4 lg:px-6">
                 <Card className="mb-6">
@@ -553,7 +463,6 @@ function LedgerPageContent() {
                   </CardHeader>
                 </Card>
 
-                {/* ✅ UPDATED: Matching Tax Report transition */}
                 <div className={cn("transition-opacity duration-200", isLoading && !ledgerData ? "opacity-50" : "opacity-100")}>
                   {isLoading && statsData.length === 0 ? (
                     <LedgerSkeleton />
@@ -566,7 +475,6 @@ function LedgerPageContent() {
 
                 <Card>
                   <CardContent className="p-6">
-                    {/* ✅ UPDATED: Smooth table transition */}
                     <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
                       {isLoading && !ledgerData.entries.length ? (
                         <DataTableSkeleton columnCount={columns.length} rowCount={10} />
@@ -581,6 +489,7 @@ function LedgerPageContent() {
               </div>
             )}
 
+            {/* Empty state */}
             {!ledgerData && !isLoading && (
               <div className="px-4 lg:px-6">
                 <Card>
@@ -595,18 +504,20 @@ function LedgerPageContent() {
               </div>
             )}
 
+            {/* Loading state */}
             {isLoading && !ledgerData && (
               <div className="px-4 lg:px-6">
                 <Card>
                   <CardContent className="flex items-center justify-center py-12">
                     <div className="text-center">
-                      <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                      <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
                       <p className="text-muted-foreground">Loading ledger data...</p>
                     </div>
                   </CardContent>
                 </Card>
               </div>
             )}
+
           </div>
         </div>
       </div>
@@ -615,12 +526,10 @@ function LedgerPageContent() {
         isOpen={isPdfViewerOpen}
         onClose={() => {
           setIsPdfViewerOpen(false);
-          if (pdfUrl) {
-            URL.revokeObjectURL(pdfUrl);
-            setPdfUrl("");
-          }
+          if (pdfUrl.startsWith("blob:")) URL.revokeObjectURL(pdfUrl);
+          setPdfUrl("");
         }}
-        pdfUrl={pdfUrl || ""}
+        pdfUrl={pdfUrl}
         title={`Ledger - ${ledgerData?.account.accountCode || ''}`}
       />
     </>

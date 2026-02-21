@@ -1,4 +1,4 @@
-// components/VoucherDocument.tsx - Using party snapshots for PDF generation
+// components/pdf/VoucherDocument.tsx - Using party snapshots for PDF generation
 
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Image } from '@react-pdf/renderer';
@@ -8,8 +8,8 @@ import { numberToWords } from '@/lib/numberToWords';
 import { formatCurrency } from '@/utils/formatters/currency';
 import { formatDisplayDate, formatDateTime } from '@/utils/formatters/date';
 
-import { commonStyles, registerPdfFonts, pdfColors } from './pdf/styles';
-import { MapPinIcon, PhoneIcon, MailIcon } from './pdf/Icons';
+import { commonStyles, registerPdfFonts, pdfColors } from './shared/styles';
+import { MapPinIcon, PhoneIcon, MailIcon } from './shared/Icons';
 
 // Only styles that are truly unique to the A5-landscape voucher layout
 const styles = StyleSheet.create({
