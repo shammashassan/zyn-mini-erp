@@ -200,3 +200,173 @@ export function exportCashFlowToExcel(data: any, dateRange: { from: Date; to: Da
   XLSX.utils.book_append_sheet(wb, ws, 'Cash Flow');
   XLSX.writeFile(wb, `Cash_Flow_${format(dateRange.to, 'yyyyMMdd')}.xlsx`);
 }
+
+// ============================================================
+// GENERAL REPORT EXPORTS (Sales, Purchase, Expense, Tax, Payments, Inventory)
+// ============================================================
+
+// --- 6. SALES REPORT ---
+export function exportSalesReportToExcel(
+  monthlyBreakdown: Array<{ month: string; invoiceCount: number; revenue: number; tax: number; netTotal: number }>,
+  summary: { totalRevenue: number; totalTax: number; totalNetTotal: number; totalInvoices: number; avgInvoiceValue: number },
+  dateRange: { from: Date; to: Date },
+  company: CompanyDetails | null,
+) {
+  const ws = XLSX.utils.aoa_to_sheet([]);
+  const dateStr = `${format(dateRange.from, 'dd MMM yyyy')} - ${format(dateRange.to, 'dd MMM yyyy')}`;
+  addExcelHeader(ws, 'SALES REPORT', dateStr, company);
+
+  const rows = [
+    ['Month', 'Invoices', 'Revenue', 'Tax', 'Net Total'],
+    ...monthlyBreakdown.map(r => [r.month, r.invoiceCount, r.revenue, r.tax, r.netTotal]),
+    [],
+    ['TOTAL', summary.totalInvoices, summary.totalRevenue, summary.totalTax, summary.totalNetTotal],
+    ['Average Invoice Value', '', summary.avgInvoiceValue],
+  ];
+
+  XLSX.utils.sheet_add_aoa(ws, rows, { origin: 'A6' });
+  ws['!cols'] = [{ wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sales Report');
+  XLSX.writeFile(wb, `Sales_Report_${format(dateRange.from, 'yyyyMMdd')}_${format(dateRange.to, 'yyyyMMdd')}.xlsx`);
+}
+
+// --- 7. PURCHASE REPORT ---
+export function exportPurchaseReportToExcel(
+  monthlyBreakdown: Array<{ month: string; purchaseCount: number; amount: number; tax: number; netTotal: number }>,
+  summary: { totalAmount: number; totalTax: number; totalNetTotal: number; totalPurchases: number; avgPurchaseValue: number },
+  dateRange: { from: Date; to: Date },
+  company: CompanyDetails | null,
+) {
+  const ws = XLSX.utils.aoa_to_sheet([]);
+  const dateStr = `${format(dateRange.from, 'dd MMM yyyy')} - ${format(dateRange.to, 'dd MMM yyyy')}`;
+  addExcelHeader(ws, 'PURCHASE REPORT', dateStr, company);
+
+  const rows = [
+    ['Month', 'Orders', 'Amount', 'Tax', 'Net Total'],
+    ...monthlyBreakdown.map(r => [r.month, r.purchaseCount, r.amount, r.tax, r.netTotal]),
+    [],
+    ['TOTAL', summary.totalPurchases, summary.totalAmount, summary.totalTax, summary.totalNetTotal],
+    ['Average Order Value', '', summary.avgPurchaseValue],
+  ];
+
+  XLSX.utils.sheet_add_aoa(ws, rows, { origin: 'A6' });
+  ws['!cols'] = [{ wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Purchase Report');
+  XLSX.writeFile(wb, `Purchase_Report_${format(dateRange.from, 'yyyyMMdd')}_${format(dateRange.to, 'yyyyMMdd')}.xlsx`);
+}
+
+// --- 8. EXPENSE REPORT ---
+export function exportExpenseReportToExcel(
+  monthlyBreakdown: Array<{ period: string; totalAmount: number; totalExpenses: number; topCategory: string; averageExpense: number; highestExpense: number; trendVsLastMonth?: number }>,
+  summary: { totalAmount: number; totalCount: number; averageExpense: number },
+  dateRange: { from: Date; to: Date },
+  company: CompanyDetails | null,
+) {
+  const ws = XLSX.utils.aoa_to_sheet([]);
+  const dateStr = `${format(dateRange.from, 'dd MMM yyyy')} - ${format(dateRange.to, 'dd MMM yyyy')}`;
+  addExcelHeader(ws, 'EXPENSE REPORT', dateStr, company);
+
+  const rows = [
+    ['Period', 'No. of Expenses', 'Top Category', 'Total Amount', 'Avg per Expense'],
+    ...monthlyBreakdown.map(r => [r.period, r.totalExpenses, r.topCategory || 'N/A', r.totalAmount, r.averageExpense]),
+    [],
+    ['TOTAL', summary.totalCount, '', summary.totalAmount, summary.averageExpense],
+  ];
+
+  XLSX.utils.sheet_add_aoa(ws, rows, { origin: 'A6' });
+  ws['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 25 }, { wch: 16 }, { wch: 16 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Expense Report');
+  XLSX.writeFile(wb, `Expense_Report_${format(dateRange.from, 'yyyyMMdd')}_${format(dateRange.to, 'yyyyMMdd')}.xlsx`);
+}
+
+// --- 9. TAX REPORT ---
+export function exportTaxReportToExcel(
+  monthlyBreakdown: Array<{ period: string; salesTax: number; purchaseTax: number; netTaxLiability: number; salesTransactions: number; purchaseTransactions: number }>,
+  summary: { totalSalesTax: number; totalPurchaseTax: number; netTaxLiability: number; salesTransactions: number; purchaseTransactions: number },
+  dateRange: { from: Date; to: Date },
+  company: CompanyDetails | null,
+) {
+  const ws = XLSX.utils.aoa_to_sheet([]);
+  const dateStr = `${format(dateRange.from, 'dd MMM yyyy')} - ${format(dateRange.to, 'dd MMM yyyy')}`;
+  addExcelHeader(ws, 'TAX REPORT', dateStr, company);
+
+  const rows = [
+    ['Period', 'Sales Tax', 'Purchase Tax', 'Net Tax Liability', 'Total Txns'],
+    ...monthlyBreakdown.map(r => [r.period, r.salesTax, r.purchaseTax, r.netTaxLiability, r.salesTransactions + r.purchaseTransactions]),
+    [],
+    ['TOTAL', summary.totalSalesTax, summary.totalPurchaseTax, summary.netTaxLiability, summary.salesTransactions + summary.purchaseTransactions],
+  ];
+
+  XLSX.utils.sheet_add_aoa(ws, rows, { origin: 'A6' });
+  ws['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 12 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Tax Report');
+  XLSX.writeFile(wb, `Tax_Report_${format(dateRange.from, 'yyyyMMdd')}_${format(dateRange.to, 'yyyyMMdd')}.xlsx`);
+}
+
+// --- 10. PAYMENTS REPORT ---
+export function exportPaymentsReportToExcel(
+  monthlyBreakdown: Array<{ month: string; totalInflow: number; totalOutflow: number; netMovement: number; inflowCount: number; outflowCount: number }>,
+  summary: { totalCashIn: number; totalCashOut: number; netCashMovement: number; openingBalance: number; closingBalance: number; totalTransactions: number },
+  dateRange: { from: Date; to: Date },
+  company: CompanyDetails | null,
+) {
+  const ws = XLSX.utils.aoa_to_sheet([]);
+  const dateStr = `${format(dateRange.from, 'dd MMM yyyy')} - ${format(dateRange.to, 'dd MMM yyyy')}`;
+  addExcelHeader(ws, 'PAYMENTS REPORT', dateStr, company);
+
+  const rows = [
+    ['Month', 'Total Inflow', 'Total Outflow', 'Net Movement', 'Receipts', 'Payments'],
+    ...monthlyBreakdown.map(r => [r.month, r.totalInflow, r.totalOutflow, r.netMovement, r.inflowCount, r.outflowCount]),
+    [],
+    ['TOTAL', summary.totalCashIn, summary.totalCashOut, summary.netCashMovement, summary.totalTransactions],
+    [],
+    ['Opening Balance', summary.openingBalance],
+    ['Closing Balance', summary.closingBalance],
+  ];
+
+  XLSX.utils.sheet_add_aoa(ws, rows, { origin: 'A6' });
+  ws['!cols'] = [{ wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 12 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Payments Report');
+  XLSX.writeFile(wb, `Payments_Report_${format(dateRange.from, 'yyyyMMdd')}_${format(dateRange.to, 'yyyyMMdd')}.xlsx`);
+}
+
+// --- 11. INVENTORY REPORT ---
+export function exportInventoryReportToExcel(
+  inventory: Array<{ name: string; category: string; type: string; openingQty: number; purchased: number; sold: number; adjusted: number; closingQty: number; unitCost: number; stockValue: number; status: string }>,
+  summary: { totalItems: number; totalStockValue: number; lowStockItems: number; outOfStockItems: number; avgStockValue: number },
+  dateRange: { from: Date; to: Date },
+  company: CompanyDetails | null,
+) {
+  const ws = XLSX.utils.aoa_to_sheet([]);
+  const dateStr = `${format(dateRange.from, 'dd MMM yyyy')} - ${format(dateRange.to, 'dd MMM yyyy')}`;
+  addExcelHeader(ws, 'INVENTORY REPORT', dateStr, company);
+
+  const rows = [
+    ['Name', 'Category', 'Type', 'Opening', 'Purchased', 'Adjusted', 'Closing Qty', 'Unit Cost', 'Stock Value', 'Status'],
+    ...inventory.map(r => [r.name, r.category, r.type, r.openingQty, r.purchased, r.adjusted, r.closingQty, r.unitCost, r.stockValue, r.status]),
+    [],
+    ['SUMMARY'],
+    ['Total Materials', summary.totalItems],
+    ['Total Stock Value', summary.totalStockValue],
+    ['Low Stock Items', summary.lowStockItems],
+    ['Out of Stock Items', summary.outOfStockItems],
+    ['Avg Material Value', summary.avgStockValue],
+  ];
+
+  XLSX.utils.sheet_add_aoa(ws, rows, { origin: 'A6' });
+  ws['!cols'] = [{ wch: 28 }, { wch: 20 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 14 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Inventory Report');
+  XLSX.writeFile(wb, `Inventory_Report_${format(dateRange.from, 'yyyyMMdd')}_${format(dateRange.to, 'yyyyMMdd')}.xlsx`);
+}

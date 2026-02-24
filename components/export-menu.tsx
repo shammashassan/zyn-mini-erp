@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Download, FileText, FileSpreadsheet, ChevronDown } from "lucide-react";
+import { Download, FileText, FileSpreadsheet, ChevronDown, Table } from "lucide-react";
 import { Spinner } from "./ui/spinner";
 
 interface ExportMenuProps {
@@ -31,13 +31,13 @@ export function ExportMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant="outline" 
-          className="gap-2" 
+        <Button
+          variant="outline"
+          className="gap-2"
           disabled={isExporting || disabled} // Apply disabled state
         >
           {isExporting ? (
-            <Spinner/>
+            <Spinner />
           ) : (
             <Download className="h-4 w-4" />
           )}
@@ -51,7 +51,7 @@ export function ExportMenu({
           Export as PDF
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onExportExcel} className="gap-2 cursor-pointer">
-          <FileSpreadsheet className="h-4 w-4 text-green-600" />
+          <Table className="h-4 w-4 text-green-600" />
           Export as Excel
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -56,7 +56,7 @@ export async function GET(request: Request) {
     });
 
     if (error) return error;
-    
+
     await dbConnect();
 
     const { searchParams } = new URL(request.url);
@@ -103,7 +103,7 @@ export async function GET(request: Request) {
               $group: {
                 _id: { $dateToString: { format: "%Y-%m", date: "$entryDate" } },
                 count: { $sum: 1 },
-                maxExpense: { $max: "$totalDebit" } 
+                maxExpense: { $max: "$totalDebit" }
               }
             }
           ],
@@ -132,10 +132,10 @@ export async function GET(request: Request) {
     const countMap = new Map<string, AggregationMonthlyCount>(
       monthlyCounts.map((m: any) => [m._id, m])
     );
-    
+
     // Process Line Items into a structured Map: Month -> Category -> Data
     const processedData = new Map<string, Map<string, { amount: number, count: number }>>();
-    
+
     // Global category accumulator
     const globalCategoryMap = new Map<string, { amount: number, count: number }>();
     let globalTotalAmount = 0;
@@ -162,7 +162,7 @@ export async function GET(request: Request) {
         processedData.set(month, new Map());
       }
       const monthMap = processedData.get(month)!;
-      
+
       const catData = monthMap.get(category) || { amount: 0, count: 0 };
       catData.amount += amount;
       catData.count += count;
@@ -215,7 +215,7 @@ export async function GET(request: Request) {
         if (prevAmount > 0) {
           trendVsLastMonth = ((monthTotalAmount - prevAmount) / prevAmount) * 100;
         } else if (monthTotalAmount > 0) {
-          trendVsLastMonth = 100; 
+          trendVsLastMonth = 100;
         } else {
           trendVsLastMonth = 0;
         }
@@ -273,27 +273,27 @@ export async function GET(request: Request) {
       {
         $facet: {
           "totalCount": [
-             { $count: "count" }
+            { $count: "count" }
           ],
           "totalAmount": [
             { $unwind: "$entries" },
             {
-               $lookup: {
-                  from: "chartofaccounts",
-                  localField: "entries.accountCode",
-                  foreignField: "accountCode",
-                  as: "account"
-               }
+              $lookup: {
+                from: "chartofaccounts",
+                localField: "entries.accountCode",
+                foreignField: "accountCode",
+                as: "account"
+              }
             },
             { $unwind: "$account" },
             // Filter by Expenses OR Fixed Assets
-            { 
-              $match: { 
+            {
+              $match: {
                 $or: [
                   { "account.groupName": "Expenses" },
                   { "account.groupName": "Assets", "account.subGroup": "Fixed Assets" }
                 ]
-              } 
+              }
             },
             { $group: { _id: null, total: { $sum: "$entries.debit" } } }
           ]
@@ -319,7 +319,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       summary,
       categoryData,
-      monthlyBreakdown: monthlyBreakdown.reverse(),
+      monthlyBreakdown,
       monthlyTrend,
       trends
     });
@@ -338,7 +338,7 @@ export async function GET(request: Request) {
  */
 function mapAccountToCategory(account: any): string {
   const accountCode = account.accountCode;
-  
+
   const categoryMap: { [key: string]: string } = {
     'X2001': 'Salary',
     'X2002': 'Rent',

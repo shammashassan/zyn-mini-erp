@@ -66,7 +66,7 @@ export async function GET(request: Request) {
       report: ["read"],
     });
     if (error) return error;
-    
+
     await dbConnect();
 
     // Parse query parameters
@@ -214,8 +214,8 @@ export async function GET(request: Request) {
       totalTax: summaryRes.totalTax,
       totalNetTotal: totalRevenue + summaryRes.totalTax,
       totalInvoices: summaryRes.totalInvoices,
-      avgInvoiceValue: summaryRes.totalInvoices > 0 
-        ? totalRevenue / summaryRes.totalInvoices 
+      avgInvoiceValue: summaryRes.totalInvoices > 0
+        ? totalRevenue / summaryRes.totalInvoices
         : 0,
       profitMargin
     };
@@ -259,15 +259,15 @@ export async function GET(request: Request) {
     );
 
     const months = eachMonthOfInterval({ start: startDate, end: endDate });
-    
+
     const monthlyBreakdown: MonthlyBreakdown[] = months.map(month => {
       const monthKey = format(month, 'yyyy-MM');
-      
-      const data = monthlyMap.get(monthKey) || { 
-        monthRevenue: 0, 
-        monthTax: 0, 
-        monthCount: 0, 
-        _id: monthKey 
+
+      const data = monthlyMap.get(monthKey) || {
+        monthRevenue: 0,
+        monthTax: 0,
+        monthCount: 0,
+        _id: monthKey
       };
 
       return {
@@ -277,7 +277,7 @@ export async function GET(request: Request) {
         tax: data.monthTax,
         netTotal: data.monthRevenue + data.monthTax,
       };
-    }).reverse();
+    });
 
     return NextResponse.json({
       summary,

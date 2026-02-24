@@ -64,7 +64,7 @@ export async function GET(request: Request) {
       report: ["read"],
     });
     if (error) return error;
-    
+
     await dbConnect();
 
     // Parse query parameters
@@ -196,8 +196,8 @@ export async function GET(request: Request) {
       totalTax: summaryRes.totalTax,
       totalNetTotal: summaryRes.totalAmount + summaryRes.totalTax,
       totalPurchases: summaryRes.totalPurchases,
-      avgPurchaseValue: summaryRes.totalPurchases > 0 
-        ? summaryRes.totalAmount / summaryRes.totalPurchases 
+      avgPurchaseValue: summaryRes.totalPurchases > 0
+        ? summaryRes.totalAmount / summaryRes.totalPurchases
         : 0
     };
 
@@ -240,15 +240,15 @@ export async function GET(request: Request) {
     );
 
     const months = eachMonthOfInterval({ start: startDate, end: endDate });
-    
+
     const monthlyBreakdown: MonthlyBreakdown[] = months.map(month => {
       const monthKey = format(month, 'yyyy-MM');
-      
-      const data = monthlyMap.get(monthKey) || { 
-        monthAmount: 0, 
-        monthTax: 0, 
-        monthCount: 0, 
-        _id: monthKey 
+
+      const data = monthlyMap.get(monthKey) || {
+        monthAmount: 0,
+        monthTax: 0,
+        monthCount: 0,
+        _id: monthKey
       };
 
       return {
@@ -258,7 +258,7 @@ export async function GET(request: Request) {
         tax: data.monthTax,
         netTotal: data.monthAmount + data.monthTax,
       };
-    }).reverse();
+    });
 
     return NextResponse.json({
       summary,

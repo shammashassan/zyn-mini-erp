@@ -26,6 +26,9 @@ import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { redirect, usePathname } from "next/navigation";
+import { ExportMenu } from "@/components/export-menu";
+import { exportPaymentsReportToExcel } from "@/utils/reportExports";
+import { PDFViewerModal } from "@/components/PDFViewerModal";
 
 interface PaymentsSummary {
   totalCashIn: number;
@@ -99,6 +102,9 @@ function PaymentsReportPageContent() {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [isPdfViewerOpen, setIsPdfViewerOpen] = useState(false);
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(subMonths(new Date(), 5)),
@@ -215,6 +221,39 @@ function PaymentsReportPageContent() {
     return `${format(dateRange.from, "MMM dd, yyyy")} - ${format(dateRange.to, "MMM dd, yyyy")}`;
   };
 
+  const handleExportPDF = async () => {
+    if (!data) return;
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams({
+        startDate: dateRange?.from?.toISOString() || '',
+        endDate: dateRange?.to?.toISOString() || '',
+      });
+      const res = await fetch(`/api/payments-report/pdf?${params}`);
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || 'PDF generation failed'); }
+      const blob = await res.blob();
+      setPdfUrl(URL.createObjectURL(blob));
+      setIsPdfViewerOpen(true);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to generate PDF');
+    } finally { setIsExporting(false); }
+  };
+
+  const handleExportExcel = () => {
+    if (!data) return;
+    setIsExporting(true);
+    try {
+      exportPaymentsReportToExcel(
+        data.monthlyBreakdown,
+        data.summary,
+        { from: dateRange!.from!, to: dateRange!.to! },
+        null
+      );
+      toast.success('Exported to Excel');
+    } catch { toast.error('Failed to export Excel'); }
+    finally { setIsExporting(false); }
+  };
+
   const columns = useMemo(() => getMonthlyColumns(), []);
 
   const { table } = useDataTable({
@@ -283,123 +322,144 @@ function PaymentsReportPageContent() {
   }
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="@container/main flex flex-1 flex-col gap-2">
-        <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-          {/* Header */}
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 px-4 lg:px-6 gap-4">
-            <div className="flex items-center gap-3">
-              <Wallet className="h-12 w-12 text-primary" />
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">Payments Report</h1>
-                <p className="text-muted-foreground">
-                  Monthly summary of cash inflows and outflows.
-                </p>
+    <>
+      <div className="flex flex-1 flex-col">
+        <div className="@container/main flex flex-1 flex-col gap-2">
+          <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+            {/* Header */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between px-4 lg:px-6 gap-4">
+              <div className="flex items-center gap-3 self-start lg:self-center">
+                <div className="p-3 bg-primary/10 rounded-full">
+                  <Wallet className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight">Payments Report</h1>
+                  <p className="text-muted-foreground">
+                    Monthly summary of cash inflows and outflows.
+                  </p>
+                </div>
+              </div>
+
+              {/* Date controls + Export */}
+              <div className="flex flex-col gap-3 w-full lg:w-auto lg:items-end">
+                <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <UIButton variant="outline" className="w-full sm:w-[300px] justify-between px-3 font-normal">
+                        <span className={cn("truncate", !dateRange && "text-muted-foreground")}>
+                          {dateRange?.from ? (
+                            dateRange.to ? (
+                              <>
+                                {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
+                              </>
+                            ) : (
+                              format(dateRange.from, "LLL dd, y")
+                            )
+                          ) : (
+                            "Pick a date range"
+                          )}
+                        </span>
+                        <CalendarIcon size={16} aria-hidden="true" />
+                      </UIButton>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={dateRange?.from}
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        captionLayout="dropdown"
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <Select onValueChange={handleQuickSelect}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectValue placeholder="Quick select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="thisMonth">This Month</SelectItem>
+                      <SelectItem value="lastMonth">Last Month</SelectItem>
+                      <SelectItem value="last3Months">Last 3 Months</SelectItem>
+                      <SelectItem value="last6Months">Last 6 Months</SelectItem>
+                      <SelectItem value="thisYear">This Year</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex justify-start w-full lg:w-auto">
+                  <ExportMenu
+                    onExportPDF={handleExportPDF}
+                    onExportExcel={handleExportExcel}
+                    canExport={true}
+                    isExporting={isExporting}
+                    disabled={!data}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Date controls */}
-            <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <UIButton variant="outline" className="w-full sm:w-[300px] justify-between px-3 font-normal">
-                    <span className={cn("truncate", !dateRange && "text-muted-foreground")}>
-                      {dateRange?.from ? (
-                        dateRange.to ? (
-                          <>
-                            {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
-                          </>
-                        ) : (
-                          format(dateRange.from, "LLL dd, y")
-                        )
-                      ) : (
-                        "Pick a date range"
+            <div className="px-4 lg:px-6">
+              {/* ✅ UPDATED: Applied transition-opacity & Skeleton */}
+              <div className={cn("transition-opacity duration-200", isLoading && !data ? "opacity-50" : "opacity-100")}>
+                {isLoading && !data ? (
+                  <PaymentsReportSkeleton />
+                ) : (
+                  <>
+                    {/* Summary Cards */}
+                    <div className="mb-6">
+                      <StatsCards data={cardsData} columns={4} />
+                    </div>
+
+                    {/* Chart */}
+                    <div className="mb-6">
+                      {dateRange?.from && dateRange?.to && data?.monthlyBreakdown && data.monthlyBreakdown.length > 0 && (
+                        <PaymentsChart
+                          data={data.monthlyBreakdown}
+                          dateRange={{ from: dateRange.from, to: dateRange.to }}
+                        />
                       )}
-                    </span>
-                    <CalendarIcon size={16} aria-hidden="true" />
-                  </UIButton>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange?.from}
-                    selected={dateRange}
-                    onSelect={setDateRange}
-                    captionLayout="dropdown"
-                  />
-                </PopoverContent>
-              </Popover>
-
-              <Select onValueChange={handleQuickSelect}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Quick select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="thisMonth">This Month</SelectItem>
-                  <SelectItem value="lastMonth">Last Month</SelectItem>
-                  <SelectItem value="last3Months">Last 3 Months</SelectItem>
-                  <SelectItem value="last6Months">Last 6 Months</SelectItem>
-                  <SelectItem value="thisYear">This Year</SelectItem>
-                </SelectContent>
-              </Select>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className="px-4 lg:px-6">
-            {/* ✅ UPDATED: Applied transition-opacity & Skeleton */}
-            <div className={cn("transition-opacity duration-200", isLoading && !data ? "opacity-50" : "opacity-100")}>
-              {isLoading && !data ? (
-                <PaymentsReportSkeleton />
-              ) : (
-                <>
-                  {/* Summary Cards */}
-                  <div className="mb-6">
-                    <StatsCards data={cardsData} columns={4} />
-                  </div>
-
-                  {/* Chart */}
-                  <div className="mb-6">
-                    {dateRange?.from && dateRange?.to && data?.monthlyBreakdown && data.monthlyBreakdown.length > 0 && (
-                      <PaymentsChart
-                        data={data.monthlyBreakdown}
-                        dateRange={{ from: dateRange.from, to: dateRange.to }}
+            {/* Table */}
+            <div className="px-4 lg:px-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Monthly Breakdown</CardTitle>
+                  <CardDescription>
+                    Summary of cash movements by month for {formatDateRange()}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {/* ✅ UPDATED: Applied transition-opacity for smooth updates */}
+                  <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
+                    {isLoading && !data ? (
+                      <DataTableSkeleton
+                        columnCount={columns.length}
+                        rowCount={6}
                       />
+                    ) : (
+                      <DataTable table={table}>
+                        <DataTableToolbar table={table} />
+                      </DataTable>
                     )}
                   </div>
-                </>
-              )}
+                </CardContent>
+              </Card>
             </div>
-          </div>
-
-          {/* Table */}
-          <div className="px-4 lg:px-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Monthly Breakdown</CardTitle>
-                <CardDescription>
-                  Summary of cash movements by month for {formatDateRange()}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* ✅ UPDATED: Applied transition-opacity for smooth updates */}
-                <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
-                  {isLoading && !data ? (
-                    <DataTableSkeleton
-                      columnCount={columns.length}
-                      rowCount={6}
-                    />
-                  ) : (
-                    <DataTable table={table}>
-                      <DataTableToolbar table={table} />
-                    </DataTable>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>
-    </div>
+      <PDFViewerModal
+        isOpen={isPdfViewerOpen}
+        onClose={() => { setIsPdfViewerOpen(false); if (pdfUrl) { URL.revokeObjectURL(pdfUrl); setPdfUrl(null); } }}
+        pdfUrl={pdfUrl || ''}
+        title="Payments Report"
+      />
+    </>
   );
 }
