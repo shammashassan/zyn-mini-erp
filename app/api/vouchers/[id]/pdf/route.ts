@@ -11,7 +11,7 @@ import "@/models/Purchase";
 import "@/models/Expense";
 import "@/models/DebitNote";
 import "@/models/CreditNote";
-import Party from "@/models/Party";
+import "@/models/Party";
 
 import { VoucherDocument } from "@/components/pdf/VoucherDocument";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
