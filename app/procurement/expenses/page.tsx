@@ -261,13 +261,8 @@ function ExpensesPageContent() {
       // Open view modal after creation
       if (!id) {
         const savedExpense = result.expense || result;
-        // Fetch full details to ensure population
-        const fullRes = await fetch(`/api/expenses/${savedExpense._id}`);
-        if (fullRes.ok) {
-          const fullExpense = await fullRes.json();
-          setExpenseToView(fullExpense);
-          setViewModalOpen(true);
-        }
+        setExpenseToView(savedExpense);
+        setViewModalOpen(true);
       }
     } catch (error: any) {
       toast.error(error.message);

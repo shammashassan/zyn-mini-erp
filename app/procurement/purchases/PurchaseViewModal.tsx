@@ -178,8 +178,13 @@ export function PurchaseViewModal({
     || currentData.contactId?.designation;
 
   // ✅ Check if party data has changed since snapshot
-  const hasPartyChanged = currentData.partyId && currentData.partySnapshot &&
-    (currentData.partyId.company || currentData.partyId.name) !== currentData.partySnapshot.displayName;
+  const hasPartyChanged = Boolean(
+    currentData.partyId &&
+    typeof currentData.partyId === 'object' &&
+    (currentData.partyId.company || currentData.partyId.name) &&
+    currentData.partySnapshot &&
+    (currentData.partyId.company || currentData.partyId.name) !== currentData.partySnapshot.displayName
+  );
 
   const creatorUsername = getCreatorUsername(currentData);
   const totalItems = currentData.items?.length || 0;
@@ -268,7 +273,7 @@ export function PurchaseViewModal({
                       <p className="font-medium text-warning">Party name has changed</p>
                       <p className="text-muted-foreground">
                         This purchase was created for "{currentData.partySnapshot.displayName}"
-                        (currently: "{currentData.partyId.company || currentData.partyId.name}")
+                        (currently: "{currentData.partyId?.company || currentData.partyId?.name}")
                       </p>
                     </div>
                   </div>

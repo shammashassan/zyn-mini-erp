@@ -146,8 +146,13 @@ export function ExpenseViewModal({ isOpen, onClose, expense: initialExpense, onV
     || currentData.payeeId?.address;
 
   // ✅ Check if payee data has changed since snapshot
-  const hasPayeeChanged = currentData.payeeId && currentData.payeeSnapshot &&
-    currentData.payeeId.name !== currentData.payeeSnapshot.name;
+  const hasPayeeChanged = Boolean(
+    currentData.payeeId &&
+    typeof currentData.payeeId === 'object' &&
+    currentData.payeeId.name &&
+    currentData.payeeSnapshot &&
+    currentData.payeeId.name !== currentData.payeeSnapshot.name
+  );
 
   const creatorUsername = getCreatorUsername(currentData);
   const categoryColor = getCategoryColor(currentData.category);
@@ -227,7 +232,7 @@ export function ExpenseViewModal({ isOpen, onClose, expense: initialExpense, onV
                       <p className="font-medium text-warning">Payee name has changed</p>
                       <p className="text-muted-foreground">
                         This expense was recorded for "{currentData.payeeSnapshot.name}"
-                        (currently: "{currentData.payeeId.name}")
+                        (currently: "{currentData.payeeId?.name}")
                       </p>
                     </div>
                   </div>
