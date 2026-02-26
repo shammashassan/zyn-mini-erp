@@ -95,35 +95,35 @@ export async function GET(request: Request) {
 
     // 3. Opening Balance Aggregation
     let openingBalance = 0;
-    
-    if (startDate) {
-        const openingAgg = await Journal.aggregate([
-            {
-                $match: {
-                    status: 'posted',
-                    isDeleted: false,
-                    entryDate: { $lt: startDate },
-                    'entries.accountCode': { $in: CASH_BANK_ACCOUNTS }
-                }
-            },
-            { $unwind: "$entries" },
-            {
-                $match: {
-                    "entries.accountCode": { $in: CASH_BANK_ACCOUNTS }
-                }
-            },
-            {
-                $group: {
-                    _id: null,
-                    totalDebit: { $sum: "$entries.debit" },
-                    totalCredit: { $sum: "$entries.credit" }
-                }
-            }
-        ]);
 
-        if (openingAgg.length > 0) {
-            openingBalance = openingAgg[0].totalDebit - openingAgg[0].totalCredit;
+    if (startDate) {
+      const openingAgg = await Journal.aggregate([
+        {
+          $match: {
+            status: 'posted',
+            isDeleted: false,
+            entryDate: { $lt: startDate },
+            'entries.accountCode': { $in: CASH_BANK_ACCOUNTS }
+          }
+        },
+        { $unwind: "$entries" },
+        {
+          $match: {
+            "entries.accountCode": { $in: CASH_BANK_ACCOUNTS }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalDebit: { $sum: "$entries.debit" },
+            totalCredit: { $sum: "$entries.credit" }
+          }
         }
+      ]);
+
+      if (openingAgg.length > 0) {
+        openingBalance = openingAgg[0].totalDebit - openingAgg[0].totalCredit;
+      }
     }
 
     // 4. Process transactions
@@ -175,7 +175,7 @@ export async function GET(request: Request) {
       }
     });
 
-    transactions.sort((a, b) => 
+    transactions.sort((a, b) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
 
@@ -199,7 +199,7 @@ export async function GET(request: Request) {
       const monthStart = startOfMonth(month);
       const monthEnd = endOfMonth(month);
 
-      const monthTransactions = transactions.filter(t => 
+      const monthTransactions = transactions.filter(t =>
         isWithinInterval(new Date(t.date), { start: monthStart, end: monthEnd })
       );
 
@@ -220,7 +220,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       summary,
       transactions, // Still returning transactions in case needed for drill-down later
-      monthlyBreakdown: monthlyBreakdown // Newest first
+      monthlyBreakdown: monthlyBreakdown.reverse() // Newest first
     });
 
   } catch (error) {
@@ -238,8 +238,8 @@ function getPaymentMethod(journal: any): string {
   if (narration.includes('bank') || narration.includes('transfer')) return 'Bank Transfer';
   if (narration.includes('card') || narration.includes('credit')) return 'Card';
   if (narration.includes('cheque') || narration.includes('check')) return 'Cheque';
-  
-  const cashBankEntry = journal.entries?.find((e: any) => 
+
+  const cashBankEntry = journal.entries?.find((e: any) =>
     CASH_BANK_ACCOUNTS.includes(e.accountCode)
   );
   if (cashBankEntry) {

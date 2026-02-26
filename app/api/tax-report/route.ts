@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     });
 
     if (error) return error;
-    
+
     await dbConnect();
 
     // Parse query parameters
@@ -219,11 +219,11 @@ export async function GET(request: Request) {
 
     // --- Process Summary ---
     const netTaxLiability = summaryRes.totalSalesTax - summaryRes.totalPurchaseTax;
-    const salesTaxRate = summaryRes.totalRevenueExTax > 0 
-      ? (summaryRes.totalSalesTax / summaryRes.totalRevenueExTax) * 100 
+    const salesTaxRate = summaryRes.totalRevenueExTax > 0
+      ? (summaryRes.totalSalesTax / summaryRes.totalRevenueExTax) * 100
       : 0;
-    const purchaseTaxRate = summaryRes.totalPurchasesExTax > 0 
-      ? (summaryRes.totalPurchaseTax / summaryRes.totalPurchasesExTax) * 100 
+    const purchaseTaxRate = summaryRes.totalPurchasesExTax > 0
+      ? (summaryRes.totalPurchaseTax / summaryRes.totalPurchasesExTax) * 100
       : 0;
 
     const summary: TaxSummary = {
@@ -245,25 +245,25 @@ export async function GET(request: Request) {
     );
 
     const months = eachMonthOfInterval({ start: startDate, end: endDate });
-    
+
     const monthlyBreakdown: MonthlyBreakdown[] = months.map(month => {
       const monthKey = format(month, 'yyyy-MM');
-      
-      const data = monthlyMap.get(monthKey) || { 
-        monthSalesTax: 0, 
-        monthPurchaseTax: 0, 
-        monthRevenue: 0, 
+
+      const data = monthlyMap.get(monthKey) || {
+        monthSalesTax: 0,
+        monthPurchaseTax: 0,
+        monthRevenue: 0,
         monthPurchasesExTax: 0,
         salesCount: 0,
         purchaseCount: 0
       };
 
       const monthNetTaxLiability = data.monthSalesTax - data.monthPurchaseTax;
-      const monthSalesTaxRate = data.monthRevenue > 0 
-        ? (data.monthSalesTax / data.monthRevenue) * 100 
+      const monthSalesTaxRate = data.monthRevenue > 0
+        ? (data.monthSalesTax / data.monthRevenue) * 100
         : 0;
-      const monthPurchaseTaxRate = data.monthPurchasesExTax > 0 
-        ? (data.monthPurchaseTax / data.monthPurchasesExTax) * 100 
+      const monthPurchaseTaxRate = data.monthPurchasesExTax > 0
+        ? (data.monthPurchaseTax / data.monthPurchasesExTax) * 100
         : 0;
 
       return {
@@ -283,7 +283,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       summary,
-      monthlyBreakdown
+      monthlyBreakdown: monthlyBreakdown.reverse()
     });
 
   } catch (error) {

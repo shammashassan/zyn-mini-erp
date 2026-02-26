@@ -264,7 +264,7 @@ export async function GET(request: Request) {
       summary,
       trends, // Include trends in response
       dailyData,
-      monthlyBreakdown
+      monthlyBreakdown: monthlyBreakdown.reverse()
     });
 
   } catch (error) {

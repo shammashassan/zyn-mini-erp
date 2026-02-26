@@ -319,7 +319,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       summary,
       categoryData,
-      monthlyBreakdown,
+      monthlyBreakdown: monthlyBreakdown.reverse(),
       monthlyTrend,
       trends
     });
