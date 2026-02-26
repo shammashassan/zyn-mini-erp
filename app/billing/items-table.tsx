@@ -11,10 +11,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Item } from "@/lib/types";
 import type { IProduct } from "@/models/Product";
-import { Check, ChevronsUpDown, Plus, PlusCircle, Trash2 } from "lucide-react";
+import { Check, ChevronsUpDown, PlusCircle, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatCurrency } from "@/utils/formatters/currency";
+import { ProductForm } from "@/app/inventory/products/product-form";
 
 interface ItemsTableProps {
   items: Item[];
@@ -22,9 +23,10 @@ interface ItemsTableProps {
   updateItem: (index: number, field: keyof Item, value: string | number | boolean) => void;
   addItem: () => void;
   removeItem: (index: number) => void;
+  onRefreshProducts?: () => Promise<void>;
 }
 
-function ItemRow({ item, index, products, updateItem, removeItem }: { item: Item; index: number; products: IProduct[]; updateItem: ItemsTableProps['updateItem']; removeItem: ItemsTableProps['removeItem'] }) {
+function ItemRow({ item, index, products, updateItem, removeItem, onOpenCreate }: { item: Item; index: number; products: IProduct[]; updateItem: ItemsTableProps['updateItem']; removeItem: ItemsTableProps['removeItem']; onOpenCreate: (index: number, name: string) => void }) {
   const [open, setOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const inputStyles = "bg-background placeholder:text-muted-foreground/70";
@@ -41,26 +43,6 @@ function ItemRow({ item, index, products, updateItem, removeItem }: { item: Item
     updateItem(index, "rate", product.price);
     setOpen(false);
     setSearchQuery("");
-  };
-
-  const handleCreateNew = () => {
-    if (searchQuery.trim()) {
-      updateItem(index, "description", searchQuery.trim());
-      updateItem(index, "shouldCreateProduct", false);
-      // Don't auto-set rate for custom items, let user decide
-      setOpen(false);
-      setSearchQuery("");
-    }
-  };
-
-  const handleMarkForCreation = () => {
-    if (searchQuery.trim()) {
-      updateItem(index, "description", searchQuery.trim());
-      updateItem(index, "shouldCreateProduct", true);
-      setOpen(false);
-      setSearchQuery("");
-      toast.info(`"${searchQuery}" will be created as a product when bill is submitted`);
-    }
   };
 
   const handleQuantityChange = (value: string) => {
@@ -115,20 +97,16 @@ function ItemRow({ item, index, products, updateItem, removeItem }: { item: Item
                   </CommandGroup>
                 )}
 
-                {/* Create Custom Item or New Product */}
+                {/* Create New Product */}
                 {searchQuery.trim() && !doesProductExist && (
-                  <CommandGroup heading="Add Custom Item">
+                  <CommandGroup heading="Create New Product">
                     <CommandItem
-                      onSelect={handleCreateNew}
+                      onSelect={() => {
+                        onOpenCreate(index, searchQuery);
+                        setOpen(false);
+                        setSearchQuery("");
+                      }}
                       className="text-primary"
-                      value={searchQuery} // Value ensures it's selectable via keyboard
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Use "{searchQuery}"
-                    </CommandItem>
-                    <CommandItem
-                      onSelect={handleMarkForCreation}
-                      className="text-green-600 dark:text-green-400"
                       value={`create-${searchQuery}`}
                     >
                       <PlusCircle className="mr-2 h-4 w-4" />
@@ -160,40 +138,96 @@ function ItemRow({ item, index, products, updateItem, removeItem }: { item: Item
 }
 
 
-export function ItemsTable({ items, products, updateItem, addItem, removeItem }: ItemsTableProps) {
+export function ItemsTable({ items, products, updateItem, addItem, removeItem, onRefreshProducts }: ItemsTableProps) {
+  const [isProductFormOpen, setIsProductFormOpen] = React.useState(false);
+  const [pendingItemName, setPendingItemName] = React.useState("");
+  const [pendingItemIndex, setPendingItemIndex] = React.useState<number | null>(null);
+
+  const handleOpenCreate = (index: number, name: string) => {
+    if (!name.trim()) return;
+    setPendingItemName(name.trim());
+    setPendingItemIndex(index);
+    setIsProductFormOpen(true);
+  };
+
+  const handleProductFormSubmit = async (data: any, id?: string) => {
+    const url = id ? `/api/products/${id}` : "/api/products";
+    const method = id ? "PUT" : "POST";
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (response.ok) {
+        const newProduct: IProduct = await response.json();
+        toast.success("Product created successfully");
+        if (onRefreshProducts) await onRefreshProducts();
+        if (pendingItemIndex !== null) {
+          updateItem(pendingItemIndex, "description", newProduct.name);
+          updateItem(pendingItemIndex, "rate", newProduct.price);
+        }
+        setIsProductFormOpen(false);
+        setPendingItemName("");
+        setPendingItemIndex(null);
+      } else {
+        const error = await response.json();
+        toast.error("Failed to create product", { description: error.error || "Please try again" });
+      }
+    } catch (error) {
+      console.error("Error creating product:", error);
+      toast.error("Failed to create product");
+    }
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Items</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-2/5">Description</TableHead>
-              <TableHead>Quantity</TableHead>
-              <TableHead>Rate</TableHead>
-              <TableHead>Total</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((item, index) => (
-              <ItemRow
-                key={index}
-                item={item}
-                index={index}
-                products={products}
-                updateItem={updateItem}
-                removeItem={removeItem}
-              />
-            ))}
-          </TableBody>
-        </Table>
-        <Button onClick={addItem} variant="default" className="mt-4 w-full">
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Item
-        </Button>
-      </CardContent>
-    </Card>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Items</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-2/5">Description</TableHead>
+                <TableHead>Quantity</TableHead>
+                <TableHead>Rate</TableHead>
+                <TableHead>Total</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item, index) => (
+                <ItemRow
+                  key={index}
+                  item={item}
+                  index={index}
+                  products={products}
+                  updateItem={updateItem}
+                  removeItem={removeItem}
+                  onOpenCreate={handleOpenCreate}
+                />
+              ))}
+            </TableBody>
+          </Table>
+          <Button onClick={addItem} variant="default" className="mt-4 w-full">
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Item
+          </Button>
+        </CardContent>
+      </Card>
+
+      <ProductForm
+        isOpen={isProductFormOpen}
+        onClose={() => {
+          setIsProductFormOpen(false);
+          setPendingItemName("");
+          setPendingItemIndex(null);
+        }}
+        onSubmit={handleProductFormSubmit}
+        defaultValues={pendingItemName ? { name: pendingItemName, type: "", price: 0 } as any : null}
+        existingTypes={[]}
+      />
+    </>
   );
 }
