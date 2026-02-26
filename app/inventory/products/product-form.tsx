@@ -172,7 +172,7 @@ export function ProductForm({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] lg:max-w-2xl max-h-[90vh] overflow-y-auto sidebar-scroll">
         <DialogHeader>
-          <DialogTitle>{defaultValues ? "Edit Product" : "Add New Product"}</DialogTitle>
+          <DialogTitle>{defaultValues?._id ? "Edit Product" : "Add New Product"}</DialogTitle>
           <DialogDescription>
             Fill in the details for the product below.
           </DialogDescription>
@@ -462,14 +462,14 @@ export function ProductForm({
             </DialogClose>
             <Button
               type="submit"
-              disabled={isSubmitting || (!!defaultValues && !isDirty)}
+              disabled={isSubmitting || (!!defaultValues?._id && !isDirty)}
             >
               {isSubmitting ? (
                 <>
                   <Spinner />
                   Saving...
                 </>
-              ) : defaultValues ? "Update Product" : "Save Product"}
+              ) : defaultValues?._id ? "Update Product" : "Save Product"}
             </Button>
           </DialogFooter>
         </form>

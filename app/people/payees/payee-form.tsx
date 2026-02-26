@@ -103,7 +103,7 @@ export function PayeeForm({ isOpen, onClose, onSubmit, defaultValues }: PayeeFor
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] lg:max-w-xl max-h-[90vh] overflow-y-auto sidebar-scroll">
         <DialogHeader>
-          <DialogTitle>{defaultValues ? "Edit Payee" : "Add New Payee"}</DialogTitle>
+          <DialogTitle>{defaultValues?._id ? "Edit Payee" : "Add New Payee"}</DialogTitle>
           <DialogDescription>
             Fill in the details for the payee below.
           </DialogDescription>
@@ -187,14 +187,14 @@ export function PayeeForm({ isOpen, onClose, onSubmit, defaultValues }: PayeeFor
             </DialogClose>
             <Button
               type="submit"
-              disabled={isSubmitting || (!!defaultValues && !isDirty)}
+              disabled={isSubmitting || (!!defaultValues?._id && !isDirty)}
             >
               {isSubmitting ? (
                 <>
                   <Spinner />
                   Saving...
                 </>
-              ) : defaultValues ? "Update Payee" : "Create Payee"}
+              ) : defaultValues?._id ? "Update Payee" : "Create Payee"}
             </Button>
           </DialogFooter>
         </form>

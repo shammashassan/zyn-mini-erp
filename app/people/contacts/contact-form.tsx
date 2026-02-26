@@ -168,7 +168,7 @@ export function ContactForm({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <UserCircle className="h-5 w-5" />
-                        {defaultValues ? "Edit Contact" : "Create Contact"}
+                        {defaultValues?._id ? "Edit Contact" : "Create Contact"}
                     </DialogTitle>
                     <DialogDescription>
                         Add or update contact person details for a party.
@@ -203,7 +203,7 @@ export function ContactForm({
                                             variant="outline"
                                             role="combobox"
                                             className="w-full justify-between"
-                                            disabled={!!defaultValues}
+                                            disabled={!!defaultValues?._id}
                                         >
                                             {field.value
                                                 ? (selectedParty?.company || selectedParty?.name || "Unknown Party")
@@ -421,14 +421,14 @@ export function ContactForm({
                         </Button>
                         <Button
                             type="submit"
-                            disabled={isSubmitting || (!!defaultValues && !isDirty)}
+                            disabled={isSubmitting || (!!defaultValues?._id && !isDirty)}
                         >
                             {isSubmitting ? (
                                 <>
                                     <Spinner />
                                     Saving...
                                 </>
-                            ) : defaultValues ? "Update Contact" : "Create Contact"}
+                            ) : defaultValues?._id ? "Update Contact" : "Create Contact"}
                         </Button>
                     </DialogFooter>
                 </form>

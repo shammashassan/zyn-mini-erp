@@ -158,7 +158,7 @@ export function PartyForm({ isOpen, onClose, onSubmit, defaultValues }: PartyFor
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Users className="h-5 w-5" />
-                        {defaultValues ? "Edit Party" : "Create Party"}
+                        {defaultValues?._id ? "Edit Party" : "Create Party"}
                     </DialogTitle>
                     <DialogDescription>
                         Add or update party information. A party can be both a customer and supplier.
@@ -443,14 +443,14 @@ export function PartyForm({ isOpen, onClose, onSubmit, defaultValues }: PartyFor
                         </Button>
                         <Button
                             type="submit"
-                            disabled={isSubmitting || (!!defaultValues && !isDirty)}
+                            disabled={isSubmitting || (!!defaultValues?._id && !isDirty)}
                         >
                             {isSubmitting ? (
                                 <>
                                     <Spinner />
                                     Saving...
                                 </>
-                            ) : defaultValues ? "Update Party" : "Create Party"}
+                            ) : defaultValues?._id ? "Update Party" : "Create Party"}
                         </Button>
                     </DialogFooter>
                 </form>

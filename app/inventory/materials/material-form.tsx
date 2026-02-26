@@ -193,7 +193,7 @@ export function MaterialForm({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] lg:max-w-1xl max-h-[90vh] overflow-y-auto sidebar-scroll">
         <DialogHeader>
-          <DialogTitle>{defaultValues ? "Edit Material" : "Add New Material"}</DialogTitle>
+          <DialogTitle>{defaultValues?._id ? "Edit Material" : "Add New Material"}</DialogTitle>
           <DialogDescription>
             Fill in the details for the material below.
           </DialogDescription>
@@ -392,14 +392,14 @@ export function MaterialForm({
             </DialogClose>
             <Button
               type="submit"
-              disabled={isSubmitting || (!!defaultValues && !isDirty)}
+              disabled={isSubmitting || (!!defaultValues?._id && !isDirty)}
             >
               {isSubmitting ? (
                 <>
                   <Spinner />
                   Saving...
                 </>
-              ) : defaultValues ? "Update Material" : "Save Material"}
+              ) : defaultValues?._id ? "Update Material" : "Save Material"}
             </Button>
           </DialogFooter>
         </form>
