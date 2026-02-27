@@ -218,14 +218,21 @@ export function CreateInvoiceModal({
 
         <div className="space-y-4">
           <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
-            <div className="col-span-2">
-              <Label className="text-xs text-muted-foreground mb-1 block">Customer</Label>
-              <div className="text-sm font-medium">{customerName}</div>
-            </div>
             <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Quotation:</span>
-              <span className="text-sm font-medium">{quotation.invoiceNumber}</span>
+              <span className="text-sm text-muted-foreground">Customer:</span>
+              <span className="text-sm font-medium">{customerName}</span>
             </div>
+            {quotation.contactSnapshot?.name && (
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Contact:</span>
+                <span className="text-sm font-medium">
+                  {quotation.contactSnapshot.name}
+                  {quotation.contactSnapshot.designation && (
+                    <span className="text-muted-foreground font-normal"> ({quotation.contactSnapshot.designation})</span>
+                  )}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Items:</span>
               <span className="text-sm font-medium">{quotation.items.length} item(s)</span>

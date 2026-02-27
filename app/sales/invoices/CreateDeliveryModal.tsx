@@ -20,7 +20,7 @@ import type { Invoice } from "./columns";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+
 
 interface CreateDeliveryModalProps {
   isOpen: boolean;
@@ -232,15 +232,21 @@ export function CreateDeliveryModal({
         <div className="space-y-6">
           {/* Invoice Summary */}
           <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
-            <div className="col-span-2">
-              <Label className="text-xs text-muted-foreground mb-1 block">Customer</Label>
-              <Input
-                value={displayName}
-                readOnly
-                disabled
-                className="bg-muted"
-              />
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">Customer:</span>
+              <span className="text-sm font-medium">{displayName}</span>
             </div>
+            {invoice.contactSnapshot?.name && (
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Contact:</span>
+                <span className="text-sm font-medium">
+                  {invoice.contactSnapshot.name}
+                  {invoice.contactSnapshot.designation && (
+                    <span className="text-muted-foreground font-normal"> ({invoice.contactSnapshot.designation})</span>
+                  )}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Invoice:</span>
               <span className="text-sm font-medium font-mono">{invoice.invoiceNumber}</span>

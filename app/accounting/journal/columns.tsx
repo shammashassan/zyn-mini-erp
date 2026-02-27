@@ -1,7 +1,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, ArrowUpDown, Edit, Trash2, Eye, XCircle } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, Edit, Trash2, Eye, XCircle, SendHorizonal } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -423,79 +423,104 @@ export const getJournalColumns = (
       cell: ({ row }) => {
         const journal = row.original;
         const { canUpdate, canDelete, canVoid: hasVoidPermission } = permissions;
+        const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+        const refresh = onRefresh || (() => { });
 
         const canEdit = journal.status === 'draft' && canUpdate;
+        const canPostAction = journal.status === 'draft' && permissions.canPost;
         const canVoid = journal.status === 'posted' && hasVoidPermission;
         const canDeleteAction = journal.status !== 'posted' && canDelete;
 
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
 
-              <DropdownMenuItem
-                onClick={() => onView(journal)}
-                className="cursor-pointer"
-              >
-                <Eye className="mr-2 h-4 w-4" />
-                View Details
-              </DropdownMenuItem>
-
-              {canEdit && (
                 <DropdownMenuItem
-                  onClick={() => onEdit(journal)}
+                  onClick={() => onView(journal)}
                   className="cursor-pointer"
                 >
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Details
                 </DropdownMenuItem>
-              )}
 
-              {canVoid && (
-                <>
-                  <DropdownMenuSeparator />
-                  <VoidJournalDialog
-                    journal={journal}
-                    onVoid={onVoid}
-                    trigger={
-                      <DropdownMenuItem
-                        className="text-orange-600 cursor-pointer"
-                        onSelect={(e) => e.preventDefault()}
-                      >
-                        <XCircle className="mr-2 h-4 w-4" />
-                        Void Entry
-                      </DropdownMenuItem>
-                    }
-                  />
-                </>
-              )}
+                {canEdit && (
+                  <DropdownMenuItem
+                    onClick={() => onEdit(journal)}
+                    className="cursor-pointer"
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Entry
+                  </DropdownMenuItem>
+                )}
 
-              {canDeleteAction && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DeleteJournalDialog
-                    journal={journal}
-                    onDelete={onDelete}
-                    trigger={
-                      <DropdownMenuItem
-                        className="text-destructive cursor-pointer"
-                        onSelect={(e) => e.preventDefault()}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    }
-                  />
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {canPostAction && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setIsPostModalOpen(true)}
+                      className="cursor-pointer text-green-600"
+                    >
+                      <SendHorizonal className="mr-2 h-4 w-4" />
+                      Post Entry
+                    </DropdownMenuItem>
+                  </>
+                )}
+
+                {canVoid && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <VoidJournalDialog
+                      journal={journal}
+                      onVoid={onVoid}
+                      trigger={
+                        <DropdownMenuItem
+                          className="text-orange-600 cursor-pointer"
+                          onSelect={(e) => e.preventDefault()}
+                        >
+                          <XCircle className="mr-2 h-4 w-4" />
+                          Void Entry
+                        </DropdownMenuItem>
+                      }
+                    />
+                  </>
+                )}
+
+                {canDeleteAction && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DeleteJournalDialog
+                      journal={journal}
+                      onDelete={onDelete}
+                      trigger={
+                        <DropdownMenuItem
+                          className="text-destructive cursor-pointer"
+                          onSelect={(e) => e.preventDefault()}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      }
+                    />
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <JournalStatusUpdateModal
+              isOpen={isPostModalOpen}
+              onClose={() => setIsPostModalOpen(false)}
+              journal={journal}
+              onRefresh={refresh}
+            />
+          </>
         );
       },
     },

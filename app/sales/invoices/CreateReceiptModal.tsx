@@ -193,15 +193,21 @@ export function CreateReceiptModal({
         <div className="space-y-4">
           {/* Invoice Summary */}
           <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
-            <div className="col-span-2">
-              <Label className="text-xs text-muted-foreground mb-1 block">Customer</Label>
-              <Input
-                value={displayName}
-                readOnly
-                disabled
-                className="bg-muted"
-              />
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">Customer:</span>
+              <span className="text-sm font-medium">{displayName}</span>
             </div>
+            {invoice.contactSnapshot?.name && (
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Contact:</span>
+                <span className="text-sm font-medium">
+                  {invoice.contactSnapshot.name}
+                  {invoice.contactSnapshot.designation && (
+                    <span className="text-muted-foreground font-normal"> ({invoice.contactSnapshot.designation})</span>
+                  )}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Total Amount:</span>
               <span className="text-sm font-medium">{formatCurrency(invoice.grandTotal)}</span>

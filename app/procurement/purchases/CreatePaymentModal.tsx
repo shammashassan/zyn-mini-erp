@@ -29,6 +29,12 @@ interface Purchase {
   partySnapshot: {
     displayName: string;
   };
+  contactSnapshot?: {
+    name: string;
+    phone?: string;
+    email?: string;
+    designation?: string;
+  };
   totalAmount: number;
   isTaxPayable?: boolean;
   vatAmount?: number;
@@ -226,27 +232,23 @@ export function CreatePaymentModal({
         <div className="space-y-4">
           {/* Purchase Summary */}
           <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
-            <div className="col-span-2">
-              <Label className="text-xs text-muted-foreground mb-1 block">Supplier</Label>
-              <Input
-                value={displayName}
-                readOnly
-                disabled
-                className="bg-muted"
-              />
-            </div>
             <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Total Amount:</span>
-              <span className="text-sm font-medium text-muted-foreground">{formatCurrency(purchase.totalAmount)}</span>
+              <span className="text-sm text-muted-foreground">Supplier:</span>
+              <span className="text-sm font-medium">{displayName}</span>
             </div>
-            {purchase.isTaxPayable && purchase.vatAmount && purchase.vatAmount > 0 && (
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Includes VAT:</span>
-                <span>{formatCurrency(purchase.vatAmount)}</span>
+            {purchase.contactSnapshot?.name && (
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Contact:</span>
+                <span className="text-sm font-medium">
+                  {purchase.contactSnapshot.name}
+                  {purchase.contactSnapshot.designation && (
+                    <span className="text-muted-foreground font-normal"> ({purchase.contactSnapshot.designation})</span>
+                  )}
+                </span>
               </div>
             )}
             <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Grand Total:</span>
+              <span className="text-sm text-muted-foreground">Total Amount:</span>
               <span className="text-sm font-medium">{formatCurrency(displayTotal)}</span>
             </div>
             <div className="flex justify-between">

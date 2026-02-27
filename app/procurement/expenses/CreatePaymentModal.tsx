@@ -205,18 +205,11 @@ export function CreatePaymentModal({
 
         <div className="space-y-4">
           <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
-            <div className="col-span-2 space-y-2">
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-xs text-muted-foreground">
-                  {(expense as any).payeeSnapshot ? 'Payee' : 'Vendor'}
-                </Label>
-              </div>
-              <Input
-                value={displayPayeeName}
-                readOnly
-                disabled
-                className="bg-muted"
-              />
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">
+                {(expense as any).payeeSnapshot ? 'Payee:' : 'Vendor:'}
+              </span>
+              <span className="text-sm font-medium">{displayPayeeName}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Category:</span>

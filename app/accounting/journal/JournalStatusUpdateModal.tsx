@@ -36,11 +36,11 @@ const getStatusColor = (status: string) => {
   }
 };
 
-export function JournalStatusUpdateModal({ 
-  isOpen, 
-  onClose, 
-  journal, 
-  onRefresh 
+export function JournalStatusUpdateModal({
+  isOpen,
+  onClose,
+  journal,
+  onRefresh
 }: JournalStatusUpdateModalProps) {
   const [initialStatus, setInitialStatus] = useState(journal.status);
   const [isLoading, setIsLoading] = useState(false);
@@ -146,7 +146,7 @@ export function JournalStatusUpdateModal({
               </>
             ) : (
               <>
-                <FileCheck className="mr-2 h-4 w-4" />
+                {/* <FileCheck className="h-4 w-4" /> */}
                 Post Entry
               </>
             )}

@@ -176,15 +176,21 @@ export function CreatePaymentModal({
         <div className="space-y-4">
           {/* Credit Note Summary */}
           <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
-            <div className="col-span-2 space-y-2">
-              <Label className="text-xs text-muted-foreground">Party</Label>
-              <Input
-                value={partyDisplayName}
-                readOnly
-                disabled
-                className="bg-muted"
-              />
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">Party:</span>
+              <span className="text-sm font-medium">{partyDisplayName}</span>
             </div>
+            {creditNote.contactSnapshot?.name && (
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Contact:</span>
+                <span className="text-sm font-medium">
+                  {creditNote.contactSnapshot.name}
+                  {creditNote.contactSnapshot.designation && (
+                    <span className="text-muted-foreground font-normal"> ({creditNote.contactSnapshot.designation})</span>
+                  )}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Total Amount:</span>
               <span className="text-sm font-medium">{formatCurrency(creditNote.grandTotal)}</span>
