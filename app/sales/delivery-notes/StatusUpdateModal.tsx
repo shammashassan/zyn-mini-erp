@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import type { DeliveryNote } from "./columns";
 import { Spinner } from "@/components/ui/spinner";
+import { formatCurrency } from "@/utils/formatters/currency";
 import { Clock, Truck, CheckCircle, XCircle } from "lucide-react";
 
 interface StatusUpdateModalProps {
@@ -108,6 +109,38 @@ export function StatusUpdateModal({ isOpen, onClose, deliveryNote, onRefresh }: 
         </DialogHeader>
 
         <div className="space-y-4">
+          <div className="rounded-lg border p-3 bg-muted/50 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Delivery No:</span>
+              <span className="font-medium font-mono">{deliveryNote.invoiceNumber}</span>
+            </div>
+            {deliveryNote.partySnapshot?.displayName || deliveryNote.partyId?.name || deliveryNote.partyId?.company ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Party:</span>
+                <span className="font-medium">
+                  {deliveryNote.partySnapshot?.displayName || deliveryNote.partyId?.name || deliveryNote.partyId?.company}
+                </span>
+              </div>
+            ) : null}
+            {deliveryNote.contactSnapshot?.name ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Contact:</span>
+                <span className="font-medium">
+                  {deliveryNote.contactSnapshot.name}
+                  {deliveryNote.contactSnapshot.designation ? (
+                    <span className="text-muted-foreground font-normal"> ({deliveryNote.contactSnapshot.designation})</span>
+                  ) : null}
+                </span>
+              </div>
+            ) : null}
+            {deliveryNote.grandTotal ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Amount:</span>
+                <span className="font-medium text-green-600">{formatCurrency(deliveryNote.grandTotal)}</span>
+              </div>
+            ) : null}
+          </div>
+
           <div className="grid gap-2 grid-cols-2">
             {availableStatuses.map((status) => {
               const StatusIcon = getStatusIcon(status);

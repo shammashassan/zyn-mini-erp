@@ -23,6 +23,7 @@ import { Spinner } from "@/components/ui/spinner";
 
 interface Purchase {
   _id: string;
+  referenceNumber: string;
   inventoryStatus: 'pending' | 'received' | 'partially received';
   totalAmount: number;
   grandTotal?: number;
@@ -35,7 +36,14 @@ interface Purchase {
     total: number;
     receivedQuantity?: number;
   }>;
-  partyId?: any; // Unified Party Reference
+  partySnapshot?: {
+    displayName: string;
+  };
+  contactSnapshot?: {
+    name: string;
+    designation?: string;
+  };
+  partyId?: any;
 }
 
 interface InventoryStatusUpdateModalProps {
@@ -343,14 +351,29 @@ export function InventoryStatusUpdateModal({
           {/* Purchase Info */}
           <div className="rounded-lg border p-3 bg-muted/50 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Party:</span>
-              <span className="font-medium">
-                {purchase.partyId?.name || purchase.partyId?.company || 'Unknown Party'}
-              </span>
+              <span className="text-muted-foreground">PO No:</span>
+              <span className="font-medium font-mono">{purchase.referenceNumber}</span>
             </div>
             <div className="flex justify-between mt-1">
+              <span className="text-muted-foreground">Party:</span>
+              <span className="font-medium">
+                {purchase.partySnapshot?.displayName || purchase.partyId?.name || purchase.partyId?.company || 'Unknown Party'}
+              </span>
+            </div>
+            {purchase.contactSnapshot?.name ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Contact:</span>
+                <span className="font-medium">
+                  {purchase.contactSnapshot.name}
+                  {purchase.contactSnapshot.designation ? (
+                    <span className="text-muted-foreground font-normal"> ({purchase.contactSnapshot.designation})</span>
+                  ) : null}
+                </span>
+              </div>
+            ) : null}
+            <div className="flex justify-between mt-1">
               <span className="text-muted-foreground">Total:</span>
-              <span className="font-medium">{formatCurrency(displayTotal)}</span>
+              <span className="font-medium text-green-600">{formatCurrency(displayTotal)}</span>
             </div>
           </div>
 
@@ -525,7 +548,7 @@ export function InventoryStatusUpdateModal({
                 </p>
                 {newStatus === 'received' && (
                   <p className="text-green-700 dark:text-green-300 text-xs mt-1">
-                    ✅ Journal entry will be created
+                    Journal entry will be created
                   </p>
                 )}
               </div>
@@ -542,7 +565,7 @@ export function InventoryStatusUpdateModal({
                 </p>
                 {purchase.inventoryStatus === 'received' && (
                   <p className="text-orange-700 dark:text-orange-300 text-xs mt-1">
-                    🔴 Journal entry will be voided
+                    Journal entry will be voided
                   </p>
                 )}
               </div>

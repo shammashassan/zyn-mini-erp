@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import type { Quotation } from "./columns";
 import { Spinner } from "@/components/ui/spinner";
+import { formatCurrency } from "@/utils/formatters/currency";
 import { Clock, Send, CheckCircle, XCircle } from "lucide-react";
 
 interface StatusUpdateModalProps {
@@ -109,6 +110,38 @@ export function StatusUpdateModal({ isOpen, onClose, quotation, onRefresh }: Sta
         </DialogHeader>
 
         <div className="space-y-4">
+          <div className="rounded-lg border p-3 bg-muted/50 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Quotation No:</span>
+              <span className="font-medium font-mono">{quotation.invoiceNumber}</span>
+            </div>
+            {quotation.partySnapshot?.displayName || quotation.partyId?.name || quotation.partyId?.company ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Party:</span>
+                <span className="font-medium">
+                  {quotation.partySnapshot?.displayName || quotation.partyId?.name || quotation.partyId?.company}
+                </span>
+              </div>
+            ) : null}
+            {quotation.contactSnapshot?.name ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Contact:</span>
+                <span className="font-medium">
+                  {quotation.contactSnapshot.name}
+                  {quotation.contactSnapshot.designation ? (
+                    <span className="text-muted-foreground font-normal"> ({quotation.contactSnapshot.designation})</span>
+                  ) : null}
+                </span>
+              </div>
+            ) : null}
+            {quotation.grandTotal ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Amount:</span>
+                <span className="font-medium text-green-600">{formatCurrency(quotation.grandTotal)}</span>
+              </div>
+            ) : null}
+          </div>
+
           <div className="grid gap-2 grid-cols-2">
             {availableStatuses.map((status) => {
               const StatusIcon = getStatusIcon(status);
@@ -149,11 +182,7 @@ export function StatusUpdateModal({ isOpen, onClose, quotation, onRefresh }: Sta
             </div>
           </div>
 
-          {newStatus === 'approved' && quotation.status !== 'approved' && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg text-sm text-blue-900 dark:text-blue-100">
-              💡 Use the Convert button to create an invoice from this quotation
-            </div>
-          )}
+
         </div>
 
         <DialogFooter>

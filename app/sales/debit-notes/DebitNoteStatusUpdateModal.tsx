@@ -29,9 +29,15 @@ interface DebitNote {
   partySnapshot?: {
     displayName: string;
   };
+  contactSnapshot?: {
+    name: string;
+    designation?: string;
+  };
 
   // ✅ References (fallback)
   partyId?: any;
+
+  debitNoteNumber?: string;
 }
 
 interface DebitNoteStatusUpdateModalProps {
@@ -127,48 +133,32 @@ export function DebitNoteStatusUpdateModal({
         <div className="space-y-4">
           {/* Debit Note Info */}
           <div className="rounded-lg border p-3 bg-muted/50 text-sm">
-            <div className="flex justify-between">
+            {debitNote.debitNoteNumber ? (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Debit Note No:</span>
+                <span className="font-medium font-mono">{debitNote.debitNoteNumber}</span>
+              </div>
+            ) : null}
+            <div className="flex justify-between mt-1">
               <span className="text-muted-foreground">Party:</span>
               <span className="font-medium">{partyName}</span>
             </div>
-            <div className="flex justify-between mt-2">
+            {debitNote.contactSnapshot?.name ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Contact:</span>
+                <span className="font-medium">
+                  {debitNote.contactSnapshot.name}
+                  {debitNote.contactSnapshot.designation ? (
+                    <span className="text-muted-foreground font-normal"> ({debitNote.contactSnapshot.designation})</span>
+                  ) : null}
+                </span>
+              </div>
+            ) : null}
+            <div className="flex justify-between mt-1">
               <span className="text-muted-foreground">Total:</span>
-              <span className="font-medium">{formatCurrency(displayTotal)}</span>
+              <span className="font-medium text-green-600">{formatCurrency(displayTotal)}</span>
             </div>
           </div>
-
-          {/* Status Warning */}
-          {newStatus === 'approved' && initialStatus !== 'approved' && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
-                <div className="text-sm">
-                  <p className="font-medium text-blue-900 dark:text-blue-100">
-                    Approving this debit note
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This will create a journal entry crediting inventory/COGS and debiting accounts payable.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {initialStatus === 'approved' && newStatus !== 'approved' && (
-            <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
-                <div className="text-sm">
-                  <p className="font-medium text-orange-900 dark:text-orange-100">
-                    ⚠️ Reversing approved status
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This will void the associated journal entry.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Status Selection */}
           <div className="grid grid-cols-3 gap-2">
@@ -211,6 +201,39 @@ export function DebitNoteStatusUpdateModal({
               </Badge>
             </div>
           </div>
+
+          {/* Status Warning */}
+          {newStatus === 'approved' && initialStatus !== 'approved' && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-blue-900 dark:text-blue-100">
+                    Approving this debit note
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This will create a journal entry crediting inventory/COGS and debiting accounts payable.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {initialStatus === 'approved' && newStatus !== 'approved' && (
+            <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-orange-900 dark:text-orange-100">
+                    Reversing approved status
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This will void the associated journal entry.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

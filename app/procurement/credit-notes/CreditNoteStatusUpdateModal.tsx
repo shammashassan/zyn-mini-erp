@@ -20,12 +20,19 @@ import { AlertCircle, Clock, CheckCircle, XCircle } from "lucide-react";
 
 interface CreditNote {
   _id: string;
+  creditNoteNumber?: string;
   status: 'pending' | 'approved' | 'cancelled';
-  payeeName?: string;
+  partySnapshot?: {
+    displayName: string;
+  };
+  contactSnapshot?: {
+    name: string;
+    designation?: string;
+  };
   totalAmount: number;
   grandTotal?: number;
   vatAmount?: number;
-  partyId?: any; // Unified Party Reference
+  partyId?: any;
 }
 
 interface CreditNoteStatusUpdateModalProps {
@@ -124,50 +131,36 @@ export function CreditNoteStatusUpdateModal({
         <div className="space-y-4">
           {/* Credit Note Info */}
           <div className="rounded-lg border p-3 bg-muted/50 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Party:</span>
-              <span className="font-medium">
-                {creditNote.partyId?.name || creditNote.partyId?.company || 'Unknown Party'}
-              </span>
-            </div>
-            <div className="flex justify-between mt-2">
+            {creditNote.creditNoteNumber ? (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Credit Note No:</span>
+                <span className="font-medium font-mono">{creditNote.creditNoteNumber}</span>
+              </div>
+            ) : null}
+            {creditNote.partySnapshot?.displayName || creditNote.partyId?.name || creditNote.partyId?.company ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Party:</span>
+                <span className="font-medium">
+                  {creditNote.partySnapshot?.displayName || creditNote.partyId?.name || creditNote.partyId?.company}
+                </span>
+              </div>
+            ) : null}
+            {creditNote.contactSnapshot?.name ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Contact:</span>
+                <span className="font-medium">
+                  {creditNote.contactSnapshot.name}
+                  {creditNote.contactSnapshot.designation ? (
+                    <span className="text-muted-foreground font-normal"> ({creditNote.contactSnapshot.designation})</span>
+                  ) : null}
+                </span>
+              </div>
+            ) : null}
+            <div className="flex justify-between mt-1">
               <span className="text-muted-foreground">Total:</span>
-              <span className="font-medium">{formatCurrency(displayTotal)}</span>
+              <span className="font-medium text-green-600">{formatCurrency(displayTotal)}</span>
             </div>
           </div>
-
-          {/* Status Warning */}
-          {newStatus === 'approved' && initialStatus !== 'approved' && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
-                <div className="text-sm">
-                  <p className="font-medium text-blue-900 dark:text-blue-100">
-                    Approving this credit note
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This will create a journal entry debiting revenue/sales and crediting accounts receivable.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {initialStatus === 'approved' && newStatus !== 'approved' && (
-            <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
-                <div className="text-sm">
-                  <p className="font-medium text-orange-900 dark:text-orange-100">
-                    ⚠️ Reversing approved status
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This will void the associated journal entry.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Status Selection */}
           <div className="grid grid-cols-3 gap-2">
@@ -210,6 +203,39 @@ export function CreditNoteStatusUpdateModal({
               </Badge>
             </div>
           </div>
+
+          {/* Status Warning */}
+          {newStatus === 'approved' && initialStatus !== 'approved' && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-blue-900 dark:text-blue-100">
+                    Approving this credit note
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This will create a journal entry debiting revenue/sales and crediting accounts receivable.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {initialStatus === 'approved' && newStatus !== 'approved' && (
+            <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-orange-900 dark:text-orange-100">
+                    Reversing approved status
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This will void the associated journal entry.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

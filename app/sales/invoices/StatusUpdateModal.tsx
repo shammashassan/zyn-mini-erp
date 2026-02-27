@@ -16,7 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import type { Invoice } from "./columns";
 import { Spinner } from "@/components/ui/spinner";
-import { Clock, CheckCircle, XCircle } from "lucide-react";
+import { formatCurrency } from "@/utils/formatters/currency";
+import { Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 
 interface StatusUpdateModalProps {
   isOpen: boolean;
@@ -105,6 +106,38 @@ export function StatusUpdateModal({ isOpen, onClose, invoice, onRefresh }: Statu
         </DialogHeader>
 
         <div className="space-y-4">
+          <div className="rounded-lg border p-3 bg-muted/50 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Invoice No:</span>
+              <span className="font-medium font-mono">{invoice.invoiceNumber}</span>
+            </div>
+            {invoice.partySnapshot?.displayName || invoice.partyId?.name || invoice.partyId?.company ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Party:</span>
+                <span className="font-medium">
+                  {invoice.partySnapshot?.displayName || invoice.partyId?.name || invoice.partyId?.company}
+                </span>
+              </div>
+            ) : null}
+            {invoice.contactSnapshot?.name ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Contact:</span>
+                <span className="font-medium">
+                  {invoice.contactSnapshot.name}
+                  {invoice.contactSnapshot.designation ? (
+                    <span className="text-muted-foreground font-normal"> ({invoice.contactSnapshot.designation})</span>
+                  ) : null}
+                </span>
+              </div>
+            ) : null}
+            {invoice.grandTotal ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Amount:</span>
+                <span className="font-medium text-green-600">{formatCurrency(invoice.grandTotal)}</span>
+              </div>
+            ) : null}
+          </div>
+
           <div className="grid gap-2 grid-cols-3">
             {availableStatuses.map((status) => {
               const StatusIcon = getStatusIcon(status);
@@ -146,8 +179,34 @@ export function StatusUpdateModal({ isOpen, onClose, invoice, onRefresh }: Statu
           </div>
 
           {newStatus === 'approved' && invoice.status !== 'approved' && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg text-sm text-blue-900 dark:text-blue-100">
-              💡 Use the Receipt button to create receipt vouchers for payments
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-blue-900 dark:text-blue-100">
+                    Approving this invoice
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This will create a journal entry debiting accounts receivable and crediting revenue.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {invoice.status === 'approved' && newStatus !== 'approved' && (
+            <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-orange-900 dark:text-orange-100">
+                    Reversing approved status
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This will void the associated journal entry.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -15,13 +15,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
-import { Clock, CheckCircle, XCircle } from "lucide-react";
+import { formatCurrency } from "@/utils/formatters/currency";
+import { Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 
 interface Expense {
   _id: string;
   referenceNumber: string;
   description: string;
+  amount: number;
   status: 'pending' | 'approved' | 'cancelled';
+  vendor?: string;
+  payeeSnapshot?: {
+    name: string;
+  };
 }
 
 interface StatusUpdateModalProps {
@@ -116,6 +122,31 @@ export function StatusUpdateModal({
         </DialogHeader>
 
         <div className="space-y-4">
+          <div className="rounded-lg border p-3 bg-muted/50 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Ref No:</span>
+              <span className="font-medium font-mono">{expense.referenceNumber}</span>
+            </div>
+            {expense.payeeSnapshot?.name || expense.vendor ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Payee:</span>
+                <span className="font-medium">{expense.payeeSnapshot?.name || expense.vendor}</span>
+              </div>
+            ) : null}
+            {expense.amount ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Amount:</span>
+                <span className="font-medium text-green-600">{formatCurrency(expense.amount)}</span>
+              </div>
+            ) : null}
+            {expense.description ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Description:</span>
+                <span className="font-medium text-right max-w-[60%]">{expense.description}</span>
+              </div>
+            ) : null}
+          </div>
+
           <div className="grid gap-2 grid-cols-3">
             {availableStatuses.map((status) => {
               const StatusIcon = getStatusIcon(status);
@@ -157,8 +188,34 @@ export function StatusUpdateModal({
           </div>
 
           {newStatus === 'approved' && expense.status !== 'approved' && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg text-sm text-blue-900 dark:text-blue-100">
-              💡 Use the Payment button to create payment vouchers for this expense
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-blue-900 dark:text-blue-100">
+                    Approving this expense
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This will create a journal entry debiting the expense account and crediting accounts payable.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {expense.status === 'approved' && newStatus !== 'approved' && (
+            <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-orange-900 dark:text-orange-100">
+                    Reversing approved status
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This will void the associated journal entry.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </div>

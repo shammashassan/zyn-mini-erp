@@ -27,6 +27,7 @@ interface SalesReturn {
   }>;
   partyId?: any;
   partySnapshot?: any;
+  contactSnapshot?: any;
 }
 
 interface SalesReturnStatusUpdateModalProps {
@@ -137,6 +138,17 @@ export function SalesReturnStatusUpdateModal({
                 </span>
               </div>
             ) : null}
+            {salesReturn.contactSnapshot?.name ? (
+              <div className="flex justify-between mt-1">
+                <span className="text-muted-foreground">Contact:</span>
+                <span className="font-medium">
+                  {salesReturn.contactSnapshot.name}
+                  {salesReturn.contactSnapshot.designation ? (
+                    <span className="text-muted-foreground font-normal"> ({salesReturn.contactSnapshot.designation})</span>
+                  ) : null}
+                </span>
+              </div>
+            ) : null}
             {salesReturn.items && salesReturn.items.length > 0 && (
               <>
                 <div className="flex justify-between mt-1">
@@ -152,7 +164,7 @@ export function SalesReturnStatusUpdateModal({
             {salesReturn.grandTotal && (
               <div className="flex justify-between mt-1">
                 <span className="text-muted-foreground">Amount:</span>
-                <span className="font-medium text-red-600">{formatCurrency(salesReturn.grandTotal)}</span>
+                <span className="font-medium text-green-600">{formatCurrency(salesReturn.grandTotal)}</span>
               </div>
             )}
           </div>
