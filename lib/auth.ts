@@ -28,11 +28,11 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24, // 24 hours
     updateAge: 60 * 60 * 4,  // Update session in DB every 4 hours
-    cookieCache: {           // CRITICAL FIX: Extended cache time to prevent frequent DB hits
+    cookieCache: {
       enabled: true,
-      maxAge: 60 * 60 * 2,   // Cache lasts 2 hours (was 15 mins)
-      strategy: "compact",   // Compact strategy for performance
-      refreshCache: true
+      maxAge: 60 * 60 * 2,   // Cache lasts 2 hours
+      strategy: "compact",
+      // NOTE: refreshCache is only for stateless (DB-less) setups — removed
     }
   },
 
@@ -71,9 +71,6 @@ export const auth = betterAuth({
   databaseHooks: {
     session: {
       create: {
-        async before(session) {
-          // No-op
-        },
         async after(session) {
           try {
             let result = await db.collection('user').updateOne(

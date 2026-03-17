@@ -308,6 +308,10 @@ function UsersPageContent() {
         const formData = new FormData();
         const filename = `${Date.now()}-avatar.jpeg`;
         formData.append('file', avatarBlob, filename);
+        // Pass old image URL so the server can delete it from Cloudinary
+        if (selectedUser.image) {
+          formData.append('oldImageUrl', selectedUser.image);
+        }
         const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
         const uploadData = await uploadRes.json();
         if (!uploadRes.ok || !uploadData.success) {
@@ -316,6 +320,14 @@ function UsersPageContent() {
         imageUrl = uploadData.url;
       } else if (wasAvatarRemoved) {
         imageUrl = null;
+        // Delete old image from Cloudinary
+        if (selectedUser.image) {
+          fetch('/api/upload', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageUrl: selectedUser.image }),
+          }).catch(e => console.warn('Failed to delete old avatar from Cloudinary:', e));
+        }
       }
 
       const updateData: any = {

@@ -58,13 +58,13 @@ type UserFormData = {
 interface UserFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: any, avatarBlob: Blob | null, wasAvatarRemoved: boolean) => void;
+  onSubmit: (data: any, avatarBlob: Blob | null, wasAvatarRemoved: boolean) => Promise<void>;
   defaultValues?: BetterAuthUser | null;
   currentUserRole?: string;
 }
 
 export function UserForm({ isOpen, onClose, onSubmit, defaultValues, currentUserRole }: UserFormProps) {
-  const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting, errors } } = useForm<UserFormData>();
+  const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting, errors, isDirty } } = useForm<UserFormData>();
 
   const [avatarBlob, setAvatarBlob] = React.useState<Blob | null>(null);
   const [wasAvatarRemoved, setWasAvatarRemoved] = React.useState(false);
@@ -137,7 +137,7 @@ export function UserForm({ isOpen, onClose, onSubmit, defaultValues, currentUser
     }
   };
 
-  const handleFormSubmit: SubmitHandler<UserFormData> = (data) => {
+  const handleFormSubmit: SubmitHandler<UserFormData> = async (data) => {
     if (data.username && (isEditing ? data.username !== defaultValues?.username : true) && !usernameAvailable) {
       toast.error("Username is not available.");
       return;
@@ -148,7 +148,7 @@ export function UserForm({ isOpen, onClose, onSubmit, defaultValues, currentUser
       ...(isEditing && data.password && { newPassword: data.password }),
     };
 
-    onSubmit(submissionData, avatarBlob, wasAvatarRemoved);
+    await onSubmit(submissionData, avatarBlob, wasAvatarRemoved);
   };
 
   const getUsernameStatus = () => {
@@ -161,6 +161,7 @@ export function UserForm({ isOpen, onClose, onSubmit, defaultValues, currentUser
   };
 
   const usernameStatus = getUsernameStatus();
+  const hasChanges = isDirty || avatarBlob !== null || wasAvatarRemoved;
 
   // Check if current user can assign a specific role
   const canAssignRole = (role: string) => {
@@ -257,7 +258,7 @@ export function UserForm({ isOpen, onClose, onSubmit, defaultValues, currentUser
 
               <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
-                <Select value={watchedRole} onValueChange={(value) => setValue("role", value)}>
+                <Select value={watchedRole} onValueChange={(value) => setValue("role", value, { shouldDirty: true })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="user">User</SelectItem>
@@ -316,7 +317,7 @@ export function UserForm({ isOpen, onClose, onSubmit, defaultValues, currentUser
               </DialogClose>
               <Button
                 type="submit"
-                disabled={isSubmitting || (!!watchedUsername && usernameAvailable === false)}
+              disabled={isSubmitting || (!!watchedUsername && usernameAvailable === false) || (isEditing && !hasChanges)}
               >
                 {isSubmitting ? (
                   <>

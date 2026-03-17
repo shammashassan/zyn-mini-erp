@@ -66,13 +66,13 @@ type EmployeeFormData = {
 interface EmployeeFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: any, avatarBlob: Blob | null, wasAvatarRemoved: boolean, id?: string) => void;
+  onSubmit: (data: any, avatarBlob: Blob | null, wasAvatarRemoved: boolean, id?: string) => Promise<void>;
   defaultValues?: IEmployee | null;
   existingRoles?: string[];
 }
 
 export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existingRoles = [] }: EmployeeFormProps) {
-  const { register, handleSubmit, reset, control, formState: { isSubmitting } } = useForm<EmployeeFormData>({
+  const { register, handleSubmit, reset, control, formState: { isSubmitting, isDirty } } = useForm<EmployeeFormData>({
     defaultValues: {
       firstName: "",
       lastName: "",
@@ -138,10 +138,13 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
     }
   };
 
-  const handleFormSubmit: SubmitHandler<EmployeeFormData> = (data) => {
+  const handleFormSubmit: SubmitHandler<EmployeeFormData> = async (data) => {
     const submissionId = defaultValues?._id ? String(defaultValues._id) : undefined;
-    onSubmit(data, avatarBlob, wasAvatarRemoved, submissionId);
+    await onSubmit(data, avatarBlob, wasAvatarRemoved, submissionId);
   };
+
+  const isEditing = !!defaultValues?._id;
+  const hasChanges = isDirty || avatarBlob !== null || wasAvatarRemoved;
 
   const handleAddCustomRole = (field: any) => {
     if (customRole.trim()) {
@@ -409,7 +412,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
           <DialogClose asChild>
             <Button type="button" variant="outline">Cancel</Button>
           </DialogClose>
-          <Button type="submit" form="employee-form" disabled={isSubmitting}>
+          <Button type="submit" form="employee-form" disabled={isSubmitting || (isEditing && !hasChanges)}>
             {isSubmitting ? (
               <>
                 <Spinner />

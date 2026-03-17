@@ -199,6 +199,10 @@ function EmployeesPageContent() {
       const formData = new FormData();
       const filename = `${Date.now()}-avatar.jpeg`;
       formData.append("file", avatarBlob, filename);
+      // Pass old avatar URL so the server can delete it from Cloudinary
+      if (selectedEmployee?.avatar) {
+        formData.append("oldImageUrl", selectedEmployee.avatar);
+      }
       try {
         const uploadRes = await fetch("/api/upload", {
           method: "POST",
@@ -214,6 +218,14 @@ function EmployeesPageContent() {
       }
     } else if (wasAvatarRemoved) {
       finalData.avatar = "";
+      // Delete old image from Cloudinary
+      if (selectedEmployee?.avatar) {
+        fetch("/api/upload", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageUrl: selectedEmployee.avatar }),
+        }).catch(e => console.warn("Failed to delete old employee avatar from Cloudinary:", e));
+      }
     }
 
     const url = id ? `/api/employees/${id}` : "/api/employees";

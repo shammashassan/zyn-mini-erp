@@ -154,6 +154,10 @@ export function ProfileSection() {
         const formData = new FormData();
         const filename = `${Date.now()}-avatar.jpeg`;
         formData.append('file', avatarBlob, filename);
+        // Pass old image URL so the server can delete it from Cloudinary
+        if (session?.user?.image) {
+          formData.append('oldImageUrl', session.user.image);
+        }
 
         try {
           const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -167,6 +171,14 @@ export function ProfileSection() {
         }
       } else if (wasAvatarRemoved) {
         imageUrl = null;
+        // Delete old image from Cloudinary
+        if (session?.user?.image) {
+          fetch('/api/upload', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageUrl: session.user.image }),
+          }).catch(e => console.warn('Failed to delete old avatar from Cloudinary:', e));
+        }
       }
 
       // --- PART B: Update Basic Profile ---
@@ -440,7 +452,6 @@ export function ProfileSection() {
               Cancel
             </Button>
             <Button onClick={() => {
-              setIsImageModalOpen(false);
               handleSubmit(onSubmit)();
             }} disabled={(!avatarBlob && !wasAvatarRemoved) || isUpdating}>
                {isUpdating ? (
