@@ -748,7 +748,7 @@ export function DebitNoteForm({
                     existingTypes={materialTypes}
                     existingUnits={materialUnits}
                     fields={fields}
-                    control={control}
+                    control={control as any}
                     register={register}
                     watch={watch}
                     setValue={setValue}

@@ -1,7 +1,6 @@
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
-export interface IParty extends Document {
-    _id: string;
+export interface IParty extends Document<string> {
 
     // Identity
     company?: string;          // Legal business name (for companies)

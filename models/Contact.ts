@@ -1,7 +1,6 @@
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
-export interface IContact extends Document {
-    _id: string;
+export interface IContact extends Document<string> {
     partyId: mongoose.Types.ObjectId;         // REQUIRED - parent Party
 
     // Human identity

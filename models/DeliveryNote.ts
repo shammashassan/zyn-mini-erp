@@ -43,8 +43,7 @@ export interface IContactSnapshot {
   designation?: string;
 }
 
-export interface IDeliveryNote extends Document {
-  _id: string;
+export interface IDeliveryNote extends Document<string> {
   invoiceNumber: string;
 
   // Party & Contact References (Dynamic - Current Truth)

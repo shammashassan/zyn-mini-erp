@@ -2,8 +2,7 @@
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
-export interface IPayee extends Document {
-  _id: string;
+export interface IPayee extends Document<string> {
   name: string;
   type: 'employee' | 'landlord' | 'consultant' | 'restaurant' | 'vendor' | 'contractor' | 'utility_company' | 'service_provider' | 'government' | 'miscellaneous' | 'individual';
   email?: string;

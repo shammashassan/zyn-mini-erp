@@ -373,7 +373,7 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                 existingTypes={materialTypes}
                 existingUnits={materialUnits}
                 fields={fields}
-                control={control}
+                control={control as any}
                 register={register}
                 watch={watch}
                 setValue={setValue}

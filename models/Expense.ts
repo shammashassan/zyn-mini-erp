@@ -28,8 +28,7 @@ export interface IPayeeSnapshot {
   address?: string;
 }
 
-export interface IExpense extends Document {
-  _id: string;
+export interface IExpense extends Document<string> {
   referenceNumber: string;
   description: string;
   amount: number;

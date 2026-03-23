@@ -79,7 +79,7 @@ export async function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = {
+export const proxyConfig = {
   matcher: [
     // Match all request paths except for the ones starting with:
     // - _next/static (static files)

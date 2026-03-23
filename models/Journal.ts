@@ -21,8 +21,7 @@ export interface IAuditEntry {
   }[];
 }
 
-export interface IJournal extends Document {
-  _id: string;
+export interface IJournal extends Document<string> {
   journalNumber: string;
   entryDate: Date;
   referenceType: 'Invoice' | 'Receipt' | 'Payment' | 'Purchase' | 'Expense' | 'DebitNote' | 'CreditNote' | 'General' | 'Contra' | 'Adjustment';

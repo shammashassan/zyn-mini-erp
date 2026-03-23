@@ -2,8 +2,7 @@
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
-export interface IMaterial extends Document {
-  _id: string;
+export interface IMaterial extends Document<string> {
   name: string;
   type: string;
   unit: string;

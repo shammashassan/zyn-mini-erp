@@ -2,8 +2,7 @@
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
-export interface IEmployee extends Document {
-  _id: string;
+export interface IEmployee extends Document<string> {
   firstName: string;
   lastName: string;
   role: string;

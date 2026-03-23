@@ -51,8 +51,7 @@ export interface IContactSnapshot {
   designation?: string;
 }
 
-export interface IInvoice extends Document {
-  _id: string;
+export interface IInvoice extends Document<string> {
   invoiceNumber: string;
 
   // Party & Contact References (Dynamic - Current Truth)

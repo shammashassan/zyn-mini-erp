@@ -14,7 +14,7 @@ import { ChartAreaInteractive } from "./dashboard-chart";
 import { SectionCards, type CardData } from "@/components/section-cards";
 import { getColumns, type RecentSale } from "./columns";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
-import { redirect, useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { formatCurrency, formatCompactCurrency } from "@/utils/formatters/currency";
 import { useDashboardPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
@@ -197,6 +197,13 @@ function DashboardContent() {
     return () => window.removeEventListener("focus", onFocus);
   }, [fetchDashboardData, isMounted, canRead]);
 
+  // Redirect to login if not authenticated (after mount + auth check)
+  useEffect(() => {
+    if (isMounted && !isPending && !session) {
+      router.push(`/login?callbackURL=${encodeURIComponent(pathname)}`);
+    }
+  }, [isMounted, isPending, session, router, pathname]);
+
   const handleViewPdf = (sale: RecentSale) => {
     if (!sale || !sale._id) {
       toast.error("Cannot view PDF. Document data is missing.");
@@ -282,7 +289,7 @@ function DashboardContent() {
   }
 
   if (!session) {
-    redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
+    return null;
   }
 
   if (!canRead) {

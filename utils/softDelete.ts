@@ -2,7 +2,7 @@
 
 import mongoose, { Model, Document } from 'mongoose';
 
-interface SoftDeleteDocument extends Document {
+interface SoftDeleteDocument extends Document<string> {
   isDeleted: boolean;
   deletedAt: Date | null;
   deletedBy: string | null;

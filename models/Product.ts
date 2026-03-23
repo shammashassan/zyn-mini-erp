@@ -9,8 +9,7 @@ export interface IBOMItem {
 }
 
 
-export interface IProduct extends Document {
-  _id: string;
+export interface IProduct extends Document<string> {
   name: string;
   type: string;
   price: number;

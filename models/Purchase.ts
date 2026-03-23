@@ -52,8 +52,7 @@ export interface IContactSnapshot {
   designation?: string;
 }
 
-export interface IPurchase extends Document {
-  _id: string;
+export interface IPurchase extends Document<string> {
   referenceNumber: string;
 
   // ✅ Party & Contact References (Dynamic - Current Truth)

@@ -2,8 +2,7 @@
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
-export interface IStockAdjustment extends Document {
-  _id: string;
+export interface IStockAdjustment extends Document<string> {
   materialId: mongoose.Types.ObjectId;
   materialName: string;
   adjustmentType: 'increment' | 'decrement';

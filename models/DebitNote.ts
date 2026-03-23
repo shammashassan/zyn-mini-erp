@@ -50,8 +50,7 @@ export interface IContactSnapshot {
   designation?: string;
 }
 
-export interface IDebitNote extends Document {
-  _id: string;
+export interface IDebitNote extends Document<string> {
   debitNoteNumber: string;
 
   // ✅ Party & Contact References (Dynamic - Current Truth)

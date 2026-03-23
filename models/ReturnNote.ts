@@ -27,8 +27,7 @@ export interface IAuditEntry {
   }[];
 }
 
-export interface IReturnNote extends Document {
-  _id: string;
+export interface IReturnNote extends Document<string> {
   returnNumber: string;
   returnType: 'salesReturn' | 'purchaseReturn';
 

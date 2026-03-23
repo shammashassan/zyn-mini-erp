@@ -50,8 +50,7 @@ export interface IContactSnapshot {
   designation?: string;
 }
 
-export interface IVoucher extends Document {
-  _id: string;
+export interface IVoucher extends Document<string> {
   invoiceNumber: string;
   voucherType: 'receipt' | 'payment';
 

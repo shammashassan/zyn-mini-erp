@@ -2,8 +2,7 @@
 
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
-export interface IChartOfAccount extends Document {
-  _id: string;
+export interface IChartOfAccount extends Document<string> {
   accountCode: string;
   accountName: string;
   groupName: 'Assets' | 'Liabilities' | 'Equity' | 'Income' | 'Expenses';

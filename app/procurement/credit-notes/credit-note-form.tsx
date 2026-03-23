@@ -741,7 +741,7 @@ export function CreditNoteForm({ isOpen, onClose, onSubmit, defaultValues, retur
                     onRefreshItems={fetchProducts}
                     existingTypes={productTypes}
                     fields={fields}
-                    control={control}
+                    control={control as any}
                     register={register}
                     watch={watch}
                     setValue={setValue}

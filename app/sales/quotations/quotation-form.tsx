@@ -314,7 +314,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                 onRefreshItems={fetchProducts}
                 existingTypes={productTypes}
                 fields={fields}
-                control={control}
+                control={control as any}
                 register={register}
                 watch={watch}
                 setValue={setValue}
