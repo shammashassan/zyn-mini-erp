@@ -165,7 +165,6 @@ const ExpenseSchema: Schema<IExpense> = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'Payee',
     required: false,
-    index: true
   },
 
   // Immutable Snapshot
