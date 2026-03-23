@@ -81,11 +81,14 @@ export async function proxy(request: NextRequest) {
 
 export const proxyConfig = {
   matcher: [
-    // Match all request paths except for the ones starting with:
-    // - _next/static (static files)
-    // - _next/image (image optimization files)
-    // - favicon.ico (favicon file)
-    // - public folder assets
-    '/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)',
+    /*
+     * Match all request paths EXCEPT:
+     * - _next/static (static files — CSS, JS chunks)
+     * - _next/image (image optimization)
+     * - favicon.ico
+     * - Files with extensions (images, fonts, etc.)
+     * - api routes (handled separately)
+     */
+    '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2|ttf|otf)).*)',
   ],
 };
