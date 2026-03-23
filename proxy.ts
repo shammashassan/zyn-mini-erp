@@ -7,6 +7,17 @@ const PUBLIC_ROUTES = ['/login'];
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
+  // ⚡ STATIC ASSET GUARD — must be first, before any auth logic.
+  // If the matcher config is not excluding these correctly, this catches them.
+  // _next/static, _next/image, and any file with an extension must always pass through.
+  if (
+    path.startsWith('/_next/') ||
+    path.startsWith('/favicon') ||
+    /\.[a-zA-Z0-9]+$/.test(path) // has a file extension
+  ) {
+    return NextResponse.next();
+  }
+
   // 🛡️ RATE LIMITING LOGIC
   // We only limit POST requests (usually login/mutations) or specific paths to save quota
   // You can remove "request.method === 'POST'" if you want to limit EVERYTHING.
