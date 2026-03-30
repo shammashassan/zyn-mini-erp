@@ -469,7 +469,9 @@ export const getColumns = (
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction variant="destructive">
+                  <AlertDialogAction
+                    onClick={() => onDelete(String(expense._id))}
+                    variant="destructive">
                     Delete
                   </AlertDialogAction>
                 </AlertDialogFooter>
