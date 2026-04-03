@@ -33,20 +33,33 @@ import { FileText, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import type { IProduct } from "@/models/Product";
 import type { Quotation } from "./columns";
 import { formatCurrency } from "@/utils/formatters/currency";
-import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 import { Spinner } from "@/components/ui/spinner";
 import { PartyContactSelector } from "@/components/PartyContactSelector";
 import { ItemsTable } from "@/components/ItemsTable";
 
+/** Minimal item shape returned from /api/items */
+type ItemApiData = {
+  _id: string;
+  name: string;
+  sellingPrice: number;
+  costPrice: number;
+  unit?: string;
+  category?: string;
+  types: string[];
+  taxRate?: number;
+  taxType?: string;
+};
+
 type QuotationItem = {
-  productId?: string;
+  itemId?: string;
   description: string;
   quantity: number;
-  rate: number;
+  price: number;
   total: number;
+  taxRate?: number;      // stored snapshot — needed to recompute taxAmount when qty/price change
+  taxAmount?: number;    // pre-computed tax for this line — VATtotal = sum(taxAmount)
   shouldCreateProduct?: boolean;
 };
 
@@ -80,7 +93,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
     defaultValues: {
       partyId: "",
       contactId: undefined,
-      items: [{ productId: "", description: "", quantity: 1, rate: 0, total: 0 }],
+      items: [{ itemId: "", description: "", quantity: 1, price: 0, total: 0, taxRate: 0, taxAmount: 0 }],
       discount: 0,
       notes: "",
       quotationDate: new Date(),
@@ -93,8 +106,8 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
     name: "items"
   });
 
-  const [products, setProducts] = useState<IProduct[]>([]);
-  const [productTypes, setProductTypes] = useState<string[]>([]); // ✅ ADDED
+  const [itemCatalog, setItemCatalog] = useState<ItemApiData[]>([]);
+  const [itemTypes, setItemTypes] = useState<string[]>([]); // distinct categories/types for ItemsTable
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
 
@@ -111,27 +124,29 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
 
   const grossTotal = watchedItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
   const subTotal = Math.max(grossTotal - (Number(discount) || 0), 0);
-  const vatAmount = subTotal * (UAE_VAT_PERCENTAGE / 100);
+  // VAT = simple sum of per-line taxAmount snapshots (no rate lookup, no fallback)
+  const vatAmount = watchedItems.reduce((sum, item) =>
+    sum + (Number((item as any).taxAmount) || 0), 0);
   const grandTotal = subTotal + vatAmount;
   const totalItems = watchedItems.filter(item => item.description).length;
 
-  // ✅ UPDATED: Extract types
-  const fetchProducts = async () => {
+  // Fetch from unified /api/items — ?types=product matches ['product'] AND ['product','material']
+  const fetchItems = async () => {
     try {
-      const productsRes = await fetch("/api/products");
-      if (productsRes.ok) {
-        const productsData = await productsRes.json();
-        setProducts(productsData);
-        const types = Array.from(new Set(productsData.map((p: IProduct) => p.type).filter(Boolean))) as string[];
-        setProductTypes(types);
+      const res = await fetch("/api/items?types=product");
+      if (res.ok) {
+        const data: ItemApiData[] = await res.json();
+        setItemCatalog(data);
+        const types = Array.from(new Set(data.map(p => p.category).filter(Boolean))) as string[];
+        setItemTypes(types);
       }
     } catch (error) {
-      console.error("Failed to fetch products:", error);
+      console.error("Failed to fetch items:", error);
     }
   };
 
   useEffect(() => {
-    fetchProducts();
+    fetchItems();
   }, []);
 
   useEffect(() => {
@@ -144,7 +159,15 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
         reset({
           partyId: partyIdValue || "",
           contactId: defaultValues.contactId?.toString() || undefined,
-          items: defaultValues.items || [{ productId: "", description: "", quantity: 1, rate: 0, total: 0 }],
+          items: defaultValues.items?.map((it: any) => ({
+            itemId: it.itemId?.toString() || '',
+            description: it.description || '',
+            quantity: it.quantity ?? 1,
+            price: it.rate ?? it.price ?? 0,
+            total: it.total ?? 0,
+            taxRate: it.taxRate ?? 0,
+            taxAmount: it.taxAmount ?? 0,
+          })) || [{ itemId: "", description: "", quantity: 1, price: 0, total: 0, taxRate: 0, taxAmount: 0 }],
           discount: defaultValues.discount || 0,
           notes: defaultValues.notes || "",
           quotationDate: defaultValues.quotationDate ? new Date(defaultValues.quotationDate) : new Date(),
@@ -154,7 +177,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
         reset({
           partyId: "",
           contactId: undefined,
-          items: [{ productId: "", description: "", quantity: 1, rate: 0, total: 0 }],
+          items: [{ itemId: "", description: "", quantity: 1, price: 0, total: 0, taxRate: 0, taxAmount: 0 }],
           discount: 0,
           notes: "",
           quotationDate: new Date(),
@@ -187,20 +210,32 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
       return;
     }
 
+    // Totals: VAT is sum of per-line taxAmount
+    const finalGrossTotal = calculatedGrossTotal;
+    const finalSubTotal = Math.max(finalGrossTotal - (Number(data.discount) || 0), 0);
+    const finalVatAmount = validItems.reduce((sum, item) =>
+      sum + (Number((item as any).taxAmount) || 0), 0);
+    const finalGrandTotal = finalSubTotal + finalVatAmount;
+
     const submitData = {
       partyId: data.partyId,
       contactId: data.contactId,
       quotationDate: data.quotationDate,
       items: validItems.map(item => ({
-        productId: item.productId || '',
+        itemId: item.itemId || '',
         description: item.description,
         quantity: Number(item.quantity) || 0,
-        rate: Number(item.rate) || 0,
-        total: Number(item.total) || 0
+        rate: Number(item.price) || 0,
+        total: Number(item.total) || 0,
+        taxRate: Number((item as any).taxRate) || 0,
+        taxAmount: Number((item as any).taxAmount) || 0,
       })),
       discount: Number(data.discount) || 0,
       notes: data.notes,
       status: isEditMode ? data.status : "pending",
+      totalAmount: finalGrossTotal,
+      vatAmount: finalVatAmount,
+      grandTotal: finalGrandTotal,
     };
 
     const submissionId = defaultValues?._id ? String(defaultValues._id) : undefined;
@@ -309,16 +344,15 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
             </CardHeader>
             <CardContent className="space-y-4">
               <ItemsTable
-                itemType="product"
-                items={products}
-                onRefreshItems={fetchProducts}
-                existingTypes={productTypes}
+                allowedTypes={['product']}
+                items={itemCatalog}
+                onRefreshItems={fetchItems}
                 fields={fields}
                 control={control as any}
                 register={register}
                 watch={watch}
                 setValue={setValue}
-                onAppendItem={() => append({ productId: "", description: "", quantity: 1, rate: 0, total: 0 })}
+                onAppendItem={() => append({ itemId: "", description: "", quantity: 1, price: 0, total: 0 })}
                 onRemoveItem={remove}
                 fieldName="items"
                 isDesktop={isDesktop}
@@ -369,7 +403,7 @@ export function QuotationForm({ isOpen, onClose, onSubmit, defaultValues }: Quot
                   <span className="font-medium">{formatCurrency(subTotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">VAT ({UAE_VAT_PERCENTAGE}%):</span>
+                  <span className="text-muted-foreground">Calculated VAT:</span>
                   <span className="font-medium">{formatCurrency(vatAmount)}</span>
                 </div>
                 <div className="flex justify-between pt-3 border-t">

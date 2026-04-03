@@ -140,6 +140,9 @@ export function CreateInvoiceModal({
           status: "pending",
           items: quotation.items,
           discount: quotation.discount || 0,
+          vatAmount: quotation.vatAmount || 0,
+          totalAmount: quotation.totalAmount,
+          grandTotal: quotation.grandTotal,
           invoiceDate: new Date(),
           notes: invoiceNotes,
           connectedDocuments: {

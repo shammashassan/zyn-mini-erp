@@ -89,29 +89,16 @@ export function useNotificationPermissions() {
   });
 }
 
-// Specific hook for product permissions
-export function useProductPermissions() {
+// Specific hook for item permissions (unified products/materials)
+export function useItemPermissions() {
   return usePermissions({
-    canRead: { product: ["read"] },
-    canCreate: { product: ["create"] },
-    canUpdate: { product: ["update"] },
-    canDelete: { product: ["soft_delete"] },
-    canViewTrash: { product: ["view_trash"] },
-    canRestore: { product: ["restore"] },
-    canPermanentDelete: { product: ["permanent_delete"] },
-  });
-}
-
-// Specific hook for material permissions
-export function useMaterialPermissions() {
-  return usePermissions({
-    canRead: { material: ["read"] },
-    canCreate: { material: ["create"] },
-    canUpdate: { material: ["update"] },
-    canDelete: { material: ["soft_delete"] },
-    canViewTrash: { material: ["view_trash"] },
-    canRestore: { material: ["restore"] },
-    canPermanentDelete: { material: ["permanent_delete"] },
+    canRead: { item: ["read"] },
+    canCreate: { item: ["create"] },
+    canUpdate: { item: ["update"] },
+    canDelete: { item: ["soft_delete"] },
+    canViewTrash: { item: ["view_trash"] },
+    canRestore: { item: ["restore"] },
+    canPermanentDelete: { item: ["permanent_delete"] },
   });
 }
 

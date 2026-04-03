@@ -111,7 +111,7 @@ export default async function generateInvoiceNumber(
       }
 
       // Count existing documents matching the pattern
-      count = await Model.countDocuments(query);
+      count = await Model.countDocuments(query).setOptions({ includeDeleted: true });
 
       // Generate next number
       const nextNumber = count + 1 + attempt;
@@ -120,20 +120,21 @@ export default async function generateInvoiceNumber(
 
       // Double-check uniqueness based on the specific field name
       let exists;
+      let queryField = 'invoiceNumber';
+      
       if (documentType === 'journal') {
-        exists = await Model.findOne({ journalNumber: generatedNumber });
+        queryField = 'journalNumber';
       } else if (documentType === 'purchase' || documentType === 'expense') {
-        exists = await Model.findOne({ referenceNumber: generatedNumber });
+        queryField = 'referenceNumber';
       } else if (documentType === 'return') {
-        exists = await Model.findOne({ returnNumber: generatedNumber });
+        queryField = 'returnNumber';
       } else if (documentType === 'debitNote') {
-        exists = await Model.findOne({ debitNoteNumber: generatedNumber });
+        queryField = 'debitNoteNumber';
       } else if (documentType === 'creditNote') {
-        exists = await Model.findOne({ creditNoteNumber: generatedNumber });
-      } else {
-        // ✅ For invoice, quotation, delivery, receipt, payment - all use invoiceNumber
-        exists = await Model.findOne({ invoiceNumber: generatedNumber });
+        queryField = 'creditNoteNumber';
       }
+
+      exists = await Model.findOne({ [queryField]: generatedNumber }).setOptions({ includeDeleted: true });
 
       if (!exists) {
         console.log(`✅ Generated ${documentType} number: ${generatedNumber}`);

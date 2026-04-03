@@ -1,4 +1,5 @@
 // app/sales/invoices/columns.tsx - FINAL: Using partySnapshot for display
+// UPDATED: Invoice line items use `itemId` (unified Item model)`
 
 "use client";
 
@@ -66,7 +67,7 @@ export interface Invoice {
   partyId: any;
   contactId?: string;
 
-  // ✅ Snapshots (Frozen - Legal Truth) - Optional for backward compatibility
+  // ✅ Snapshots (Frozen - Legal Truth)
   partySnapshot?: {
     displayName: string;
     address?: {
@@ -87,11 +88,13 @@ export interface Invoice {
     email?: string;
     designation?: string;
   };
-
+  totalAmount: number;
+  vatAmount: number;
   grandTotal: number;
   status: "pending" | "approved" | "cancelled";
   items: Array<{
-    productId?: string;
+    /** References the unified Item model. */
+    itemId?: string;
     description: string;
     quantity: number;
     rate: number;
@@ -242,7 +245,7 @@ const StatusBadgeButton = ({ invoice, onRefresh, canUpdateStatus }: { invoice: I
     } else {
       toast.error("You don't have permission to update invoice status");
     }
-  }
+  };
 
   return (
     <>
@@ -436,7 +439,6 @@ export const getColumns = (
       accessorKey: "partySnapshot.displayName",
       header: "Customer",
       cell: ({ row }) => {
-        // ✅ Use snapshot as primary, fallback to populated party
         const name = row.original.partySnapshot?.displayName
           || row.original.partyId?.company
           || row.original.partyId?.name

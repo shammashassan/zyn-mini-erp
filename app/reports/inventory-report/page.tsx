@@ -283,7 +283,7 @@ function InventoryReportPageContent() {
       },
       {
         name: "Out of Stock Items",
-        stat: summary.outOfStockItems.toString(),
+        stat: summary.outOfStockItems === 0 ? "None" : summary.outOfStockItems.toString(),
         changeType: summary.outOfStockItems > 0 ? "negative" : "positive",
         subtext: `${summary.lowStockItems} running low`
       },

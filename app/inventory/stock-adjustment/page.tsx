@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { toast } from "sonner";
-import { ArrowRightLeft, Plus, Trash2, CalendarIcon } from "lucide-react";
+import { ArrowRightLeft, Plus, Trash2, CalendarIcon, WarehouseIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useDataTable } from "@/hooks/use-data-table";
@@ -13,7 +13,6 @@ import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { DataTable } from "@/components/data-table/data-table";
 import { AdjustmentForm } from "./adjustment-form";
 import { getAdjustmentHistoryColumns, type IAdjustmentHistory } from "./columns"; // ✅ Import exported type
-import type { IMaterial } from "@/models/Material";
 import Link from "next/link";
 import { useStockAdjustmentPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
@@ -38,16 +37,16 @@ import { redirect, usePathname } from "next/navigation";
 import { StockAdjustmentViewModal } from "./StockAdjustmentViewModal";
 
 type AdjustmentFormData = {
-  materialId: string;
+  itemId: string;
   adjustmentType: "increment" | "decrement";
   value: number | "";
-  newUnitCost?: number;
+  newCostPrice?: number;
   adjustmentReason?: string;
 };
 
 function StockAdjustmentPageContent() {
   const pathname = usePathname();
-  const [materials, setMaterials] = useState<IMaterial[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [adjustmentHistory, setAdjustmentHistory] = useState<IAdjustmentHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   // ✅ Initial load state for the table specifically
@@ -90,20 +89,19 @@ function StockAdjustmentPageContent() {
     setIsMounted(true);
   }, []);
 
-  // ✅ Separate fetch for Materials (Only runs once on mount)
   useEffect(() => {
-    const fetchMaterials = async () => {
+    const fetchItems = async () => {
       if (!canRead) return;
       try {
-        const res = await fetch("/api/materials");
+        const res = await fetch("/api/items?types=material");
         if (res.ok) {
-          setMaterials(await res.json());
+          setItems(await res.json());
         }
       } catch (error) {
-        console.error("Failed to fetch materials", error);
+        console.error("Failed to fetch items", error);
       }
     };
-    if (canRead) fetchMaterials();
+    if (canRead) fetchItems();
   }, [canRead]);
 
   // ✅ UPDATED: Added 'background' param. If true, skips loading state (silent fetch).
@@ -194,14 +192,14 @@ function StockAdjustmentPageContent() {
 
     try {
       const isStockAdjustment = data.value !== 0;
-      const isPriceAdjustment = data.value === 0 && data.newUnitCost !== undefined;
+      const isPriceAdjustment = data.value === 0 && data.newCostPrice !== undefined;
 
       if (isStockAdjustment) {
         if (data.value === "" || typeof data.value !== "number" || data.value <= 0) {
           throw new Error("Please enter a valid quantity.");
         }
       } else if (isPriceAdjustment) {
-        if (data.newUnitCost === undefined || data.newUnitCost === null || data.newUnitCost < 0) {
+        if (data.newCostPrice === undefined || data.newCostPrice === null || data.newCostPrice < 0) {
           throw new Error("Please enter a valid unit cost.");
         }
       } else {
@@ -394,7 +392,7 @@ function StockAdjustmentPageContent() {
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold tracking-tight">
-                    Stock Adjustment
+                    Adjustment
                   </h1>
                   <p className="text-muted-foreground">
                     Review and manage all material inventory changes
@@ -415,6 +413,12 @@ function StockAdjustmentPageContent() {
                       </Button>
                     </Link>
                   )}
+                  <Link href="./stock">
+                    <Button variant="outline" className="gap-2">
+                      <WarehouseIcon className="h-4 w-4" />
+                      Stock Details
+                    </Button>
+                  </Link>
                   {canCreate && (
                     <Button onClick={() => setIsFormOpen(true)} className="gap-2 w-full sm:w-auto">
                       <Plus className="h-4 w-4" /> Adjust Stock
@@ -525,8 +529,8 @@ function StockAdjustmentPageContent() {
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onSubmit={handleFormSubmit}
-        materials={materials}
-        isLoadingMaterials={false} // Materials loaded on mount
+        items={items}
+        isLoadingItems={false} // Items loaded on mount
       />
 
       <StockAdjustmentViewModal

@@ -5,8 +5,6 @@ import dbConnect from "@/lib/dbConnect";
 import ReturnNote from "@/models/ReturnNote";
 import Purchase from "@/models/Purchase";
 import Invoice from "@/models/Invoice";
-import Material from "@/models/Material";
-import StockAdjustment from "@/models/StockAdjustment";
 import { restore } from "@/utils/softDelete";
 import { requireAuthAndPermission, validateRequiredFields } from "@/lib/auth-utils";
 import {
@@ -54,7 +52,9 @@ export async function POST(request: Request) {
           // Restore purchase item returned quantities
           for (const returnItem of returnNoteToRestore.items) {
             const purchaseItemIndex = purchase.items.findIndex(
-              (pi: any) => pi.materialId === returnItem.materialId
+              (pi: any) =>
+                (pi.itemId && returnItem.itemId && pi.itemId.toString() === returnItem.itemId.toString()) ||
+                pi.description === returnItem.description
             );
 
             if (purchaseItemIndex !== -1) {
@@ -85,7 +85,11 @@ export async function POST(request: Request) {
         // Reduce material stock again using helper function
         await removeStockForPurchaseReturn(
           returnNoteToRestore._id,
-          returnNoteToRestore.items,
+          returnNoteToRestore.items.map((item: any) => ({
+            itemId: item.itemId?.toString(),
+            itemName: item.description,
+            returnQuantity: item.returnQuantity,
+          })),
           returnNoteToRestore.returnNumber
         );
       } else if (returnType === 'salesReturn') {
@@ -93,7 +97,9 @@ export async function POST(request: Request) {
         if (invoice && !invoice.isDeleted) {
           for (const returnItem of returnNoteToRestore.items) {
             const invoiceItemIndex = invoice.items.findIndex(
-              (ii: any) => ii.description === returnItem.productName
+              (ii: any) =>
+                (ii.itemId && returnItem.itemId && ii.itemId.toString() === returnItem.itemId.toString()) ||
+                ii.description === returnItem.description
             );
 
             if (invoiceItemIndex !== -1) {

@@ -1,77 +1,57 @@
-// app/api/stock-adjustments/trash/restore/route.ts
+// app/api/stock-adjustments/trash/restore/route.ts - UPDATED: Uses itemId
 
-import { NextResponse } from "next/server";
-import dbConnect from "@/lib/dbConnect";
-import StockAdjustment from "@/models/StockAdjustment";
-import Material from "@/models/Material";
-import { restore } from "@/utils/softDelete";
-import { requireAuthAndPermission, validateRequiredFields } from "@/lib/auth-utils";
+import { NextResponse } from 'next/server';
+import dbConnect from '@/lib/dbConnect';
+import StockAdjustment from '@/models/StockAdjustment';
+import Item from '@/models/Item';
+import { restore } from '@/utils/softDelete';
+import { requireAuthAndPermission, validateRequiredFields } from '@/lib/auth-utils';
 
-/**
- * POST - Restore a soft-deleted stock adjustment
- * Body: { id: string }
- */
 export async function POST(request: Request) {
   try {
     const { error, session } = await requireAuthAndPermission({
-      stockAdjustment: ["restore"],
+      stockAdjustment: ['restore'],
     });
     if (error) return error;
 
     await dbConnect();
     const body = await request.json();
 
-    // Validate required fields
-    const { error: validationError } = validateRequiredFields(body, ["id"]);
+    const { error: validationError } = validateRequiredFields(body, ['id']);
     if (validationError) return validationError;
 
     const { id } = body;
-    
-    // Get the adjustment before restoring to reapply changes
-    const adjustmentToRestore = await StockAdjustment.findById(id)
-      .setOptions({ includeDeleted: true });
-    
-    if (!adjustmentToRestore) {
-      return NextResponse.json({ error: "Adjustment not found" }, { status: 404 });
+
+    const adj = await StockAdjustment.findById(id).setOptions({ includeDeleted: true });
+    if (!adj) {
+      return NextResponse.json({ error: 'Adjustment not found' }, { status: 404 });
+    }
+    if (!adj.isDeleted) {
+      return NextResponse.json({ error: 'Adjustment is not deleted' }, { status: 400 });
     }
 
-    if (!adjustmentToRestore.isDeleted) {
-      return NextResponse.json({ 
-        error: "Adjustment is not deleted" 
-      }, { status: 400 });
-    }
-
-    // Reapply the stock and price changes
-    const material = await Material.findById(adjustmentToRestore.materialId);
-    if (material) {
-      const stockReapplyValue = adjustmentToRestore.adjustmentType === 'increment' 
-        ? adjustmentToRestore.value 
-        : -adjustmentToRestore.value;
-      
-      const newStock = material.stock + stockReapplyValue;
-      
-      const wasUnitCostChanged = adjustmentToRestore.oldUnitCost !== adjustmentToRestore.newUnitCost;
-      
-      const updatePayload: { stock: number; unitCost?: number } = {
-        stock: newStock
-      };
-      
-      if (wasUnitCostChanged && typeof adjustmentToRestore.newUnitCost === 'number') {
-        updatePayload.unitCost = adjustmentToRestore.newUnitCost;
+    // Re-apply the stock / cost change to the Item
+    const item = await Item.findById(adj.itemId);
+    if (item) {
+      const stockReapply = adj.adjustmentType === 'increment' ? adj.value : -adj.value;
+      const newStock = item.stock + stockReapply;
+      const updatePayload: any = { stock: newStock };
+      if (
+        typeof adj.newCostPrice === 'number' &&
+        adj.newCostPrice !== adj.oldCostPrice
+      ) {
+        updatePayload.costPrice = adj.newCostPrice;
       }
-      
-      await Material.findByIdAndUpdate(adjustmentToRestore.materialId, updatePayload);
+      await Item.findByIdAndUpdate(adj.itemId, updatePayload);
     }
-    
-    // Restore the adjustment record
-    const restoredAdjustment = await restore(StockAdjustment, id, session.user.id);
-    
-    return NextResponse.json({ 
-      message: "Adjustment restored successfully and changes reapplied",
-      adjustment: restoredAdjustment 
+
+    const restored = await restore(StockAdjustment, id, session.user.id);
+    return NextResponse.json({
+      message: 'Adjustment restored and changes reapplied',
+      adjustment: restored,
     });
   } catch (error) {
-    console.error("Failed to restore stock adjustment:", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    console.error('POST /api/stock-adjustments/trash/restore error:', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

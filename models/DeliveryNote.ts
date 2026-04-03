@@ -3,10 +3,15 @@
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
 export interface IItem extends Document {
+  /** References the unified Item model*/
+  itemId?: mongoose.Types.ObjectId;
   description: string;
   quantity: number;
   rate: number;
   total: number;
+  /** Carried over from invoice line item — for audit/reference only */
+  taxRate?: number;
+  taxAmount?: number;
 }
 
 export interface IAuditEntry {
@@ -91,10 +96,14 @@ export interface IDeliveryNote extends Document<string> {
 }
 
 const ItemSchema: Schema = new Schema({
+  itemId: { type: Schema.Types.ObjectId, ref: 'Item', required: false },
   description: { type: String, required: true },
   quantity: { type: Number, required: true },
   rate: { type: Number, required: true },
   total: { type: Number, required: true },
+  /** Carried over from invoice line item — for audit/reference, no recalculation */
+  taxRate: { type: Number, default: 0 },
+  taxAmount: { type: Number, default: 0 },
 });
 
 const AuditEntrySchema: Schema = new Schema({
@@ -198,6 +207,7 @@ DeliveryNoteSchema.index({ 'connectedDocuments.invoiceIds': 1 });
 DeliveryNoteSchema.index({ 'connectedDocuments.quotationId': 1 });
 DeliveryNoteSchema.index({ partyId: 1, deliveryDate: -1 });
 DeliveryNoteSchema.index({ 'partySnapshot.displayName': 'text' });
+DeliveryNoteSchema.index({ 'items.itemId': 1 });
 
 // Pre-find hook
 DeliveryNoteSchema.pre(/^find/, function (this: Query<any, any>, next) {

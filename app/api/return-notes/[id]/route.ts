@@ -5,7 +5,6 @@ import dbConnect from "@/lib/dbConnect";
 import ReturnNote from "@/models/ReturnNote";
 import Purchase from "@/models/Purchase";
 import Invoice from "@/models/Invoice";
-import Material from "@/models/Material";
 import DebitNote from "@/models/DebitNote";
 import StockAdjustment from "@/models/StockAdjustment";
 import { softDelete } from "@/utils/softDelete";
@@ -33,7 +32,7 @@ export async function GET(request: Request, context: RequestContext) {
     });
     if (error) return error;
 
-    const _ensureModels = [DebitNote, Purchase, Invoice, Material];
+    const _ensureModels = [DebitNote, Purchase, Invoice];
 
     const returnNote = await ReturnNote.findById(id)
       .populate({
@@ -137,7 +136,9 @@ export async function PUT(request: Request, context: RequestContext) {
         // Update purchase item returned quantities
         for (const returnItem of currentReturnNote.items) {
           const purchaseItemIndex = purchase.items.findIndex(
-            (pi: any) => pi.materialId === returnItem.materialId
+            (pi: any) =>
+              (pi.itemId && returnItem.itemId && pi.itemId.toString() === returnItem.itemId.toString()) ||
+              pi.description === returnItem.description
           );
 
           if (purchaseItemIndex !== -1) {
@@ -157,7 +158,11 @@ export async function PUT(request: Request, context: RequestContext) {
         // Reduce material stock using helper function
         await removeStockForPurchaseReturn(
           currentReturnNote._id,
-          currentReturnNote.items,
+          currentReturnNote.items.map((item: any) => ({
+            itemId: item.itemId?.toString(),
+            itemName: item.description,
+            returnQuantity: item.returnQuantity,
+          })),
           currentReturnNote.returnNumber
         );
 
@@ -168,7 +173,7 @@ export async function PUT(request: Request, context: RequestContext) {
           // Update invoice returned quantities
           for (const returnItem of currentReturnNote.items) {
             const invoiceItemIndex = invoice.items.findIndex(
-              (ii: any) => ii.description === returnItem.productName
+              (ii: any) => ii.description === returnItem.description
             );
 
             if (invoiceItemIndex !== -1) {
@@ -208,7 +213,9 @@ export async function PUT(request: Request, context: RequestContext) {
           // Reverse purchase item returned quantities
           for (const returnItem of currentReturnNote.items) {
             const purchaseItemIndex = purchase.items.findIndex(
-              (pi: any) => pi.materialId === returnItem.materialId
+              (pi: any) =>
+                (pi.itemId && returnItem.itemId && pi.itemId.toString() === returnItem.itemId.toString()) ||
+                pi.description === returnItem.description
             );
 
             if (purchaseItemIndex !== -1) {
@@ -229,7 +236,11 @@ export async function PUT(request: Request, context: RequestContext) {
         // Add material stock back using helper function
         await addStockForPurchaseReturn(
           currentReturnNote._id,
-          currentReturnNote.items,
+          currentReturnNote.items.map((item: any) => ({
+            itemId: item.itemId?.toString(),
+            itemName: item.description,
+            returnQuantity: item.returnQuantity,
+          })),
           currentReturnNote.returnNumber
         );
       } else if (returnType === 'salesReturn') {
@@ -237,7 +248,7 @@ export async function PUT(request: Request, context: RequestContext) {
         if (invoice && !invoice.isDeleted) {
           for (const returnItem of currentReturnNote.items) {
             const invoiceItemIndex = invoice.items.findIndex(
-              (ii: any) => ii.description === returnItem.productName
+              (ii: any) => ii.description === returnItem.description
             );
 
             if (invoiceItemIndex !== -1) {
@@ -329,7 +340,9 @@ export async function DELETE(request: Request, context: RequestContext) {
           // Reverse purchase item returned quantities
           for (const returnItem of returnNote.items) {
             const purchaseItemIndex = purchase.items.findIndex(
-              (pi: any) => pi.materialId === returnItem.materialId
+              (pi: any) =>
+                (pi.itemId && returnItem.itemId && pi.itemId.toString() === returnItem.itemId.toString()) ||
+                pi.description === returnItem.description
             );
 
             if (purchaseItemIndex !== -1) {
@@ -359,7 +372,11 @@ export async function DELETE(request: Request, context: RequestContext) {
         // Add material stock back using helper function
         await addStockForPurchaseReturn(
           returnNote._id,
-          returnNote.items,
+          returnNote.items.map((item: any) => ({
+            itemId: item.itemId?.toString(),
+            itemName: item.description,
+            returnQuantity: item.returnQuantity,
+          })),
           returnNote.returnNumber
         );
       } else if (returnType === 'salesReturn') {
@@ -367,7 +384,7 @@ export async function DELETE(request: Request, context: RequestContext) {
         if (invoice && !invoice.isDeleted) {
           for (const returnItem of returnNote.items) {
             const invoiceItemIndex = invoice.items.findIndex(
-              (ii: any) => ii.description === returnItem.productName
+              (ii: any) => ii.description === returnItem.description
             );
 
             if (invoiceItemIndex !== -1) {
@@ -398,7 +415,7 @@ export async function DELETE(request: Request, context: RequestContext) {
             await deductStockForInvoice(
               returnNote._id, // Using returnNote ID for the adjustment reference
               returnNote.items.map((item: any) => ({
-                productId: item.productId,
+                itemId: item.itemId, // Strictly use the unified itemId
                 quantity: item.returnQuantity
               }))
             );

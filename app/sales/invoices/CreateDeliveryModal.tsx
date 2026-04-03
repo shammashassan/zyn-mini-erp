@@ -145,6 +145,9 @@ export function CreateDeliveryModal({
           discount: 0,
           notes: deliveryNotes,
           deliveryDate: new Date().toISOString(),
+          vatAmount: invoice.vatAmount,
+          totalAmount: invoice.totalAmount,
+          grandTotal: invoice.grandTotal,
           connectedDocuments: {
             invoiceId: invoice._id,
           },
@@ -318,7 +321,7 @@ export function CreateDeliveryModal({
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="text-xs text-muted-foreground mb-1">Item #{index + 1}</div>
-                        <div className="font-medium text-sm break-words">{item.description}</div>
+                        <div className="font-medium text-sm wrap-break-word">{item.description}</div>
                       </div>
                     </div>
 

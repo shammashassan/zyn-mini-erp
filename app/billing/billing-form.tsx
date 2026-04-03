@@ -9,7 +9,6 @@ import { PartyDetailsCard } from "./party-details-card";
 import { DocumentDetailsCard } from "./document-details-card";
 import { ItemsTable } from "./items-table";
 import { SummaryActions } from "./summary-actions";
-import type { IProduct } from "@/models/Product";
 
 interface BillingFormProps {
   payload: BillPayload;
@@ -25,7 +24,7 @@ interface BillingFormProps {
   vatAmount: number;
   grandTotal: number;
   vatPercentage: number;
-  products: IProduct[];
+  products: any[];
 }
 
 export function BillingForm({

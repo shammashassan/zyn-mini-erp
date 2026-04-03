@@ -49,11 +49,17 @@ interface ConnectedInvoice {
   _id: string;
   invoiceNumber: string;
   grandTotal: number;
+  totalAmount: number;
+  vatAmount: number;
+  discount: number;
   items: Array<{
+    itemId?: string;
     description: string;
     quantity: number;
     rate: number;
     total: number;
+    taxRate?: number;
+    taxAmount?: number;
   }>;
 }
 
@@ -171,6 +177,9 @@ export function DeliveryNoteForm({
             _id: invoiceData._id,
             invoiceNumber: invoiceData.invoiceNumber,
             grandTotal: defaultValues.grandTotal,
+            totalAmount: defaultValues.totalAmount ?? defaultValues.grandTotal,
+            vatAmount: defaultValues.vatAmount ?? 0,
+            discount: defaultValues.discount ?? 0,
             items: defaultValues.items || []
           });
         }
@@ -227,8 +236,12 @@ export function DeliveryNoteForm({
 
     // Only include items and invoice connection if creating (not editing)
     if (!isEditMode && selectedInvoice) {
-      submitData.items = selectedInvoice.items;
-      submitData.discount = 0;
+      submitData.items = selectedInvoice.items;  // carries itemId, taxRate, taxAmount from invoice
+      submitData.discount = selectedInvoice.discount ?? 0;
+      // Pass through the invoice totals directly — no VAT recalculation needed
+      submitData.totalAmount = selectedInvoice.totalAmount;
+      submitData.vatAmount = selectedInvoice.vatAmount;
+      submitData.grandTotal = selectedInvoice.grandTotal;
       submitData.connectedDocuments = {
         invoiceId: data.invoiceId,
       };
@@ -502,7 +515,7 @@ export function DeliveryNoteForm({
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="text-xs text-muted-foreground mb-1">Item #{idx + 1}</div>
-                            <div className="font-medium text-sm break-words">{item.description}</div>
+                            <div className="font-medium text-sm wrap-break-word">{item.description}</div>
                           </div>
                         </div>
 

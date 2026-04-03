@@ -401,9 +401,9 @@ async function extractPurchasePartyAndItemInfo(purchase: any) {
 
   if (purchase.items && purchase.items.length > 0) {
     const firstItem = purchase.items[0];
-    if (firstItem.materialName) {
+    if (firstItem.description) {
       result.itemType = 'Material';
-      result.itemName = firstItem.materialName;
+      result.itemName = firstItem.description;
     }
   }
 
@@ -439,9 +439,9 @@ async function extractDebitNotePartyAndItemInfo(debitNote: any) {
 
   if (debitNote.items && debitNote.items.length > 0) {
     const firstItem = debitNote.items[0];
-    if (firstItem.materialName) {
+    if (firstItem.description) {
       result.itemType = 'Material';
-      result.itemName = firstItem.materialName;
+      result.itemName = firstItem.description;
     }
   }
 
@@ -468,8 +468,8 @@ export async function createJournalForDebitNote(
     const grossTotal = Number(debitNote.totalAmount) || 0;
     const discount = Number(debitNote.discount) || 0;
     const subtotal = grossTotal - discount;
-    const vatAmount = debitNote.isTaxPayable ? (subtotal * 0.05) : 0;
-    const grandTotal = subtotal + vatAmount;
+    const vatAmount = Number(debitNote.vatAmount) || 0;
+    const grandTotal = Number(debitNote.grandTotal) || (subtotal + vatAmount);
 
     const narration = debitNote.debitType === 'return'
       ? `Debit Note for Return ${debitNote.returnNumber || 'N/A'} - ${debitNote.items.length} item(s) returned`
@@ -501,8 +501,8 @@ export async function createJournalForDebitNote(
       });
     }
 
-    // Cr. VAT Receivable (if tax payable)
-    if (debitNote.isTaxPayable && vatAmount > 0) {
+    // Cr. VAT Receivable (when VAT is present)
+    if (vatAmount > 0) {
       entries.push({
         accountCode: 'A1300',
         accountName: 'VAT Receivable',
@@ -668,8 +668,8 @@ export async function createJournalForCreditNote(
     const grossTotal = Number(creditNote.totalAmount) || 0;
     const discount = Number(creditNote.discount) || 0;
     const subtotal = grossTotal - discount;
-    const vatAmount = creditNote.isTaxPayable ? (subtotal * 0.05) : 0;
-    const grandTotal = subtotal + vatAmount;
+    const vatAmount = Number(creditNote.vatAmount) || 0;
+    const grandTotal = Number(creditNote.grandTotal) || (subtotal + vatAmount);
 
     const narration = creditNote.creditType === 'return'
       ? `Credit Note for Invoice ${creditNote.invoiceNumber || 'N/A'} - ${creditNote.items.length} item(s) returned`
@@ -693,8 +693,8 @@ export async function createJournalForCreditNote(
       });
     }
 
-    // Dr. VAT Payable (if tax payable) - reduces VAT liability
-    if (creditNote.isTaxPayable && vatAmount > 0) {
+    // Dr. VAT Payable (when VAT is present) - reduces VAT liability
+    if (vatAmount > 0) {
       entries.push({
         accountCode: 'L1002',
         accountName: 'VAT Payable',
@@ -825,13 +825,9 @@ export async function createJournalForPurchase(
     // Recalculate subtotal
     const subtotal = grossTotal - discount;
 
-    // Recalculate VAT based on subtotal
-    const vatAmount = purchase.isTaxPayable
-      ? (subtotal * 0.05)
-      : 0;
-
-    // Recalculate grand total
-    const grandTotal = subtotal + vatAmount;
+    // Use persisted VAT and Grand Total
+    const vatAmount = Number(purchase.vatAmount) || 0;
+    const grandTotal = Number(purchase.grandTotal) || (subtotal + vatAmount);
 
     // Validation
     const expectedGrandTotal = Number(purchase.grandTotal) || 0;
@@ -846,8 +842,8 @@ export async function createJournalForPurchase(
     }
 
     const narration = discount > 0
-      ? `Purchase from ${partyName || 'Supplier'} - ${purchase.items.length} item(s) (Discount: ${discount.toFixed(2)})${purchase.isTaxPayable ? ' (Tax Payable)' : ' (Tax Free)'}`
-      : `Purchase from ${partyName || 'Supplier'} - ${purchase.items.length} item(s)${purchase.isTaxPayable ? ' (Tax Payable)' : ' (Tax Free)'}`;
+      ? `Purchase from ${partyName || 'Supplier'} - ${purchase.items.length} item(s) (Discount: ${discount.toFixed(2)})`
+      : `Purchase from ${partyName || 'Supplier'} - ${purchase.items.length} item(s)`;
 
     // Dr. Inventory = Subtotal (after discount)
     entries.push({
@@ -857,8 +853,8 @@ export async function createJournalForPurchase(
       credit: 0,
     });
 
-    // Dr. VAT Receivable (if applicable)
-    if (purchase.isTaxPayable && vatAmount > 0) {
+    // Dr. VAT Receivable (when VAT is present)
+    if (vatAmount > 0) {
       entries.push({
         accountCode: 'A1300',
         accountName: 'VAT Receivable',
@@ -885,7 +881,7 @@ export async function createJournalForPurchase(
     }
     console.log(`   Subtotal: ${subtotal.toFixed(2)}`);
     if (vatAmount > 0) {
-      console.log(`   VAT (5%): ${vatAmount.toFixed(2)}`);
+      console.log(`   VAT: ${vatAmount.toFixed(2)}`);
     }
     console.log(`   Grand Total: ${grandTotal.toFixed(2)}`);
     console.log(`   Total Debit: ${totalDebit.toFixed(2)}`);

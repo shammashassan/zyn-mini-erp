@@ -10,23 +10,23 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Item } from "@/lib/types";
-import type { IProduct } from "@/models/Product";
+
 import { Check, ChevronsUpDown, PlusCircle, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatCurrency } from "@/utils/formatters/currency";
-import { ProductForm } from "@/app/inventory/products/product-form";
+import { ItemForm, type ItemFormData } from "@/app/inventory/items/item-form";
 
 interface ItemsTableProps {
   items: Item[];
-  products: IProduct[];
+  products: any[];
   updateItem: (index: number, field: keyof Item, value: string | number | boolean) => void;
   addItem: () => void;
   removeItem: (index: number) => void;
   onRefreshProducts?: () => Promise<void>;
 }
 
-function ItemRow({ item, index, products, updateItem, removeItem, onOpenCreate }: { item: Item; index: number; products: IProduct[]; updateItem: ItemsTableProps['updateItem']; removeItem: ItemsTableProps['removeItem']; onOpenCreate: (index: number, name: string) => void }) {
+function ItemRow({ item, index, products, updateItem, removeItem, onOpenCreate }: { item: Item; index: number; products: any[]; updateItem: ItemsTableProps['updateItem']; removeItem: ItemsTableProps['removeItem']; onOpenCreate: (index: number, name: string) => void }) {
   const [open, setOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const inputStyles = "bg-background placeholder:text-muted-foreground/70";
@@ -38,9 +38,10 @@ function ItemRow({ item, index, products, updateItem, removeItem, onOpenCreate }
     }
   }, [open, item.description]);
 
-  const handleProductSelect = (product: IProduct) => {
+  const handleProductSelect = (product: any) => {
     updateItem(index, "description", product.name);
-    updateItem(index, "rate", product.price);
+    updateItem(index, "rate", product.sellingPrice || product.price || 0);
+    updateItem(index, "taxRate", product.taxRate || 0);
     setOpen(false);
     setSearchQuery("");
   };
@@ -89,7 +90,7 @@ function ItemRow({ item, index, products, updateItem, removeItem, onOpenCreate }
                         <div>
                           <div>{product.name}</div>
                           <div className="text-xs text-muted-foreground">
-                            {formatCurrency(product.price)}
+                            {formatCurrency(product.sellingPrice || product.price || 0)}
                           </div>
                         </div>
                       </CommandItem>
@@ -150,8 +151,8 @@ export function ItemsTable({ items, products, updateItem, addItem, removeItem, o
     setIsProductFormOpen(true);
   };
 
-  const handleProductFormSubmit = async (data: any, id?: string) => {
-    const url = id ? `/api/products/${id}` : "/api/products";
+  const handleProductFormSubmit = async (data: ItemFormData, id?: string) => {
+    const url = id ? `/api/items/${id}` : "/api/items";
     const method = id ? "PUT" : "POST";
     try {
       const response = await fetch(url, {
@@ -160,12 +161,13 @@ export function ItemsTable({ items, products, updateItem, addItem, removeItem, o
         body: JSON.stringify(data),
       });
       if (response.ok) {
-        const newProduct: IProduct = await response.json();
-        toast.success("Product created successfully");
+        const newProduct: any = await response.json();
+        toast.success("Item created successfully");
         if (onRefreshProducts) await onRefreshProducts();
         if (pendingItemIndex !== null) {
           updateItem(pendingItemIndex, "description", newProduct.name);
-          updateItem(pendingItemIndex, "rate", newProduct.price);
+          updateItem(pendingItemIndex, "rate", newProduct.sellingPrice || newProduct.price || 0);
+          updateItem(pendingItemIndex, "taxRate", newProduct.taxRate || 0);
         }
         setIsProductFormOpen(false);
         setPendingItemName("");
@@ -217,7 +219,7 @@ export function ItemsTable({ items, products, updateItem, addItem, removeItem, o
         </CardContent>
       </Card>
 
-      <ProductForm
+      <ItemForm
         isOpen={isProductFormOpen}
         onClose={() => {
           setIsProductFormOpen(false);
@@ -225,8 +227,7 @@ export function ItemsTable({ items, products, updateItem, addItem, removeItem, o
           setPendingItemIndex(null);
         }}
         onSubmit={handleProductFormSubmit}
-        defaultValues={pendingItemName ? { name: pendingItemName, type: "", price: 0 } as any : null}
-        existingTypes={[]}
+        defaultValues={pendingItemName ? { name: pendingItemName, types: ['product'] } as any : null}
       />
     </>
   );

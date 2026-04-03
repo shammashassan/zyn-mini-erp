@@ -14,7 +14,7 @@ import { redirect, usePathname } from "next/navigation";
 
 interface DeletedAdjustment {
   _id: string;
-  materialName?: string;
+  itemName?: string;
   adjustmentType?: 'increment' | 'decrement';
   value?: number;
   oldStock?: number;
@@ -66,7 +66,7 @@ export default function StockAdjustmentTrashPage() {
       deleteEndpoint="/api/stock-adjustments/trash/delete"
       backUrl="../stock-adjustment"
       backLabel="Back to Stock Adjustment"
-      getItemName={(item) => item.materialName || "Unknown Material"}
+      getItemName={(item) => item.itemName || "Unknown Item"}
       getItemDescription={(item) => {
         const parts: string[] = [];
 

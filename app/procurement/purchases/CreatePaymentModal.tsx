@@ -36,14 +36,13 @@ interface Purchase {
     designation?: string;
   };
   totalAmount: number;
-  isTaxPayable?: boolean;
   vatAmount?: number;
   grandTotal?: number;
   paidAmount: number;
   remainingAmount: number;
   items: Array<{
-    materialId: string;
-    materialName: string;
+    itemId: string;
+    itemName: string;
     quantity: number;
     unitCost: number;
     total: number;

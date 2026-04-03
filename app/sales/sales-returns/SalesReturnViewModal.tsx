@@ -36,7 +36,7 @@ interface SalesReturn {
   partySnapshot?: any;
 
   items: Array<{
-    productName?: string;
+    description?: string;
     returnQuantity: number;
     rate?: number;
     total?: number;
@@ -184,7 +184,7 @@ export function SalesReturnViewModal({
                     <div className="text-xs sm:text-sm text-muted-foreground">
                       Return Date
                     </div>
-                    <div className="font-medium text-xs sm:text-sm break-words">
+                    <div className="font-medium text-xs sm:text-sm wrap-break-word">
                       {formatLongDate(salesReturn.returnDate)}
                     </div>
                   </div>
@@ -197,7 +197,7 @@ export function SalesReturnViewModal({
                       <div className="text-xs sm:text-sm text-muted-foreground">
                         Invoice Reference
                       </div>
-                      <div className="font-medium text-xs sm:text-sm font-mono break-words">
+                      <div className="font-medium text-xs sm:text-sm font-mono wrap-break-word">
                         {documentRef}
                       </div>
                     </div>
@@ -211,7 +211,7 @@ export function SalesReturnViewModal({
                       <div className="text-xs sm:text-sm text-muted-foreground">
                         Party
                       </div>
-                      <div className="font-medium text-xs sm:text-sm break-words">
+                      <div className="font-medium text-xs sm:text-sm wrap-break-word">
                         {partyName}
                       </div>
                     </div>
@@ -225,7 +225,7 @@ export function SalesReturnViewModal({
                       <div className="text-xs sm:text-sm text-muted-foreground">
                         Created By
                       </div>
-                      <div className="font-medium text-xs sm:text-sm break-words">
+                      <div className="font-medium text-xs sm:text-sm wrap-break-word">
                         @{creatorUsername}
                       </div>
                     </div>
@@ -237,7 +237,7 @@ export function SalesReturnViewModal({
                     <CircleUserRound className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                     <div className="min-w-0">
                       <div className="text-xs sm:text-sm text-muted-foreground">Contact</div>
-                      <div className="font-medium text-xs sm:text-sm break-words">
+                      <div className="font-medium text-xs sm:text-sm wrap-break-word">
                         {contactName}
                         {contactDesignation && (
                           <span className="text-muted-foreground"> ({contactDesignation})</span>
@@ -281,7 +281,7 @@ export function SalesReturnViewModal({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm sm:text-base">Return Products</CardTitle>
+              <CardTitle className="text-sm sm:text-base">Return Items</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="hidden md:block overflow-x-auto">
@@ -297,7 +297,7 @@ export function SalesReturnViewModal({
                   </thead>
                   <tbody>
                     {salesReturn.items?.map((item, index) => {
-                      const itemName = item.productName || 'Unknown';
+                      const itemName = item.description || 'Unknown';
 
                       return (
                         <tr key={index} className="border-b hover:bg-muted/50">
@@ -336,7 +336,7 @@ export function SalesReturnViewModal({
 
               <div className="md:hidden space-y-3">
                 {salesReturn.items?.map((item, index) => {
-                  const itemName = item.productName || 'Unknown';
+                  const itemName = item.description || 'Unknown';
 
                   return (
                     <Card key={index} className="border">
@@ -344,9 +344,9 @@ export function SalesReturnViewModal({
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="text-xs text-muted-foreground mb-1">
-                              Product #{index + 1}
+                              Item #{index + 1}
                             </div>
-                            <div className="font-medium text-sm break-words">
+                            <div className="font-medium text-sm wrap-break-word">
                               {itemName}
                             </div>
                           </div>
@@ -443,7 +443,7 @@ export function SalesReturnViewModal({
                       className="flex items-start gap-3 text-xs sm:text-sm p-2 sm:p-3 rounded-lg bg-muted/50"
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium break-words">{action.action}</div>
+                        <div className="font-medium wrap-break-word">{action.action}</div>
                         {(action.username || action.userId) && (
                           <div className="text-xs text-muted-foreground">
                             by @{action.username || action.userId}
@@ -459,7 +459,7 @@ export function SalesReturnViewModal({
                             {action.changes.map((change, idx) => (
                               <div
                                 key={idx}
-                                className="text-xs text-muted-foreground break-words"
+                                className="text-xs text-muted-foreground wrap-break-word"
                               >
                                 <span className="font-medium">{change.field}:</span>{' '}
                                 <span className="line-through">
@@ -487,13 +487,13 @@ export function SalesReturnViewModal({
           <Card className="bg-muted/50">
             <CardContent className="p-3 sm:p-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
-                <div className="break-words">
+                <div className="wrap-break-word">
                   <span className="text-muted-foreground">Created:</span>
                   <span className="ml-2 font-medium">
                     {formatDateTime(salesReturn.createdAt)}
                   </span>
                 </div>
-                <div className="break-words">
+                <div className="wrap-break-word">
                   <span className="text-muted-foreground">Last Updated:</span>
                   <span className="ml-2 font-medium">
                     {formatDateTime(salesReturn.updatedAt)}

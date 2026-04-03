@@ -3,16 +3,18 @@
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
 export interface IReturnItem {
-  materialId?: string;
-  materialName?: string;
-  productId?: string;
-  productName?: string;
+  /** References the unified Item model */
+  itemId?: string;
+  description: string;
   orderedQuantity?: number;
   receivedQuantity?: number;
   returnedQuantity?: number;
   returnQuantity: number;
   rate?: number;
   total?: number;
+  /** Carried from source document line item — for audit/reference */
+  taxRate?: number;
+  taxAmount?: number;
 }
 
 export interface IAuditEntry {
@@ -96,21 +98,18 @@ export interface IReturnNote extends Document<string> {
 }
 
 const ReturnItemSchema: Schema = new Schema({
-  // Purchase return fields
-  materialId: { type: String },
-  materialName: { type: String },
-
-  // Sales return fields
-  productId: { type: String },
-  productName: { type: String },
+  /** References the unified Item model */
+  itemId: { type: Schema.Types.ObjectId, ref: 'Item', required: false },
+  description: { type: String, required: true },
   rate: { type: Number },
   total: { type: Number },
-
-  // Common fields
   orderedQuantity: { type: Number },
   receivedQuantity: { type: Number },
   returnedQuantity: { type: Number },
   returnQuantity: { type: Number, required: true },
+  /** Carried from source document — for audit/reference, no recalculation */
+  taxRate: { type: Number, default: 0 },
+  taxAmount: { type: Number, default: 0 },
 });
 
 const AuditEntrySchema: Schema = new Schema({

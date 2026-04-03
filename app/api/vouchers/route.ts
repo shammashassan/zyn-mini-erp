@@ -38,8 +38,6 @@ export async function GET(request: Request) {
     if (isServerSide) {
       const { page, pageSize, sorting, filters } = extractTableParams(searchParams);
 
-      console.log('📊 Server-side voucher request:', { page, pageSize, sorting, filters, startDateParam, endDateParam });
-
       const baseFilter: any = { isDeleted: false };
 
       if (startDateParam || endDateParam) {

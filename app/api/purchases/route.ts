@@ -5,7 +5,7 @@ import dbConnect from "@/lib/dbConnect";
 import Purchase from "@/models/Purchase";
 import Voucher from "@/models/Voucher";
 import ReturnNote from "@/models/ReturnNote";
-import Material from "@/models/Material";
+import Item from "@/models/Item";
 import StockAdjustment from "@/models/StockAdjustment";
 import Party from "@/models/Party";
 import { getUserInfo } from "@/lib/auth-helpers";
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
     await dbConnect();
 
-    const ensureModels = [Purchase, Voucher, ReturnNote, Material, StockAdjustment, Party];
+    const ensureModels = [Purchase, Voucher, ReturnNote, Item, StockAdjustment, Party];
 
     const { searchParams } = new URL(request.url);
 
@@ -225,10 +225,9 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    // Recalculate amounts server-side
     const grossTotal = Number(body.totalAmount) || 0;
     const subtotal = grossTotal - discount;
-    const vatAmount = body.isTaxPayable ? (subtotal * 0.05) : 0;
+    const vatAmount = Number(body.vatAmount) || 0;
     const grandTotal = subtotal + vatAmount;
 
     const purchaseStatus = 'pending';
@@ -281,37 +280,39 @@ export async function POST(request: Request) {
       console.log(`📦 Processing stock for directly created ${savedPurchase.inventoryStatus} purchase`);
 
       for (const item of savedPurchase.items) {
-        const material = await Material.findById(item.materialId);
-        if (material) {
+        const dbItem = await Item.findById(item.itemId);
+        if (dbItem) {
           const qtyToAdd = savedPurchase.inventoryStatus === 'received'
             ? item.quantity
             : (item.receivedQuantity || 0);
 
           if (qtyToAdd > 0) {
-            const oldStock = material.stock;
+            const oldStock = dbItem.stock || 0;
             const newStock = oldStock + qtyToAdd;
 
-            await Material.findByIdAndUpdate(item.materialId, { stock: newStock });
+            await Item.findByIdAndUpdate(item.itemId, { stock: newStock });
 
             const adjustmentReason = savedPurchase.inventoryStatus === 'received'
               ? `Purchase ${referenceNumber} created as fully received`
               : `Purchase ${referenceNumber} created as partially received (${qtyToAdd} of ${item.quantity} total)`;
 
             const newAdjustment = new StockAdjustment({
-              materialId: item.materialId,
-              materialName: item.materialName,
+              itemId: item.itemId,
+              itemName: item.description,
               adjustmentType: 'increment',
               value: qtyToAdd,
               oldStock,
               newStock,
-              oldUnitCost: material.unitCost,
-              newUnitCost: material.unitCost,
+              oldCostPrice: dbItem.rate,
+              newCostPrice: dbItem.rate,
               adjustmentReason,
+              referenceModel: 'Purchase',
+              referenceId: savedPurchase._id,
               createdAt: new Date(),
             });
 
             await newAdjustment.save();
-            console.log(`  ✅ Added ${qtyToAdd} units of ${item.materialName} to stock`);
+            console.log(`  ✅ Added ${qtyToAdd} units of ${item.description} to stock`);
           }
         }
       }

@@ -64,15 +64,20 @@ export interface Quotation {
   };
 
   grandTotal: number;
+  totalAmount: number;
+  vatAmount: number;
   status: "pending" | "approved" | "sent" | "cancelled" | "converted";
   documentType: "quotation";
   discount: number;
   notes: string;
   items: Array<{
+    itemId?: string;
     description: string;
     quantity: number;
     rate: number;
     total: number;
+    taxRate?: number;
+    taxAmount?: number;
   }>;
   connectedDocuments?: {
     invoiceIds?: (string | ConnectedDocument)[];

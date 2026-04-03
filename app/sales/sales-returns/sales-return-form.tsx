@@ -53,11 +53,14 @@ import { formatCurrency } from "@/utils/formatters/currency";
 import { PartyContactSelector } from "@/components/PartyContactSelector";
 
 type ReturnItem = {
-  productId?: string;
-  productName: string;
+  /** References unified Item model */
+  itemId?: string;
+  description: string;
   returnQuantity: number;
   rate?: number;
   total?: number;
+  taxRate?: number;
+  taxAmount?: number;
 };
 
 type SalesReturnFormData = {
@@ -231,9 +234,11 @@ export function SalesReturnForm({
                 const quantities: Record<string, number> = {};
 
                 defaultValues.items.forEach((item: any) => {
-                  const itemId = item.productName;
-                  itemsSet.add(itemId);
-                  quantities[itemId] = item.returnQuantity;
+                  const key = item.itemId?.toString();
+                  if (key) {
+                    itemsSet.add(key);
+                    quantities[key] = item.returnQuantity;
+                  }
                 });
 
                 setSelectedItems(itemsSet);
@@ -372,13 +377,17 @@ export function SalesReturnForm({
       }
 
       returnItems.push({
-        productId: item.productId || '',
-        productName: item.description,
+        itemId: item.itemId || item._id || '',
+        description: item.description,
         returnQuantity: returnQty,
         rate: item.rate,
         total: returnQty * item.rate,
+        taxRate: item.taxRate ?? 0,
+        taxAmount: (returnQty * item.rate) * ((item.taxRate ?? 0) / 100),
       });
     }
+
+    const vatAmount = returnItems.reduce((sum, item) => sum + (item.taxAmount || 0), 0);
 
     const submitData: any = {
       returnType: 'salesReturn',
@@ -391,7 +400,8 @@ export function SalesReturnForm({
       returnDate: data.returnDate,
       status: isEditMode ? data.status : 'pending',
       totalAmount,
-      grandTotal: totalAmount,
+      vatAmount,
+      grandTotal: totalAmount + vatAmount,
     };
 
     const submissionId = defaultValues?._id ? String(defaultValues._id) : undefined;

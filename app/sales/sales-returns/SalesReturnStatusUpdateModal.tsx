@@ -22,7 +22,7 @@ interface SalesReturn {
   status: 'pending' | 'approved' | 'cancelled';
   grandTotal?: number;
   items?: Array<{
-    productName?: string;
+    description?: string;
     returnQuantity: number;
   }>;
   partyId?: any;
@@ -152,8 +152,8 @@ export function SalesReturnStatusUpdateModal({
             {salesReturn.items && salesReturn.items.length > 0 && (
               <>
                 <div className="flex justify-between mt-1">
-                  <span className="text-muted-foreground">Products:</span>
-                  <span className="font-medium">{salesReturn.items.length} product(s)</span>
+                  <span className="text-muted-foreground">Items:</span>
+                  <span className="font-medium">{salesReturn.items.length} item(s)</span>
                 </div>
                 <div className="flex justify-between mt-1">
                   <span className="text-muted-foreground">Total Qty:</span>

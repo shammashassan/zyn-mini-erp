@@ -14,16 +14,11 @@ import { redirect, usePathname } from "next/navigation";
 interface DeletedPurchase {
   _id: string;
   referenceNumber?: string;
-  materialName?: string;
-  material?: {
-    name?: string;
-  };
   partyId?: any; // Populated
   items?: Array<{
     quantity: number;
   }>;
   totalAmount?: number;
-  isTaxPayable?: boolean;
   vatAmount?: number;
   grandTotal?: number;
   deletedAt?: Date | string;
@@ -76,8 +71,6 @@ export default function PurchasesTrashPage() {
       backLabel="Back to Purchases"
       getItemName={(item) =>
         item.referenceNumber ||
-        item.materialName ||
-        item.material?.name ||
         "Unnamed Purchase"
       }
       getItemDescription={(item) => {

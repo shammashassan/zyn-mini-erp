@@ -61,9 +61,9 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Billing": { bill: ["create"] },
 
   // Inventory
-  "Products": { product: ["read"] },
-  "Materials": { material: ["read"] },
-  "Stock Adjustment": { stockAdjustment: ["read"] },
+  "Items": { item: ["read"] },
+  "Stock": { stockAdjustment: ["read"] },
+  "Adjustment": { stockAdjustment: ["read"] },
 
   // People
   "Parties": { party: ["read"] },
@@ -123,9 +123,9 @@ const navigationData = [
   { title: "Billing", url: "/billing", icon: ScrollText, group: "General" },
 
   // Inventory
-  { title: "Products", url: "/inventory/products", icon: Package, group: "Inventory" },
-  { title: "Materials", url: "/inventory/materials", icon: Layers, group: "Inventory" },
-  { title: "Stock Adjustment", url: "/inventory/stock-adjustment", icon: ArrowRightLeft, group: "Inventory" },
+  { title: "Items", url: "/inventory/items", icon: Package, group: "Inventory" },
+  { title: "Stock", url: "/inventory/stock", icon: Layers, group: "Inventory" },
+  { title: "Adjustment", url: "/inventory/stock-adjustment", icon: ArrowRightLeft, group: "Inventory" },
 
   // People
   { title: "Parties", url: "/people/parties", icon: Users, group: "People" },
@@ -138,14 +138,14 @@ const navigationData = [
   { title: "Receipts", url: "/sales/receipts", icon: Ticket, group: "Sales" },
   { title: "Delivery notes", url: "/sales/delivery-notes", icon: Truck, group: "Sales" },
   { title: "Sales Returns", url: "/sales/sales-returns", icon: Undo2, group: "Sales" },
-  { title: "Debit Notes", url: "/sales/debit-notes", icon: ClipboardCheck, group: "Sales" },
+  { title: "Credit Notes", url: "/sales/credit-notes", icon: ClipboardCheck, group: "Sales" },
 
   // Procurement
   { title: "Purchases", url: "/procurement/purchases", icon: ShoppingCart, group: "Procurement" },
   { title: "Expenses", url: "/procurement/expenses", icon: Banknote, group: "Procurement" },
   { title: "Payments", url: "/procurement/payments", icon: Banknote, group: "Procurement" },
   { title: "Purchase Returns", url: "/procurement/purchase-returns", icon: Redo2, group: "Procurement" },
-  { title: "Credit Notes", url: "/procurement/credit-notes", icon: ClipboardCheck, group: "Procurement" },
+  { title: "Debit Notes", url: "/procurement/debit-notes", icon: ClipboardCheck, group: "Procurement" },
 
   // Reports
   { title: "Sales Report", url: "/reports/sales-report", icon: TrendingUp, group: "Reports" },

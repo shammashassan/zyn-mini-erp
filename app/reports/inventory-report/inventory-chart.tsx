@@ -1,4 +1,4 @@
-// app/inventory/inventory-chart.tsx - UPDATED: Responsive Y-Axis for Mobile
+// app/reports/inventory-report/inventory-chart.tsx - UPDATED: Responsive Y-Axis for Mobile
 
 "use client";
 
@@ -24,7 +24,7 @@ import { formatMonth, formatMonthKey } from "@/utils/formatters/date";
 interface InventoryItemData {
   id: string;
   name: string;
-  type: 'Material' | 'Product';
+  type: string;
   category: string;
   closingQty: number;
   stockValue: number;
@@ -59,10 +59,10 @@ export function InventoryChart({ data, dateRange }: InventoryChartProps) {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 640); // sm breakpoint
     };
-    
+
     // Initial check
     checkMobile();
-    
+
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
@@ -70,7 +70,7 @@ export function InventoryChart({ data, dateRange }: InventoryChartProps) {
   // Filter only materials and get top 5 by stock value for the chart
   const topMaterials = React.useMemo(() => {
     return [...data]
-      .filter(item => item.type === 'Material')
+      .filter(item => item.type.toLowerCase().includes('material'))
       .sort((a, b) => b.stockValue - a.stockValue)
       .slice(0, 5);
   }, [data]);
@@ -83,7 +83,7 @@ export function InventoryChart({ data, dateRange }: InventoryChartProps) {
   const chartData = React.useMemo(() => {
     // Truncate labels more aggressively on mobile
     const charLimit = isMobile ? 12 : 20;
-    
+
     return topMaterials.map((item, index) => ({
       material: item.name.length > charLimit ? item.name.slice(0, charLimit) + '...' : item.name,
       fullName: item.name,
@@ -94,11 +94,11 @@ export function InventoryChart({ data, dateRange }: InventoryChartProps) {
   }, [topMaterials, isMobile]);
 
   const totals = React.useMemo(() => {
-    const materials = data.filter(item => item.type === 'Material');
+    const materials = data.filter(item => item.type.toLowerCase().includes('material'));
     const totalValue = materials.reduce((sum, item) => sum + item.stockValue, 0);
     const totalQty = materials.reduce((sum, item) => sum + item.closingQty, 0);
     const avgValue = materials.length > 0 ? totalValue / materials.length : 0;
-    
+
     return {
       totalValue,
       totalQty,
@@ -162,11 +162,11 @@ export function InventoryChart({ data, dateRange }: InventoryChartProps) {
           </div>
 
           {/* Metrics Section */}
-          <div className="w-full @[800px]/chart:w-72 flex-shrink-0">
+          <div className="w-full @[800px]/chart:w-72 shrink-0">
             <div className="space-y-4">
               <div>
                 <h4 className="font-medium text-sm text-muted-foreground mb-3">Performance Metrics</h4>
-                
+
                 {/* Total Value */}
                 <div className="flex items-center justify-between p-1 rounded-lg bg-muted/50 mb-1">
                   <div className="flex items-center gap-2">
@@ -204,8 +204,8 @@ export function InventoryChart({ data, dateRange }: InventoryChartProps) {
                   {top3Materials.map((item, index) => (
                     <div key={item.id} className="flex justify-between items-center text-sm">
                       <span className="flex items-center gap-2 flex-1 min-w-0">
-                        <div 
-                          className="w-3 h-3 rounded-full flex-shrink-0" 
+                        <div
+                          className="w-3 h-3 rounded-full shrink-0"
                           style={{ backgroundColor: materialColors[index % materialColors.length] }}
                         ></div>
                         <span className="truncate">{item.name}</span>

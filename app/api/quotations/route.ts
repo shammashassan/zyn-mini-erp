@@ -1,12 +1,9 @@
-// app/api/quotations/route.ts - UPDATED: Using party snapshots instead of legacy fields
-
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Quotation from "@/models/Quotation";
 import Invoice from "@/models/Invoice";
 import DeliveryNote from "@/models/DeliveryNote";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
-import { UAE_VAT_PERCENTAGE } from '@/utils/constants';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
 import { createPartySnapshot } from "@/utils/partySnapshot";
@@ -32,8 +29,6 @@ export async function GET(request: Request) {
 
     if (isServerSide) {
       const { page, pageSize, sorting, filters } = extractTableParams(searchParams);
-
-      console.log('📊 Server-side quotation request:', { page, pageSize, sorting, filters, startDateParam, endDateParam });
 
       const baseFilter: any = { isDeleted: false };
 
@@ -184,6 +179,9 @@ export async function POST(request: Request) {
       createdAt,
       updatedAt,
       connectedDocuments,
+      vatAmount: customVatAmount,
+      totalAmount: customTotalAmount,
+      grandTotal: customGrandTotal,
     } = body;
 
     // ✅ Validation: Party is required
@@ -208,11 +206,11 @@ export async function POST(request: Request) {
     // ✅ Create immutable snapshots of party and contact
     const { partySnapshot, contactSnapshot } = await createPartySnapshot(partyId, contactId);
 
-    // Calculate totals
+    // Trust frontend-calculated totals. VAT = sum of per-line taxAmount stored on items.
     const grossTotal = items.reduce((sum: number, item: { total: number }) => sum + item.total, 0);
-    const subtotal = (Math.max(grossTotal - discount, 0));
-    const vatAmount = subtotal * (UAE_VAT_PERCENTAGE / 100);
-    const grandTotal = subtotal + vatAmount;
+    const finalVatAmount = customVatAmount ?? 0;
+    const finalTotalAmount = customTotalAmount ?? grossTotal;
+    const finalGrandTotal = customGrandTotal ?? Math.max(grossTotal - discount, 0) + finalVatAmount;
 
     // Generate quotation number
     const invoiceNumber = await generateInvoiceNumber('quotation');
@@ -248,9 +246,9 @@ export async function POST(request: Request) {
       discount,
       notes,
       quotationDate: new Date(quotationDate),
-      totalAmount: grossTotal,
-      vatAmount: vatAmount,
-      grandTotal: grandTotal,
+      totalAmount: finalTotalAmount,
+      vatAmount: finalVatAmount,
+      grandTotal: finalGrandTotal,
       status: status || 'pending',
 
       // Metadata
@@ -291,7 +289,7 @@ export async function POST(request: Request) {
 
       console.log(`✅ Successfully created quotation: ${newQuotation.invoiceNumber}`);
       console.log(`   Party: ${partySnapshot.displayName}`);
-      console.log(`   Gross Total: ${grossTotal}, VAT: ${vatAmount}, Subtotal: ${subtotal}, Discount: ${discount}, Grand Total: ${grandTotal}`);
+      console.log(`   Gross Total: ${finalTotalAmount}, VAT: ${finalVatAmount}, Discount: ${discount}, Grand Total: ${finalGrandTotal}`);
 
       return NextResponse.json({
         message: 'Quotation saved',

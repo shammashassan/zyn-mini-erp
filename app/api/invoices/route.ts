@@ -10,7 +10,6 @@ import Voucher from "@/models/Voucher";
 import Party from "@/models/Party";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { createJournalForInvoice } from '@/utils/journalAutoCreate';
-import { UAE_VAT_PERCENTAGE } from '@/utils/constants';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
 import { createPartySnapshot } from "@/utils/partySnapshot";
@@ -258,16 +257,11 @@ export async function POST(request: Request) {
     // ✅ Create immutable snapshots of party and contact
     const { partySnapshot, contactSnapshot } = await createPartySnapshot(partyId, contactId);
 
-    // Calculate totals
+    // Trust frontend-calculated totals. VAT = sum of per-line taxAmount (no server recalc).
     const grossTotal = items.reduce((sum: number, item: { total: number }) => sum + item.total, 0);
-    const subtotal = Math.max(grossTotal - discount, 0);
-    const calculatedVatAmount = subtotal * (UAE_VAT_PERCENTAGE / 100);
-    const calculatedGrandTotal = subtotal + calculatedVatAmount;
-
-    // Allow custom values if provided, otherwise use calculated
-    const finalVatAmount = customVatAmount !== undefined ? customVatAmount : calculatedVatAmount;
-    const finalTotalAmount = customTotalAmount !== undefined ? customTotalAmount : grossTotal;
-    const finalGrandTotal = customGrandTotal !== undefined ? customGrandTotal : calculatedGrandTotal;
+    const finalVatAmount = customVatAmount ?? 0;
+    const finalTotalAmount = customTotalAmount ?? grossTotal;
+    const finalGrandTotal = customGrandTotal ?? Math.max(grossTotal - discount, 0) + finalVatAmount;
 
     // Generate invoice number
     const invoiceNumber = await generateInvoiceNumber('invoice');

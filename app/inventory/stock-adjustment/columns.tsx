@@ -29,13 +29,13 @@ import { cn } from "@/lib/utils";
 // ✅ Export the interface
 export interface IAdjustmentHistory {
   _id: string;
-  materialName: string;
+  itemName: string;
   adjustmentType: 'increment' | 'decrement';
   value: number;
   oldStock: number;
   newStock: number;
-  oldUnitCost?: number;
-  newUnitCost?: number;
+  oldCostPrice?: number;
+  newCostPrice?: number;
   adjustmentReason?: string;
   createdAt: string;
 }
@@ -141,11 +141,11 @@ export const getAdjustmentHistoryColumns = (
       },
     },
     {
-      accessorKey: "materialName",
-      header: "Material",
+      accessorKey: "itemName",
+      header: "Item",
       meta: {
-        label: "Material",
-        placeholder: "Search material...",
+        label: "Item",
+        placeholder: "Search item...",
         variant: "text",
       },
       enableColumnFilter: true,
@@ -165,11 +165,11 @@ export const getAdjustmentHistoryColumns = (
       id: 'adjustment',
       header: 'Adjustment',
       cell: ({ row }) => {
-        const { adjustmentType, value, oldUnitCost, newUnitCost } = row.original;
+        const { adjustmentType, value, oldCostPrice, newCostPrice } = row.original;
         const hasStockChange = value > 0;
         const stockChange = adjustmentType === 'decrement' ? `-${value}` : `+${value}`;
         const isDecrement = adjustmentType === 'decrement';
-        const unitCostChanged = typeof oldUnitCost === 'number' && typeof newUnitCost === 'number' && oldUnitCost !== newUnitCost;
+        const unitCostChanged = typeof oldCostPrice === 'number' && typeof newCostPrice === 'number' && oldCostPrice !== newCostPrice;
 
         if (!hasStockChange && !unitCostChanged) {
           return <span className="text-muted-foreground">—</span>;
@@ -190,7 +190,7 @@ export const getAdjustmentHistoryColumns = (
             {unitCostChanged && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Tag className="h-4 w-4 shrink-0 text-blue-500" />
-                <span>Price: {formatCurrency(oldUnitCost)} → {formatCurrency(newUnitCost)}</span>
+                <span>Price: {formatCurrency(oldCostPrice)} → {formatCurrency(newCostPrice)}</span>
               </div>
             )}
           </div>

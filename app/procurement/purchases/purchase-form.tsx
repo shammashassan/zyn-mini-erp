@@ -34,20 +34,31 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { IPurchase } from "@/models/Purchase";
-import type { IMaterial } from "@/models/Material";
 import { formatCurrency } from "@/utils/formatters/currency";
-import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 import { Spinner } from "@/components/ui/spinner";
 import { ItemsTable } from "@/components/ItemsTable";
 import { PartyContactSelector } from "@/components/PartyContactSelector";
 
+type ItemApiData = {
+  _id: string;
+  name: string;
+  sellingPrice: number;
+  costPrice: number;
+  unit?: string;
+  category?: string;
+  types: string[];
+  taxRate?: number;
+  taxType?: string;
+};
+
 type PurchaseItem = {
-  materialId: string;
-  materialName: string;
+  itemId?: string;
+  description: string;
   quantity: number;
-  unitCost: number;
+  price: number; // mapped to unitCost on submit
   total: number;
-  shouldCreateMaterial?: boolean;
+  taxRate?: number;
+  taxAmount?: number;
 };
 
 type PurchaseFormData = {
@@ -57,7 +68,6 @@ type PurchaseFormData = {
   purchaseDate: Date;
   purchaseStatus: 'pending' | 'approved' | 'cancelled';
   discount: number;
-  isTaxPayable: boolean;
 };
 
 interface PurchaseFormProps {
@@ -80,10 +90,9 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
     defaultValues: {
       partyId: "",
       contactId: undefined,
-      items: [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
+      items: [{ itemId: '', description: '', quantity: 1, price: 0, total: 0, taxRate: 0, taxAmount: 0 }],
       purchaseDate: new Date(),
       discount: 0,
-      isTaxPayable: true,
       purchaseStatus: 'pending',
     }
   });
@@ -93,51 +102,35 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
     name: "items"
   });
 
-  const [materials, setMaterials] = useState<IMaterial[]>([]);
-  const [materialTypes, setMaterialTypes] = useState<string[]>([]); // ✅ ADDED
-  const [materialUnits, setMaterialUnits] = useState<string[]>([]); // ✅ ADDED
+  const [availableItems, setAvailableItems] = useState<ItemApiData[]>([]);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(true);
-
-  useEffect(() => {
-    const checkIsDesktop = () => setIsDesktop(window.innerWidth >= 1024);
-    checkIsDesktop();
-    window.addEventListener("resize", checkIsDesktop);
-    return () => window.removeEventListener("resize", checkIsDesktop);
-  }, []);
 
   const watchedItems = watch("items");
   const discount = watch("discount");
-  const isTaxPayable = watch("isTaxPayable");
 
   const isEditMode = !!defaultValues?._id;
 
   // Calculate totals
   const grossTotal = watchedItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
-  const subtotal = grossTotal - discount;
-  const vatAmount = isTaxPayable ? subtotal * (UAE_VAT_PERCENTAGE / 100) : 0;
+  const subtotal = Math.max(grossTotal - (Number(discount) || 0), 0);
+  const vatAmount = watchedItems.reduce((sum, item) => sum + (Number((item as any).taxAmount) || 0), 0);
   const grandTotal = subtotal + vatAmount;
-  const totalItems = watchedItems.filter(item => item.materialId).length;
+  const totalItems = watchedItems.filter(item => item.description).length;
 
-  // ✅ UPDATED: Extract types and units
-  const fetchMaterials = async () => {
+  const fetchItems = async () => {
     try {
-      const materialsRes = await fetch("/api/materials");
-      if (materialsRes.ok) {
-        const materialsData = await materialsRes.json();
-        setMaterials(materialsData);
-        const types = Array.from(new Set(materialsData.map((m: IMaterial) => m.type).filter(Boolean))) as string[];
-        const units = Array.from(new Set(materialsData.map((m: IMaterial) => m.unit).filter(Boolean))) as string[];
-        setMaterialTypes(types);
-        setMaterialUnits(units);
+      const res = await fetch("/api/items?types=material");
+      if (res.ok) {
+        const data: ItemApiData[] = await res.json();
+        setAvailableItems(data);
       }
     } catch (error) {
-      console.error("Failed to fetch materials:", error);
+      console.error("Failed to fetch items:", error);
     }
   };
 
   useEffect(() => {
-    fetchMaterials();
+    fetchItems();
   }, []);
 
   useEffect(() => {
@@ -150,21 +143,27 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
         reset({
           partyId: partyIdValue || "",
           contactId: defaultValues.contactId?.toString() || undefined,
-          items: defaultValues.items || [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
+          items: defaultValues.items ? defaultValues.items.map((it: any) => ({
+            itemId: it.itemId?.toString() || '',
+            description: it.description || '',
+            quantity: it.quantity ?? 1,
+            price: it.unitCost ?? 0,
+            total: it.total ?? 0,
+            taxRate: it.taxRate ?? 0,
+            taxAmount: it.taxAmount ?? 0,
+          })) : [{ itemId: '', description: '', quantity: 1, price: 0, total: 0, taxRate: 0, taxAmount: 0 }],
           purchaseDate: defaultValues.purchaseDate ? new Date(defaultValues.purchaseDate) : new Date(),
           purchaseStatus: defaultValues.purchaseStatus || 'pending',
           discount: defaultValues.discount || 0,
-          isTaxPayable: defaultValues.isTaxPayable !== undefined ? defaultValues.isTaxPayable : true,
         });
       } else {
         reset({
           partyId: "",
           contactId: undefined,
-          items: [{ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 }],
+          items: [{ itemId: '', description: '', quantity: 1, price: 0, total: 0, taxRate: 0, taxAmount: 0 }],
           purchaseDate: new Date(),
           purchaseStatus: 'pending',
           discount: 0,
-          isTaxPayable: true,
         });
       }
     }
@@ -181,9 +180,9 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
       return;
     }
 
-    const validItems = data.items.filter(item => item.materialId || (item.materialName && item.materialName.trim()));
+    const validItems = data.items.filter(item => item.description?.trim());
     if (validItems.length === 0) {
-      toast.error("Please add at least one material");
+      toast.error("Please add at least one item");
       return;
     }
 
@@ -207,8 +206,8 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
     }
 
     // Calculate amounts with discount
-    const calculatedSubtotal = itemsGrossTotal - discountAmount;
-    const calculatedVatAmount = data.isTaxPayable ? calculatedSubtotal * (UAE_VAT_PERCENTAGE / 100) : 0;
+    const calculatedSubtotal = Math.max(itemsGrossTotal - discountAmount, 0);
+    const calculatedVatAmount = validItems.reduce((sum, item) => sum + (Number(item.taxAmount) || 0), 0);
     const calculatedGrandTotal = calculatedSubtotal + calculatedVatAmount;
 
     const submitData = {
@@ -216,13 +215,16 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
       contactId: data.contactId,
       purchaseDate: data.purchaseDate,
       items: validItems.map(item => ({
-        ...item,
+        itemId: item.itemId || null,
+        description: item.description,
         quantity: Number(item.quantity) || 0,
-        total: Number(item.total) || 0
+        unitCost: Number(item.price) || 0,
+        total: Number(item.total) || 0,
+        taxRate: Number(item.taxRate) || 0,
+        taxAmount: Number(item.taxAmount) || 0,
       })),
       totalAmount: itemsGrossTotal,
       discount: discountAmount,
-      isTaxPayable: data.isTaxPayable,
       vatAmount: calculatedVatAmount,
       grandTotal: calculatedGrandTotal,
       purchaseStatus: isEditMode ? data.purchaseStatus : 'pending',
@@ -330,57 +332,25 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
             )}
           </div>
 
-          {/* Tax Payable Toggle */}
-          <Label
-            htmlFor="isTaxPayable"
-            className={cn(
-              "hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-4 cursor-pointer transition-colors",
-              isTaxPayable && "border-green-600 bg-green-50 dark:border-green-900 dark:bg-green-950"
-            )}
-          >
-            <div className="grid gap-1.5 font-normal flex-1">
-              <p className="text-sm leading-none font-medium">
-                {isTaxPayable ? "Tax Payable" : "Tax Free"}
-              </p>
-              <p className="text-muted-foreground text-sm">
-                {isTaxPayable ? `${UAE_VAT_PERCENTAGE}% VAT will be added to the subtotal` : 'No VAT will be applied to this purchase'}
-              </p>
-            </div>
-            <Controller
-              name="isTaxPayable"
-              control={control}
-              render={({ field }) => (
-                <Checkbox
-                  id="isTaxPayable"
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  className="data-[state=checked]:border-green-600 data-[state=checked]:bg-green-600 data-[state=checked]:text-white dark:data-[state=checked]:border-green-700 dark:data-[state=checked]:bg-green-700"
-                />
-              )}
-            />
-          </Label>
-
-          {/* Materials Section */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Materials</CardTitle>
+              <CardTitle className="text-base">Items</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <ItemsTable
-                itemType="material"
-                items={materials}
-                onRefreshItems={fetchMaterials}
-                existingTypes={materialTypes}
-                existingUnits={materialUnits}
+                priceContext="purchase"
+                allowedTypes={['material']}
+                items={availableItems}
+                onRefreshItems={fetchItems}
                 fields={fields}
                 control={control as any}
                 register={register}
                 watch={watch}
                 setValue={setValue}
-                onAppendItem={() => append({ materialId: '', materialName: '', quantity: 1, unitCost: 0, total: 0 })}
+                onAppendItem={() => append({ itemId: '', description: '', quantity: 1, price: 0, total: 0, taxRate: 0, taxAmount: 0 })}
                 onRemoveItem={remove}
                 fieldName="items"
-                isDesktop={isDesktop}
+                isDesktop={true}
                 priceLabel="Unit Cost"
               />
             </CardContent>
@@ -430,13 +400,13 @@ export function PurchaseForm({ isOpen, onClose, onSubmit, defaultValues }: Purch
                   <span className="text-muted-foreground">Discount:</span>
                   <span className="font-medium text-destructive">-{formatCurrency(Number(discount) || 0)}</span>
                 </div>
-                <div className="flex justify-between text-sm pt-2">
+                <div className="flex justify-between text-sm pt-2 border-t">
                   <span className="text-muted-foreground">Subtotal:</span>
                   <span className="font-medium">{formatCurrency(subtotal)}</span>
                 </div>
-                {isTaxPayable && (
+                {vatAmount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">VAT ({UAE_VAT_PERCENTAGE}%):</span>
+                    <span className="text-muted-foreground">VAT:</span>
                     <span className="font-medium">{formatCurrency(vatAmount)}</span>
                   </div>
                 )}

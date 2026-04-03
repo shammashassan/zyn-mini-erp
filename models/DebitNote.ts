@@ -3,11 +3,13 @@
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
 export interface IDebitNoteItem {
-  materialId?: string;
-  materialName: string;
+  itemId?: string;
+  description: string;
   quantity: number;
   unitCost: number;
   total: number;
+  taxRate?: number;
+  taxAmount?: number;
 }
 
 export interface IReceiptAllocation {
@@ -64,7 +66,6 @@ export interface IDebitNote extends Document<string> {
   items: IDebitNoteItem[];
   totalAmount: number;
   discount: number;
-  isTaxPayable: boolean;
   vatAmount: number;
   grandTotal: number;
   debitDate: Date;
@@ -110,11 +111,13 @@ export interface IDebitNote extends Document<string> {
 }
 
 const DebitNoteItemSchema: Schema = new Schema({
-  materialId: { type: String, required: false },
-  materialName: { type: String, required: true },
+  itemId: { type: String, required: false },
+  description: { type: String, required: true },
   quantity: { type: Number, required: true, min: 0 },
   unitCost: { type: Number, required: true, min: 0 },
   total: { type: Number, required: true, min: 0 },
+  taxRate: { type: Number, default: 0, min: 0 },
+  taxAmount: { type: Number, default: 0, min: 0 },
 });
 
 const ReceiptAllocationSchema: Schema = new Schema({
@@ -191,7 +194,6 @@ const DebitNoteSchema: Schema<IDebitNote> = new Schema({
   items: [DebitNoteItemSchema],
   totalAmount: { type: Number, required: true, min: 0 },
   discount: { type: Number, default: 0, min: 0 },
-  isTaxPayable: { type: Boolean, default: false },
   vatAmount: { type: Number, default: 0, min: 0 },
   grandTotal: { type: Number, required: true, min: 0 },
   debitDate: { type: Date, required: true },
@@ -249,12 +251,11 @@ DebitNoteSchema.index({ 'partySnapshot.displayName': 'text' });
 // Pre-save hook
 DebitNoteSchema.pre('save', function (next) {
   // Calculate amounts
-  const grossTotal = this.totalAmount;
+  const grossTotal = this.totalAmount || 0;
   const discount = this.discount || 0;
   const subtotal = grossTotal - discount;
-  const vatAmount = this.isTaxPayable ? (subtotal * 0.05) : 0;
+  const vatAmount = this.vatAmount || 0;
 
-  this.vatAmount = vatAmount;
   this.grandTotal = subtotal + vatAmount;
 
   // Calculate receipt allocations

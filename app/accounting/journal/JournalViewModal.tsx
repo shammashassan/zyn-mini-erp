@@ -127,8 +127,8 @@ function ItemsDisplay({ referenceType, referenceId }: { referenceType: string; r
           className="flex items-start justify-between p-2 sm:p-3 rounded-lg bg-muted/50 border text-xs sm:text-sm gap-2"
         >
           <div className="flex-1 min-w-0">
-            <div className="font-medium break-words">
-              {referenceType === 'Invoice' ? item.description : item.materialName}
+            <div className="font-medium wrap-break-word">
+              {item.description || '—'}
             </div>
             <div className="text-xs text-muted-foreground mt-1">
               Quantity: {item.quantity} {referenceType === 'Purchase' && `× ${formatCurrency(item.unitCost)}`}
@@ -167,7 +167,7 @@ export function JournalViewModal({ isOpen, onClose, journal }: JournalViewModalP
           <Card>
             <CardHeader>
               <CardTitle className="text-sm sm:text-base flex items-center justify-between flex-wrap gap-2">
-                <span className="break-words">{journal.journalNumber}</span>
+                <span className="wrap-break-word">{journal.journalNumber}</span>
                 <Badge variant={getStatusVariant(journal.status)} appearance="outline" className="capitalize text-xs">
                   {journal.status}
                 </Badge>
@@ -179,7 +179,7 @@ export function JournalViewModal({ isOpen, onClose, journal }: JournalViewModalP
                   <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                   <div className="min-w-0">
                     <div className="text-xs sm:text-sm text-muted-foreground">Entry Date</div>
-                    <div className="font-medium text-xs sm:text-sm break-words">{formatLongDate(journal.entryDate)}</div>
+                    <div className="font-medium text-xs sm:text-sm wrap-break-word">{formatLongDate(journal.entryDate)}</div>
                   </div>
                 </div>
 
@@ -201,7 +201,7 @@ export function JournalViewModal({ isOpen, onClose, journal }: JournalViewModalP
                       <Badge
                         variant={getReferenceTypeVariant(journal.referenceType)}
                         appearance="outline"
-                        className="font-mono text-xs break-all"
+                        className="font-mono text-xs wrap-break-word"
                       >
                         {journal.referenceNumber}
                       </Badge>
@@ -214,7 +214,7 @@ export function JournalViewModal({ isOpen, onClose, journal }: JournalViewModalP
                     <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                     <div className="min-w-0">
                       <div className="text-xs sm:text-sm text-muted-foreground">Created By</div>
-                      <div className="font-medium text-xs sm:text-sm break-words">@{creatorUsername}</div>
+                      <div className="font-medium text-xs sm:text-sm wrap-break-word">@{creatorUsername}</div>
                     </div>
                   </div>
                 )}
@@ -226,7 +226,7 @@ export function JournalViewModal({ isOpen, onClose, journal }: JournalViewModalP
                       <div className="text-xs sm:text-sm text-muted-foreground mb-1">
                         {journal.partyType}
                       </div>
-                      <div className="text-xs sm:text-sm font-medium break-words">{journal.partyName}</div>
+                      <div className="text-xs sm:text-sm font-medium wrap-break-word">{journal.partyName}</div>
                     </div>
                   </div>
                 )}
@@ -238,7 +238,7 @@ export function JournalViewModal({ isOpen, onClose, journal }: JournalViewModalP
                       <div className="text-xs sm:text-sm text-muted-foreground mb-1">
                         {journal.itemType}
                       </div>
-                      <div className="text-xs sm:text-sm font-medium break-words">{journal.itemName}</div>
+                      <div className="text-xs sm:text-sm font-medium wrap-break-word">{journal.itemName}</div>
                     </div>
                   </div>
                 )}
@@ -247,7 +247,7 @@ export function JournalViewModal({ isOpen, onClose, journal }: JournalViewModalP
               {journal.narration && (
                 <div className="pt-3 sm:pt-4 border-t">
                   <div className="text-xs sm:text-sm text-muted-foreground mb-1">Narration</div>
-                  <p className="text-xs sm:text-sm break-words">{journal.narration}</p>
+                  <p className="text-xs sm:text-sm wrap-break-word">{journal.narration}</p>
                 </div>
               )}
 
@@ -323,7 +323,7 @@ export function JournalViewModal({ isOpen, onClose, journal }: JournalViewModalP
                         <div className="flex-1 min-w-0">
                           <div className="text-xs text-muted-foreground mb-1">Entry #{index + 1}</div>
                           <div className="font-mono text-xs font-bold break-all">{entry.accountCode}</div>
-                          <div className="text-sm font-medium break-words mt-1">{entry.accountName}</div>
+                          <div className="text-sm font-medium wrap-break-word mt-1">{entry.accountName}</div>
                         </div>
                       </div>
 
@@ -374,7 +374,7 @@ export function JournalViewModal({ isOpen, onClose, journal }: JournalViewModalP
                   {journal.actionHistory.map((action, index) => (
                     <div key={index} className="flex items-start gap-3 text-xs sm:text-sm p-2 sm:p-3 rounded-lg bg-muted/50">
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium break-words">{action.action}</div>
+                        <div className="font-medium wrap-break-word">{action.action}</div>
                         {action.username && (
                           <div className="text-xs text-muted-foreground">by @{action.username}</div>
                         )}

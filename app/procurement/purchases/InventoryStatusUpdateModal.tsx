@@ -29,8 +29,8 @@ interface Purchase {
   grandTotal?: number;
   vatAmount?: number;
   items: Array<{
-    materialId: string;
-    materialName: string;
+    itemId?: string;
+    description: string;
     quantity: number;
     unitCost: number;
     total: number;
@@ -91,7 +91,7 @@ export function InventoryStatusUpdateModal({
     if (newStatus === 'partially received' && purchase.inventoryStatus === 'received') {
       const fullQuantities: Record<string, number> = {};
       purchase.items.forEach(item => {
-        fullQuantities[item.materialId] = item.quantity;
+        fullQuantities[item.itemId || item.description] = item.quantity;
       });
       setPartialQuantities(fullQuantities);
       setIsEditMode(true);
@@ -112,15 +112,24 @@ export function InventoryStatusUpdateModal({
 
     if (purchase.inventoryStatus === 'received') {
       return purchase.items.some(item => {
-        const inputQty = partialQuantities[item.materialId];
+        const inputQty = partialQuantities[item.itemId || item.description];
         return inputQty !== undefined && inputQty < item.quantity;
       });
     }
 
     return purchase.items.some(item => {
-      const currentReceived = getCurrentReceivedQty(item);
-      const inputQty = partialQuantities[item.materialId];
-      return inputQty !== undefined && inputQty !== currentReceived;
+      const itemKey = item.itemId || item.description;
+      const inputQty = partialQuantities[itemKey];
+      if (inputQty === undefined) return false;
+
+      if (isEditMode) {
+        // Edit mode: inputQty is the absolute new total — compare against current
+        const currentReceived = getCurrentReceivedQty(item);
+        return inputQty !== currentReceived;
+      } else {
+        // Add mode: inputQty is additional quantity to add — any value > 0 is a change
+        return inputQty > 0;
+      }
     });
   };
 
@@ -147,8 +156,8 @@ export function InventoryStatusUpdateModal({
       const allFullyReceived = purchase.items.every(item => {
         const currentReceived = getCurrentReceivedQty(item);
         const inputQty = isEditMode
-          ? (partialQuantities[item.materialId] !== undefined ? partialQuantities[item.materialId] : currentReceived)
-          : (partialQuantities[item.materialId] || 0);
+          ? (partialQuantities[item.itemId || item.description] !== undefined ? partialQuantities[item.itemId || item.description] : currentReceived)
+          : (partialQuantities[item.itemId || item.description] || 0);
         const newTotal = isEditMode ? inputQty : currentReceived + inputQty;
         return newTotal >= item.quantity;
       });
@@ -217,18 +226,18 @@ export function InventoryStatusUpdateModal({
           const currentReceived = getCurrentReceivedQty(item);
 
           const inputQty = isEditMode
-            ? (partialQuantities[item.materialId] !== undefined ? partialQuantities[item.materialId] : currentReceived)
-            : (partialQuantities[item.materialId] || 0);
+            ? (partialQuantities[item.itemId || item.description] !== undefined ? partialQuantities[item.itemId || item.description] : currentReceived)
+            : (partialQuantities[item.itemId || item.description] || 0);
           const newTotal = isEditMode ? inputQty : currentReceived + inputQty;
 
           if (newTotal > item.quantity) {
-            toast.error(`Total received (${newTotal}) exceeds ordered quantity (${item.quantity}) for ${item.materialName}`);
+            toast.error(`Total received (${newTotal}) exceeds ordered quantity (${item.quantity}) for ${item.description}`);
             hasError = true;
             break;
           }
 
           if (newTotal < 0) {
-            toast.error(`Received quantity cannot be negative for ${item.materialName}`);
+            toast.error(`Received quantity cannot be negative for ${item.description}`);
             hasError = true;
             break;
           }
@@ -243,8 +252,8 @@ export function InventoryStatusUpdateModal({
           const currentReceived = getCurrentReceivedQty(item);
 
           const inputQty = isEditMode
-            ? (partialQuantities[item.materialId] !== undefined ? partialQuantities[item.materialId] : currentReceived)
-            : (partialQuantities[item.materialId] || 0);
+            ? (partialQuantities[item.itemId || item.description] !== undefined ? partialQuantities[item.itemId || item.description] : currentReceived)
+            : (partialQuantities[item.itemId || item.description] || 0);
 
           return {
             ...item,
@@ -290,37 +299,37 @@ export function InventoryStatusUpdateModal({
     }
   };
 
-  const handleQuantityChange = (materialId: string, value: string) => {
+  const handleQuantityChange = (itemId: string, value: string) => {
     const numValue = parseFloat(value) || 0;
-    const item = purchase.items.find(i => i.materialId === materialId);
+    const item = purchase.items.find(i => (i.itemId || i.description) === itemId);
     if (!item) return;
 
     const currentReceived = getCurrentReceivedQty(item);
 
     if (isEditMode) {
       if (numValue > item.quantity) {
-        toast.error(`Cannot receive more than ${item.quantity} units for ${item.materialName}`);
+        toast.error(`Cannot receive more than ${item.quantity} units for ${item.description}`);
         return;
       }
       if (numValue < 0) {
-        toast.error(`Cannot have negative received quantity for ${item.materialName}`);
+        toast.error(`Cannot have negative received quantity for ${item.description}`);
         return;
       }
     } else {
       const maxCanReceive = item.quantity - currentReceived;
       if (numValue > maxCanReceive) {
-        toast.error(`Cannot receive more than ${maxCanReceive} units for ${item.materialName}`);
+        toast.error(`Cannot receive more than ${maxCanReceive} units for ${item.description}`);
         return;
       }
       if (numValue < 0) {
-        toast.error(`Cannot have negative received quantity for ${item.materialName}`);
+        toast.error(`Cannot have negative received quantity for ${item.description}`);
         return;
       }
     }
 
     setPartialQuantities(prev => ({
       ...prev,
-      [materialId]: numValue
+      [itemId]: numValue
     }));
   };
 
@@ -414,7 +423,7 @@ export function InventoryStatusUpdateModal({
                         if (checked) {
                           const newQuantities: Record<string, number> = {};
                           purchase.items.forEach(item => {
-                            newQuantities[item.materialId] = getCurrentReceivedQty(item);
+                            newQuantities[item.itemId || item.description] = getCurrentReceivedQty(item);
                           });
                           setPartialQuantities(newQuantities);
                         } else {
@@ -428,7 +437,7 @@ export function InventoryStatusUpdateModal({
 
               {purchase.inventoryStatus === 'received' && (
                 <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900 rounded-md mb-3 flex items-start gap-2">
-                  <Info className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                  <Info className="h-4 w-4 text-yellow-600 mt-0.5 shrink-0" />
                   <p className="text-sm text-yellow-900 dark:text-yellow-100">
                     Currently fully received. Reduce quantities below ordered amounts to mark as partially received.
                   </p>
@@ -436,17 +445,18 @@ export function InventoryStatusUpdateModal({
               )}
 
               <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 sidebar-scroll">
-                {purchase.items.map((item) => {
+                {purchase.items.map((item, index) => {
                   const currentReceived = getCurrentReceivedQty(item);
                   const maxCanReceive = item.quantity - currentReceived;
-                  const currentInput = partialQuantities[item.materialId] !== undefined
-                    ? partialQuantities[item.materialId]
+                  const itemKey = item.itemId || item.description || String(index);
+                  const currentInput = partialQuantities[itemKey] !== undefined
+                    ? partialQuantities[itemKey]
                     : (isEditMode ? currentReceived : 0);
 
                   return (
-                    <div key={item.materialId} className="space-y-2 p-3 bg-white dark:bg-gray-900 rounded-md border">
-                      <Label htmlFor={`qty-${item.materialId}`} className="text-sm font-medium">
-                        {item.materialName}
+                    <div key={itemKey} className="space-y-2 p-3 bg-white dark:bg-gray-900 rounded-md border">
+                      <Label htmlFor={`qty-${itemKey}`} className="text-sm font-medium">
+                        {item.description}
                       </Label>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                         <span>Ordered: <span className="font-medium text-foreground">{item.quantity}</span></span>
@@ -464,14 +474,14 @@ export function InventoryStatusUpdateModal({
                         )}
                       </div>
                       <Input
-                        id={`qty-${item.materialId}`}
+                        id={`qty-${itemKey}`}
                         type="number"
                         step="0.01"
                         min="0"
                         max={isEditMode ? item.quantity : maxCanReceive}
                         placeholder={isEditMode ? `Max: ${item.quantity}` : `Max: ${maxCanReceive}`}
                         value={currentInput || ''}
-                        onChange={(e) => handleQuantityChange(item.materialId, e.target.value)}
+                        onChange={(e) => handleQuantityChange(itemKey, e.target.value)}
                         className="text-left"
                         disabled={purchase.inventoryStatus === 'received' && !isEditMode}
                       />

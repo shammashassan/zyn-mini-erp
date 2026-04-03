@@ -3,10 +3,16 @@
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
 export interface IItem extends Document {
+  /** References the unified Item model */
+  itemId?: mongoose.Types.ObjectId;
   description: string;
   quantity: number;
   rate: number;
   total: number;
+  /** Tax rate snapshot at time of document creation */
+  taxRate?: number;
+  /** Pre-computed tax amount per line (taxRate applied to total) */
+  taxAmount?: number;
 }
 
 export interface IAuditEntry {
@@ -91,10 +97,16 @@ export interface IQuotation extends Document<string> {
 }
 
 const ItemSchema: Schema = new Schema({
+  /** References unified Item model */
+  itemId: { type: Schema.Types.ObjectId, ref: 'Item', required: false },
   description: { type: String, required: true },
   quantity: { type: Number, required: true },
   rate: { type: Number, required: true },
   total: { type: Number, required: true },
+  /** Tax rate snapshot — stored at time of document creation */
+  taxRate: { type: Number, default: 0 },
+  /** Pre-computed tax amount per line — VATtotal = sum(taxAmount) */
+  taxAmount: { type: Number, default: 0 },
 });
 
 const AuditEntrySchema: Schema = new Schema({
@@ -197,6 +209,7 @@ QuotationSchema.index({ status: 1 });
 QuotationSchema.index({ 'connectedDocuments.invoiceIds': 1 });
 QuotationSchema.index({ partyId: 1, quotationDate: -1 });
 QuotationSchema.index({ 'partySnapshot.displayName': 'text' });
+QuotationSchema.index({ 'items.itemId': 1 });
 
 // Pre-find hook
 QuotationSchema.pre(/^find/, function (this: Query<any, any>, next) {

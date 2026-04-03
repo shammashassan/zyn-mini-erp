@@ -3,8 +3,6 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Purchase from "@/models/Purchase";
-import Material from "@/models/Material";
-import StockAdjustment from "@/models/StockAdjustment";
 import { restore } from "@/utils/softDelete";
 import { getVoidedJournalsForReference, createJournalWithDate } from "@/utils/journalManager";
 import { getUserInfo } from "@/lib/auth-helpers";
@@ -114,11 +112,11 @@ export async function POST(request: Request) {
 
       const itemsWithQty = purchaseToRestore.items
         .map((item: any) => ({
-          materialId: item.materialId,
-          materialName: item.materialName,
+          itemId: item.itemId?.toString(),
+          itemName: item.description,
           quantity: getReceivedQuantity(item, purchaseToRestore.inventoryStatus)
         }))
-        .filter((item: any) => item.quantity > 0);
+        .filter((item: any) => item.quantity > 0 && item.itemId);
 
       const reason = purchaseToRestore.inventoryStatus === 'received'
         ? 'Purchase restored (fully received)'

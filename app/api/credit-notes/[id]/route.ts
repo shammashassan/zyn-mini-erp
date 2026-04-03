@@ -154,8 +154,10 @@ export async function PUT(request: Request, context: RequestContext) {
       const grossTotal = itemsToUse.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0);
       const discount = body.discount !== undefined ? Number(body.discount) || 0 : (currentCreditNote.discount || 0);
       const subtotal = grossTotal - discount;
-      const isTaxPayable = body.isTaxPayable !== undefined ? body.isTaxPayable : currentCreditNote.isTaxPayable;
-      const vatAmount = isTaxPayable ? (subtotal * 0.05) : 0;
+      
+      // Calculate VAT from item snapshots
+      const vatAmount = itemsToUse.reduce((sum: number, item: any) => sum + (Number(item.taxAmount) || 0), 0);
+      
       const grandTotal = subtotal + vatAmount;
 
       body.totalAmount = grossTotal;

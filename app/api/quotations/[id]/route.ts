@@ -1,11 +1,10 @@
-// app/api/quotations/[id]/route.ts - UPDATED: Handle snapshot updates when party/contact changes
+// app/api/quotations/[id]/route.ts - UPDATED: Trust frontend-calculated item-level tax totals
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Quotation from "@/models/Quotation";
 import { softDelete } from "@/utils/softDelete";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
-import { UAE_VAT_PERCENTAGE } from '@/utils/constants';
 import { createPartySnapshot } from "@/utils/partySnapshot";
 
 interface RequestContext {
@@ -126,39 +125,23 @@ export async function PUT(request: Request, context: RequestContext) {
       body.contactSnapshot = contactSnapshot;
     }
 
-    // Recalculate with VAT on Gross Total
+    // Trust frontend-calculated totals (item-level tax per item)
     let calculatedData: any = {};
 
     if (body.items || body.discount !== undefined) {
-      // Use updated items if provided, otherwise use existing
       const items = body.items || currentQuotation.items;
       const discount = body.discount !== undefined ? body.discount : currentQuotation.discount;
-
-      // 1. Gross Total = Sum of all items
       const grossTotal = items.reduce((sum: number, item: { total: number }) => sum + item.total, 0);
-
-      // 2. Subtotal = Gross Total - Discount
       const subtotal = Math.max(grossTotal - discount, 0);
 
-      // 3. VAT = Subtotal × 5%
-      const vatAmount = subtotal * (UAE_VAT_PERCENTAGE / 100);
-
-      // 4. Grand Total = Subtotal + VAT
-      const grandTotal = subtotal + vatAmount;
-
       calculatedData = {
-        totalAmount: grossTotal,
-        vatAmount: vatAmount,
-        grandTotal: grandTotal,
+        // Use frontend-provided totals if present; fallback to gross (no VAT) for safety
+        totalAmount: body.totalAmount !== undefined ? body.totalAmount : grossTotal,
+        vatAmount:   body.vatAmount   !== undefined ? body.vatAmount   : currentQuotation.vatAmount,
+        grandTotal:  body.grandTotal  !== undefined ? body.grandTotal  : subtotal,
       };
 
-      console.log(`♻️ Recalculated quotation ${id}:`, {
-        grossTotal,
-        vatAmount,
-        subtotal,
-        discount,
-        grandTotal
-      });
+      console.log(`♻️ Quotation ${id} totals:`, calculatedData);
     }
 
     // Merge body data with calculated data

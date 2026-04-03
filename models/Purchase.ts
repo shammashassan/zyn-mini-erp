@@ -3,11 +3,13 @@
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
 export interface IPurchaseItem {
-  materialId: string;
-  materialName: string;
+  itemId?: string;
+  description: string;
   quantity: number;
   unitCost: number;
   total: number;
+  taxRate?: number;
+  taxAmount?: number;
   receivedQuantity?: number;
   returnedQuantity?: number;
 }
@@ -66,7 +68,6 @@ export interface IPurchase extends Document<string> {
   items: IPurchaseItem[];
   totalAmount: number;
   discount: number;
-  isTaxPayable: boolean;
   vatAmount: number;
   grandTotal: number;
   date: Date;
@@ -111,11 +112,13 @@ export interface IPurchase extends Document<string> {
 }
 
 const PurchaseItemSchema: Schema = new Schema({
-  materialId: { type: String, required: true },
-  materialName: { type: String, required: true, trim: true },
+  itemId: { type: String, required: false },
+  description: { type: String, required: true, trim: true },
   quantity: { type: Number, required: true, min: 0.01 },
   unitCost: { type: Number, required: true, min: 0 },
   total: { type: Number, required: true, min: 0 },
+  taxRate: { type: Number, default: 0, min: 0 },
+  taxAmount: { type: Number, default: 0, min: 0 },
   receivedQuantity: { type: Number, default: 0, min: 0 },
   returnedQuantity: { type: Number, default: 0, min: 0 },
 });
@@ -198,7 +201,6 @@ const PurchaseSchema: Schema<IPurchase> = new Schema({
   items: [PurchaseItemSchema],
   totalAmount: { type: Number, required: true, min: 0 },
   discount: { type: Number, default: 0, min: 0 },
-  isTaxPayable: { type: Boolean, default: true },
   vatAmount: { type: Number, default: 0, min: 0 },
   grandTotal: { type: Number, min: 0 },
   date: { type: Date, required: true },
@@ -257,12 +259,11 @@ PurchaseSchema.index({ 'partySnapshot.displayName': 'text' });
 
 // Pre-save hook
 PurchaseSchema.pre('save', function (next) {
-  const grossTotal = this.totalAmount;
+  const grossTotal = this.totalAmount || 0;
   const discount = this.discount || 0;
   const subtotal = grossTotal - discount;
-  const vatAmount = this.isTaxPayable ? (subtotal * 0.05) : 0;
+  const vatAmount = this.vatAmount || 0;
 
-  this.vatAmount = vatAmount;
   this.grandTotal = subtotal + vatAmount;
 
   // Sync date with purchaseDate for backward compatibility

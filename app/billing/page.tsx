@@ -7,9 +7,7 @@ import { toast } from "sonner";
 import { useRouter, redirect, usePathname } from "next/navigation";
 import { BillingForm } from "./billing-form";
 import type { Item } from "@/lib/types";
-import type { IProduct } from "@/models/Product";
 import { ScrollText } from "lucide-react";
-import { UAE_VAT_PERCENTAGE } from '@/utils/constants';
 import { useBillPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
@@ -51,7 +49,7 @@ export default function CreateBillPage() {
   const [isLoading, setIsLoading] = useState(false);
   const isSubmittingRef = useRef(false);
 
-  const [products, setProducts] = useState<IProduct[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [isMounted, setIsMounted] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -70,7 +68,7 @@ export default function CreateBillPage() {
     discount: 0,
     documentType: "invoice",
     status: "pending",
-    items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
+    items: [{ description: "", quantity: 1, rate: 0, total: 0, taxRate: 0, taxAmount: 0 }],
     invoiceDate: new Date(),
     quotationDate: new Date(),
     voucherDate: new Date(),
@@ -87,7 +85,7 @@ export default function CreateBillPage() {
       if (!canCreate) return;
 
       try {
-        const productsRes = await fetch('/api/products');
+        const productsRes = await fetch('/api/items?types=product');
         if (productsRes.ok) setProducts(await productsRes.json());
       } catch (error) {
         console.error("Could not fetch initial data", error);
@@ -111,6 +109,7 @@ export default function CreateBillPage() {
           break;
         case "quantity":
         case "rate":
+        case "taxRate":
           const strValue = String(value);
           if (strValue === "") {
             currentItem[field] = "" as any;
@@ -128,7 +127,9 @@ export default function CreateBillPage() {
 
       const quantity = Number(currentItem.quantity) || 0;
       const rate = Number(currentItem.rate) || 0;
+      const taxRate = Number(currentItem.taxRate) || 0;
       currentItem.total = quantity * rate;
+      currentItem.taxAmount = currentItem.total * (taxRate / 100);
 
       updatedItems[index] = currentItem;
       return { ...prev, items: updatedItems };
@@ -138,7 +139,7 @@ export default function CreateBillPage() {
   const addItem = () => {
     setPayload(prev => ({
       ...prev,
-      items: [...prev.items, { description: "", quantity: 1, rate: 0, total: 0 }],
+      items: [...prev.items, { description: "", quantity: 1, rate: 0, total: 0, taxRate: 0, taxAmount: 0 }],
     }));
   };
 
@@ -153,7 +154,7 @@ export default function CreateBillPage() {
 
   const grossTotal = isVoucher ? (payload.voucherAmount || 0) : payload.items.reduce((sum, item) => sum + item.total, 0);
   const subTotal = isVoucher ? grossTotal : (grossTotal - payload.discount);
-  const vatAmount = isVoucher ? 0 : (subTotal * (UAE_VAT_PERCENTAGE / 100));
+  const vatAmount = isVoucher ? 0 : payload.items.reduce((sum, item) => sum + (item.taxAmount || 0), 0);
   const grandTotal = isVoucher ? grossTotal : (subTotal + vatAmount);
 
   const isFormValid = useMemo(() => {
@@ -249,45 +250,6 @@ export default function CreateBillPage() {
 
     try {
       const isVoucherDoc = payload.documentType === 'receipt' || payload.documentType === 'payment';
-      if (!isVoucherDoc) {
-        const itemsWithProductCreation = await Promise.all(
-          payload.items.map(async (item) => {
-            if (item.shouldCreateProduct && item.description.trim()) {
-              try {
-                const productPayload = {
-                  name: item.description.trim(),
-                  type: "General",
-                  price: Number(item.rate) || 0,
-                };
-
-                const response = await fetch("/api/products", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(productPayload),
-                });
-
-                if (response.ok) {
-                  toast.success(`Product "${item.description}" created`);
-                  return { ...item, shouldCreateProduct: false };
-                } else {
-                  const error = await response.json();
-                  toast.error(`Failed to create product "${item.description}"`, {
-                    description: error.error || "Continuing with custom item"
-                  });
-                  return { ...item, shouldCreateProduct: false };
-                }
-              } catch (error) {
-                console.error("Error creating product:", error);
-                toast.error(`Failed to create product "${item.description}"`);
-                return { ...item, shouldCreateProduct: false };
-              }
-            }
-            return item;
-          })
-        );
-
-        payload.items = itemsWithProductCreation;
-      }
 
       let endpoint = "";
       let payloadToSend: any = { ...payload };
@@ -303,6 +265,8 @@ export default function CreateBillPage() {
             ...item,
             quantity: Number(item.quantity) || 0,
             rate: Number(item.rate) || 0,
+            taxRate: Number(item.taxRate) || 0,
+            taxAmount: Number(item.taxAmount) || 0,
           }));
           payloadToSend.invoiceDate = payload.invoiceDate;
           break;
@@ -315,6 +279,8 @@ export default function CreateBillPage() {
             ...item,
             quantity: Number(item.quantity) || 0,
             rate: Number(item.rate) || 0,
+            taxRate: Number(item.taxRate) || 0,
+            taxAmount: Number(item.taxAmount) || 0,
           }));
           payloadToSend.quotationDate = payload.quotationDate;
           break;
@@ -376,7 +342,7 @@ export default function CreateBillPage() {
           payeeName: "",
           payeeId: undefined,
           vendorName: "",
-          items: [{ description: "", quantity: 1, rate: 0, total: 0 }],
+          items: [{ description: "", quantity: 1, rate: 0, total: 0, taxRate: 0, taxAmount: 0 }],
           notes: "",
           voucherAmount: 0,
           discount: 0
@@ -429,7 +395,7 @@ export default function CreateBillPage() {
         </div>
       </div>
 
-      <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs">
+      <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:shadow-xs">
         <BillingForm
           payload={payload}
           setPayload={setPayload}
@@ -443,7 +409,7 @@ export default function CreateBillPage() {
           subTotal={subTotal}
           vatAmount={vatAmount}
           grandTotal={grandTotal}
-          vatPercentage={UAE_VAT_PERCENTAGE}
+          vatPercentage={0} // No longer used globally, handled per item
           products={products}
         />
       </div>

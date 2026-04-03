@@ -20,7 +20,7 @@ interface PurchaseReturn {
   returnNumber: string;
   status: 'pending' | 'approved' | 'cancelled';
   items?: Array<{
-    materialName?: string;
+    description?: string;
     returnQuantity: number;
   }>;
   partyId?: any;
@@ -147,8 +147,8 @@ export function PurchaseReturnStatusUpdateModal({
             {purchaseReturn.items && purchaseReturn.items.length > 0 && (
               <>
                 <div className="flex justify-between mt-1">
-                  <span className="text-muted-foreground">Materials:</span>
-                  <span className="font-medium">{purchaseReturn.items.length} material(s)</span>
+                  <span className="text-muted-foreground">Items:</span>
+                  <span className="font-medium">{purchaseReturn.items.length} item(s)</span>
                 </div>
                 <div className="flex justify-between mt-1">
                   <span className="text-muted-foreground">Total Qty:</span>

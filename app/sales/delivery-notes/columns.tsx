@@ -40,6 +40,9 @@ export interface ConnectedInvoice {
 export interface DeliveryNote {
   _id: string;
   invoiceNumber: string;
+  discount: number
+  vatAmount: number
+  totalAmount: number
 
   // Party & Contact References (Dynamic - Current Truth)
   partyId: any;

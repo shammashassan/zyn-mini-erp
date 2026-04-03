@@ -5,6 +5,8 @@ export interface Item {
   quantity: number | string;
   rate: number | string;
   total: number;
+  taxRate?: number;
+  taxAmount?: number;
   shouldCreateProduct?: boolean; // Flag to indicate if product should be created on submit
 }
 

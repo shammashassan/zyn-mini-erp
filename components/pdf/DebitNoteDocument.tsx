@@ -51,7 +51,7 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({
 
   const summaryItems = buildInvoiceSummary({ grossTotal, discount, vatAmount, grandTotal });
 
-  const isManualEntry = debitNote.items?.length === 1 && !debitNote.items[0].materialId;
+  const isManualEntry = debitNote.items?.length === 1 && !debitNote.items[0].itemId;
 
   return (
     <Document>
@@ -73,8 +73,8 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({
             referenceLabel="Against Purchase Return"
           />
 
-          {isManualEntry && debitNote.items[0].materialName && (
-            <ReasonBox title="Description" content={debitNote.items[0].materialName} />
+          {isManualEntry && debitNote.items[0].description && (
+            <ReasonBox title="Description" content={debitNote.items[0].description} />
           )}
 
           {debitNote.reason && (
@@ -84,7 +84,7 @@ export const DebitNoteDocument: React.FC<DebitNoteDocumentProps> = ({
           {!isManualEntry && debitNote.items && debitNote.items.length > 0 && (
             <ItemsTable
               columns={[
-                { header: 'Material', field: 'materialName', width: '40%', align: 'left' },
+                { header: 'Description', field: 'description', width: '40%', align: 'left' },
                 { header: 'Qty', field: 'quantity', width: '15%', align: 'center' },
                 { header: 'Unit Cost', field: 'unitCost', width: '20%', align: 'right', format: (v) => `AED ${v?.toFixed(2) || '0.00'}` },
                 { header: 'Total', field: 'total', width: '25%', align: 'right', format: (v) => `AED ${v?.toFixed(2) || '0.00'}` },

@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Purchase from "@/models/Purchase";
-import Material from "@/models/Material";
+import Item from "@/models/Item";
 import StockAdjustment from "@/models/StockAdjustment";
 import Voucher from "@/models/Voucher";
 import ReturnNote from "@/models/ReturnNote";
@@ -36,7 +36,7 @@ export async function GET(request: Request, context: RequestContext) {
 
     await dbConnect();
 
-    const _ensureModels = [Purchase, Material, StockAdjustment, Voucher, ReturnNote, Party];
+    const _ensureModels = [Purchase, Item, StockAdjustment, Voucher, ReturnNote, Party];
     const { id } = await context.params;
 
     // ✅ FIXED: Added partyId and contactId population
@@ -103,12 +103,12 @@ function detectChanges(oldPurchase: any, newData: any) {
   // Check if items changed
   if (newData.items) {
     const oldItemsStr = JSON.stringify(oldPurchase.items.map((i: any) => ({
-      materialId: i.materialId,
+      itemId: i.itemId,
       quantity: i.quantity,
       unitCost: i.unitCost
     })));
     const newItemsStr = JSON.stringify(newData.items.map((i: any) => ({
-      materialId: i.materialId,
+      itemId: i.itemId,
       quantity: i.quantity,
       unitCost: i.unitCost
     })));
@@ -135,7 +135,7 @@ function haveItemsChanged(oldItems: any[], newItems: any[]) {
 
   for (let i = 0; i < oldItems.length; i++) {
     const oldItem = oldItems[i];
-    const newItem = newItems.find((item: any) => item.materialId === oldItem.materialId);
+    const newItem = newItems.find((item: any) => item.itemId === oldItem.itemId);
 
     if (!newItem) {
       return true;
@@ -177,14 +177,14 @@ async function processItemChanges(
   oldInventoryStatus: string
 ) {
 
-  const oldItemsMap = new Map(oldItems.map(item => [item.materialId, item]));
-  const newItemsMap = new Map(newItems.map(item => [item.materialId, item]));
+  const oldItemsMap = new Map(oldItems.map(item => [item.itemId, item]));
+  const newItemsMap = new Map(newItems.map(item => [item.itemId, item]));
 
-  const allMaterialIds = new Set([...oldItemsMap.keys(), ...newItemsMap.keys()]);
+  const allItemIds = new Set([...oldItemsMap.keys(), ...newItemsMap.keys()]);
 
-  for (const materialId of allMaterialIds) {
-    const oldItem = oldItemsMap.get(materialId);
-    const newItem = newItemsMap.get(materialId);
+  for (const itemId of allItemIds) {
+    const oldItem = oldItemsMap.get(itemId);
+    const newItem = newItemsMap.get(itemId);
 
     // CASE 1: NEW ITEM ADDED
     if (!oldItem && newItem) {
@@ -196,23 +196,24 @@ async function processItemChanges(
       const oldReceivedQty = getReceivedQuantity(oldItem, oldInventoryStatus);
 
       if (oldReceivedQty > 0) {
-        const material = await Material.findById(materialId);
-        if (material) {
-          const oldStock = material.stock;
+        const dbItem = await Item.findById(itemId);
+        if (dbItem) {
+          const oldStock = dbItem.stock || 0;
           const newStock = oldStock - oldReceivedQty;
 
-          await Material.findByIdAndUpdate(materialId, { stock: newStock });
+          await Item.findByIdAndUpdate(itemId, { stock: newStock });
 
           const newAdjustment = new StockAdjustment({
-            materialId,
-            materialName: oldItem.materialName,
+            itemId,
+            itemName: oldItem.description,
             adjustmentType: 'decrement',
             value: oldReceivedQty,
             oldStock,
             newStock,
-            oldUnitCost: material.unitCost,
-            newUnitCost: material.unitCost,
+            oldCostPrice: dbItem.rate,
+            newCostPrice: dbItem.rate,
             adjustmentReason: `Purchase ${purchaseRef} - item removed (${oldReceivedQty} units were received)`,
+            referenceModel: 'Purchase',
             createdAt: new Date(),
           });
 
@@ -230,23 +231,24 @@ async function processItemChanges(
       if (newItem.quantity < oldReceivedQty) {
         const excessQty = oldReceivedQty - newItem.quantity;
 
-        const material = await Material.findById(materialId);
-        if (material) {
-          const oldStock = material.stock;
+        const dbItem = await Item.findById(itemId);
+        if (dbItem) {
+          const oldStock = dbItem.stock || 0;
           const newStock = oldStock - excessQty;
 
-          await Material.findByIdAndUpdate(materialId, { stock: newStock });
+          await Item.findByIdAndUpdate(itemId, { stock: newStock });
 
           const newAdjustment = new StockAdjustment({
-            materialId,
-            materialName: newItem.materialName,
+            itemId,
+            itemName: newItem.description,
             adjustmentType: 'decrement',
             value: excessQty,
             oldStock,
             newStock,
-            oldUnitCost: material.unitCost,
-            newUnitCost: material.unitCost,
+            oldCostPrice: dbItem.rate,
+            newCostPrice: dbItem.rate,
             adjustmentReason: `Purchase ${purchaseRef} - ordered quantity reduced (received: ${oldReceivedQty} → ${newItem.quantity})`,
+            referenceModel: 'Purchase',
             createdAt: new Date(),
           });
 
@@ -350,7 +352,7 @@ export async function PUT(request: Request, context: RequestContext) {
     const structuralItemChanges = itemsChanged && body.items && (
       currentPurchase.items.length !== body.items.length ||
       currentPurchase.items.some((oldItem: any) => {
-        const newItem = body.items.find((ni: any) => ni.materialId === oldItem.materialId);
+        const newItem = body.items.find((ni: any) => ni.itemId === oldItem.itemId);
         if (!newItem) return true; // Item removed
         return oldItem.quantity !== newItem.quantity || oldItem.unitCost !== newItem.unitCost;
       })
@@ -390,10 +392,10 @@ export async function PUT(request: Request, context: RequestContext) {
       (newInventoryStatus === oldInventoryStatus) &&
       itemsChanged) {
 
-      const itemsToAdjust: Array<{ materialId: string; materialName: string; quantity: number }> = [];
+      const itemsToAdjust: Array<{ itemId: string; itemName: string; quantity: number }> = [];
 
       for (const newItem of body.items) {
-        const oldItem = currentPurchase.items.find((i: any) => i.materialId === newItem.materialId);
+        const oldItem = currentPurchase.items.find((i: any) => i.itemId === newItem.itemId);
         if (!oldItem) continue; // New items are handled by processItemChanges
 
         const oldReceivedQty = getReceivedQuantity(oldItem, oldInventoryStatus);
@@ -402,8 +404,8 @@ export async function PUT(request: Request, context: RequestContext) {
 
         if (qtyDifference !== 0) {
           itemsToAdjust.push({
-            materialId: newItem.materialId,
-            materialName: newItem.materialName,
+            itemId: newItem.itemId,
+            itemName: newItem.description,
             quantity: Math.abs(qtyDifference)
           });
 
@@ -413,8 +415,8 @@ export async function PUT(request: Request, context: RequestContext) {
       // Apply stock adjustments
       if (itemsToAdjust.length > 0) {
         for (const item of itemsToAdjust) {
-          const newItem = body.items.find((i: any) => i.materialId === item.materialId);
-          const oldItem = currentPurchase.items.find((i: any) => i.materialId === item.materialId);
+          const newItem = body.items.find((i: any) => i.itemId === item.itemId);
+          const oldItem = currentPurchase.items.find((i: any) => i.itemId === item.itemId);
 
           const oldReceivedQty = getReceivedQuantity(oldItem, oldInventoryStatus);
           const newReceivedQty = getReceivedQuantity(newItem, newInventoryStatus);
@@ -454,8 +456,8 @@ export async function PUT(request: Request, context: RequestContext) {
             const remainingToAdd = item.quantity - previouslyReceived;
 
             return {
-              materialId: item.materialId,
-              materialName: item.materialName,
+              itemId: item.itemId,
+              itemName: item.description,
               quantity: remainingToAdd
             };
           })
@@ -479,31 +481,32 @@ export async function PUT(request: Request, context: RequestContext) {
         for (const item of itemsWithReceived) {
           const newReceivedQty = item.receivedQuantity || 0;
           const oldReceivedQty = getReceivedQuantity(
-            currentPurchase.items.find((i: any) => i.materialId === item.materialId),
+            currentPurchase.items.find((i: any) => i.itemId === item.itemId),
             oldInventoryStatus
           );
           const qtyDifference = newReceivedQty - oldReceivedQty;
 
           if (qtyDifference !== 0) {
-            const material = await Material.findById(item.materialId);
-            if (material) {
-              const oldStock = material.stock;
+            const dbItem = await Item.findById(item.itemId);
+            if (dbItem) {
+              const oldStock = dbItem.stock || 0;
               const newStock = oldStock + qtyDifference;
-              await Material.findByIdAndUpdate(item.materialId, { stock: newStock });
+              await Item.findByIdAndUpdate(item.itemId, { stock: newStock });
 
               const adjustmentType = qtyDifference > 0 ? 'increment' : 'decrement';
               const adjustmentValue = Math.abs(qtyDifference);
 
               const newAdjustment = new StockAdjustment({
-                materialId: item.materialId,
-                materialName: item.materialName,
+                itemId: item.itemId,
+                itemName: item.description,
                 adjustmentType,
                 value: adjustmentValue,
                 oldStock,
                 newStock,
-                oldUnitCost: material.unitCost,
-                newUnitCost: material.unitCost,
+                oldCostPrice: dbItem.rate,
+                newCostPrice: dbItem.rate,
                 adjustmentReason: `Purchase received quantity adjusted`,
+                referenceModel: 'Purchase',
                 createdAt: new Date(),
               });
               await newAdjustment.save();
@@ -521,8 +524,8 @@ export async function PUT(request: Request, context: RequestContext) {
             const qtyToRemove = getReceivedQuantity(item, oldInventoryStatus);
 
             return {
-              materialId: item.materialId,
-              materialName: item.materialName,
+              itemId: item.itemId,
+              itemName: item.description,
               quantity: qtyToRemove
             };
           })
@@ -562,8 +565,7 @@ export async function PUT(request: Request, context: RequestContext) {
       const grossTotal = itemsToUse.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0);
       const discount = body.discount !== undefined ? Number(body.discount) || 0 : (currentPurchase.discount || 0);
       const subtotal = grossTotal - discount;
-      const isTaxPayable = body.isTaxPayable !== undefined ? body.isTaxPayable : currentPurchase.isTaxPayable;
-      const vatAmount = isTaxPayable ? (subtotal * 0.05) : 0;
+      const vatAmount = body.vatAmount !== undefined ? Number(body.vatAmount) || 0 : (currentPurchase.vatAmount || 0);
       const grandTotal = subtotal + vatAmount;
 
       updateData.totalAmount = grossTotal;
@@ -660,23 +662,25 @@ export async function DELETE(request: Request, context: RequestContext) {
       for (const item of purchaseToDelete.items) {
         const qtyToRemove = getReceivedQuantity(item, purchaseToDelete.inventoryStatus);
         if (qtyToRemove > 0) {
-          const material = await Material.findById(item.materialId);
-          if (material) {
-            const oldStock = material.stock;
+          const dbItem = await Item.findById(item.itemId);
+          if (dbItem) {
+            const oldStock = dbItem.stock || 0;
             const newStock = oldStock - qtyToRemove;
 
-            await Material.findByIdAndUpdate(item.materialId, { stock: newStock });
+            await Item.findByIdAndUpdate(item.itemId, { stock: newStock });
 
             await new StockAdjustment({
-              materialId: item.materialId,
-              materialName: item.materialName,
+              itemId: item.itemId,
+              itemName: item.description,
               adjustmentType: 'decrement',
               value: qtyToRemove,
               oldStock,
               newStock,
-              oldUnitCost: material.unitCost,
-              newUnitCost: material.unitCost,
+              oldCostPrice: dbItem.rate,
+              newCostPrice: dbItem.rate,
               adjustmentReason: `Purchase soft deleted`,
+              referenceModel: 'Purchase',
+              referenceId: purchaseToDelete._id,
               createdAt: new Date(),
             }).save();
           }

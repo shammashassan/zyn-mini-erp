@@ -52,14 +52,17 @@ import { Spinner } from "@/components/ui/spinner";
 import { PartyContactSelector } from "@/components/PartyContactSelector";
 
 type ReturnItem = {
-  materialId: string;
-  materialName: string;
+  /** References unified Item model */
+  itemId: string;
+  description: string;
   orderedQuantity?: number;
   receivedQuantity?: number;
   returnedQuantity?: number;
   returnQuantity: number;
   rate?: number;
   total?: number;
+  taxRate?: number;
+  taxAmount?: number;
 };
 
 type PurchaseReturnFormData = {
@@ -237,9 +240,11 @@ export function PurchaseReturnForm({
                 const quantities: Record<string, number> = {};
 
                 defaultValues.items.forEach((item: any) => {
-                  const itemId = item.materialId;
-                  itemsSet.add(itemId);
-                  quantities[itemId] = item.returnQuantity;
+                  const key = item.itemId?.toString();
+                  if (key) {
+                    itemsSet.add(key);
+                    quantities[key] = item.returnQuantity;
+                  }
                 });
 
                 setSelectedItems(itemsSet);
@@ -308,7 +313,9 @@ export function PurchaseReturnForm({
   const handleReturnQuantityChange = (itemId: string, value: string) => {
     const numValue = parseFloat(value) || 0;
 
-    const item = selectedPurchase?.items.find((i: any) => i.materialId === itemId);
+    const item = selectedPurchase?.items.find(
+      (i: any) => i.itemId?.toString() === itemId
+    );
     if (!item) return;
 
     const receivedQty = item.receivedQuantity || 0;
@@ -360,28 +367,38 @@ export function PurchaseReturnForm({
 
     let returnItems: ReturnItem[] = [];
 
-    for (const materialId of selectedItems) {
-      const item = selectedPurchase.items.find((i: any) => i.materialId === materialId);
-      const returnQty = returnQuantities[materialId] || 0;
+    for (const key of selectedItems) {
+      const item = selectedPurchase.items.find(
+        (i: any) => i.itemId?.toString() === key
+      );
+      const returnQty = returnQuantities[key] || 0;
 
       if (returnQty <= 0) {
-        toast.error(`Please enter a valid return quantity for ${item.materialName}`);
+        toast.error(`Please enter a valid return quantity for ${item?.description}`);
         return;
       }
 
+      const unitCost = item.unitCost || 0;
+      const lineTotal = returnQty * unitCost;
+      const taxRate = item.taxRate ?? 0;
+      const taxAmount = lineTotal * (taxRate / 100);
+
       returnItems.push({
-        materialId: item.materialId,
-        materialName: item.materialName,
+        itemId: item.itemId?.toString(),
+        description: item.description,
         orderedQuantity: item.quantity,
         receivedQuantity: item.receivedQuantity || 0,
         returnedQuantity: item.returnedQuantity || 0,
         returnQuantity: returnQty,
-        rate: item.unitCost || 0,
-        total: returnQty * (item.unitCost || 0),
+        rate: unitCost,
+        total: lineTotal,
+        taxRate,
+        taxAmount,
       });
     }
 
     const totalAmount = returnItems.reduce((sum, item) => sum + (item.total || 0), 0);
+    const vatAmount = returnItems.reduce((sum, item) => sum + (item.taxAmount || 0), 0);
 
     const submitData: any = {
       returnType: 'purchaseReturn',
@@ -394,7 +411,8 @@ export function PurchaseReturnForm({
       returnDate: data.returnDate,
       status: isEditMode ? data.status : 'pending',
       totalAmount,
-      grandTotal: totalAmount,
+      vatAmount,
+      grandTotal: totalAmount + vatAmount,
     };
 
     const submissionId = defaultValues?._id ? String(defaultValues._id) : undefined;
@@ -634,8 +652,8 @@ export function PurchaseReturnForm({
                       </thead>
                       <tbody>
                         {eligibleItems.map((item: any) => {
-                          const itemId = item.materialId;
-                          const itemName = item.materialName;
+                          const itemId = item.itemId?.toString();
+                          const itemName = item.description;
                           const isSelected = selectedItems.has(itemId);
 
                           const receivedQty = item.receivedQuantity || 0;
@@ -702,8 +720,8 @@ export function PurchaseReturnForm({
                 ) : (
                   <div className="space-y-3">
                     {eligibleItems.map((item: any) => {
-                      const itemId = item.materialId;
-                      const itemName = item.materialName;
+                      const itemId = item.itemId?.toString();
+                      const itemName = item.description;
                       const isSelected = selectedItems.has(itemId);
 
                       const receivedQty = item.receivedQuantity || 0;

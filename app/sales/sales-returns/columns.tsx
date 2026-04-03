@@ -54,7 +54,7 @@ export interface SalesReturn {
   partySnapshot?: any;
 
   items: Array<{
-    productName?: string;
+    description?: string;
     returnQuantity: number;
     rate?: number;
     total?: number;
@@ -356,7 +356,7 @@ export const getColumns = (
         return (
           <div className="flex flex-col gap-0.5 text-sm">
             {displayItems.map((item, idx) => {
-              const itemName = item.productName || 'Unknown';
+              const itemName = item.description || 'Unknown';
               return (
                 <div key={idx} className="text-muted-foreground">
                   {itemName}:{" "}

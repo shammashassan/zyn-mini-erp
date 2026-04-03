@@ -1,42 +1,35 @@
-// app/api/stock-adjustments/route.ts
+// app/api/stock-adjustments/route.ts - UPDATED: Uses itemId (unified Item model)
 
-import { NextResponse } from "next/server";
-import dbConnect from "@/lib/dbConnect";
-import Material from "@/models/Material";
-import StockAdjustment, { IStockAdjustment } from "@/models/StockAdjustment";
-import { requireAuthAndPermission } from "@/lib/auth-utils";
-import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
+import { NextResponse } from 'next/server';
+import dbConnect from '@/lib/dbConnect';
+import Item from '@/models/Item';
+import StockAdjustment, { IStockAdjustment } from '@/models/StockAdjustment';
+import { requireAuthAndPermission } from '@/lib/auth-utils';
+import { extractTableParams, executePaginatedQuery } from '@/lib/query-builders';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET  /api/stock-adjustments
+// ─────────────────────────────────────────────────────────────────────────────
 export async function GET(request: Request) {
   try {
-    const { error } = await requireAuthAndPermission({
-      stockAdjustment: ["read"],
-    });
+    const { error } = await requireAuthAndPermission({ stockAdjustment: ['read'] });
     if (error) return error;
 
     await dbConnect();
 
     const { searchParams } = new URL(request.url);
-
-    // ✅ Detect server-side mode
     const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
 
-    // Extract date params (support both naming conventions)
     const startDateParam = searchParams.get('startDate') || searchParams.get('from');
     const endDateParam = searchParams.get('endDate') || searchParams.get('to');
 
     if (isServerSide) {
-      // 🚀 SERVER-SIDE MODE
       const { page, pageSize, sorting, filters } = extractTableParams(searchParams);
 
       const baseFilter: any = { isDeleted: false };
-
-      // Apply Date Range Filter
       if (startDateParam || endDateParam) {
         baseFilter.createdAt = {};
-        if (startDateParam) {
-          baseFilter.createdAt.$gte = new Date(startDateParam);
-        }
+        if (startDateParam) baseFilter.createdAt.$gte = new Date(startDateParam);
         if (endDateParam) {
           const end = new Date(endDateParam);
           end.setHours(23, 59, 59, 999);
@@ -60,43 +53,38 @@ export async function GET(request: Request) {
         currentPage: result.currentPage,
         pageSize: result.pageSize,
       });
-
-    } else {
-      // 📋 CLIENT-SIDE MODE (fallback)
-      const filter: any = { isDeleted: false };
-
-      // Apply Date Range Filter
-      if (startDateParam || endDateParam) {
-        filter.createdAt = {};
-        if (startDateParam) filter.createdAt.$gte = new Date(startDateParam);
-        if (endDateParam) {
-          const toDate = new Date(endDateParam);
-          toDate.setHours(23, 59, 59, 999);
-          filter.createdAt.$lte = toDate;
-        }
-      }
-
-      const activeAdjustments = await StockAdjustment.find(filter)
-        .sort({ createdAt: -1 });
-      
-      return NextResponse.json(activeAdjustments);
     }
+
+    const filter: any = { isDeleted: false };
+    if (startDateParam || endDateParam) {
+      filter.createdAt = {};
+      if (startDateParam) filter.createdAt.$gte = new Date(startDateParam);
+      if (endDateParam) {
+        const toDate = new Date(endDateParam);
+        toDate.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = toDate;
+      }
+    }
+
+    const adjustments = await StockAdjustment.find(filter).sort({ createdAt: -1 });
+    return NextResponse.json(adjustments);
   } catch (error) {
-    console.error("Failed to fetch stock adjustments:", error);
-    return NextResponse.json({ error: "Server error." }, { status: 500 });
+    console.error('GET /api/stock-adjustments error:', error);
+    return NextResponse.json({ error: 'Server error.' }, { status: 500 });
   }
 }
 
-// POST remains UNCHANGED except for imports
+// ─────────────────────────────────────────────────────────────────────────────
+// POST  /api/stock-adjustments
+// ─────────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
     await dbConnect();
     const body = await request.json();
-    
-    // Determine permission needed based on action
-    let permissionRequired = ["create"];
-    if (body.action === 'restore') permissionRequired = ["restore"];
-    if (body.action === 'revert') permissionRequired = ["soft_delete"];
+
+    let permissionRequired = ['create'];
+    if (body.action === 'restore') permissionRequired = ['restore'];
+    if (body.action === 'revert') permissionRequired = ['soft_delete'];
 
     const { error, session } = await requireAuthAndPermission({
       stockAdjustment: permissionRequired,
@@ -104,94 +92,105 @@ export async function POST(request: Request) {
     if (error) return error;
 
     switch (body.action) {
+      // ── Revert (undo) an adjustment ────────────────────────────────────────
       case 'revert': {
-        const adjustmentToRevert: IStockAdjustment = body.payload;
-        
-        const material = await Material.findById(adjustmentToRevert.materialId);
-        if (material) {
-          const stockRevertValue = adjustmentToRevert.adjustmentType === 'increment' 
-            ? -adjustmentToRevert.value 
-            : +adjustmentToRevert.value;
-          
-          const isUnitCostChanged = adjustmentToRevert.oldUnitCost !== adjustmentToRevert.newUnitCost;
-
-          const updatePayload: { $inc: { stock: number }; unitCost?: number } = {
-            $inc: { stock: stockRevertValue }
-          };
-
-          if (isUnitCostChanged) {
-            updatePayload.unitCost = adjustmentToRevert.oldUnitCost;
+        const adj: IStockAdjustment = body.payload;
+        const item = await Item.findById(adj.itemId);
+        if (item) {
+          const stockRevert = adj.adjustmentType === 'increment' ? -adj.value : adj.value;
+          const updatePayload: any = { $inc: { stock: stockRevert } };
+          if (adj.oldCostPrice !== adj.newCostPrice) {
+            updatePayload.costPrice = adj.oldCostPrice;
           }
-          
-          await Material.findByIdAndUpdate(adjustmentToRevert.materialId, updatePayload);
+          await Item.findByIdAndUpdate(adj.itemId, updatePayload);
         }
-        
-        await StockAdjustment.findByIdAndDelete(adjustmentToRevert._id);
-        return NextResponse.json({ message: "Adjustment reverted successfully" });
+        await StockAdjustment.findByIdAndDelete(adj._id);
+        return NextResponse.json({ message: 'Adjustment reverted successfully' });
       }
 
+      // ── Restore a soft-deleted adjustment ──────────────────────────────────
       case 'restore': {
         const { _id, ...restoreData } = body.payload;
-        const restoredAdjustment = new StockAdjustment({
+        const restored = new StockAdjustment({
           ...restoreData,
           createdAt: new Date(restoreData.createdAt),
           isDeleted: false,
           deletedAt: null,
           deletedBy: null,
-          updatedBy: session.user.id
+          updatedBy: session.user.id,
         });
-        await restoredAdjustment.save();
-        return NextResponse.json(restoredAdjustment, { status: 201 });
+        await restored.save();
+        return NextResponse.json(restored, { status: 201 });
       }
 
+      // ── New manual adjustment ───────────────────────────────────────────────
       default: {
-        const { materialId, adjustmentType, value, newUnitCost, adjustmentReason } = body;
-        const originalMaterial = await Material.findById(materialId);
-        if (!originalMaterial) {
-          return NextResponse.json({ error: "Material not found." }, { status: 404 });
+        const {
+          itemId,
+          adjustmentType,
+          value,
+          newCostPrice,
+          adjustmentReason,
+        } = body;
+
+        const item = await Item.findById(itemId);
+        if (!item) {
+          return NextResponse.json({ error: 'Item not found.' }, { status: 404 });
         }
-        const oldStock = originalMaterial.stock;
+
+        const oldStock = item.stock;
         const newStock = oldStock + (adjustmentType === 'increment' ? value : -value);
-        const oldUnitCost = originalMaterial.unitCost;
-        const isUnitCostChanged = newUnitCost !== undefined && newUnitCost !== oldUnitCost;
+        const oldCostPrice = item.costPrice;
+        const isCostChanged =
+          newCostPrice !== undefined && newCostPrice !== oldCostPrice;
 
         if (newStock < 0) {
-          return NextResponse.json({ error: "Stock cannot be negative." }, { status: 400 });
+          return NextResponse.json(
+            { error: 'Stock cannot go below zero.' },
+            { status: 400 }
+          );
         }
-        if (isUnitCostChanged && !adjustmentReason) {
-          return NextResponse.json({ error: "A reason is required when changing the unit cost." }, { status: 400 });
+        if (isCostChanged && !adjustmentReason) {
+          return NextResponse.json(
+            { error: 'A reason is required when changing the cost price.' },
+            { status: 400 }
+          );
         }
 
-        const updatePayload: { stock: number; unitCost?: number } = { stock: newStock };
-        if (isUnitCostChanged) {
-          updatePayload.unitCost = newUnitCost;
+        const itemUpdate: any = { stock: newStock };
+        if (isCostChanged) itemUpdate.costPrice = newCostPrice;
+        await Item.findByIdAndUpdate(itemId, itemUpdate);
+
+        // Auto-lock unit on first stock entry
+        if (!item.baseUnitLocked && newStock > 0) {
+          await Item.findByIdAndUpdate(itemId, { baseUnitLocked: true });
         }
-        await Material.findByIdAndUpdate(materialId, updatePayload);
-        
-        const adjustmentData = {
-          materialId,
-          materialName: originalMaterial.name,
+
+        const adjustment = await StockAdjustment.create({
+          itemId,
+          itemName: item.name,
           adjustmentType,
           value,
           oldStock,
           newStock,
-          oldUnitCost,
-          newUnitCost: isUnitCostChanged ? newUnitCost : oldUnitCost,
+          oldCostPrice,
+          newCostPrice: isCostChanged ? newCostPrice : oldCostPrice,
           adjustmentReason: adjustmentReason || null,
           createdAt: new Date(),
           isDeleted: false,
           deletedAt: null,
           deletedBy: null,
           createdBy: session.user.id,
-        };
-        
-        const newAdjustment = await StockAdjustment.create(adjustmentData);
-        
-        return NextResponse.json(newAdjustment, { status: 201 });
+        });
+
+        return NextResponse.json(adjustment, { status: 201 });
       }
     }
   } catch (error) {
-    console.error("Failed to process stock adjustment:", error);
-    return NextResponse.json({ error: "Failed to process stock adjustment." }, { status: 500 });
+    console.error('POST /api/stock-adjustments error:', error);
+    return NextResponse.json(
+      { error: 'Failed to process stock adjustment.' },
+      { status: 500 }
+    );
   }
 }

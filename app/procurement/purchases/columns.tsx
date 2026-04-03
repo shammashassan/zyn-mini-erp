@@ -364,7 +364,7 @@ export const getColumns = (
           <div className="flex flex-col gap-0.5 text-sm">
             {displayItems.map((item, idx) => (
               <div key={idx} className="text-muted-foreground">
-                {item.materialName}: <span className="font-medium text-foreground">{item.quantity}</span>
+                {item.description}: <span className="font-medium text-foreground">{item.quantity}</span>
               </div>
             ))}
             {remainingCount > 0 && (

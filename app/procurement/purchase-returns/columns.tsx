@@ -53,7 +53,7 @@ export interface PurchaseReturn {
   partySnapshot?: any;
 
   items: Array<{
-    materialName?: string;
+    description?: string;
     orderedQuantity?: number;
     receivedQuantity?: number;
     returnedQuantity?: number;
@@ -354,7 +354,7 @@ export const getColumns = (
         return (
           <div className="flex flex-col gap-0.5 text-sm">
             {displayItems.map((item, idx) => {
-              const itemName = item.materialName || 'Unknown';
+              const itemName = item.description || 'Unknown';
               return (
                 <div key={idx} className="text-muted-foreground">
                   {itemName}:{" "}

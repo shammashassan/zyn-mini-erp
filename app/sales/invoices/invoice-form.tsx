@@ -1,4 +1,10 @@
-// app/sales/invoices/invoice-form.tsx - MINIMAL CHANGES: Event propagation fix + Self-contained ItemsTable
+// app/sales/invoices/invoice-form.tsx
+// UPDATED: Uses unified Item model (replaces old Product model)
+// Key changes:
+//   - Fetches from /api/items (not /api/products)
+//   - InvoiceItem uses `itemId` and `price` internally (not `rate`)
+//   - `price` is mapped → `rate` on submit so the API/DB field name is unchanged
+//   - `rate` is mapped → `price` when loading an existing invoice for editing
 
 "use client";
 
@@ -41,21 +47,32 @@ import { ChevronsUpDown, Check, FileText, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import type { IProduct } from "@/models/Product";
 import type { Invoice } from "./columns";
 import { formatCurrency } from "@/utils/formatters/currency";
-import { UAE_VAT_PERCENTAGE } from "@/utils/constants";
 import { Spinner } from "@/components/ui/spinner";
 import { PartyContactSelector } from "@/components/PartyContactSelector";
 import { ItemsTable } from "@/components/ItemsTable";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Internal form item — uses `price` (not `rate`) so ItemsTable's field binding works
+ * correctly. The `price` field is mapped back to `rate` on submit.
+ */
 type InvoiceItem = {
-  productId?: string;
+  /** References the unified Item model (_id). */
+  itemId?: string;
   description: string;
   quantity: number;
-  rate: number;
+  /** Internal form field name used by ItemsTable. Mapped to `rate` on submit. */
+  price: number;
   total: number;
-  shouldCreateProduct?: boolean;
+  /** Tax rate snapshot stored per line — needed to recompute taxAmount when qty/price change */
+  taxRate?: number;
+  /** Pre-computed tax for this line — VATtotal = sum(taxAmount) */
+  taxAmount?: number;
 };
 
 type InvoiceFormData = {
@@ -69,12 +86,33 @@ type InvoiceFormData = {
   status: 'pending' | 'approved' | 'cancelled';
 };
 
+/** Minimal item shape returned from /api/items — matches ItemsTable's ItemData */
+interface ItemApiData {
+  _id: string;
+  name: string;
+  sellingPrice: number;
+  costPrice: number;
+  unit?: string;
+  category?: string;
+  types: string[];
+  taxRate?: number;
+  taxType?: string;
+}
+
 interface ConnectedQuotation {
   _id: string;
   invoiceNumber: string;
   grandTotal: number;
   discount: number;
-  items: InvoiceItem[];
+  /** Quotation items may come from API with `rate` or `price` field */
+  items: Array<{
+    itemId?: string;
+    description: string;
+    quantity: number;
+    rate?: number;
+    price?: number;
+    total: number;
+  }>;
 }
 
 interface InvoiceFormProps {
@@ -83,6 +121,38 @@ interface InvoiceFormProps {
   onSubmit: (data: any, id?: string) => Promise<void>;
   defaultValues?: Invoice | null;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Normalise a line item coming from the DB/API into the internal form shape. */
+function normaliseLineItem(item: any): InvoiceItem {
+  return {
+    itemId: item.itemId?.toString() || '',
+    description: item.description ?? '',
+    quantity: item.quantity ?? 1,
+    price: item.price ?? item.rate ?? 0,
+    total: item.total ?? 0,
+    taxRate: item.taxRate ?? 0,
+    taxAmount: item.taxAmount ?? 0,
+  };
+}
+
+/** Empty line item used when appending a new row. */
+const emptyItem = (): InvoiceItem => ({
+  itemId: '',
+  description: '',
+  quantity: 1,
+  price: 0,
+  total: 0,
+  taxRate: 0,
+  taxAmount: 0,
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: InvoiceFormProps) {
   const {
@@ -97,7 +167,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     defaultValues: {
       partyId: "",
       contactId: undefined,
-      items: [{ productId: "", description: "", quantity: 1, rate: 0, total: 0 }],
+      items: [emptyItem()],
       discount: 0,
       notes: "",
       invoiceDate: new Date(),
@@ -110,8 +180,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     name: "items"
   });
 
-  const [products, setProducts] = useState<IProduct[]>([]);
-  const [productTypes, setProductTypes] = useState<string[]>([]); // ✅ ADDED
+  const [items, setItems] = useState<ItemApiData[]>([]);
   const [quotations, setQuotations] = useState<ConnectedQuotation[]>([]);
   const [quotationPopoverOpen, setQuotationPopoverOpen] = useState(false);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
@@ -119,10 +188,10 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
   const [isDesktop, setIsDesktop] = useState(true);
 
   useEffect(() => {
-    const checkIsDesktop = () => setIsDesktop(window.innerWidth >= 1024);
-    checkIsDesktop();
-    window.addEventListener("resize", checkIsDesktop);
-    return () => window.removeEventListener("resize", checkIsDesktop);
+    const check = () => setIsDesktop(window.innerWidth >= 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
   }, []);
 
   const watchedItems = watch("items");
@@ -135,31 +204,33 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
   // Calculate totals
   const grossTotal = watchedItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
   const subTotal = Math.max(grossTotal - (Number(discount) || 0), 0);
-  const vatAmount = subTotal * (UAE_VAT_PERCENTAGE / 100);
+
+  // VAT = simple sum of per-line taxAmount snapshots (no rate lookup, no fallback)
+  const vatAmount = watchedItems.reduce((sum, item) =>
+    sum + (Number((item as any).taxAmount) || 0), 0);
+
   const grandTotal = subTotal + vatAmount;
   const totalItems = watchedItems.filter(item => item.description).length;
 
-  // ✅ UPDATED: Extract types
-  const fetchProducts = async () => {
+  // ── Fetch items (product type only) ────────────────────────────────────────
+  const fetchItems = async () => {
     try {
-      const productsRes = await fetch("/api/products");
-      if (productsRes.ok) {
-        const productsData = await productsRes.json();
-        setProducts(productsData);
-
-        // ✅ ADDED: Extract unique types
-        const types = Array.from(new Set(productsData.map((p: IProduct) => p.type).filter(Boolean))) as string[];
-        setProductTypes(types);
+      // Fetch only product-type items; ItemsTable will also client-filter via allowedTypes
+      const res = await fetch("/api/items?types=product");
+      if (res.ok) {
+        const data: ItemApiData[] = await res.json();
+        setItems(data);
       }
     } catch (error) {
-      console.error("Failed to fetch products:", error);
+      console.error("Failed to fetch items:", error);
     }
   };
 
   useEffect(() => {
-    fetchProducts();
+    fetchItems();
   }, []);
 
+  // ── Fetch linked quotations when party is selected ─────────────────────────
   useEffect(() => {
     if (!partyId || !isOpen || isEditMode) return;
 
@@ -168,14 +239,13 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
       try {
         const res = await fetch(`/api/quotations?partyId=${partyId}&populate=true`);
         if (res.ok) {
-          const quotations = await res.json();
-          const availableQuotations = quotations.filter(
-            (quotation: any) =>
-              (quotation.status === 'approved' || quotation.status === 'sent') &&
-              (!quotation.connectedDocuments?.invoiceIds ||
-                quotation.connectedDocuments.invoiceIds.length === 0)
+          const list = await res.json();
+          const available = list.filter(
+            (q: any) =>
+              (q.status === 'approved' || q.status === 'sent') &&
+              (!q.connectedDocuments?.invoiceIds || q.connectedDocuments.invoiceIds.length === 0)
           );
-          setQuotations(availableQuotations);
+          setQuotations(available);
         }
       } catch (error) {
         console.error("Failed to fetch quotations:", error);
@@ -187,6 +257,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     fetchQuotations();
   }, [partyId, isOpen, isEditMode]);
 
+  // ── Populate form when modal opens / defaultValues change ─────────────────
   useEffect(() => {
     if (isOpen) {
       if (defaultValues) {
@@ -197,7 +268,8 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
         reset({
           partyId: partyIdValue || "",
           contactId: defaultValues.contactId?.toString() || undefined,
-          items: defaultValues.items || [{ productId: "", description: "", quantity: 1, rate: 0, total: 0 }],
+          // Map DB `rate` → form `price`
+          items: (defaultValues.items ?? [emptyItem()]).map(normaliseLineItem),
           discount: defaultValues.discount || 0,
           notes: defaultValues.notes || "",
           quotationId: "",
@@ -208,7 +280,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
         reset({
           partyId: "",
           contactId: undefined,
-          items: [{ productId: "", description: "", quantity: 1, rate: 0, total: 0 }],
+          items: [emptyItem()],
           discount: 0,
           notes: "",
           quotationId: "",
@@ -219,20 +291,22 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     }
   }, [isOpen, defaultValues, reset]);
 
+  // ── Quotation selection ────────────────────────────────────────────────────
   const handleQuotationSelect = (quotation: ConnectedQuotation) => {
     setValue("quotationId", quotation._id, { shouldDirty: true });
-    setValue("items", quotation.items, { shouldDirty: true });
+    // Normalise quotation items (they may have `rate` or `price`)
+    setValue("items", quotation.items.map(normaliseLineItem), { shouldDirty: true });
     setValue("discount", quotation.discount, { shouldDirty: true });
     setQuotationPopoverOpen(false);
     toast.success(`Linked quotation ${quotation.invoiceNumber}`);
   };
 
+  // ── Form submit ────────────────────────────────────────────────────────────
   const handleFormSubmit = async (data: InvoiceFormData) => {
     if (!data.partyId) {
       toast.error("Please select a customer (Party)");
       return;
     }
-
     if (!data.invoiceDate) {
       toast.error("Please select an invoice date");
       return;
@@ -255,22 +329,30 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
       contactId: data.contactId,
       invoiceDate: data.invoiceDate,
       items: validItems.map(item => ({
-        productId: item.productId || '',
+        itemId: item.itemId || undefined,
         description: item.description,
         quantity: Number(item.quantity) || 0,
-        rate: Number(item.rate) || 0,
-        total: Number(item.total) || 0
+        rate: Number(item.price) || 0,
+        total: Number(item.total) || 0,
+        taxRate: Number((item as any).taxRate) || 0,
+        taxAmount: Number((item as any).taxAmount) || 0,
       })),
       discount: Number(data.discount) || 0,
+      totalAmount: grossTotal,
+      vatAmount: vatAmount,
+      grandTotal: grandTotal,
       notes: data.notes,
       status: isEditMode ? data.status : "pending",
-      connectedDocuments: !isEditMode && data.quotationId ? { quotationId: data.quotationId } : {},
+      connectedDocuments: !isEditMode && data.quotationId
+        ? { quotationId: data.quotationId }
+        : {},
     };
 
     const submissionId = defaultValues?._id ? String(defaultValues._id) : undefined;
     await onSubmit(submitData, submissionId);
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] lg:max-w-3xl max-h-[90vh] overflow-y-auto sidebar-scroll">
@@ -283,6 +365,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
 
         <form onSubmit={(e) => { e.stopPropagation(); handleSubmit(handleFormSubmit)(e); }} className="space-y-6">
           <div className={cn("grid grid-cols-1 gap-4", isEditMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
+            {/* Party / Contact selector */}
             <div>
               <Controller
                 name="partyId"
@@ -298,14 +381,12 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                     showCreateButton={true}
                     className="w-full"
                     layout="vertical"
-                  // disablePartyTypeSelector={isEditMode}
-                  // disablePartySelector={isEditMode}
                   />
                 )}
               />
             </div>
 
-            {/* Date Field */}
+            {/* Invoice Date */}
             <div className="space-y-2">
               <Label>Invoice Date</Label>
               <Controller
@@ -341,7 +422,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
               />
             </div>
 
-            {/* Status Field (Edit Mode Only) */}
+            {/* Status (edit mode only) */}
             {isEditMode && (
               <div className="space-y-2">
                 <Label>Status</Label>
@@ -365,7 +446,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
             )}
           </div>
 
-          {/* Quotation Link Section */}
+          {/* Link quotation (new invoice only) */}
           {!isEditMode && partyId && quotations.length > 0 && (
             <div className="space-y-2 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
               <Label className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
@@ -427,31 +508,31 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
             </div>
           )}
 
-          {/* Items Section */}
+          {/* Items table — uses unified Item model, sale price context */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Items</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <ItemsTable
-                itemType="product"
-                items={products}
-                onRefreshItems={fetchProducts}
-                existingTypes={productTypes}
+                items={items}
+                allowedTypes={['product']}
+                priceContext="sale"
                 fields={fields}
                 control={control as any}
                 register={register}
                 watch={watch}
                 setValue={setValue}
-                onAppendItem={() => append({ productId: "", description: "", quantity: 1, rate: 0, total: 0 })}
+                onAppendItem={() => append(emptyItem())}
                 onRemoveItem={remove}
+                onRefreshItems={fetchItems}
                 fieldName="items"
                 isDesktop={isDesktop}
-                priceLabel="Rate"
               />
             </CardContent>
           </Card>
 
+          {/* Discount */}
           <div className="space-y-2">
             <Label htmlFor="discount">Discount</Label>
             <Input
@@ -464,6 +545,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
             />
           </div>
 
+          {/* Notes */}
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
             <Textarea
@@ -474,6 +556,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
             />
           </div>
 
+          {/* Totals summary */}
           <Card className="bg-muted/50">
             <CardContent className="p-6">
               <div className="space-y-3">
@@ -494,7 +577,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
                   <span className="font-medium">{formatCurrency(subTotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">VAT ({UAE_VAT_PERCENTAGE}%):</span>
+                  <span className="text-muted-foreground">Calculated VAT:</span>
                   <span className="font-medium">{formatCurrency(vatAmount)}</span>
                 </div>
                 <div className="flex justify-between pt-3 border-t">
@@ -515,17 +598,14 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
               type="submit"
               disabled={isSubmitting || (isEditMode && !isDirty)}
             >
-              {isSubmitting ? (isEditMode ? (
+              {isSubmitting ? (
                 <>
                   <Spinner />
-                  Updating...
+                  {isEditMode ? "Updating..." : "Creating..."}
                 </>
               ) : (
-                <>
-                  <Spinner />
-                  Creating...
-                </>
-              )) : (isEditMode ? "Update Invoice" : "Create Invoice")}
+                isEditMode ? "Update Invoice" : "Create Invoice"
+              )}
             </Button>
           </DialogFooter>
         </form>

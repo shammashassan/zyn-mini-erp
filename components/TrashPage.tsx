@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Trash2, RefreshCw, AlertTriangle, PackageX, Undo2, Search } from "lucide-react";
+import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -177,11 +178,13 @@ export function TrashPage<T extends { _id: string; deletedAt?: Date | string; de
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                onClick={() => (window.location.href = backUrl)}
+                asChild
                 className="gap-2"
               >
-                <Undo2 className="h-4 w-4" />
-                {backLabel}
+                <Link href={backUrl}>
+                  <Undo2 className="h-4 w-4" />
+                  {backLabel}
+                </Link>
               </Button>
               {items.length > 0 && (
                 <Button

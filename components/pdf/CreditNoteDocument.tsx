@@ -51,7 +51,7 @@ export const CreditNoteDocument: React.FC<CreditNoteDocumentProps> = ({
 
   const summaryItems = buildInvoiceSummary({ grossTotal, discount, vatAmount, grandTotal });
 
-  const isManualEntry = creditNote.items?.length === 1 && !creditNote.items[0].productId;
+  const isManualEntry = creditNote.items?.length === 1 && !creditNote.items[0].itemId;
 
   return (
     <Document>
@@ -86,7 +86,7 @@ export const CreditNoteDocument: React.FC<CreditNoteDocumentProps> = ({
               columns={[
                 { header: 'Product', field: 'description', width: '40%', align: 'left' },
                 { header: 'Qty', field: 'quantity', width: '15%', align: 'center' },
-                { header: 'Unit Price', field: 'price', width: '20%', align: 'right', format: (v) => `AED ${v?.toFixed(2) || '0.00'}` },
+                { header: 'Rate', field: 'rate', width: '20%', align: 'right', format: (v) => `AED ${v?.toFixed(2) || '0.00'}` },
                 { header: 'Total', field: 'total', width: '25%', align: 'right', format: (v) => `AED ${v?.toFixed(2) || '0.00'}` },
               ]}
               items={creditNote.items}

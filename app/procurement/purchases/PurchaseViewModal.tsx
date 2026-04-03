@@ -284,7 +284,7 @@ export function PurchaseViewModal({
                     <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                     <div className="min-w-0">
                       <div className="text-xs sm:text-sm text-muted-foreground">Purchase Date</div>
-                      <div className="font-medium text-xs sm:text-sm break-words">
+                      <div className="font-medium text-xs sm:text-sm wrap-break-word">
                         {formatLongDate(currentData.purchaseDate)}
                       </div>
                     </div>
@@ -295,7 +295,7 @@ export function PurchaseViewModal({
                       <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                       <div className="min-w-0">
                         <div className="text-xs sm:text-sm text-muted-foreground">Party</div>
-                        <div className="font-medium text-xs sm:text-sm break-words">
+                        <div className="font-medium text-xs sm:text-sm wrap-break-word">
                           {partyName}
                         </div>
                         {partyVAT && (
@@ -312,7 +312,7 @@ export function PurchaseViewModal({
                       <CircleUserRound className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                       <div className="min-w-0">
                         <div className="text-xs sm:text-sm text-muted-foreground">Contact</div>
-                        <div className="font-medium text-xs sm:text-sm break-words">
+                        <div className="font-medium text-xs sm:text-sm wrap-break-word">
                           {contactName}
                           {contactDesignation && (
                             <span className="text-muted-foreground"> ({contactDesignation})</span>
@@ -333,7 +333,7 @@ export function PurchaseViewModal({
                       <CircleUserRound className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
                       <div className="min-w-0">
                         <div className="text-xs sm:text-sm text-muted-foreground">Created By</div>
-                        <div className="font-medium text-xs sm:text-sm break-words">@{creatorUsername}</div>
+                        <div className="font-medium text-xs sm:text-sm wrap-break-word">@{creatorUsername}</div>
                       </div>
                     </div>
                   )}
@@ -395,7 +395,7 @@ export function PurchaseViewModal({
                     <thead>
                       <tr className="border-b">
                         <th className="text-left p-3 font-medium text-sm">#</th>
-                        <th className="text-left p-3 font-medium text-sm">Material</th>
+                        <th className="text-left p-3 font-medium text-sm">Item</th>
                         <th className="text-right p-3 font-medium text-sm">Quantity</th>
                         {hasPartialReceipt && (
                           <th className="text-right p-3 font-medium text-sm text-green-600">Received</th>
@@ -409,7 +409,7 @@ export function PurchaseViewModal({
                         <tr key={index} className="border-b hover:bg-muted/50">
                           <td className="p-3 text-sm text-muted-foreground">{index + 1}</td>
                           <td className="p-3">
-                            <div className="font-medium">{item.materialName}</div>
+                            <div className="font-medium">{item.description}</div>
                           </td>
                           <td className="p-3 text-right font-medium">
                             {item.quantity?.toFixed(2)}
@@ -466,10 +466,10 @@ export function PurchaseViewModal({
                           {formatCurrency(subtotal)}
                         </td>
                       </tr>
-                      {currentData.isTaxPayable && vatAmount > 0 && (
+                      {vatAmount > 0 && (
                         <tr className="bg-muted/50">
                           <td colSpan={hasPartialReceipt ? 4 : 3} className="p-3 text-right">
-                            VAT (5%):
+                            VAT:
                           </td>
                           <td className="p-3 text-right font-semibold" colSpan={2}>
                             {formatCurrency(vatAmount)}
@@ -496,7 +496,7 @@ export function PurchaseViewModal({
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="text-xs text-muted-foreground mb-1">Item #{index + 1}</div>
-                            <div className="font-medium text-sm break-words">{item.materialName}</div>
+                            <div className="font-medium text-sm wrap-break-word">{item.description}</div>
                           </div>
                         </div>
 
@@ -560,9 +560,9 @@ export function PurchaseViewModal({
                         <span className="text-muted-foreground">Subtotal</span>
                         <span className="font-semibold">{formatCurrency(subtotal)}</span>
                       </div>
-                      {currentData.isTaxPayable && vatAmount > 0 && (
+                      {vatAmount > 0 && (
                         <div className="flex justify-between text-xs sm:text-sm">
-                          <span className="text-muted-foreground">VAT (5%)</span>
+                          <span className="text-muted-foreground">VAT</span>
                           <span className="font-semibold">{formatCurrency(vatAmount)}</span>
                         </div>
                       )}
@@ -598,7 +598,7 @@ export function PurchaseViewModal({
                         Discount: {formatCurrency(discount)}
                       </div>
                     )}
-                    {currentData.isTaxPayable && vatAmount > 0 && (
+                    {vatAmount > 0 && (
                       <div className="text-xs text-muted-foreground mt-1">
                         Includes VAT: {formatCurrency(vatAmount)}
                       </div>
@@ -677,7 +677,7 @@ export function PurchaseViewModal({
                     {currentData.actionHistory.map((action: any, index: number) => (
                       <div key={index} className="flex items-start gap-3 text-xs sm:text-sm p-2 sm:p-3 rounded-lg bg-muted/50">
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium break-words">{action.action}</div>
+                          <div className="font-medium wrap-break-word">{action.action}</div>
                           {(action.username || action.userId) && (
                             <div className="text-xs text-muted-foreground">
                               by @{action.username || action.userId}
@@ -691,7 +691,7 @@ export function PurchaseViewModal({
                           {action.changes && action.changes.length > 0 && (
                             <div className="mt-2 space-y-1">
                               {action.changes.map((change: any, idx: number) => (
-                                <div key={idx} className="text-xs text-muted-foreground break-words">
+                                <div key={idx} className="text-xs text-muted-foreground wrap-break-word">
                                   <span className="font-medium">{change.field}:</span>{' '}
                                   {change.field === 'paidAmount' ? (
                                     <>
@@ -725,13 +725,13 @@ export function PurchaseViewModal({
             <Card className="bg-muted/50">
               <CardContent className="p-3 sm:p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
-                  <div className="break-words">
+                  <div className="wrap-break-word">
                     <span className="text-muted-foreground">Created:</span>
                     <span className="ml-2 font-medium">
                       {formatDateTime(currentData.createdAt)}
                     </span>
                   </div>
-                  <div className="break-words">
+                  <div className="wrap-break-word">
                     <span className="text-muted-foreground">Last Updated:</span>
                     <span className="ml-2 font-medium">
                       {formatDateTime(currentData.updatedAt)}

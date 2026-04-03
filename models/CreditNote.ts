@@ -3,11 +3,13 @@
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
 export interface ICreditNoteItem {
-  productId?: string;
+  itemId?: string;
   description: string;
   quantity: number;
-  price: number;
+  rate: number;
   total: number;
+  taxRate?: number;
+  taxAmount?: number;
 }
 
 export interface IPaymentAllocation {
@@ -64,7 +66,6 @@ export interface ICreditNote extends Document<string> {
   items: ICreditNoteItem[];
   totalAmount: number;
   discount: number;
-  isTaxPayable: boolean;
   vatAmount: number;
   grandTotal: number;
   creditDate: Date;
@@ -110,11 +111,13 @@ export interface ICreditNote extends Document<string> {
 }
 
 const CreditNoteItemSchema: Schema = new Schema({
-  productId: { type: String, required: false },
+  itemId: { type: String, required: false },
   description: { type: String, required: true },
   quantity: { type: Number, required: true, min: 0 },
-  price: { type: Number, required: true, min: 0 },
+  rate: { type: Number, required: true, min: 0 },
   total: { type: Number, required: true, min: 0 },
+  taxRate: { type: Number, default: 0, min: 0 },
+  taxAmount: { type: Number, default: 0, min: 0 },
 });
 
 const PaymentAllocationSchema: Schema = new Schema({
@@ -191,7 +194,6 @@ const CreditNoteSchema: Schema<ICreditNote> = new Schema({
   items: [CreditNoteItemSchema],
   totalAmount: { type: Number, required: true, min: 0 },
   discount: { type: Number, default: 0, min: 0 },
-  isTaxPayable: { type: Boolean, default: false },
   vatAmount: { type: Number, default: 0, min: 0 },
   grandTotal: { type: Number, required: true, min: 0 },
   creditDate: { type: Date, required: true },
@@ -248,12 +250,11 @@ CreditNoteSchema.index({ 'partySnapshot.displayName': 'text' });
 
 // Pre-save hook
 CreditNoteSchema.pre('save', function (next) {
-  const grossTotal = this.totalAmount;
+  const grossTotal = this.totalAmount || 0;
   const discount = this.discount || 0;
   const subtotal = grossTotal - discount;
-  const vatAmount = this.isTaxPayable ? (subtotal * 0.05) : 0;
+  const vatAmount = this.vatAmount || 0;
 
-  this.vatAmount = vatAmount;
   this.grandTotal = subtotal + vatAmount;
 
   if (this.paymentAllocations && this.paymentAllocations.length > 0) {

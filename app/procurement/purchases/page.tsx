@@ -237,48 +237,6 @@ function PurchasesPageContent() {
     const method = id ? "PUT" : "POST";
 
     try {
-      // Create materials for items marked with shouldCreateMaterial (only for new purchases)
-      if (!id && data.items) {
-        const itemsWithMaterialIds = await Promise.all(
-          data.items.map(async (item: any) => {
-            if (item.shouldCreateMaterial && item.materialName) {
-              try {
-                const materialPayload = {
-                  name: item.materialName.trim(),
-                  type: "General",
-                  unit: "pieces",
-                  unitCost: Number(item.unitCost) || 0,
-                  stock: 0,
-                };
-
-                const response = await fetch("/api/materials", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(materialPayload),
-                });
-
-                if (response.ok) {
-                  const newMaterial = await response.json();
-                  toast.success(`Material "${item.materialName}" created`);
-                  return { ...item, materialId: newMaterial._id, shouldCreateMaterial: false };
-                } else {
-                  toast.error(`Failed to create material "${item.materialName}"`);
-                  return item;
-                }
-              } catch (error) {
-                console.error(`Error creating material "${item.materialName}":`, error);
-                return item;
-              }
-            }
-            return item;
-          })
-        );
-
-        data.items = itemsWithMaterialIds;
-
-        // Refresh materials after creating new ones
-        window.dispatchEvent(new Event("refreshMaterials"));
-      }
 
       const res = await fetch(url, {
         method,

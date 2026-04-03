@@ -153,7 +153,6 @@ export async function POST(request: Request) {
       contactId,
       items,
       discount = 0,
-      isTaxPayable = true,
       creditDate,
       reason,
       notes,
@@ -212,7 +211,10 @@ export async function POST(request: Request) {
     }
 
     const subtotal = grossTotal - discountAmount;
-    const vatAmount = isTaxPayable ? (subtotal * 0.05) : 0;
+
+    // Calculate VAT based on item-level tax amounts
+    const vatAmount = items.reduce((sum: number, item: any) => sum + (Number(item.taxAmount) || 0), 0);
+
     const grandTotal = subtotal + vatAmount;
 
     // Generate credit note number
@@ -245,7 +247,6 @@ export async function POST(request: Request) {
       items,
       totalAmount: grossTotal,
       discount: discountAmount,
-      isTaxPayable,
       vatAmount,
       grandTotal,
       creditDate: creditDate || new Date(),

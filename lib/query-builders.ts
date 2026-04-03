@@ -27,7 +27,7 @@ export function buildFilterQuery(filters: ColumnFiltersState): Record<string, an
     const { id, value } = filter;
     // ✅ Get operator, with smart defaults based on value type
     let operator = (filter as any).operator;
-    
+
     // ✅ If no operator is provided, infer it from the value type
     if (!operator) {
       if (typeof value === 'string') {
@@ -203,21 +203,12 @@ export async function executePaginatedQuery<T>(
   // Combine filters
   const finalFilter = { ...baseFilter, ...filterQuery };
 
-  console.log('🗄️ Executing query:', {
-    baseFilter,
-    filterQuery,
-    finalFilter,
-    sortQuery,
-    skip,
-    limit,
-  });
-
   // Execute count and data queries in parallel
   const [totalCount, data] = await Promise.all([
     Model.countDocuments(finalFilter),
     (async () => {
       let query = Model.find(finalFilter).sort(sortQuery).skip(skip).limit(limit);
-      
+
       if (populate) {
         if (Array.isArray(populate)) {
           populate.forEach(p => { query = query.populate(p); });
@@ -225,7 +216,7 @@ export async function executePaginatedQuery<T>(
           query = query.populate(populate);
         }
       }
-      
+
       return query.exec();
     })(),
   ]);

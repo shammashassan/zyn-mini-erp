@@ -1,3 +1,5 @@
+// app-sidebar.tsx - UPDATED: Products/Materials → Items
+
 "use client"
 
 import * as React from "react"
@@ -13,7 +15,6 @@ import {
   User,
   FileText,
   CircleUserRound,
-  Command,
   Users,
 } from "lucide-react"
 
@@ -24,25 +25,20 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { authClient } from "@/lib/auth-client"
 
-// Define the precise Role type to satisfy TypeScript
 type RoleType = "user" | "admin" | "manager" | "owner";
 
-// 1. Define the Permission Mapping based on your permissions.ts
+// ─── Permission map ────────────────────────────────────────────────────────
+// "product" and "material" keys are removed; "Items" uses item: ["read"]
 const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
-  // General
   "Dashboard": { dashboard: ["read"] },
 
-  // Inventory
-  "Products": { product: ["read"] },
-  "Materials": { material: ["read"] },
-  "Stock Adjustment": { stockAdjustment: ["read"] },
+  // Inventory (unified)
+  "Items": { item: ["read"] },
+  "Stock": { item: ["read"] },
+  "Adjustment": { stockAdjustment: ["read"] },
 
   // People
   "Parties": { party: ["read"] },
@@ -50,18 +46,18 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Payees": { payee: ["read"] },
 
   // Sales
-  "Quotations": { invoice: ["read"] },
+  "Quotations": { quotation: ["read"] },
   "Invoices": { invoice: ["read"] },
   "Receipts": { voucher: ["read"] },
+  "Delivery Notes": { deliveryNote: ["read"] },
+  "Sales Returns": { returnNote: ["read"] },
   "Debit Notes": { debitNote: ["read"] },
-  "Delivery notes": { deliveryNote: ["read"] },
-  "Sales Return": { returnNote: ["read"] },
 
   // Procurement
   "Purchases": { purchase: ["read"] },
   "Expenses": { expense: ["read"] },
   "Payments": { voucher: ["read"] },
-  "Purchase Return": { returnNote: ["read"] },
+  "Purchase Returns": { returnNote: ["read"] },
   "Credit Notes": { creditNote: ["read"] },
 
   // Reports
@@ -75,7 +71,7 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   // Accounting
   "Chart of Accounts": { chartOfAccounts: ["read"] },
   "Journal": { journal: ["read"] },
-  "ledger": { journal: ["read"] },
+  "Ledger": { ledger: ["read"] },
   "Trial Balance": { trialBalance: ["read"] },
   "Profit & Loss": { profitLoss: ["read"] },
   "Financial Statements": { financialStatements: ["read"] },
@@ -90,16 +86,16 @@ const staticData = {
     {
       title: "Dashboard",
       url: "/dashboard",
-      icon: LayoutDashboard
+      icon: LayoutDashboard,
     },
     {
       title: "Inventory",
       url: "#",
       icon: Archive,
       items: [
-        { title: "Products", url: "/inventory/products" },
-        { title: "Materials", url: "/inventory/materials" },
-        { title: "Stock Adjustment", url: "/inventory/stock-adjustment" },
+        { title: "Items", url: "/inventory/items" },
+        { title: "Stock", url: "/inventory/stock" },
+        { title: "Adjustment", url: "/inventory/stock-adjustment" },
       ],
     },
     {
@@ -120,10 +116,10 @@ const staticData = {
         { title: "Quotations", url: "/sales/quotations" },
         { title: "Invoices", url: "/sales/invoices" },
         { title: "Receipts", url: "/sales/receipts" },
-        { title: "Delivery notes", url: "/sales/delivery-notes" },
+        { title: "Delivery Notes", url: "/sales/delivery-notes" },
         { title: "Sales Returns", url: "/sales/sales-returns" },
-        { title: "Debit Notes", url: "/sales/debit-notes" },
-      ]
+        { title: "Credit Notes", url: "/sales/credit-notes" },
+      ],
     },
     {
       title: "Procurement",
@@ -134,7 +130,7 @@ const staticData = {
         { title: "Expenses", url: "/procurement/expenses" },
         { title: "Payments", url: "/procurement/payments" },
         { title: "Purchase Returns", url: "/procurement/purchase-returns" },
-        { title: "Credit Notes", url: "/procurement/credit-notes" },
+        { title: "Debit Notes", url: "/procurement/debit-notes" },
       ],
     },
     {
@@ -157,7 +153,7 @@ const staticData = {
       items: [
         { title: "Chart of Accounts", url: "/accounting/chart-of-accounts" },
         { title: "Journal", url: "/accounting/journal" },
-        { title: "ledger", url: "/accounting/ledger" },
+        { title: "Ledger", url: "/accounting/ledger" },
         { title: "Trial Balance", url: "/accounting/trial-balance" },
         { title: "Profit & Loss", url: "/accounting/profit-loss" },
         { title: "Financial Statements", url: "/accounting/financial-statements" },
@@ -189,15 +185,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }, [])
 
   const currentUser = React.useMemo(() => {
-    if (!session?.user) {
-      return {
-        name: "User",
-        email: "user@company.com",
-        avatar: null,
-        username: undefined
-      }
-    }
-
+    if (!session?.user) return { name: "User", email: "user@company.com", avatar: null, username: undefined }
     return {
       name: session.user.name || session.user.email?.split('@')[0] || "User",
       email: session.user.email || "user@company.com",
@@ -206,67 +194,32 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
   }, [session])
 
-  // 2. Filter Navigation based on granular permissions
   const filteredNavMain = React.useMemo(() => {
     if (isPending) return [];
-
-    // FIX: Cast the role string to the specific union type expected by checkRolePermission
     const userRole = (session?.user?.role || "user") as RoleType;
 
     const hasAccess = (itemTitle: string) => {
-      const requiredPermission = PERMISSION_MAP[itemTitle];
-
-      // If no permission is mapped, assume it's public (or change to false to restrict)
-      if (!requiredPermission) return true;
-
-      // Now userRole satisfies the expected type
-      return authClient.admin.checkRolePermission({
-        role: userRole,
-        permissions: requiredPermission
-      });
+      const required = PERMISSION_MAP[itemTitle];
+      if (!required) return true;
+      return authClient.admin.checkRolePermission({ role: userRole, permissions: required });
     };
 
     return staticData.navMain.map((item) => {
-      // Case 1: Item has sub-items (Group)
       if (item.items) {
-        const visibleChildren = item.items.filter((subItem) =>
-          hasAccess(subItem.title)
-        );
-
-        if (visibleChildren.length === 0) return null;
-
-        return { ...item, items: visibleChildren };
+        const visible = item.items.filter((sub) => hasAccess(sub.title));
+        if (visible.length === 0) return null;
+        return { ...item, items: visible };
       }
-
-      // Case 2: Item is a direct link
-      if (hasAccess(item.title)) {
-        return item;
-      }
-
-      return null;
+      return hasAccess(item.title) ? item : null;
     }).filter(Boolean) as typeof staticData.navMain;
-
   }, [session, isPending]);
 
   return (
     <Sidebar
       className="top-(--header-height) h-[calc(100svh-var(--header-height))]!"
-      collapsible="icon" {...props}>
-      {/* <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
-            >
-              <a href="#">
-                <Command className="!size-5" />
-                <span className="text-base font-semibold">Acme Inc.</span>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader> */}
+      collapsible="icon"
+      {...props}
+    >
       <SidebarContent className="sidebar-scroll">
         <NavMain items={filteredNavMain} />
         <NavSecondary items={staticData.navSecondary} className="mt-auto" />

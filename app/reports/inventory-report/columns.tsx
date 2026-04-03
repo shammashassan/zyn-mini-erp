@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 export interface InventoryItemData {
   id: string;
   name: string;
-  type: 'Material' | 'Product';
+  type: string;
   category: string;
   openingQty: number;
   purchased: number;

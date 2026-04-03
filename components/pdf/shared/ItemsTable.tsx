@@ -91,21 +91,21 @@ export const InvoiceTableColumns: TableColumn[] = [
 ];
 
 export const PurchaseTableColumns: TableColumn[] = [
-    { header: 'Material', field: 'materialName', width: '40%', align: 'left' },
+    { header: 'Description', field: 'description', width: '40%', align: 'left' },
     { header: 'Quantity', field: 'quantity', width: '15%', align: 'center' },
     { header: 'Unit Cost', field: 'unitCost', width: '20%', align: 'right', format: formatCurrency },
     { header: 'Total', field: 'total', width: '25%', align: 'right', format: formatCurrency },
 ];
 
 export const SalesReturnTableColumns: TableColumn[] = [
-    { header: 'Product', field: 'productName', width: '40%', align: 'left' },
+    { header: 'Item', field: 'description', width: '40%', align: 'left' },
     { header: 'Returned Qty', field: 'returnQuantity', width: '20%', align: 'center' },
     { header: 'Rate', field: 'rate', width: '20%', align: 'right', format: formatCurrency },
     { header: 'Total', field: 'total', width: '20%', align: 'right', format: formatCurrency },
 ];
 
 export const PurchaseReturnTableColumns: TableColumn[] = [
-    { header: 'Material', field: 'materialName', width: '30%', align: 'left' },
+    { header: 'Item', field: 'description', width: '30%', align: 'left' },
     { header: 'Ordered', field: 'orderedQuantity', width: '15%', align: 'center', format: (v) => v?.toFixed(2) || '0.00' },
     { header: 'Received', field: 'receivedQuantity', width: '15%', align: 'center', format: (v) => v?.toFixed(2) || '0.00' },
     { header: 'Returned', field: 'returnQuantity', width: '15%', align: 'center', format: (v) => v?.toFixed(2) || '0.00' },

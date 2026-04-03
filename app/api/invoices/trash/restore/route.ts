@@ -83,7 +83,21 @@ export async function POST(request: Request) {
     }
     console.log(`📋 Invoice: Found ${voidedJournals.length} voided journal(s), ${journalsToRecreate.length} to recreate`);
 
-    // ✅ NEW: Handle quotation status restoration
+    // ✅ STOCK DEDUCTION: Deduct stock if invoice was approved
+    if (invoiceToRestore.status === 'approved') {
+      try {
+        await deductStockForInvoice(
+          invoiceToRestore._id,
+          invoiceToRestore.items
+        );
+      } catch (stockError: any) {
+        return NextResponse.json({
+          error: `Cannot restore invoice: ${stockError.message}`
+        }, { status: 400 });
+      }
+    }
+
+    // ✅ Handle quotation status restoration (Moved after stock validation to ensure transaction safety)
     if (invoiceToRestore.connectedDocuments?.quotationId) {
       try {
         const quotation = await Quotation.findById(invoiceToRestore.connectedDocuments.quotationId);
@@ -122,7 +136,6 @@ export async function POST(request: Request) {
           );
 
           await quotation.save();
-          console.log(`✅ Restored quotation ${quotation.invoiceNumber} status to 'converted'`);
         }
       } catch (quotationError) {
         console.error('Error restoring quotation status:', quotationError);
@@ -130,26 +143,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // ✅ STOCK DEDUCTION: Deduct stock if invoice was approved
-    if (invoiceToRestore.status === 'approved') {
-      try {
-        console.log(`🔄 Deducting stock for restored approved invoice ${invoiceToRestore.invoiceNumber}...`);
-        await deductStockForInvoice(
-          invoiceToRestore._id,
-          invoiceToRestore.items
-        );
-        console.log(`✅ Stock deducted successfully`);
-      } catch (stockError: any) {
-        console.error(`❌ Stock deduction failed:`, stockError);
-        // Fail the restore if stock deduction fails
-        return NextResponse.json({
-          error: `Cannot restore invoice: ${stockError.message}`
-        }, { status: 400 });
-      }
-    }
-
     // Restore the invoice
-    console.log(`♻️ Restoring invoice ${invoiceToRestore.invoiceNumber}...`);
     const restoredInvoice = await restore(
       Invoice,
       id,
@@ -161,11 +155,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
-    console.log(`✅ Invoice restored: ${restoredInvoice.invoiceNumber}`);
-
     // Recreate journals
     if (journalsToRecreate.length > 0) {
-      console.log(`🔄 Recreating ${journalsToRecreate.length} journal(s)...`);
 
       for (const voidedJournal of journalsToRecreate) {
         const journalData = {
@@ -191,8 +182,6 @@ export async function POST(request: Request) {
           user?.username || user?.name || null
         );
       }
-
-      console.log(`✅ Recreated ${journalsToRecreate.length} journal entries`);
     }
 
     let message = `Invoice restored successfully`;

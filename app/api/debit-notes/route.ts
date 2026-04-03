@@ -155,7 +155,6 @@ export async function POST(request: Request) {
       returnNoteId,
       items,
       discount = 0,
-      isTaxPayable = true,
       debitDate,
       reason,
       notes,
@@ -210,7 +209,9 @@ export async function POST(request: Request) {
     }
 
     const subtotal = grossTotal - discountAmount;
-    const vatAmount = isTaxPayable ? (subtotal * 0.05) : 0;
+    
+    // Calculate VAT from item snapshots (manual subtotal mode won't apply tax default)
+    const vatAmount = items.reduce((sum: number, item: any) => sum + (Number(item.taxAmount) || 0), 0);
     const grandTotal = subtotal + vatAmount;
 
     // Generate debit note number
@@ -245,7 +246,6 @@ export async function POST(request: Request) {
       items,
       totalAmount: grossTotal,
       discount: discountAmount,
-      isTaxPayable,
       vatAmount,
       grandTotal,
       debitDate: debitDate || new Date(),

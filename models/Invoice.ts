@@ -3,11 +3,16 @@
 import mongoose, { Document, Schema, models, model, Query } from 'mongoose';
 
 export interface IItem extends Document {
-  productId?: string;
+  /** References the unified Item model */
+  itemId?: mongoose.Types.ObjectId;
   description: string;
   quantity: number;
   rate: number;
   total: number;
+  /** Snapshot of item tax rate at time of invoicing */
+  taxRate?: number;
+  /** Pre-computed tax amount per line (rate applied to total) — VATtotal = sum(taxAmount) */
+  taxAmount?: number;
   returnedQuantity?: number;
 }
 
@@ -110,11 +115,16 @@ export interface IInvoice extends Document<string> {
 }
 
 const ItemSchema: Schema = new Schema({
-  productId: { type: String, required: false },
+  /** References unified Item model */
+  itemId: { type: Schema.Types.ObjectId, ref: 'Item', required: false },
   description: { type: String, required: true },
   quantity: { type: Number, required: true },
   rate: { type: Number, required: true },
   total: { type: Number, required: true },
+  /** Tax rate snapshot — avoids re-lookup on edit; preserves rate at time of sale */
+  taxRate: { type: Number, default: 0 },
+  /** Pre-computed tax amount per line — VATtotal = sum(taxAmount) */
+  taxAmount: { type: Number, default: 0 },
   returnedQuantity: { type: Number, default: 0 },
 });
 
@@ -242,6 +252,7 @@ InvoiceSchema.index({ 'receiptAllocations.voucherId': 1 });
 InvoiceSchema.index({ 'connectedDocuments.returnNoteIds': 1 });
 InvoiceSchema.index({ partyId: 1, invoiceDate: -1 });
 InvoiceSchema.index({ 'partySnapshot.displayName': 'text' });
+InvoiceSchema.index({ 'items.itemId': 1 });
 
 // Pre-save hook
 InvoiceSchema.pre('save', function (next) {

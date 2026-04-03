@@ -7,7 +7,6 @@ import Quotation from "@/models/Quotation";
 import Invoice from "@/models/Invoice";
 import Party from "@/models/Party";
 import generateInvoiceNumber from "@/utils/invoiceNumber";
-import { UAE_VAT_PERCENTAGE } from '@/utils/constants';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
 import { createPartySnapshot } from "@/utils/partySnapshot";
@@ -33,8 +32,6 @@ export async function GET(request: Request) {
     if (isServerSide) {
       // 🚀 SERVER-SIDE MODE
       const { page, pageSize, sorting, filters } = extractTableParams(searchParams);
-
-      console.log('📊 Server-side delivery note request:', { page, pageSize, sorting, filters, startDateParam, endDateParam });
 
       const baseFilter: any = { isDeleted: false };
 
@@ -203,13 +200,11 @@ export async function POST(request: Request) {
     // ✅ Create immutable snapshots of party and contact
     const { partySnapshot, contactSnapshot } = await createPartySnapshot(partyId, contactId);
 
-    // Calculate totals
+    // Trust frontend-provided totals (copied from the source invoice)
     const subTotal = items.reduce((sum: number, item: { total: number }) => sum + item.total, 0);
-    const discountedTotal = subTotal - discount;
-
-    const finalVatAmount = customVatAmount !== undefined ? customVatAmount : (discountedTotal * (UAE_VAT_PERCENTAGE / 100));
-    const finalTotalAmount = customTotalAmount !== undefined ? customTotalAmount : subTotal;
-    const finalGrandTotal = customGrandTotal !== undefined ? customGrandTotal : (discountedTotal + finalVatAmount);
+    const finalVatAmount = customVatAmount ?? 0;
+    const finalTotalAmount = customTotalAmount ?? subTotal;
+    const finalGrandTotal = customGrandTotal ?? (subTotal - discount) + finalVatAmount;
 
     // Generate delivery note number
     const invoiceNumber = await generateInvoiceNumber('delivery');

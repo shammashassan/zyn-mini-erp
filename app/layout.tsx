@@ -32,7 +32,6 @@ export default function RootLayout({
             </NuqsAdapter>
             <Toaster
               expand={false}
-              richColors
               position="top-right"
             />
           </ThemeProvider>
