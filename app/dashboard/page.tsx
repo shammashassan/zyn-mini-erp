@@ -136,7 +136,17 @@ function DashboardContent() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const showWelcome = searchParams.get("welcome") === "true";
+  
+  const [showWelcome, setShowWelcome] = useState(() => searchParams.get("welcome") === "true");
+
+  useEffect(() => {
+    if (searchParams.get("welcome") === "true") {
+      const timeout = setTimeout(() => {
+        router.replace("/dashboard", { scroll: false });
+      }, 50);
+      return () => clearTimeout(timeout);
+    }
+  }, [searchParams, router]);
 
   const {
     permissions: { canRead },
@@ -306,7 +316,7 @@ function DashboardContent() {
           <Preloader
             mode="reveal"
             onComplete={() => {
-              router.replace("/dashboard", { scroll: false });
+              setShowWelcome(false);
             }}
           />
         )}
