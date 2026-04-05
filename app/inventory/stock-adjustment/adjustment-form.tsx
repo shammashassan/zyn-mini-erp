@@ -122,7 +122,7 @@ export function AdjustmentForm({
     }
   }, [isPopoverOpen, watchedItemId, items]);
 
-  const handleFormSubmit: SubmitHandler<AdjustmentFormData> = (data) => {
+  const handleFormSubmit: SubmitHandler<AdjustmentFormData> = async (data) => {
     if (!data.itemId) { toast.error('Please select an item'); return; }
     if (!data.adjustmentReason?.trim()) { toast.error('Please provide a reason'); return; }
 
@@ -141,7 +141,7 @@ export function AdjustmentForm({
       }
     }
 
-    onSubmit(submission);
+    await onSubmit(submission);
   };
 
   const selectedItem = items.find((m) => m._id === watchedItemId);

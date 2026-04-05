@@ -240,14 +240,14 @@ export default function StockPage() {
                                 </div>
                             </div>
                             <div className="flex gap-2 flex-wrap">
-                                <Link href="../items">
+                                <Link href="./items">
                                     <Button variant="outline" className="gap-2">
                                         <ArrowLeft className="h-4 w-4" />
                                         Back to Items
                                     </Button>
                                 </Link>
                                 {/* ↓ Update href to ../adjustments if you rename that page */}
-                                <Link href="../stock-adjustment">
+                                <Link href="./stock-adjustment">
                                     <Button variant="outline" className="gap-2">
                                         <ArrowRightLeft className="h-4 w-4" />
                                         Adjustments

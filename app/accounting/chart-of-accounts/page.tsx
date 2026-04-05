@@ -399,12 +399,10 @@ function ChartOfAccountsPageContent() {
                   <COAPageSkeleton />
                 ) : accounts.length > 0 ? (
                   <>
-                    {/* Statistics Cards */}
                     <div className="mb-6">
                       <StatsCards data={statsData} columns={4} />
                     </div>
 
-                    {/* View Toggle and Content */}
                     <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "table" | "tree")}>
                       <div className="flex justify-center items-center mb-4">
                         <TabsList className="flex justify-center w-full max-w-2xl grid-cols-3">
@@ -430,7 +428,6 @@ function ChartOfAccountsPageContent() {
                       <TabsContent value="table" className="mt-0">
                         <Card>
                           <CardContent className="p-6">
-                            {/* ✅ UPDATED: Table transition like Tax Report */}
                             <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
                               <DataTable table={table}>
                                 <DataTableToolbar table={table} />
@@ -442,7 +439,6 @@ function ChartOfAccountsPageContent() {
                     </Tabs>
                   </>
                 ) : (
-                  /* Empty State */
                   <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12">
                       <ListTree className="h-12 w-12 text-muted-foreground mb-4" />

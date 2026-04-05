@@ -18,6 +18,7 @@ import { usePayeePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import { redirect, usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 type PayeeFormData = {
   name: string;
@@ -226,42 +227,46 @@ export default function PayeesPage() {
             </div>
 
             <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
-              <Card>
-                <CardContent className="p-6">
-                  {isLoading ? (
-                    <DataTableSkeleton
-                      columnCount={columns.length}
-                      rowCount={10}
-                    />
-                  ) : (
-                    <>
-                      <DataTable table={table}>
-                        <DataTableToolbar table={table} />
-                      </DataTable>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-
-              {payees.length === 0 && !isLoading && (
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <Users className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No payees yet</h3>
-                    <p className="text-muted-foreground text-center mb-4">
-                      Start managing your payment recipients by adding your first payee.
-                    </p>
-                    {canCreate && (
-                      <Button onClick={() => {
-                        setSelectedPayeeForEdit(null);
-                        setIsFormOpen(true);
-                      }} className="gap-2">
-                        <Plus className="h-4 w-4" /> Add Your First Payee
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+              <div className={cn("transition-opacity duration-200", isLoading && !payees.length ? "opacity-50" : "opacity-100")}>
+                {isLoading && !payees.length ? (
+                  <Card>
+                    <CardContent className="p-6">
+                      <DataTableSkeleton
+                        columnCount={columns.length}
+                        rowCount={10}
+                      />
+                    </CardContent>
+                  </Card>
+                ) : payees.length > 0 ? (
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
+                        <DataTable table={table}>
+                          <DataTableToolbar table={table} />
+                        </DataTable>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">No payees yet</h3>
+                      <p className="text-muted-foreground text-center mb-4">
+                        Start managing your payment recipients by adding your first payee.
+                      </p>
+                      {canCreate && (
+                        <Button onClick={() => {
+                          setSelectedPayeeForEdit(null);
+                          setIsFormOpen(true);
+                        }} className="gap-2">
+                          <Plus className="h-4 w-4" /> Add Your First Payee
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
           </div>
         </div>

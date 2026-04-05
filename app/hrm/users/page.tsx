@@ -21,6 +21,7 @@ import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { useUserManagementPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
 
 const useMediaQuery = (query: string) => {
   const [matches, setMatches] = useState(false);
@@ -645,38 +646,44 @@ function UsersPageContent() {
             </div>
 
             <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
-              <Card>
-                <CardContent className="p-6">
-                  {isLoading ? (
-                    <DataTableSkeleton
-                      columnCount={columns.length}
-                      rowCount={10}
-                    />
-                  ) : (
-                    <DataTable table={table}>
-                      <DataTableToolbar table={table} />
-                    </DataTable>
-                  )}
-                </CardContent>
-              </Card>
-
-              {!isLoading && users.length === 0 && canCreate && (
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <BookUser className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No users yet</h3>
-                    <p className="text-muted-foreground text-center mb-4">
-                      Start building your team by adding your first user.
-                    </p>
-                    <Button onClick={() => {
-                      setSelectedUser(null);
-                      setIsFormOpen(true);
-                    }} className="gap-2">
-                      <UserPlus className="h-4 w-4" /> Add Your First User
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
+              <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50" : "opacity-100")}>
+                {isLoading ? (
+                  <Card>
+                    <CardContent className="p-6">
+                      <DataTableSkeleton columnCount={columns.length} rowCount={10} />
+                    </CardContent>
+                  </Card>
+                ) : users.length > 0 ? (
+                  <Card>
+                    <CardContent className="p-6">
+                      <DataTable table={table}>
+                        <DataTableToolbar table={table} />
+                      </DataTable>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <BookUser className="h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">No users yet</h3>
+                      <p className="text-muted-foreground text-center mb-4">
+                        Start building your team by adding your first user.
+                      </p>
+                      {canCreate && (
+                        <Button
+                          onClick={() => {
+                            setSelectedUser(null);
+                            setIsFormOpen(true);
+                          }}
+                          className="gap-2"
+                        >
+                          <UserPlus className="h-4 w-4" /> Add Your First User
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
           </div>
         </div>

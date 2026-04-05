@@ -500,40 +500,45 @@ function PaymentsPageContent() {
                         </div>
 
                         <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
-                            <Card>
-                                <CardContent className="p-6">
-                                    {isInitialLoad ? (
-                                        <DataTableSkeleton
-                                            columnCount={columns.length}
-                                            rowCount={10}
-                                        />
-                                    ) : (
-                                        <div className={cn("transition-opacity duration-200", isLoading ? "opacity-50 pointer-events-none" : "opacity-100")}>
-                                            <DataTable table={table}>
-                                                <DataTableToolbar table={table} />
-                                            </DataTable>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            {payments.length === 0 && !isLoading && !isInitialLoad && (
-                                <Card>
-                                    <CardContent className="flex flex-col items-center justify-center py-12">
-                                        <Wallet className="h-12 w-12 text-muted-foreground mb-4" />
-                                        <h3 className="text-lg font-semibold mb-2">No payments yet</h3>
-                                        <p className="text-muted-foreground text-center mb-4">
-                                            Your payments will appear here once you create them
-                                        </p>
-                                        {canCreate && (
-                                            <Button onClick={() => setIsPaymentFormOpen(true)} className="gap-2">
-                                                <Plus className="h-4 w-4" />
-                                                Create Payment
-                                            </Button>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )}
+                            <div className={cn("transition-opacity duration-200", isInitialLoad ? "opacity-50" : "opacity-100")}>
+                                {isInitialLoad ? (
+                                    <Card>
+                                        <CardContent className="p-6">
+                                            <DataTableSkeleton columnCount={columns.length} rowCount={10} />
+                                        </CardContent>
+                                    </Card>
+                                ) : payments.length > 0 || (urlState.filters && urlState.filters.length > 0) ? (
+                                    <Card>
+                                        <CardContent className="p-6">
+                                            <div
+                                                className={cn(
+                                                    "transition-opacity duration-200",
+                                                    isLoading ? "opacity-50 pointer-events-none" : "opacity-100"
+                                                )}
+                                            >
+                                                <DataTable table={table}>
+                                                    <DataTableToolbar table={table} />
+                                                </DataTable>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ) : (
+                                    <Card>
+                                        <CardContent className="flex flex-col items-center justify-center py-12">
+                                            <Wallet className="h-12 w-12 text-muted-foreground mb-4" />
+                                            <h3 className="text-lg font-semibold mb-2">No payments yet</h3>
+                                            <p className="text-muted-foreground text-center mb-4">
+                                                Your payments will appear here once you create them.
+                                            </p>
+                                            {canCreate && (
+                                                <Button onClick={() => setIsPaymentFormOpen(true)} className="gap-2">
+                                                    <Plus className="h-4 w-4" /> Create Payment
+                                                </Button>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
