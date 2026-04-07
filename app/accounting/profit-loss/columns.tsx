@@ -15,6 +15,7 @@ export interface ProfitLossData {
   salesTax: number;
   purchaseTax: number;
   profit: number;
+  grossProfit: number;       // NEW: Revenue - Purchases (COGS)
   orderAmount?: number;
   purchaseAmount?: number;
   expenseCount?: number;
@@ -71,6 +72,32 @@ export const getColumns = (): ColumnDef<ProfitLossData>[] => [
     ),
   },
   {
+    // NEW COLUMN: Gross Profit = Revenue - Purchases (COGS)
+    accessorKey: "grossProfit",
+    header: ({ column }) => (
+      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+        Gross Profit
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => {
+      const gp = row.original.grossProfit;
+      return (
+        <div className="text-center font-medium">
+          <div className={cn(
+            "font-mono",
+            gp >= 0 ? "text-emerald-600" : "text-red-600"
+          )}>
+            {formatCurrency(gp)}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Rev − COGS
+          </div>
+        </div>
+      );
+    },
+  },
+  {
     accessorKey: "expenses",
     header: ({ column }) => (
       <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
@@ -117,7 +144,7 @@ export const getColumns = (): ColumnDef<ProfitLossData>[] => [
       const profit = row.original.profit;
       return (
         <div className={cn(
-          "text-center font-mono",
+          "text-center font-mono font-semibold",
           profit >= 0 ? "text-green-600" : "text-red-600"
         )}>
           <div>{formatCurrency(profit)}</div>

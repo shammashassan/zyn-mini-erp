@@ -1,3 +1,5 @@
+// app/accounting/profit-loss/route.ts - UPDATED: Added grossProfit to monthly breakdown
+
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Journal from "@/models/Journal";
@@ -39,7 +41,7 @@ export async function GET(request: Request) {
       accounts.map(acc => [acc.accountCode, acc])
     );
 
-    // Helper function to calculate totals for a given date range
+    // Helper function to calculate totals for a given date range (used for trends)
     async function calculateTotals(start: Date, end: Date) {
       const aggregationResult = await Journal.aggregate([
         {
@@ -78,17 +80,18 @@ export async function GET(request: Request) {
         if (account.groupName === 'Expenses') {
           expenses += (debit - credit);
         }
-        if (account.accountCode === 'A1200') { // Inventory
+        if (account.accountCode === 'A1200') {
           purchasesExTax += (debit - credit);
         }
-        if (account.accountCode === 'L1002') { // VAT Payable
+        if (account.accountCode === 'L1002') {
           salesTax += (credit - debit);
         }
-        if (account.accountCode === 'A1300') { // VAT Receivable
+        if (account.accountCode === 'A1300') {
           purchaseTax += (debit - credit);
         }
       });
 
+      const grossProfit = revenue - purchasesExTax;
       const totalCosts = expenses + purchasesExTax;
       const profit = revenue - totalCosts;
       const netTax = salesTax - purchaseTax;
@@ -97,6 +100,7 @@ export async function GET(request: Request) {
         revenue,
         expenses,
         purchasesExTax,
+        grossProfit,
         salesTax,
         purchaseTax,
         totalCosts,
@@ -105,7 +109,7 @@ export async function GET(request: Request) {
       };
     }
 
-    // 2. Calculate Current Period Totals with Transaction Counts
+    // 2. Monthly account-level aggregation
     const currentAggregation = await Journal.aggregate([
       {
         $match: {
@@ -127,7 +131,7 @@ export async function GET(request: Request) {
       }
     ]);
 
-    // ✅ NEW: Get transaction counts per month
+    // Transaction counts per month
     const transactionCounts = await Journal.aggregate([
       {
         $match: {
@@ -148,24 +152,21 @@ export async function GET(request: Request) {
     ]);
 
     const months = eachMonthOfInterval({ start: startDate, end: endDate });
+
     const monthlyBreakdown = months.map(month => {
       const monthKey = format(month, 'yyyy-MM');
       const monthBuckets = currentAggregation.filter((r: any) => r._id.month === monthKey);
 
-      // ✅ Get transaction counts for this month
       const monthTransactions = transactionCounts.filter((t: any) => t._id.month === monthKey);
-      
-      // Count orders (Invoice + Receipt)
+
       const orderCount = monthTransactions
         .filter((t: any) => ['Invoice', 'Receipt'].includes(t._id.referenceType))
         .reduce((sum: number, t: any) => sum + t.count, 0);
-      
-      // Count purchases
+
       const purchaseCount = monthTransactions
         .filter((t: any) => t._id.referenceType === 'Purchase')
         .reduce((sum: number, t: any) => sum + t.count, 0);
-      
-      // Count expenses
+
       const expenseCount = monthTransactions
         .filter((t: any) => t._id.referenceType === 'Expense')
         .reduce((sum: number, t: any) => sum + t.count, 0);
@@ -175,7 +176,7 @@ export async function GET(request: Request) {
       let purchasesExTax = 0;
       let salesTax = 0;
       let purchaseTax = 0;
-      
+
       monthBuckets.forEach((bucket: any) => {
         const account = accountMap.get(bucket._id.accountCode);
         if (!account) return;
@@ -189,6 +190,8 @@ export async function GET(request: Request) {
         if (account.accountCode === 'A1300') purchaseTax += (debit - credit);
       });
 
+      // Gross Profit = Revenue - COGS (Purchases ex-tax)
+      const grossProfit = revenue - purchasesExTax;
       const totalCosts = expenses + purchasesExTax;
       const profit = revenue - totalCosts;
 
@@ -196,26 +199,27 @@ export async function GET(request: Request) {
         period: format(month, 'MMM yyyy'),
         revenue,
         expenses,
-        orderAmount: revenue,           // ✅ FIXED: Use calculated revenue
-        orders: orderCount,             // ✅ FIXED: Use actual order count
+        orderAmount: revenue,
+        orders: orderCount,
         purchaseAmount: purchasesExTax,
-        purchases: purchaseCount,       // ✅ FIXED: Use actual purchase count
-        expenseCount: expenseCount,     // ✅ FIXED: Use actual expense count
+        purchases: purchaseCount,
+        expenseCount,
         salesTax,
         purchaseTax,
+        grossProfit,   // NEW
         profit,
       };
     });
 
-    // Calculate Summary from Breakdown
+    // Summary from monthly breakdown
     const summary = monthlyBreakdown.reduce((acc, month) => {
       acc.totalRevenueExTax += month.revenue;
       acc.totalExpenses += month.expenses;
       acc.totalPurchasesExTax += month.purchaseAmount;
       acc.salesTax += month.salesTax;
       acc.purchaseTax += month.purchaseTax;
-      acc.totalOrders += month.orders;              // ✅ Sum up orders
-      acc.totalOrderAmount += month.orderAmount;    // ✅ Sum up order amounts
+      acc.totalOrders += month.orders;
+      acc.totalOrderAmount += month.orderAmount;
       return acc;
     }, {
       totalRevenueExTax: 0,
@@ -225,27 +229,32 @@ export async function GET(request: Request) {
       salesTax: 0,
       purchaseTax: 0,
       netTax: 0,
+      grossProfit: 0,   // NEW
       profit: 0,
       profitMargin: 0,
+      grossProfitMargin: 0,   // NEW
       totalOrders: 0,
       totalOrderAmount: 0
     });
 
     summary.totalCosts = summary.totalExpenses + summary.totalPurchasesExTax;
     summary.netTax = summary.salesTax - summary.purchaseTax;
+    summary.grossProfit = summary.totalRevenueExTax - summary.totalPurchasesExTax;   // NEW
     summary.profit = summary.totalRevenueExTax - summary.totalCosts;
-    summary.profitMargin = summary.totalRevenueExTax > 0 
-      ? (summary.profit / summary.totalRevenueExTax) * 100 
+    summary.profitMargin = summary.totalRevenueExTax > 0
+      ? (summary.profit / summary.totalRevenueExTax) * 100
+      : 0;
+    summary.grossProfitMargin = summary.totalRevenueExTax > 0   // NEW
+      ? (summary.grossProfit / summary.totalRevenueExTax) * 100
       : 0;
 
-    // 3. Calculate Previous Period for Trends
+    // 3. Previous period for trends
     const durationMs = differenceInMilliseconds(endDate, startDate);
     const prevEndDate = subMilliseconds(startDate, 1);
     const prevStartDate = subMilliseconds(prevEndDate, durationMs);
 
     const prevTotals = await calculateTotals(prevStartDate, prevEndDate);
 
-    // Calculate Percentage Changes
     const calculateTrend = (current: number, previous: number) => {
       if (previous === 0) return current === 0 ? 0 : 100;
       return ((current - previous) / Math.abs(previous)) * 100;
@@ -255,6 +264,7 @@ export async function GET(request: Request) {
       revenue: calculateTrend(summary.totalRevenueExTax, prevTotals.revenue),
       costs: calculateTrend(summary.totalCosts, prevTotals.totalCosts),
       profit: calculateTrend(summary.profit, prevTotals.profit),
+      grossProfit: calculateTrend(summary.grossProfit, prevTotals.grossProfit),   // NEW
       netTax: calculateTrend(Math.abs(summary.netTax), Math.abs(prevTotals.netTax))
     };
 

@@ -1,4 +1,4 @@
-// app/accounting/profit-loss/page.tsx
+// app/accounting/profit-loss/page.tsx - UPDATED: Fixed double-fetch + grossProfit stats card
 
 "use client";
 
@@ -38,6 +38,8 @@ interface ProfitLossSummary {
   salesTax: number;
   purchaseTax: number;
   netTax: number;
+  grossProfit: number;           // NEW
+  grossProfitMargin: number;     // NEW
   profit: number;
   profitMargin: number;
   totalOrders: number;
@@ -55,6 +57,7 @@ interface MonthlyBreakdown {
   expenseCount: number;
   salesTax: number;
   purchaseTax: number;
+  grossProfit: number;           // NEW
   profit: number;
 }
 
@@ -62,6 +65,7 @@ interface Trends {
   revenue: number;
   costs: number;
   profit: number;
+  grossProfit: number;           // NEW
   netTax: number;
 }
 
@@ -167,6 +171,8 @@ function ProfitLossPageContent() {
     }
   }, [dateRange, canRead]);
 
+  // ✅ FIXED: Removed `dateRange` from deps — fetchData already depends on it via useCallback.
+  // Having both caused a double-fetch every time the date changed.
   useEffect(() => {
     if (isMounted && canRead) {
       fetchData();
@@ -176,8 +182,9 @@ function ProfitLossPageContent() {
       });
       setIsLoading(false);
     }
-  }, [isMounted, canRead, isPending, dateRange, fetchData]);
+  }, [isMounted, canRead, isPending, fetchData]);
 
+  // Silent background refresh on tab focus
   useEffect(() => {
     const onFocus = () => { if (isMounted && canRead) fetchData(true); };
     window.addEventListener("focus", onFocus);
@@ -196,7 +203,6 @@ function ProfitLossPageContent() {
     if (map[period]) setDateRange(map[period]);
   };
 
-  // ── PDF: call API route, stream react-pdf result ──────────────────────────
   const handleExportPDF = async () => {
     if (!data || !dateRange?.from || !dateRange?.to) return;
     setIsExporting(true);
@@ -222,7 +228,6 @@ function ProfitLossPageContent() {
     }
   };
 
-  // ── Excel: stays client-side ───────────────────────────────────────────────
   const handleExportExcel = () => {
     if (!detailedData || !dateRange?.from || !dateRange?.to) return;
     setIsExporting(true);
@@ -275,17 +280,17 @@ function ProfitLossPageContent() {
         subtext: "Income from sales"
       },
       {
-        name: "Total Costs",
-        stat: formatCompactCurrency(summary.totalCosts),
-        subtext: "Excluding VAT",
-        change: formatTrend(trends?.costs),
-        changeType: (trends?.costs || 0) <= 0 ? "positive" : "negative"
+        name: "Gross Profit",
+        stat: formatCompactCurrency(summary.grossProfit),
+        change: `${summary.grossProfitMargin.toFixed(1)}% margin`,
+        changeType: summary.grossProfit >= 0 ? "positive" : "negative",
+        subtext: `COGS ${formatCompactCurrency(summary.totalPurchasesExTax)}`
       },
       {
         name: "Net Profit",
         stat: formatCompactCurrency(summary.profit),
         change: formatTrend(trends?.profit),
-        subtext: "Profit Margin",
+        subtext: `Expenses ${formatCompactCurrency(summary.totalExpenses)}`,
         changeType: (trends?.profit || 0) >= 0 ? "positive" : "negative"
       },
       {
