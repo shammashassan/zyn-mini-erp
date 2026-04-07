@@ -1,15 +1,17 @@
-// utils/invoiceNumber.ts - FIXED: Voucher number generation
+// utils/invoiceNumber.ts - UPDATED: Added POS sale number generation
 
 import dbConnect from '@/lib/dbConnect';
 import Invoice from '@/models/Invoice';
 import Quotation from '@/models/Quotation';
 import Voucher from '@/models/Voucher';
 import DebitNote from '@/models/DebitNote';
+import CreditNote from '@/models/CreditNote';
 import DeliveryNote from '@/models/DeliveryNote';
 import Purchase from '@/models/Purchase';
 import Expense from '@/models/Expense';
 import Journal from '@/models/Journal';
 import ReturnNote from '@/models/ReturnNote';
+import POSSale from '@/models/POSSale';
 
 // Define the supported document types
 type DocumentType =
@@ -23,7 +25,8 @@ type DocumentType =
   | 'journal'
   | 'purchase'
   | 'expense'
-  | 'return';
+  | 'return'
+  | 'pos';
 
 // Define the prefixes for each document type
 const prefixes: Record<DocumentType, string> = {
@@ -38,12 +41,13 @@ const prefixes: Record<DocumentType, string> = {
   purchase: 'PUR',
   expense: 'EXP',
   return: 'RTN',
+  pos: 'POS',
 };
 
 /**
  * Generate a unique reference number with retry mechanism
  * Format: PREFIX-YYYYMMDD-SEQUENCE
- * Examples: INV-20251024-0001, QT-20251025-0001, RCP-20251024-0001, PAY-20251024-0001
+ * Examples: INV-20251024-0001, QT-20251025-0001, POS-20251024-0001
  */
 export default async function generateInvoiceNumber(
   documentType: DocumentType,
@@ -72,20 +76,20 @@ export default async function generateInvoiceNumber(
           Model = Quotation;
           query = { invoiceNumber: { $regex: searchPattern } };
           break;
-        // ✅ FIXED: Receipt and Payment use Voucher model with invoiceNumber field
+        // Receipt and Payment use Voucher model with invoiceNumber field
         case 'receipt':
         case 'payment':
           Model = Voucher;
           query = { invoiceNumber: { $regex: searchPattern } };
           break;
         case 'debitNote':
-          Model = (await import('@/models/DebitNote')).default;
+          Model = DebitNote;
           query = { debitNoteNumber: { $regex: searchPattern } };
           break;
         case 'creditNote':
-          Model = (await import('@/models/CreditNote')).default;
+          Model = CreditNote;
           query = { creditNoteNumber: { $regex: searchPattern } };
-          break;  
+          break;
         case 'delivery':
           Model = DeliveryNote;
           query = { invoiceNumber: { $regex: searchPattern } };
@@ -106,6 +110,10 @@ export default async function generateInvoiceNumber(
           Model = ReturnNote;
           query = { returnNumber: { $regex: searchPattern } };
           break;
+        case 'pos':
+          Model = POSSale;
+          query = { saleNumber: { $regex: searchPattern } };
+          break;
         default:
           throw new Error(`Unknown document type: ${documentType}`);
       }
@@ -119,9 +127,8 @@ export default async function generateInvoiceNumber(
       const generatedNumber = `${prefix}-${datePart}-${formattedNumber}`;
 
       // Double-check uniqueness based on the specific field name
-      let exists;
       let queryField = 'invoiceNumber';
-      
+
       if (documentType === 'journal') {
         queryField = 'journalNumber';
       } else if (documentType === 'purchase' || documentType === 'expense') {
@@ -132,9 +139,11 @@ export default async function generateInvoiceNumber(
         queryField = 'debitNoteNumber';
       } else if (documentType === 'creditNote') {
         queryField = 'creditNoteNumber';
+      } else if (documentType === 'pos') {
+        queryField = 'saleNumber';
       }
 
-      exists = await Model.findOne({ [queryField]: generatedNumber }).setOptions({ includeDeleted: true });
+      const exists = await Model.findOne({ [queryField]: generatedNumber }).setOptions({ includeDeleted: true });
 
       if (!exists) {
         console.log(`✅ Generated ${documentType} number: ${generatedNumber}`);

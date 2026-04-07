@@ -8,6 +8,7 @@ export const statement = {
   // General
   dashboard: ["read"],
   bill: ["create"],
+  posSale: ["read", "create", "soft_delete", "view_trash", "restore", "permanent_delete"],
   settings: ["read"],
   account: ["read"],
   help: ["read"],
@@ -58,6 +59,7 @@ export const ac = createAccessControl(statement);
 export const user = ac.newRole({
   dashboard: ["read"],
   bill: ["create"],
+  posSale: ["read", "create"],
   settings: ["read"],
   account: ["read"],
   help: ["read"],
@@ -85,6 +87,7 @@ export const user = ac.newRole({
 export const manager = ac.newRole({
   dashboard: ["read"],
   bill: ["create"],
+  posSale: ["read", "create", "soft_delete"],
   settings: ["read"],
   account: ["read"],
   help: ["read"],
@@ -124,6 +127,7 @@ export const manager = ac.newRole({
 export const admin = ac.newRole({
   dashboard: ["read"],
   bill: ["create"],
+  posSale: ["read", "create", "soft_delete", "view_trash", "restore", "permanent_delete"],
   settings: ["read"],
   account: ["read"],
   help: ["read"],
@@ -166,6 +170,7 @@ export const owner = ac.newRole({
 
   dashboard: ["read"],
   bill: ["create"],
+  posSale: ["read", "create", "soft_delete", "view_trash", "restore", "permanent_delete"],
   settings: ["read"],
   account: ["read"],
   help: ["read"],

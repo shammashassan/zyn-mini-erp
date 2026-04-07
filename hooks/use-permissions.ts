@@ -61,6 +61,17 @@ export function useBillPermissions() {
   });
 }
 
+export function usePOSPermissions() {
+  return usePermissions({
+    canRead: { posSale: ["read"] },
+    canCreate: { posSale: ["create"] },
+    canDelete: { posSale: ["soft_delete"] },
+    canViewTrash: { posSale: ["view_trash"] },
+    canRestore: { posSale: ["restore"] },
+    canPermanentDelete: { posSale: ["permanent_delete"] },
+  });
+}
+
 // Specific hook for settings permissions
 export function useSettingsPermissions() {
   return usePermissions({
