@@ -366,7 +366,7 @@ export default function StockPage() {
                                                 Create items with the &ldquo;Material&rdquo; type enabled to
                                                 start tracking stock here.
                                             </p>
-                                            <Link href="../items">
+                                            <Link href="/inventory/items">
                                                 <Button className="gap-2">
                                                     <ArrowLeft className="h-4 w-4" />
                                                     Go to Items
