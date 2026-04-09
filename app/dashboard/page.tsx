@@ -21,7 +21,7 @@ import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import Preloader from "@/components/preloader";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
-import { Banknote, ChevronRight, FileClock, FileText, ShoppingCart, Ticket, Truck } from "lucide-react";
+import { Banknote, ChevronRight, FileClock, FileText, ShoppingBag, ShoppingCart, Ticket, Truck } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -111,7 +111,7 @@ function DashboardSkeleton({ isBasicUser }: { isBasicUser: boolean }) {
         </div>
       )}
 
-      {/* Recent Invoices Table Skeleton */}
+      {/* Recent Sales Table Skeleton */}
       <Card>
         <CardHeader>
           <Skeleton className="h-6 w-[150px] mb-2" />
@@ -136,7 +136,7 @@ function DashboardContent() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const [showWelcome, setShowWelcome] = useState(() => searchParams.get("welcome") === "true");
 
   useEffect(() => {
@@ -220,8 +220,12 @@ function DashboardContent() {
       return;
     }
 
-    setSelectedPdfUrl(`/api/invoices/${sale._id}/pdf`);
-    setSelectedPdfTitle(sale.invoiceNumber || "Invoice");
+    if (sale.documentType === 'pos_sale') {
+      setSelectedPdfUrl(`/api/pos/${sale._id}/pdf`);
+    } else {
+      setSelectedPdfUrl(`/api/invoices/${sale._id}/pdf`);
+    }
+    setSelectedPdfTitle(sale.documentNumber || "Document");
     setIsModalOpen(true);
   };
 
@@ -282,7 +286,7 @@ function DashboardContent() {
         value: summary.currentOrders.toString(),
         trend: trends.orders.trend,
         change: `${trends.orders.change >= 0 ? '+' : ''}${trends.orders.change.toFixed(1)}%`,
-        note: "Approved invoices",
+        note: "Approved sales",
         subtext: summary.currentOrders > 0
           ? `Avg: ${formatCurrency(summary.currentRevenue / summary.currentOrders)} per order`
           : 'No orders yet',
@@ -329,7 +333,7 @@ function DashboardContent() {
               </h1>
               <p className="text-muted-foreground">
                 {isBasicUser
-                  ? "Access your recent invoices and quick actions."
+                  ? "Access your recent sales and quick actions."
                   : "Here's what's happening with your business today."}
               </p>
             </div>
@@ -354,15 +358,15 @@ function DashboardContent() {
                             className="cursor-pointer transition-all hover:bg-muted/50"
                           >
                             <button
-                              onClick={() => router.push('/sales/invoices')}
+                              onClick={() => router.push('/billing')}
                               className="w-full text-left"
                             >
                               <ItemMedia variant="icon">
-                                <FileText className="h-5 w-5" />
+                                <ShoppingBag className="h-5 w-5" />
                               </ItemMedia>
                               <ItemContent>
-                                <ItemTitle>Create Invoice</ItemTitle>
-                                <ItemDescription>Generate new invoice for customers</ItemDescription>
+                                <ItemTitle>Create POS sales</ItemTitle>
+                                <ItemDescription>Generate new POS sales for customers</ItemDescription>
                               </ItemContent>
                               <div className="ml-auto">
                                 <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -376,15 +380,15 @@ function DashboardContent() {
                             className="cursor-pointer transition-all hover:bg-muted/50"
                           >
                             <button
-                              onClick={() => router.push('/sales/quotations')}
+                              onClick={() => router.push('/sales/invoices')}
                               className="w-full text-left"
                             >
                               <ItemMedia variant="icon">
-                                <FileClock className="h-5 w-5" />
+                                <FileText className="h-5 w-5" />
                               </ItemMedia>
                               <ItemContent>
-                                <ItemTitle>Create Quotation</ItemTitle>
-                                <ItemDescription>Prepare quotes for potential orders</ItemDescription>
+                                <ItemTitle>Create Invoice</ItemTitle>
+                                <ItemDescription>Generate new invoice for customers</ItemDescription>
                               </ItemContent>
                               <div className="ml-auto">
                                 <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -492,9 +496,9 @@ function DashboardContent() {
             <div className="px-4 lg:px-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Recent Invoices</CardTitle>
+                  <CardTitle>Recent Sales</CardTitle>
                   <CardDescription>
-                    Latest approved invoices and their details
+                    Latest approved sales and their details
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -513,9 +517,9 @@ function DashboardContent() {
               {dashboardData?.recentSales.length === 0 && !isLoading && (
                 <Card className="mt-4">
                   <CardContent className="flex flex-col items-center justify-center py-12">
-                    <h3 className="text-lg font-semibold mb-2">No approved invoices</h3>
+                    <h3 className="text-lg font-semibold mb-2">No approved sales</h3>
                     <p className="text-muted-foreground text-center mb-4">
-                      Your approved invoices will appear here once you start creating and approving them.
+                      Your approved sales will appear here once you start creating and approving them.
                     </p>
                   </CardContent>
                 </Card>

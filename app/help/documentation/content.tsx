@@ -46,7 +46,6 @@ import StockAdjustmentSection from "./components/sections/stock-adjustment";
 import PartiesSection from "./components/sections/parties";
 import ContactsSection from "./components/sections/contacts";
 import PayeesSection from "./components/sections/payees";
-import QuotationsSection from "./components/sections/quotations";
 import InvoicesSection from "./components/sections/invoices";
 import ReceiptsSection from "./components/sections/receipts";
 import DeliveryNotesSection from "./components/sections/delivery-notes";
@@ -146,14 +145,6 @@ export const DOC_SECTIONS: DocSection[] = [
     },
 
     // --- Sales ---
-    {
-        id: "quotations",
-        group: "Sales",
-        title: "Quotations",
-        icon: FileClock,
-        description: "Sales estimates, proposals, and customer pricing.",
-        content: <QuotationsSection />,
-    },
     {
         id: "invoices",
         group: "Sales",

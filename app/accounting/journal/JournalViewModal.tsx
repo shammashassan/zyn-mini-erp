@@ -34,6 +34,7 @@ const getStatusVariant = (status: string) => {
 const getReferenceTypeVariant = (type: string) => {
   switch (type) {
     case 'Invoice': return 'primary';
+    case 'POSSale': return 'blue';
     case 'Receipt': return 'success';
     case 'Payment': return 'destructive';
     case 'Purchase': return 'warning';

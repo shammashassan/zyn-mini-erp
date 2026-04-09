@@ -41,7 +41,7 @@ import type { IItem } from '@/models/Item';
 
 /**
  * Determines which price column label and value to use.
- * "sale"     → sellingPrice  (invoices, quotations)
+ * "sale"     → sellingPrice  (invoices)
  * "purchase" → costPrice     (purchases, debit notes)
  */
 export type PriceContext = 'sale' | 'purchase';

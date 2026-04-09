@@ -24,7 +24,7 @@ export interface IAuditEntry {
 export interface IJournal extends Document<string> {
   journalNumber: string;
   entryDate: Date;
-  referenceType: 'Invoice' | 'Receipt' | 'Payment' | 'Purchase' | 'Expense' | 'DebitNote' | 'CreditNote' | 'General' | 'Contra' | 'Adjustment';
+  referenceType: 'POSSale' | 'Invoice' | 'Receipt' | 'Payment' | 'Purchase' | 'Expense' | 'DebitNote' | 'CreditNote' | 'General' | 'Contra' | 'Adjustment';
 
   referenceId?: string;
   referenceNumber?: string;
@@ -97,7 +97,7 @@ const JournalSchema: Schema<IJournal> = new Schema({
   },
   referenceType: {
     type: String,
-    enum: ['Invoice', 'Receipt', 'Payment', 'Purchase', 'Expense', 'DebitNote', 'CreditNote', 'General', 'Contra', 'Adjustment'],
+    enum: ['POSSale', 'Invoice', 'Receipt', 'Payment', 'Purchase', 'Expense', 'DebitNote', 'CreditNote', 'General', 'Contra', 'Adjustment'],
 
     required: true,
     index: true

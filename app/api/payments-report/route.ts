@@ -80,10 +80,11 @@ export async function GET(request: Request) {
       'entries.accountCode': { $in: CASH_BANK_ACCOUNTS }
     };
 
-    if (paymentType === 'receipt') {
-      journalQuery.referenceType = 'Receipt';
-    } else if (paymentType === 'payment') {
-      journalQuery.referenceType = 'Payment';
+    // We will do paymentType filtering in Javascript by inflow/outflow
+    // Explicit referenceType filtering if passed
+    const referenceType = searchParams.get('referenceType');
+    if (referenceType) {
+      journalQuery.referenceType = referenceType;
     }
 
     if (partyType) {
@@ -154,6 +155,9 @@ export async function GET(request: Request) {
       if (paymentMethod && pMethod.toLowerCase() !== paymentMethod.toLowerCase()) {
         return;
       }
+
+      if (paymentType === 'receipt' && inflow === 0) return;
+      if (paymentType === 'payment' && outflow === 0) return;
 
       if (inflow > 0 || outflow > 0) {
         transactions.push({

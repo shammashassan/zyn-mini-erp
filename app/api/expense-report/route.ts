@@ -85,13 +85,17 @@ export async function GET(request: Request) {
       accounts.map(acc => [acc.accountCode, acc])
     );
 
+    const expenseAccountCodes = accounts
+      .filter(acc => acc.groupName === 'Expenses' || (acc.groupName === 'Assets' && acc.subGroup === 'Fixed Assets'))
+      .map(acc => acc.accountCode);
+
     // 2. AGGREGATION PIPELINE (Current Period)
     const aggResult = await Journal.aggregate([
       {
         $match: {
           status: 'posted',
           isDeleted: false,
-          referenceType: 'Expense',
+          'entries.accountCode': { $in: expenseAccountCodes },
           entryDate: { $gte: startDate, $lte: endDate }
         }
       },
@@ -266,7 +270,7 @@ export async function GET(request: Request) {
         $match: {
           status: 'posted',
           isDeleted: false,
-          referenceType: 'Expense',
+          'entries.accountCode': { $in: expenseAccountCodes },
           entryDate: { $gte: prevStartDate, $lte: prevEndDate }
         }
       },

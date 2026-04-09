@@ -126,7 +126,7 @@ const ItemSchema: Schema<IItem> = new Schema(
 ItemSchema.index({ isDeleted: 1, createdAt: -1 });
 ItemSchema.index({ types: 1 });
 ItemSchema.index({ category: 1 });
-ItemSchema.index({ sku: 1 }, { sparse: true });
+
 ItemSchema.index({ name: 'text', category: 'text', notes: 'text' });
 
 // ─────────────────────────────────────────────────────────────────────────────

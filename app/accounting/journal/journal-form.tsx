@@ -58,7 +58,7 @@ type JournalEntry = {
 
 type JournalFormData = {
   entryDate: Date;
-  referenceType: 'Invoice' | 'Receipt' | 'Payment' | 'Purchase' | 'Expense' | 'DebitNote' | 'CreditNote' | 'ReturnNote' | 'General' | 'Contra' | 'Adjustment';
+  referenceType: 'POSSale' | 'Invoice' | 'Receipt' | 'Payment' | 'Purchase' | 'Expense' | 'DebitNote' | 'CreditNote' | 'ReturnNote' | 'General' | 'Contra' | 'Adjustment';
 
   referenceNumber?: string;
   partyType?: 'Customer' | 'Supplier' | 'Payee' | 'Vendor';
@@ -153,6 +153,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
     { value: "Contra", label: "Contra" },
     { value: "Adjustment", label: "Adjustment" },
     { value: "Invoice", label: "Invoice" },
+    { value: "POSSale", label: "POS Sale" },
     { value: "Receipt", label: "Receipt" },
     { value: "Payment", label: "Payment" },
     { value: "Purchase", label: "Purchase" },
@@ -688,7 +689,7 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
                                       type="button"
                                       variant="outline"
                                       role="combobox"
-                                      className="w-full justify-between h-auto min-h-[2.5rem] py-2"
+                                      className="w-full justify-between h-auto min-h-10 py-2"
                                     >
                                       <span className="truncate text-left text-sm">
                                         {account ? (

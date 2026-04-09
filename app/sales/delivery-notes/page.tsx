@@ -209,8 +209,6 @@ function DeliveryNotesPageContent() {
 
     if (doc.voucherType) {
       pdfUrl = `/api/vouchers/${doc._id}/pdf`;
-    } else if (doc.documentType === 'quotation' || (!doc.documentType && doc.invoiceNumber?.startsWith('QUO'))) {
-      pdfUrl = `/api/quotations/${doc._id}/pdf`;
     } else if (doc.documentType === 'invoice' || (!doc.documentType && doc.invoiceNumber?.startsWith('INV'))) {
       pdfUrl = `/api/invoices/${doc._id}/pdf`;
     } else {

@@ -18,7 +18,6 @@ interface ConnectedDocumentsBadgesProps {
   invoice: {
     _id: string;
     connectedDocuments?: {
-      quotationId?: string | ConnectedDocument;
       deliveryId?: string | ConnectedDocument;
       receiptIds?: (string | ConnectedDocument)[];
       returnNoteIds?: (string | ConnectedDocument)[];
@@ -36,17 +35,16 @@ export function ConnectedDocumentsBadges({ invoice, onViewPdf }: ConnectedDocume
   // Helper to extract populated objects from array
   const getDocuments = (docs?: (string | ConnectedDocument)[]): ConnectedDocument[] => {
     if (!Array.isArray(docs)) return [];
-    return docs.filter((doc): doc is ConnectedDocument => 
+    return docs.filter((doc): doc is ConnectedDocument =>
       typeof doc === 'object' && doc !== null
     );
   };
 
-  const quotation = getDocument(invoice.connectedDocuments?.quotationId);
   const delivery = getDocument(invoice.connectedDocuments?.deliveryId);
   const receipts = getDocuments(invoice.connectedDocuments?.receiptIds);
   const returnNotes = getDocuments(invoice.connectedDocuments?.returnNoteIds);
 
-  if (!quotation && !delivery && receipts.length === 0 && returnNotes.length === 0) {
+  if (!delivery && receipts.length === 0 && returnNotes.length === 0) {
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <div className="h-2 w-2 rounded-full bg-muted-foreground/30" />
@@ -57,19 +55,6 @@ export function ConnectedDocumentsBadges({ invoice, onViewPdf }: ConnectedDocume
 
   return (
     <div className="flex flex-wrap gap-1">
-      {/* Quotation Badge */}
-      {quotation && (
-        <Badge
-          variant="info"
-          appearance="outline"
-          className="font-mono cursor-pointer hover:opacity-70 transition-opacity gap-1 w-fit"
-          onClick={() => onViewPdf({ ...quotation, documentType: 'quotation' })}
-        >
-          <FileClock className="h-3 w-3" />
-          {quotation.invoiceNumber}
-          <ExternalLink className="h-3 w-3 ml-1" />
-        </Badge>
-      )}
 
       {/* Delivery Badge */}
       {delivery && (

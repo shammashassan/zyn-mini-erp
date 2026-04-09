@@ -30,14 +30,13 @@ export interface BillPayload {
   payeeName?: string;
   payeeId?: string;
   vendorName?: string;
-  documentType: "invoice" | "quotation" | "receipt" | "payment";
+  documentType: "invoice" | "receipt" | "payment";
   paymentMethod?: string;
   notes: string;
   discount: number;
   status: string;
   items: Item[];
   invoiceDate?: Date;
-  quotationDate?: Date;
   voucherDate?: Date;
   voucherAmount?: number;
 }
@@ -72,7 +71,7 @@ export default function CreateBillPage() {
     paymentMethod: "", notes: "", discount: 0,
     documentType: "invoice", status: "pending",
     items: [{ description: "", quantity: 1, rate: 0, total: 0, taxRate: 0, taxAmount: 0 }],
-    invoiceDate: new Date(), quotationDate: new Date(), voucherDate: new Date(),
+    invoiceDate: new Date(), voucherDate: new Date(),
   });
 
   useEffect(() => {
@@ -172,11 +171,6 @@ export default function CreateBillPage() {
           payloadToSend.items = payload.items.map(i => ({ ...i, quantity: Number(i.quantity) || 0, rate: Number(i.rate) || 0, taxRate: Number(i.taxRate) || 0, taxAmount: Number(i.taxAmount) || 0 }));
           payloadToSend.invoiceDate = payload.invoiceDate;
           break;
-        case "quotation":
-          endpoint = "/api/quotations"; responseKey = "quotation"; targetRoute = "/sales/quotations";
-          payloadToSend.items = payload.items.map(i => ({ ...i, quantity: Number(i.quantity) || 0, rate: Number(i.rate) || 0, taxRate: Number(i.taxRate) || 0, taxAmount: Number(i.taxAmount) || 0 }));
-          payloadToSend.quotationDate = payload.quotationDate;
-          break;
         case "receipt": case "payment":
           endpoint = "/api/vouchers"; responseKey = "voucher";
           targetRoute = payload.documentType === 'receipt' ? "/sales/receipts" : "/sales/payments";
@@ -189,7 +183,6 @@ export default function CreateBillPage() {
         const docId = data[responseKey]?._id;
         const docNumber = data[responseKey]?.invoiceNumber;
         let pdfUrl = payload.documentType === 'invoice' ? `/api/invoices/${docId}/pdf`
-          : payload.documentType === 'quotation' ? `/api/quotations/${docId}/pdf`
             : `/api/vouchers/${docId}/pdf?type=${payload.documentType}`;
         setBillingPdfUrl(pdfUrl);
         setBillingPdfTitle(docNumber || "Document");

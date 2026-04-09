@@ -41,6 +41,9 @@ export async function GET(request: Request) {
       accounts.map(acc => [acc.accountCode, acc])
     );
 
+    const incomeAccountCodes = accounts.filter(a => a.groupName === 'Income').map(a => a.accountCode);
+    const expenseAccountCodes = accounts.filter(a => a.groupName === 'Expenses').map(a => a.accountCode);
+
     // Helper function to calculate totals for a given date range (used for trends)
     async function calculateTotals(start: Date, end: Date) {
       const aggregationResult = await Journal.aggregate([
@@ -141,12 +144,45 @@ export async function GET(request: Request) {
         }
       },
       {
+        $project: {
+          entryDate: 1,
+          isOrder: {
+            $sum: {
+              $map: {
+                input: "$entries",
+                as: "e",
+                in: { $cond: [{ $in: ["$$e.accountCode", incomeAccountCodes] }, 1, 0] }
+              }
+            }
+          },
+          isPurchase: {
+            $sum: {
+              $map: {
+                input: "$entries",
+                as: "e",
+                in: { $cond: [{ $eq: ["$$e.accountCode", "A1200"] }, 1, 0] }
+              }
+            }
+          },
+          isExpense: {
+            $sum: {
+              $map: {
+                input: "$entries",
+                as: "e",
+                in: { $cond: [{ $in: ["$$e.accountCode", expenseAccountCodes] }, 1, 0] }
+              }
+            }
+          }
+        }
+      },
+      {
         $group: {
           _id: {
-            month: { $dateToString: { format: "%Y-%m", date: "$entryDate" } },
-            referenceType: "$referenceType"
+            month: { $dateToString: { format: "%Y-%m", date: "$entryDate" } }
           },
-          count: { $sum: 1 }
+          orderCount: { $sum: { $cond: [{ $gt: ["$isOrder", 0] }, 1, 0] } },
+          purchaseCount: { $sum: { $cond: [{ $gt: ["$isPurchase", 0] }, 1, 0] } },
+          expenseCount: { $sum: { $cond: [{ $gt: ["$isExpense", 0] }, 1, 0] } }
         }
       }
     ]);
@@ -157,19 +193,15 @@ export async function GET(request: Request) {
       const monthKey = format(month, 'yyyy-MM');
       const monthBuckets = currentAggregation.filter((r: any) => r._id.month === monthKey);
 
-      const monthTransactions = transactionCounts.filter((t: any) => t._id.month === monthKey);
+      const monthTransactions = transactionCounts.find((t: any) => t._id.month === monthKey) || {
+        orderCount: 0,
+        purchaseCount: 0,
+        expenseCount: 0
+      };
 
-      const orderCount = monthTransactions
-        .filter((t: any) => ['Invoice', 'Receipt'].includes(t._id.referenceType))
-        .reduce((sum: number, t: any) => sum + t.count, 0);
-
-      const purchaseCount = monthTransactions
-        .filter((t: any) => t._id.referenceType === 'Purchase')
-        .reduce((sum: number, t: any) => sum + t.count, 0);
-
-      const expenseCount = monthTransactions
-        .filter((t: any) => t._id.referenceType === 'Expense')
-        .reduce((sum: number, t: any) => sum + t.count, 0);
+      const orderCount = monthTransactions.orderCount;
+      const purchaseCount = monthTransactions.purchaseCount;
+      const expenseCount = monthTransactions.expenseCount;
 
       let revenue = 0;
       let expenses = 0;

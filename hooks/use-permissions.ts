@@ -164,21 +164,6 @@ export function usePayeePermissions() {
   });
 }
 
-// Specific hook for quotation permissions
-export function useQuotationPermissions() {
-  return usePermissions({
-    canRead: { quotation: ["read"] },
-    canCreate: { quotation: ["create"] },
-    canUpdate: { quotation: ["update"] },
-    canUpdateStatus: { quotation: ["update_status"] },
-    canDelete: { quotation: ["soft_delete"] },
-    canViewTrash: { quotation: ["view_trash"] },
-    canRestore: { quotation: ["restore"] },
-    canPermanentDelete: { quotation: ["permanent_delete"] },
-    canCreateInvoice: { quotation: ["create_invoice"] },
-  });
-}
-
 // Specific hook for invoice permissions
 export function useInvoicePermissions() {
   return usePermissions({

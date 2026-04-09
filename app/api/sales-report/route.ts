@@ -106,7 +106,7 @@ export async function GET(request: Request) {
           $match: {
             status: 'posted',
             isDeleted: false,
-            referenceType: 'Invoice',
+            'entries.accountCode': { $in: incomeAccountCodes },
             entryDate: { $gte: start, $lte: end }
           }
         },

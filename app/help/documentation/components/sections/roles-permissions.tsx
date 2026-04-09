@@ -33,7 +33,7 @@ export default function RolesPermissionsSection() {
                             <p className="text-sm text-muted-foreground mb-2 font-medium">Operational Staff</p>
                             <p className="text-sm text-muted-foreground">
                                 Standard operational role with permissions to view and create transactional documents
-                                (invoices, quotations, purchase orders). Cannot delete records or access sensitive
+                                (invoices, purchase orders). Cannot delete records or access sensitive
                                 configuration settings. Suitable for sales personnel, data entry clerks, and operational staff.
                             </p>
                         </div>

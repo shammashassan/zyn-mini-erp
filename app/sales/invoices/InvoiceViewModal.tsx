@@ -538,8 +538,7 @@ export function InvoiceViewModal({
             {/* Connected Documents */}
             {(currentData.connectedDocuments?.receiptIds?.length > 0 ||
               currentData.connectedDocuments?.deliveryId ||
-              currentData.connectedDocuments?.returnNoteIds?.length > 0 ||
-              currentData.connectedDocuments?.quotationId) && (
+              currentData.connectedDocuments?.returnNoteIds?.length > 0) && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-sm sm:text-base flex items-center gap-2">

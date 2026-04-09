@@ -17,7 +17,6 @@ import { Check, ChevronsUpDown, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 
 const documentTypes = [
-  { value: "quotation", label: "Quotation" },
   { value: "invoice", label: "Invoice" },
   { value: "receipt", label: "Receipt Voucher" },
   { value: "payment", label: "Payment Voucher" },
@@ -50,7 +49,6 @@ export function DocumentDetailsCard({ payload, onFieldChange }: DocumentDetailsP
   const getDateFieldName = (): keyof BillPayload | null => {
     switch (payload.documentType) {
       case 'invoice': return 'invoiceDate';
-      case 'quotation': return 'quotationDate';
       case 'receipt':
       case 'payment': return 'voucherDate';
       default: return null;
@@ -152,7 +150,6 @@ export function DocumentDetailsCard({ payload, onFieldChange }: DocumentDetailsP
             <div className="grid w-full items-center gap-1.5">
               <Label>
                 {payload.documentType === 'invoice' && 'Invoice Date'}
-                {payload.documentType === 'quotation' && 'Quotation Date'}
                 {(payload.documentType === 'receipt' || payload.documentType === 'payment') && 'Voucher Date'}
                 {' '}*
               </Label>
@@ -213,7 +210,7 @@ export function DocumentDetailsCard({ payload, onFieldChange }: DocumentDetailsP
             </div>
           )}
 
-          {/* Discount - Only for invoices/quotations */}
+          {/* Discount - Only for invoices */}
           {!requiresPaymentMethod && (
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="discount">Discount</Label>

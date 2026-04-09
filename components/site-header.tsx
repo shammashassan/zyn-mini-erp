@@ -20,15 +20,12 @@ import { Home, ChevronDown } from "lucide-react";
 
 const routeGroups: Record<string, { label: string; path: string }[]> = {
   accounting: [
-    { label: "Chart of Accounts", path: "/accounting/chart-of-accounts" },
     { label: "Journal", path: "/accounting/journal" },
     { label: "Ledger", path: "/accounting/ledger" },
-    { label: "Trial Balance", path: "/accounting/trial-balance" },
     { label: "Profit & Loss", path: "/accounting/profit-loss" },
-    { label: "Financial Statements", path: "/accounting/financial-statements" },
   ],
   sales: [
-    { label: "Quotations", path: "/sales/quotations" },
+    { label: "POS", path: "/sales/pos" },
     { label: "Invoices", path: "/sales/invoices" },
     { label: "Receipts", path: "/sales/receipts" },
     { label: "Delivery Notes", path: "/sales/delivery-notes" },

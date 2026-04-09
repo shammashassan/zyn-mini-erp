@@ -71,7 +71,6 @@ export interface IDeliveryNote extends Document<string> {
   // Connected documents
   connectedDocuments: {
     invoiceIds?: mongoose.Types.ObjectId[];
-    quotationId?: mongoose.Types.ObjectId;
   };
 
   // Soft delete fields
@@ -184,7 +183,6 @@ const DeliveryNoteSchema: Schema<IDeliveryNote> = new Schema({
   connectedDocuments: {
     type: {
       invoiceIds: [{ type: Schema.Types.ObjectId, ref: 'Invoice' }],
-      quotationId: { type: Schema.Types.ObjectId, ref: 'Quotation' }
     },
     default: {}
   },
@@ -204,7 +202,6 @@ const DeliveryNoteSchema: Schema<IDeliveryNote> = new Schema({
 DeliveryNoteSchema.index({ isDeleted: 1, deliveryDate: -1 });
 DeliveryNoteSchema.index({ status: 1 });
 DeliveryNoteSchema.index({ 'connectedDocuments.invoiceIds': 1 });
-DeliveryNoteSchema.index({ 'connectedDocuments.quotationId': 1 });
 DeliveryNoteSchema.index({ partyId: 1, deliveryDate: -1 });
 DeliveryNoteSchema.index({ 'partySnapshot.displayName': 'text' });
 DeliveryNoteSchema.index({ 'items.itemId': 1 });

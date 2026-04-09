@@ -6,6 +6,7 @@ import Invoice from "@/models/Invoice";
 import Journal from "@/models/Journal";
 import Party from "@/models/Party";
 import ChartOfAccount from "@/models/ChartOfAccount";
+import POSSale from "@/models/POSSale";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { startOfMonth, endOfMonth, subMonths, eachDayOfInterval, format } from 'date-fns';
 
@@ -18,7 +19,7 @@ interface DailySummary {
 
 interface RecentSaleDocument {
   _id: unknown;
-  invoiceNumber: string;
+  documentNumber: string;
 
   // ✅ Party Snapshot
   partySnapshot?: {
@@ -45,6 +46,7 @@ interface RecentSaleDocument {
   grandTotal: number;
   createdAt: Date;
   status?: string;
+  documentType?: string;
 }
 
 interface AggregatedPeriodResult {
@@ -65,7 +67,7 @@ export async function GET() {
 
     await dbConnect();
 
-    const _ensuremodel = [Invoice, Journal, Party, ChartOfAccount];
+    const _ensuremodel = [Invoice, Journal, Party, ChartOfAccount, POSSale];
 
     const now = new Date();
     // Set 'now' to end of day to include today's transactions
@@ -162,8 +164,7 @@ export async function GET() {
                 ]
               }
             }
-          },
-          isOrder: { $cond: [{ $eq: ["$referenceType", "Invoice"] }, 1, 0] }
+          }
         }
       },
       {
@@ -182,7 +183,7 @@ export async function GET() {
                 expenses: { $sum: "$expenses" },
                 purchases: { $sum: "$purchases" },
                 netTax: { $sum: "$netTax" },
-                orderCount: { $sum: "$isOrder" }
+                orderCount: { $sum: { $cond: [{ $gt: ["$revenue", 0] }, 1, 0] } }
               }
             }
           ],
@@ -200,7 +201,7 @@ export async function GET() {
                 expenses: { $sum: "$expenses" },
                 purchases: { $sum: "$purchases" },
                 netTax: { $sum: "$netTax" },
-                orderCount: { $sum: "$isOrder" }
+                orderCount: { $sum: { $cond: [{ $gt: ["$revenue", 0] }, 1, 0] } }
               }
             }
           ],
@@ -253,19 +254,56 @@ export async function GET() {
       };
     });
 
-    // 5. Fetch Recent Invoices with Party Snapshots
-    const recentInvoices = await Invoice.find({
-      isDeleted: false,
-      status: "approved"
-    })
-      .select("invoiceNumber partySnapshot partyId grandTotal createdAt status")
-      .populate({
-        path: 'partyId',
-        select: 'name company type'
+    // 5. Fetch Recent Sales (Invoices + POS)
+    const [recentInvoicesList, recentPOSSales] = await Promise.all([
+      Invoice.find({
+        isDeleted: false,
+        status: "approved"
       })
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean<RecentSaleDocument[]>();
+        .select("invoiceNumber partySnapshot partyId grandTotal createdAt status")
+        .populate({
+          path: 'partyId',
+          select: 'name company type'
+        })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean<any[]>(),
+
+      POSSale.find({
+        isDeleted: false,
+      })
+        .select("saleNumber customerName partySnapshot partyId grandTotal createdAt")
+        .populate({
+          path: 'partyId',
+          select: 'name company type'
+        })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean<any[]>()
+    ]);
+
+    const combinedSales = [
+      ...recentInvoicesList.map(sale => ({
+        _id: String(sale._id),
+        documentNumber: sale.invoiceNumber,
+        partySnapshot: sale.partySnapshot,
+        partyId: sale.partyId,
+        grandTotal: sale.grandTotal,
+        createdAt: sale.createdAt,
+        documentType: "invoice",
+        status: sale.status
+      })),
+      ...recentPOSSales.map(sale => ({
+        _id: String(sale._id),
+        documentNumber: sale.saleNumber,
+        partySnapshot: sale.partySnapshot || { displayName: sale.customerName },
+        partyId: sale.partyId,
+        grandTotal: sale.grandTotal,
+        createdAt: sale.createdAt,
+        documentType: "pos_sale",
+        status: "approved"
+      }))
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 10);
 
     // 6. Calculate Trends
     const revenueTrend = calculateTrend(currentStats.revenue, lastStats.revenue);
@@ -291,16 +329,7 @@ export async function GET() {
         orders: ordersTrend,
       },
       chartData,
-      recentSales: recentInvoices.map(sale => ({
-        _id: String(sale._id),
-        invoiceNumber: sale.invoiceNumber,
-        partySnapshot: sale.partySnapshot,
-        partyId: sale.partyId,
-        grandTotal: sale.grandTotal,
-        createdAt: sale.createdAt,
-        documentType: "invoice",
-        status: sale.status
-      }))
+      recentSales: combinedSales
     });
 
   } catch (error) {

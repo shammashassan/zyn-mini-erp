@@ -315,7 +315,7 @@ export function ItemForm({
                                         Product
                                     </p>
                                     <p className="text-muted-foreground text-sm">
-                                        Appears in sales transactions and quotations
+                                        Appears in sales transactions
                                     </p>
                                 </div>
                                 <Switch

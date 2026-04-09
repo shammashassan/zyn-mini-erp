@@ -91,7 +91,7 @@ export async function GET(request: Request) {
           $match: {
             status: 'posted',
             isDeleted: false,
-            referenceType: 'Purchase',
+            'entries.accountCode': 'A1200',
             entryDate: { $gte: start, $lte: end }
           }
         },

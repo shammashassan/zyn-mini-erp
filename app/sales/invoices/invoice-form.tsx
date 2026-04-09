@@ -81,7 +81,6 @@ type InvoiceFormData = {
   items: InvoiceItem[];
   discount: number;
   notes: string;
-  quotationId?: string;
   invoiceDate: Date;
   status: 'pending' | 'approved' | 'cancelled';
 };
@@ -99,21 +98,6 @@ interface ItemApiData {
   taxType?: string;
 }
 
-interface ConnectedQuotation {
-  _id: string;
-  invoiceNumber: string;
-  grandTotal: number;
-  discount: number;
-  /** Quotation items may come from API with `rate` or `price` field */
-  items: Array<{
-    itemId?: string;
-    description: string;
-    quantity: number;
-    rate?: number;
-    price?: number;
-    total: number;
-  }>;
-}
 
 interface InvoiceFormProps {
   isOpen: boolean;
@@ -181,10 +165,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
   });
 
   const [items, setItems] = useState<ItemApiData[]>([]);
-  const [quotations, setQuotations] = useState<ConnectedQuotation[]>([]);
-  const [quotationPopoverOpen, setQuotationPopoverOpen] = useState(false);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
-  const [loadingQuotations, setLoadingQuotations] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
 
   useEffect(() => {
@@ -196,7 +177,6 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
 
   const watchedItems = watch("items");
   const partyId = watch("partyId");
-  const quotationId = watch("quotationId");
   const discount = watch("discount");
 
   const isEditMode = !!defaultValues?._id;
@@ -230,32 +210,6 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     fetchItems();
   }, []);
 
-  // ── Fetch linked quotations when party is selected ─────────────────────────
-  useEffect(() => {
-    if (!partyId || !isOpen || isEditMode) return;
-
-    const fetchQuotations = async () => {
-      setLoadingQuotations(true);
-      try {
-        const res = await fetch(`/api/quotations?partyId=${partyId}&populate=true`);
-        if (res.ok) {
-          const list = await res.json();
-          const available = list.filter(
-            (q: any) =>
-              (q.status === 'approved' || q.status === 'sent') &&
-              (!q.connectedDocuments?.invoiceIds || q.connectedDocuments.invoiceIds.length === 0)
-          );
-          setQuotations(available);
-        }
-      } catch (error) {
-        console.error("Failed to fetch quotations:", error);
-      } finally {
-        setLoadingQuotations(false);
-      }
-    };
-
-    fetchQuotations();
-  }, [partyId, isOpen, isEditMode]);
 
   // ── Populate form when modal opens / defaultValues change ─────────────────
   useEffect(() => {
@@ -272,7 +226,6 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
           items: (defaultValues.items ?? [emptyItem()]).map(normaliseLineItem),
           discount: defaultValues.discount || 0,
           notes: defaultValues.notes || "",
-          quotationId: "",
           invoiceDate: defaultValues.invoiceDate ? new Date(defaultValues.invoiceDate) : new Date(),
           status: defaultValues.status || 'pending',
         });
@@ -283,7 +236,6 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
           items: [emptyItem()],
           discount: 0,
           notes: "",
-          quotationId: "",
           invoiceDate: new Date(),
           status: 'pending',
         });
@@ -291,15 +243,6 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
     }
   }, [isOpen, defaultValues, reset]);
 
-  // ── Quotation selection ────────────────────────────────────────────────────
-  const handleQuotationSelect = (quotation: ConnectedQuotation) => {
-    setValue("quotationId", quotation._id, { shouldDirty: true });
-    // Normalise quotation items (they may have `rate` or `price`)
-    setValue("items", quotation.items.map(normaliseLineItem), { shouldDirty: true });
-    setValue("discount", quotation.discount, { shouldDirty: true });
-    setQuotationPopoverOpen(false);
-    toast.success(`Linked quotation ${quotation.invoiceNumber}`);
-  };
 
   // ── Form submit ────────────────────────────────────────────────────────────
   const handleFormSubmit = async (data: InvoiceFormData) => {
@@ -343,9 +286,7 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
       grandTotal: grandTotal,
       notes: data.notes,
       status: isEditMode ? data.status : "pending",
-      connectedDocuments: !isEditMode && data.quotationId
-        ? { quotationId: data.quotationId }
-        : {},
+      connectedDocuments: {},
     };
 
     const submissionId = defaultValues?._id ? String(defaultValues._id) : undefined;
@@ -446,67 +387,6 @@ export function InvoiceForm({ isOpen, onClose, onSubmit, defaultValues }: Invoic
             )}
           </div>
 
-          {/* Link quotation (new invoice only) */}
-          {!isEditMode && partyId && quotations.length > 0 && (
-            <div className="space-y-2 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-              <Label className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
-                <FileText className="h-4 w-4" />
-                Link Approved Quotation (Optional)
-              </Label>
-              <Popover open={quotationPopoverOpen} onOpenChange={setQuotationPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button type="button" variant="outline" role="combobox" className="w-full justify-between">
-                    {quotationId
-                      ? quotations.find(q => q._id === quotationId)?.invoiceNumber
-                      : loadingQuotations
-                        ? "Loading quotations..."
-                        : "Select quotation..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] sm:w-[400px] p-0" align="start">
-                  <Command>
-                    <CommandList
-                      className="max-h-[200px] overflow-y-auto"
-                      onWheel={(e) => e.stopPropagation()}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onTouchMove={(e) => e.stopPropagation()}
-                    >
-                      <CommandEmpty>No approved quotations found.</CommandEmpty>
-                      <CommandGroup>
-                        {quotations.map((quotation) => (
-                          <CommandItem
-                            key={quotation._id}
-                            value={quotation._id}
-                            onSelect={() => handleQuotationSelect(quotation)}
-                          >
-                            <Check className={cn("mr-2 h-4 w-4", quotationId === quotation._id ? "opacity-100" : "opacity-0")} />
-                            <div>
-                              <div className="font-medium">{quotation.invoiceNumber}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {formatCurrency(quotation.grandTotal)}
-                              </div>
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              {quotationId && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setValue("quotationId", "", { shouldDirty: true })}
-                  className="text-xs"
-                >
-                  Clear Selection
-                </Button>
-              )}
-            </div>
-          )}
 
           {/* Items table — uses unified Item model, sale price context */}
           <Card>

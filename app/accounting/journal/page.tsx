@@ -103,6 +103,7 @@ function JournalPageContent() {
     { value: "Contra", label: "Contra" },
     { value: "Adjustment", label: "Adjustment" },
     { value: "Invoice", label: "Invoice" },
+    { value: "POSSale", label: "POS Sale" },
     { value: "Receipt", label: "Receipt" },
     { value: "Payment", label: "Payment" },
     { value: "Purchase", label: "Purchase" },

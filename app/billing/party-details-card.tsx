@@ -21,7 +21,7 @@ export function PartyDetailsCard({ payload, onFieldChange }: PartyDetailsProps) 
       // Vouchers can use any party type
       return ['customer', 'supplier', 'payee', 'vendor'] as const;
     } else {
-      // Invoices and quotations use only customer role
+      // Invoices and use only customer role
       return ['customer'] as const;
     }
   }, [isVoucher]);
@@ -37,7 +37,7 @@ export function PartyDetailsCard({ payload, onFieldChange }: PartyDetailsProps) 
       partyType = 'payee';
     } else if (payload.partyId) {
       // We need to infer from the party's role
-      // For now, default to customer for invoices/quotations
+      // For now, default to customer for invoices
       partyType = isVoucher ? 'customer' : 'customer';
     }
 
@@ -82,7 +82,7 @@ export function PartyDetailsCard({ payload, onFieldChange }: PartyDetailsProps) 
           allowedRoles={allowedRoles as any}
           value={partyContactValue}
           onChange={handlePartyContactChange}
-          showContactSelector={!isVoucher} // Only show contact selector for invoices/quotations
+          showContactSelector={!isVoucher} // Only show contact selector for invoices
           showCreateButton={true}
           layout="vertical"
         />

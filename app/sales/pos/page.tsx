@@ -6,7 +6,7 @@ import React, {
 } from "react";
 import { useQueryStates, parseAsInteger } from "nuqs";
 import { toast } from "sonner";
-import { ShoppingBag, Plus, CalendarIcon } from "lucide-react";
+import { ShoppingBag, Plus, CalendarIcon, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,7 +26,6 @@ import { cn } from "@/lib/utils";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { redirect, usePathname } from "next/navigation";
-import { useSession } from "@/lib/auth-client";
 import { getSortingStateParser, getFiltersStateParser } from "@/lib/data-table/parsers";
 import type { ExtendedColumnSort, ExtendedColumnFilter } from "@/types/data-table";
 import { getColumns, type POSSale } from "./columns";
@@ -36,6 +35,8 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { usePOSPermissions } from "@/hooks/use-permissions";
+import { AccessDenied } from "@/components/access-denied";
 
 // ─── Sale detail modal ────────────────────────────────────────────────────────
 function POSSaleDetailModal({
@@ -94,8 +95,12 @@ function POSSaleDetailModal({
                                     <tr key={i} className="border-t">
                                         <td className="p-2">{item.description}</td>
                                         <td className="p-2 text-center">{item.quantity}</td>
-                                        <td className="p-2 text-right text-muted-foreground">{formatCurrency(item.rate)}</td>
-                                        <td className="p-2 text-right font-medium">{formatCurrency(item.total)}</td>
+                                        <td className="p-2 text-right text-muted-foreground">
+                                            {formatCurrency(item.rate)}
+                                        </td>
+                                        <td className="p-2 text-right font-medium">
+                                            {formatCurrency(item.total)}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -138,14 +143,29 @@ function POSSaleDetailModal({
 // ─── Main page content ────────────────────────────────────────────────────────
 function POSSalesPageContent() {
     const pathname = usePathname();
-    const { data: session, isPending } = useSession();
 
+    // ── Permissions — identical pattern to invoice page ──────────────────────
+    const {
+        permissions: rawPermissions,
+        isPending,
+        session,
+    } = usePOSPermissions();
+
+    const permissions = useMemo(() => rawPermissions, [rawPermissions]);
+    const {
+        canRead,
+        canCreate,
+        canDelete,
+        canViewTrash,
+    } = permissions;
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    const [isMounted, setIsMounted] = useState(false);
     const [sales, setSales] = useState<POSSale[]>([]);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [pageCount, setPageCount] = useState(0);
     const [totalCount, setTotalCount] = useState(0);
-    const [isMounted, setIsMounted] = useState(false);
 
     const [pdfOpen, setPdfOpen] = useState(false);
     const [pdfUrl, setPdfUrl] = useState("");
@@ -168,7 +188,9 @@ function POSSalesPageContent() {
 
     useEffect(() => { setIsMounted(true); }, []);
 
+    // ── Data fetching ─────────────────────────────────────────────────────────
     const fetchSales = useCallback(async (background = false) => {
+        if (!canRead) return;
         try {
             if (!background) setIsLoading(true);
 
@@ -199,18 +221,19 @@ function POSSalesPageContent() {
             if (!background) setIsLoading(false);
             setIsInitialLoad(false);
         }
-    }, [urlState.page, urlState.pageSize, urlState.sort, urlState.filters, dateRange]);
+    }, [canRead, urlState.page, urlState.pageSize, urlState.sort, urlState.filters, dateRange]);
 
     useEffect(() => {
-        if (isMounted) fetchSales();
-    }, [isMounted, fetchSales]);
+        if (isMounted && canRead) fetchSales();
+    }, [isMounted, canRead, fetchSales]);
 
     useEffect(() => {
-        const onFocus = () => { if (isMounted) fetchSales(true); };
+        const onFocus = () => { if (isMounted && canRead) fetchSales(true); };
         window.addEventListener("focus", onFocus);
         return () => window.removeEventListener("focus", onFocus);
-    }, [fetchSales, isMounted]);
+    }, [fetchSales, isMounted, canRead]);
 
+    // ── Handlers ──────────────────────────────────────────────────────────────
     const handleViewPdf = useCallback((sale: POSSale) => {
         setPdfUrl(`/api/pos/${sale._id}/pdf`);
         setPdfTitle(sale.saleNumber);
@@ -223,21 +246,25 @@ function POSSalesPageContent() {
     }, []);
 
     const handleDelete = useCallback(async (id: string) => {
+        if (!canDelete) {
+            toast.error("You don't have permission to delete POS sales");
+            return;
+        }
         try {
             const res = await fetch(`/api/pos/${id}`, { method: "DELETE" });
             const data = await res.json();
             if (!res.ok) { toast.error(data.error || "Failed to delete sale"); return; }
-            toast.success("Sale deleted, stock restored, journal voided.");
+            toast.success("Sale moved to trash. Stock restored and journal voided.");
             fetchSales();
         } catch {
             toast.error("Failed to delete sale.");
         }
-    }, [fetchSales]);
+    }, [canDelete, fetchSales]);
 
     const handleQuickSelect = (period: string) => {
         const now = new Date();
         const presets: Record<string, { from: Date; to: Date }> = {
-            today: { from: new Date(now.setHours(0, 0, 0, 0)), to: new Date(new Date().setHours(23, 59, 59, 999)) },
+            today: { from: new Date(new Date().setHours(0, 0, 0, 0)), to: new Date(new Date().setHours(23, 59, 59, 999)) },
             thisWeek: { from: new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()), to: new Date() },
             thisMonth: { from: startOfMonth(new Date()), to: endOfMonth(new Date()) },
             lastMonth: { from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) },
@@ -246,11 +273,16 @@ function POSSalesPageContent() {
         if (presets[period]) { setDateRange(presets[period]); setUrlState({ page: 1 }); }
     };
 
-    const permissions = { canDelete: !!session?.user, canViewPdf: true };
+    // ── Table ─────────────────────────────────────────────────────────────────
+    const tablePermissions = { canDelete, canViewPdf: canRead };
 
     const columns = useMemo(() => getColumns(
-        handleViewPdf, handleDelete, permissions, fetchSales, handleView,
-    ), [handleViewPdf, handleDelete, handleView, fetchSales]);
+        handleViewPdf,
+        handleDelete,
+        tablePermissions,
+        fetchSales,
+        handleView,
+    ), [handleViewPdf, handleDelete, handleView, fetchSales, canDelete, canRead]);
 
     const { table } = useDataTable<POSSale>({
         data: sales,
@@ -267,6 +299,7 @@ function POSSalesPageContent() {
         getRowId: row => row._id,
     });
 
+    // ── Auth guards — identical pattern to invoice page ───────────────────────
     if (!isMounted || isPending) {
         return (
             <div className="flex flex-1 items-center justify-center">
@@ -277,6 +310,10 @@ function POSSalesPageContent() {
 
     if (!session) {
         redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
+    }
+
+    if (!canRead) {
+        return <AccessDenied />;
     }
 
     const hasActiveFilters = urlState.filters && urlState.filters.length > 0;
@@ -305,15 +342,28 @@ function POSSalesPageContent() {
                             </div>
 
                             <div className="flex flex-col gap-3 w-full lg:w-auto lg:items-end">
+
+                                {/* Action buttons */}
                                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-                                    <Link href="/billing" className="w-full sm:w-auto">
-                                        <Button className="gap-2 w-full sm:w-auto">
-                                            <Plus className="h-4 w-4" />
-                                            New Sale
-                                        </Button>
-                                    </Link>
+                                    {canViewTrash && (
+                                        <Link href="./pos/trash" className="w-full sm:w-auto">
+                                            <Button variant="outline" className="gap-2 w-full sm:w-auto">
+                                                <Trash2 className="h-4 w-4" />
+                                                Trash
+                                            </Button>
+                                        </Link>
+                                    )}
+                                    {canCreate && (
+                                        <Link href="/billing" className="w-full sm:w-auto">
+                                            <Button className="gap-2 w-full sm:w-auto">
+                                                <Plus className="h-4 w-4" />
+                                                New Sale
+                                            </Button>
+                                        </Link>
+                                    )}
                                 </div>
 
+                                {/* Date range */}
                                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                                     <Popover>
                                         <PopoverTrigger asChild>
@@ -359,19 +409,16 @@ function POSSalesPageContent() {
                             </div>
                         </div>
 
-                        {/* ── Table / Empty state — same pattern as invoice page ── */}
+                        {/* ── Table / Empty state — mirrors invoice page pattern ── */}
                         <div className="flex flex-col gap-4 px-4 lg:px-6 xl:gap-6">
                             <div className={cn("transition-opacity duration-200", isInitialLoad ? "opacity-50" : "opacity-100")}>
                                 {isInitialLoad ? (
-                                    // Skeleton shown on very first load
                                     <Card>
                                         <CardContent className="p-6">
                                             <DataTableSkeleton columnCount={columns.length} rowCount={10} />
                                         </CardContent>
                                     </Card>
                                 ) : sales.length > 0 || hasActiveFilters ? (
-                                    // Table shown when there is data OR the user has applied filters
-                                    // (so they can see "no results" within the table UI and clear filters)
                                     <Card>
                                         <CardContent className="p-6">
                                             <div className={cn(
@@ -385,7 +432,6 @@ function POSSalesPageContent() {
                                         </CardContent>
                                     </Card>
                                 ) : (
-                                    // Single empty-state card — table is hidden entirely
                                     <Card>
                                         <CardContent className="flex flex-col items-center justify-center py-12">
                                             <ShoppingBag className="h-12 w-12 text-muted-foreground mb-4" />
@@ -393,12 +439,14 @@ function POSSalesPageContent() {
                                             <p className="text-muted-foreground text-center mb-4">
                                                 Create your first sale at the POS terminal
                                             </p>
-                                            <Link href="/pos">
-                                                <Button className="gap-2">
-                                                    <Plus className="h-4 w-4" />
-                                                    Open POS Terminal
-                                                </Button>
-                                            </Link>
+                                            {canCreate && (
+                                                <Link href="/billing">
+                                                    <Button className="gap-2">
+                                                        <Plus className="h-4 w-4" />
+                                                        Open POS Terminal
+                                                    </Button>
+                                                </Link>
+                                            )}
                                         </CardContent>
                                     </Card>
                                 )}

@@ -6,6 +6,10 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { AppLayout } from "@/components/app-layout";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
   title: "Zyn Erp",
@@ -17,7 +21,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <>
-      <html lang="en" suppressHydrationWarning>
+      <html lang="en" suppressHydrationWarning className={cn("font-sans", geist.variable)}>
         <body
           className={`${GeistSans.variable} ${GeistMono.variable} antialiased font-sans`}
         >

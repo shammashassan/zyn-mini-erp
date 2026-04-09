@@ -59,7 +59,7 @@ export default function CustomersSection() {
 
                 <h2 className="scroll-m-20 border-b pb-2 text-2xl font-semibold tracking-tight mt-10 mb-6">Data Integrity</h2>
                 <p className="leading-7 mb-6">
-                    Customers referenced in invoices, quotations, or delivery notes cannot be permanently deleted.
+                    Customers referenced in invoices, or delivery notes cannot be permanently deleted.
                     The system enforces referential integrity to preserve transaction history and audit trails.
                 </p>
 

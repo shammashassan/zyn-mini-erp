@@ -41,7 +41,7 @@ export default function ContactsSection() {
 
                 <h2 className="scroll-m-20 border-b pb-2 text-2xl font-semibold tracking-tight mt-10 mb-6">Integration</h2>
                 <p className="leading-7 mb-6">
-                    When creating documents like Quotations or Purchase Orders, you can select the specific Contact person addressed.
+                    When creating documents like Invoices or Purchase Orders, you can select the specific Contact person addressed.
                     This personalizes communication and ensures documents reach the right desk.
                 </p>
 

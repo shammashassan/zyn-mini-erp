@@ -3,7 +3,6 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Invoice from "@/models/Invoice";
-import Quotation from "@/models/Quotation";
 import DeliveryNote from "@/models/DeliveryNote";
 import ReturnNote from "@/models/ReturnNote";
 import Voucher from "@/models/Voucher";
@@ -27,7 +26,7 @@ export async function GET(request: Request) {
 
     await dbConnect();
 
-    const ensureModels = [Invoice, Quotation, DeliveryNote, ReturnNote, Voucher, Party];
+    const ensureModels = [Invoice, DeliveryNote, ReturnNote, Voucher, Party];
 
     const { searchParams } = new URL(request.url);
 
@@ -82,11 +81,6 @@ export async function GET(request: Request) {
         },
         {
           path: 'connectedDocuments.deliveryId',
-          select: 'invoiceNumber status isDeleted',
-          match: { isDeleted: false }
-        },
-        {
-          path: 'connectedDocuments.quotationId',
           select: 'invoiceNumber status isDeleted',
           match: { isDeleted: false }
         },
@@ -170,12 +164,6 @@ export async function GET(request: Request) {
             path: 'connectedDocuments.returnNoteIds',
             select: 'returnNumber returnType status isDeleted',
             match: { isDeleted: false }
-          })
-          .populate({
-            path: 'connectedDocuments.quotationId',
-            select: 'invoiceNumber status isDeleted',
-            match: { isDeleted: false }
-
           })
           .populate({
             path: 'partyId',

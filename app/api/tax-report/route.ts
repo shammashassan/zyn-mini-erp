@@ -89,7 +89,6 @@ export async function GET(request: Request) {
         $match: {
           status: 'posted',
           isDeleted: false,
-          referenceType: { $in: ['Invoice', 'Purchase'] },
           entryDate: { $gte: startDate, $lte: endDate }
         }
       },
@@ -98,69 +97,45 @@ export async function GET(request: Request) {
         $project: {
           entryDate: 1,
           referenceType: 1,
-          // Calculate Sales Tax (Credit on L1002, only for Invoices)
+          // Calculate Sales Tax (Credit on L1002)
           salesTax: {
-            $cond: [
-              { $eq: ["$referenceType", "Invoice"] },
-              {
-                $sum: {
-                  $map: {
-                    input: "$entries",
-                    as: "e",
-                    in: { $cond: [{ $eq: ["$$e.accountCode", VAT_PAYABLE] }, "$$e.credit", 0] }
-                  }
-                }
-              },
-              0
-            ]
+            $sum: {
+              $map: {
+                input: "$entries",
+                as: "e",
+                in: { $cond: [{ $eq: ["$$e.accountCode", VAT_PAYABLE] }, "$$e.credit", 0] }
+              }
+            }
           },
-          // Calculate Revenue (Credit on Income Accounts, only for Invoices)
+          // Calculate Revenue (Credit on Income Accounts)
           revenue: {
-            $cond: [
-              { $eq: ["$referenceType", "Invoice"] },
-              {
-                $sum: {
-                  $map: {
-                    input: "$entries",
-                    as: "e",
-                    in: { $cond: [{ $in: ["$$e.accountCode", incomeAccountCodes] }, "$$e.credit", 0] }
-                  }
-                }
-              },
-              0
-            ]
+            $sum: {
+              $map: {
+                input: "$entries",
+                as: "e",
+                in: { $cond: [{ $in: ["$$e.accountCode", incomeAccountCodes] }, "$$e.credit", 0] }
+              }
+            }
           },
-          // Calculate Purchase Tax (Debit on A1300, only for Purchases)
+          // Calculate Purchase Tax (Debit on A1300)
           purchaseTax: {
-            $cond: [
-              { $eq: ["$referenceType", "Purchase"] },
-              {
-                $sum: {
-                  $map: {
-                    input: "$entries",
-                    as: "e",
-                    in: { $cond: [{ $eq: ["$$e.accountCode", VAT_RECEIVABLE] }, "$$e.debit", 0] }
-                  }
-                }
-              },
-              0
-            ]
+            $sum: {
+              $map: {
+                input: "$entries",
+                as: "e",
+                in: { $cond: [{ $eq: ["$$e.accountCode", VAT_RECEIVABLE] }, "$$e.debit", 0] }
+              }
+            }
           },
-          // Calculate Purchase Cost (Debit on A1200, only for Purchases)
+          // Calculate Purchase Cost (Debit on A1200)
           purchasesExTax: {
-            $cond: [
-              { $eq: ["$referenceType", "Purchase"] },
-              {
-                $sum: {
-                  $map: {
-                    input: "$entries",
-                    as: "e",
-                    in: { $cond: [{ $eq: ["$$e.accountCode", INVENTORY_ASSET] }, "$$e.debit", 0] }
-                  }
-                }
-              },
-              0
-            ]
+            $sum: {
+              $map: {
+                input: "$entries",
+                as: "e",
+                in: { $cond: [{ $eq: ["$$e.accountCode", INVENTORY_ASSET] }, "$$e.debit", 0] }
+              }
+            }
           }
         }
       },
@@ -176,10 +151,10 @@ export async function GET(request: Request) {
                 totalRevenueExTax: { $sum: "$revenue" },
                 totalPurchasesExTax: { $sum: "$purchasesExTax" },
                 salesTransactions: {
-                  $sum: { $cond: [{ $eq: ["$referenceType", "Invoice"] }, 1, 0] }
+                  $sum: { $cond: [{ $gt: ["$revenue", 0] }, 1, 0] }
                 },
                 purchaseTransactions: {
-                  $sum: { $cond: [{ $eq: ["$referenceType", "Purchase"] }, 1, 0] }
+                  $sum: { $cond: [{ $gt: ["$purchasesExTax", 0] }, 1, 0] }
                 }
               }
             }
@@ -193,10 +168,10 @@ export async function GET(request: Request) {
                 monthRevenue: { $sum: "$revenue" },
                 monthPurchasesExTax: { $sum: "$purchasesExTax" },
                 salesCount: {
-                  $sum: { $cond: [{ $eq: ["$referenceType", "Invoice"] }, 1, 0] }
+                  $sum: { $cond: [{ $gt: ["$revenue", 0] }, 1, 0] }
                 },
                 purchaseCount: {
-                  $sum: { $cond: [{ $eq: ["$referenceType", "Purchase"] }, 1, 0] }
+                  $sum: { $cond: [{ $gt: ["$purchasesExTax", 0] }, 1, 0] }
                 }
               }
             }

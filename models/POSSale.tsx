@@ -104,7 +104,6 @@ const POSSaleSchema = new Schema<IPOSSale>({
 }, { timestamps: true });
 
 POSSaleSchema.index({ isDeleted: 1, createdAt: -1 });
-POSSaleSchema.index({ partyId: 1 });
 POSSaleSchema.index({ customerName: 'text', saleNumber: 'text' });
 
 POSSaleSchema.pre(/^find/, function (this: Query<any, any>, next) {

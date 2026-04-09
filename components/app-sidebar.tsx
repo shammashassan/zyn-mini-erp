@@ -46,7 +46,7 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Payees": { payee: ["read"] },
 
   // Sales
-  "Quotations": { quotation: ["read"] },
+  "POS": { posSale: ["read"] },
   "Invoices": { invoice: ["read"] },
   "Receipts": { voucher: ["read"] },
   "Delivery Notes": { deliveryNote: ["read"] },
@@ -69,12 +69,9 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Inventory Report": { report: ["read"] },
 
   // Accounting
-  "Chart of Accounts": { chartOfAccounts: ["read"] },
   "Journal": { journal: ["read"] },
   "Ledger": { ledger: ["read"] },
-  "Trial Balance": { trialBalance: ["read"] },
   "Profit & Loss": { profitLoss: ["read"] },
-  "Financial Statements": { financialStatements: ["read"] },
 
   // HRM
   "Employees": { employee: ["read"] },
@@ -113,7 +110,7 @@ const staticData = {
       url: "/#",
       icon: FileText,
       items: [
-        { title: "Quotations", url: "/sales/quotations" },
+        { title: "POS", url: "/sales/pos" },
         { title: "Invoices", url: "/sales/invoices" },
         { title: "Receipts", url: "/sales/receipts" },
         { title: "Delivery Notes", url: "/sales/delivery-notes" },
@@ -151,12 +148,9 @@ const staticData = {
       url: "#",
       icon: BookOpenText,
       items: [
-        { title: "Chart of Accounts", url: "/accounting/chart-of-accounts" },
         { title: "Journal", url: "/accounting/journal" },
         { title: "Ledger", url: "/accounting/ledger" },
-        { title: "Trial Balance", url: "/accounting/trial-balance" },
         { title: "Profit & Loss", url: "/accounting/profit-loss" },
-        { title: "Financial Statements", url: "/accounting/financial-statements" },
       ],
     },
     {

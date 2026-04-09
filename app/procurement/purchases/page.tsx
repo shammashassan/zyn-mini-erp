@@ -317,8 +317,6 @@ function PurchasesPageContent() {
       url = `/api/vouchers/${bill._id}/pdf?type=receipt`;
     } else if (type === 'invoice' || number.startsWith('INV')) {
       url = `/api/invoices/${bill._id}/pdf`;
-    } else if (type === 'quotation' || number.startsWith('QUO')) {
-      url = `/api/quotations/${bill._id}/pdf`;
     } else if (type === 'delivery' || number.startsWith('DEL')) {
       url = `/api/delivery-notes/${bill._id}/pdf`;
     } else if (number.startsWith('RTN')) {

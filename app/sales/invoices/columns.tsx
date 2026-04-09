@@ -103,7 +103,6 @@ export interface Invoice {
   connectedDocuments?: {
     receiptIds?: (string | ConnectedDocument)[];
     deliveryId?: string | ConnectedDocument;
-    quotationId?: string | ConnectedDocument;
     returnNoteIds?: (string | ConnectedDocument)[];
   };
   paymentStatus: 'Paid' | 'Pending' | 'Partially Paid';

@@ -3,7 +3,6 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Invoice from "@/models/Invoice";
-import Quotation from "@/models/Quotation";
 import Voucher from "@/models/Voucher";
 import { softDelete } from "@/utils/softDelete";
 import { handleInvoiceStatusChange } from '@/utils/journalAutoCreate';
@@ -239,7 +238,7 @@ export async function PUT(request: Request, context: RequestContext) {
 }
 
 /**
- * DELETE - Soft delete with journal voiding and quotation status reversion
+ * DELETE - Soft delete with journal voiding
  */
 export async function DELETE(request: Request, context: RequestContext) {
   try {
@@ -259,40 +258,7 @@ export async function DELETE(request: Request, context: RequestContext) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
-    // ✅ Handle quotation status reversion
-    if (invoice.connectedDocuments?.quotationId) {
-      try {
-        const quotation = await Quotation.findById(invoice.connectedDocuments.quotationId);
 
-        if (quotation && quotation.status === 'converted') {
-          // Revert quotation status to approved
-          quotation.status = 'approved';
-
-          // Remove invoice from quotation's connected documents
-          if (quotation.connectedDocuments?.invoiceIds) {
-            quotation.connectedDocuments.invoiceIds = quotation.connectedDocuments.invoiceIds.filter(
-              (invId: any) => invId.toString() !== id
-            );
-          }
-
-          quotation.addAuditEntry(
-            'Status reverted (connected invoice deleted)',
-            user.id,
-            user.username || user.name,
-            [{
-              field: 'status',
-              oldValue: 'converted',
-              newValue: 'approved'
-            }]
-          );
-
-          await quotation.save();
-        }
-      } catch (quotationError) {
-        console.error('Error reverting quotation status:', quotationError);
-        // Don't fail the delete if quotation update fails
-      }
-    }
 
     // Void all related journals when soft deleting
     await voidJournalsForReference(

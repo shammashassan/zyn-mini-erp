@@ -19,7 +19,7 @@ import { formatDisplayDate, formatTime } from "@/utils/formatters/date";
 
 export interface RecentSale {
   _id: string;
-  invoiceNumber: string;
+  documentNumber: string;
 
   // ✅ Party Snapshot (Frozen - Legal Truth)
   partySnapshot?: {
@@ -45,7 +45,7 @@ export interface RecentSale {
 
   grandTotal: number;
   createdAt: string;
-  documentType?: "invoice"; // Always invoice
+  documentType?: string; // invoice or pos_sale
   status?: string;
 }
 
@@ -76,16 +76,16 @@ export const getColumns = (onViewPdf: (sale: RecentSale) => void): ColumnDef<Rec
     },
   },
   {
-    accessorKey: "invoiceNumber",
+    accessorKey: "documentNumber",
     header: ({ column }) => (
       <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Invoice No.
+        Document No.
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
     cell: ({ row }) => (
       <div className="font-mono font-medium text-foreground">
-        {row.getValue("invoiceNumber")}
+        {row.getValue("documentNumber")}
       </div>
     ),
   },

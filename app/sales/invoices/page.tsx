@@ -218,8 +218,6 @@ function InvoicesPageContent() {
     if (doc.voucherType) {
       // Handles Receipts
       pdfUrl = `/api/vouchers/${doc._id}/pdf`;
-    } else if (doc.documentType === 'quotation' || (!doc.documentType && doc.invoiceNumber?.startsWith('QUO'))) {
-      pdfUrl = `/api/quotations/${doc._id}/pdf`;
     } else if (doc.documentType === 'delivery' || (!doc.documentType && doc.invoiceNumber?.startsWith('DN'))) {
       pdfUrl = `/api/delivery-notes/${doc._id}/pdf`;
     } else if (doc.documentType === 'returnNote' || (!doc.documentType && doc.returnNumber)) {
@@ -272,20 +270,6 @@ function InvoicesPageContent() {
 
       const invoice = id ? result : result.invoice;
 
-      if (!id && data.connectedDocuments?.quotationId) {
-        try {
-          await fetch(`/api/quotations/${data.connectedDocuments.quotationId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              "connectedDocuments.invoiceIds": [invoice._id],
-              status: "converted"
-            }),
-          });
-        } catch (err) {
-          console.error("Failed to update quotation status", err);
-        }
-      }
 
       setIsInvoiceFormOpen(false);
       setSelectedInvoice(null);

@@ -47,11 +47,6 @@ export async function GET(request: Request, context: RequestContext) {
           match: { isDeleted: false }
         })
         .populate({
-          path: 'connectedDocuments.quotationId',
-          select: 'invoiceNumber status isDeleted',
-          match: { isDeleted: false }
-        })
-        .populate({
           path: 'partyId',
           select: 'name company type roles'
         });

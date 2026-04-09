@@ -61,7 +61,7 @@ export default function ProductsSection() {
                     </Step>
                     <Step title="Modify & Save">
                         Update necessary fields. Price changes will apply to new transactions only; existing
-                        invoices and quotations retain their original pricing.
+                        invoices retain their original pricing.
                     </Step>
                 </div>
 

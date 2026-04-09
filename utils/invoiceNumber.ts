@@ -2,7 +2,6 @@
 
 import dbConnect from '@/lib/dbConnect';
 import Invoice from '@/models/Invoice';
-import Quotation from '@/models/Quotation';
 import Voucher from '@/models/Voucher';
 import DebitNote from '@/models/DebitNote';
 import CreditNote from '@/models/CreditNote';
@@ -16,7 +15,6 @@ import POSSale from '@/models/POSSale';
 // Define the supported document types
 type DocumentType =
   | 'invoice'
-  | 'quotation'
   | 'receipt'
   | 'payment'
   | 'debitNote'
@@ -31,7 +29,6 @@ type DocumentType =
 // Define the prefixes for each document type
 const prefixes: Record<DocumentType, string> = {
   invoice: 'INV',
-  quotation: 'QT',
   receipt: 'RCP',
   payment: 'PAY',
   debitNote: 'DBN',
@@ -70,10 +67,6 @@ export default async function generateInvoiceNumber(
       switch (documentType) {
         case 'invoice':
           Model = Invoice;
-          query = { invoiceNumber: { $regex: searchPattern } };
-          break;
-        case 'quotation':
-          Model = Quotation;
           query = { invoiceNumber: { $regex: searchPattern } };
           break;
         // Receipt and Payment use Voucher model with invoiceNumber field

@@ -86,7 +86,6 @@ export interface IInvoice extends Document<string> {
   connectedDocuments: {
     receiptIds?: mongoose.Types.ObjectId[];
     deliveryId?: mongoose.Types.ObjectId;
-    quotationId?: mongoose.Types.ObjectId;
     returnNoteIds?: mongoose.Types.ObjectId[];
   };
 
@@ -228,7 +227,6 @@ const InvoiceSchema: Schema<IInvoice> = new Schema({
       receiptIds: [{ type: Schema.Types.ObjectId, ref: 'Voucher' }],
       deliveryId: { type: Schema.Types.ObjectId, ref: 'DeliveryNote' },
       returnNoteIds: [{ type: Schema.Types.ObjectId, ref: 'ReturnNote' }],
-      quotationId: { type: Schema.Types.ObjectId, ref: 'Quotation' }
     },
     default: {}
   },
@@ -247,7 +245,6 @@ InvoiceSchema.index({ isDeleted: 1, invoiceDate: -1 });
 InvoiceSchema.index({ status: 1 });
 InvoiceSchema.index({ paymentStatus: 1 });
 InvoiceSchema.index({ 'connectedDocuments.receiptIds': 1 });
-InvoiceSchema.index({ 'connectedDocuments.quotationId': 1 });
 InvoiceSchema.index({ 'receiptAllocations.voucherId': 1 });
 InvoiceSchema.index({ 'connectedDocuments.returnNoteIds': 1 });
 InvoiceSchema.index({ partyId: 1, invoiceDate: -1 });

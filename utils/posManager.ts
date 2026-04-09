@@ -224,7 +224,7 @@ export async function createJournalForPOSSale(
         const journal = new Journal({
             journalNumber,
             entryDate: sale.createdAt || new Date(),
-            referenceType: 'General',
+            referenceType: 'POSSale',
             referenceId: sale._id?.toString(),
             referenceNumber: sale.saleNumber,
             partyType: sale.customerType === 'party' ? 'Customer' : undefined,

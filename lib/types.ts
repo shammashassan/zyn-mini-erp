@@ -48,7 +48,7 @@ export interface Bill {
   vendorName?: string;
 
   // Document details
-  documentType: 'quotation' | 'invoice' | 'receipt' | 'payment' | 'delivery';
+  documentType: 'invoice' | 'receipt' | 'payment' | 'delivery';
   paymentMethod?: string;
   notes: string;
   discount: number;
@@ -67,7 +67,6 @@ export interface Bill {
 
   // Date fields for documents
   invoiceDate?: Date;
-  quotationDate?: Date;
   voucherDate?: Date;
 
   // Soft delete fields

@@ -9,7 +9,6 @@ import {
   ArrowRightLeft, // Stock Adjustment
   Users, // Customers
   Truck, // Suppliers
-  FileClock, // Quotations
   FileText, // Invoices
   Ticket, // Vouchers
   ClipboardCheck, // Delivery notes
@@ -24,9 +23,7 @@ import {
   ListTree, // Chart of Accounts
   NotebookPen, // Journal
   Book, // Ledger
-  Scale, // Trial Balance
   Calculator, // Profit & Loss
-  Landmark, // Financial Statements
   Briefcase, // Employees
   BookUser, // User Management
   Building2,
@@ -71,7 +68,7 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Payees": { payee: ["read"] },
 
   // Sales
-  "Quotations": { quotation: ["read"] },
+  "POS": { posSale: ["read"] },
   "Invoices": { invoice: ["read"] },
   "Receipts": { voucher: ["read"] },
   "Delivery notes": { deliveryNote: ["read"] },
@@ -94,12 +91,9 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Inventory Report": { report: ["read"] },
 
   // Accounting
-  "Chart of Accounts": { chartOfAccounts: ["read"] },
   "Journal": { journal: ["read"] },
-  "ledger": { ledger: ["read"] },
-  "Trial Balance": { trialBalance: ["read"] },
+  "Ledger": { ledger: ["read"] },
   "Profit & Loss": { profitLoss: ["read"] },
-  "Financial Statements": { financialStatements: ["read"] },
 
   // HRM
   "Employees": { employee: ["read"] },
@@ -133,7 +127,7 @@ const navigationData = [
   { title: "Payees", url: "/people/payees", icon: Users, group: "People" },
 
   // Sales
-  { title: "Quotations", url: "/sales/quotations", icon: FileClock, group: "Sales" },
+  { title: "POS", url: "/sales/pos", icon: ShoppingBag, group: "Sales" },
   { title: "Invoices", url: "/sales/invoices", icon: FileText, group: "Sales" },
   { title: "Receipts", url: "/sales/receipts", icon: Ticket, group: "Sales" },
   { title: "Delivery notes", url: "/sales/delivery-notes", icon: Truck, group: "Sales" },
@@ -156,12 +150,9 @@ const navigationData = [
   { title: "Inventory Report", url: "/reports/inventory-report", icon: ClipboardList, group: "Reports" },
 
   // Accounting
-  { title: "Chart of Accounts", url: "/accounting/chart-of-accounts", icon: ListTree, group: "Accounting" },
   { title: "Journal", url: "/accounting/journal", icon: NotebookPen, group: "Accounting" },
   { title: "Ledger", url: "/accounting/ledger", icon: Book, group: "Accounting" },
-  { title: "Trial Balance", url: "/accounting/trial-balance", icon: Scale, group: "Accounting" },
   { title: "Profit & Loss", url: "/accounting/profit-loss", icon: Calculator, group: "Accounting" },
-  { title: "Financial Statements", url: "/accounting/financial-statements", icon: Landmark, group: "Accounting" },
 
   // HRM
   { title: "Employees", url: "/hrm/employees", icon: Briefcase, group: "HRM" },
