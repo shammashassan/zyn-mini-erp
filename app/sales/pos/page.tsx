@@ -181,7 +181,7 @@ function POSSalesPageContent() {
 
     const [urlState, setUrlState] = useQueryStates({
         page: parseAsInteger.withDefault(1),
-        pageSize: parseAsInteger.withDefault(15),
+        pageSize: parseAsInteger.withDefault(10),
         sort: getSortingStateParser<POSSale>().withDefault([]),
         filters: getFiltersStateParser<POSSale>().withDefault([]),
     });

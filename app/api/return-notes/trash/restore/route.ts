@@ -1,4 +1,4 @@
-// app/api/return-notes/trash/restore/route.ts - COMPLETE: Multi-Type Support
+// app/api/return-notes/trash/restore/route.ts
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -9,8 +9,12 @@ import { restore } from "@/utils/softDelete";
 import { requireAuthAndPermission, validateRequiredFields } from "@/lib/auth-utils";
 import {
   reverseStockForSalesReturn,
-  removeStockForPurchaseReturn
+  removeStockForPurchaseReturn,
 } from "@/utils/inventoryManager";
+import {
+  createJournalForSalesReturn,
+  createJournalForPurchaseReturn,
+} from "@/utils/journalAutoCreate";
 
 export async function POST(request: Request) {
   try {
@@ -28,48 +32,68 @@ export async function POST(request: Request) {
 
     const user = session.user;
 
-    const returnNoteToRestore = await ReturnNote.findById(id).setOptions({ includeDeleted: true });
+    const returnNoteToRestore = await ReturnNote.findById(id).setOptions({
+      includeDeleted: true,
+    });
 
     if (!returnNoteToRestore) {
-      return NextResponse.json({ error: "Return note not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Return note not found" },
+        { status: 404 }
+      );
     }
 
     if (!returnNoteToRestore.isDeleted) {
-      return NextResponse.json({
-        error: "Return note is not deleted"
-      }, { status: 400 });
+      return NextResponse.json(
+        { error: "Return note is not deleted" },
+        { status: 400 }
+      );
     }
 
     const returnType = returnNoteToRestore.returnType;
 
-    console.log(`♻️ Restoring ${returnType} return note ${returnNoteToRestore.returnNumber}...`);
+    console.log(
+      `♻️ Restoring ${returnType} return note ${returnNoteToRestore.returnNumber}...`
+    );
 
-    // If the return note was approved, restore the stock changes
-    if (returnNoteToRestore.status === 'approved') {
-      if (returnType === 'purchaseReturn') {
-        const purchase = await Purchase.findById(returnNoteToRestore.connectedDocuments.purchaseId);
+    // ─── If it was approved: restore stock + create journal ────────────────
+    if (returnNoteToRestore.status === "approved") {
+
+      if (returnType === "purchaseReturn") {
+        const purchase = await Purchase.findById(
+          returnNoteToRestore.connectedDocuments.purchaseId
+        );
         if (purchase && !purchase.isDeleted) {
           // Restore purchase item returned quantities
           for (const returnItem of returnNoteToRestore.items) {
             const purchaseItemIndex = purchase.items.findIndex(
               (pi: any) =>
-                (pi.itemId && returnItem.itemId && pi.itemId.toString() === returnItem.itemId.toString()) ||
+                (pi.itemId &&
+                  returnItem.itemId &&
+                  pi.itemId.toString() === returnItem.itemId.toString()) ||
                 pi.description === returnItem.description
             );
 
             if (purchaseItemIndex !== -1) {
-              const currentReturned = purchase.items[purchaseItemIndex].returnedQuantity || 0;
-              purchase.items[purchaseItemIndex].returnedQuantity = currentReturned + returnItem.returnQuantity;
+              const currentReturned =
+                purchase.items[purchaseItemIndex].returnedQuantity || 0;
+              purchase.items[purchaseItemIndex].returnedQuantity =
+                currentReturned + returnItem.returnQuantity;
             }
           }
 
           // Re-add return note ID to purchase
-          const currentReturnNoteIds = purchase.connectedDocuments?.returnNoteIds || [];
-          if (!currentReturnNoteIds.some((rid: any) => rid.toString() === id)) {
+          const currentReturnNoteIds =
+            purchase.connectedDocuments?.returnNoteIds || [];
+          if (
+            !currentReturnNoteIds.some(
+              (rid: any) => rid.toString() === id
+            )
+          ) {
             currentReturnNoteIds.push(id);
             purchase.connectedDocuments = {
               ...purchase.connectedDocuments,
-              returnNoteIds: currentReturnNoteIds
+              returnNoteIds: currentReturnNoteIds,
             };
           }
 
@@ -78,11 +102,10 @@ export async function POST(request: Request) {
             user.id,
             user.username || user.name
           );
-
           await purchase.save();
         }
 
-        // Reduce material stock again using helper function
+        // Deduct stock again (items going back to supplier)
         await removeStockForPurchaseReturn(
           returnNoteToRestore._id,
           returnNoteToRestore.items.map((item: any) => ({
@@ -92,28 +115,49 @@ export async function POST(request: Request) {
           })),
           returnNoteToRestore.returnNumber
         );
-      } else if (returnType === 'salesReturn') {
-        const invoice = await Invoice.findById(returnNoteToRestore.connectedDocuments.invoiceId);
+
+        // Recreate journal
+        await createJournalForPurchaseReturn(
+          returnNoteToRestore.toObject(),
+          user.id,
+          user.username || user.name
+        );
+
+      } else if (returnType === "salesReturn") {
+        const invoice = await Invoice.findById(
+          returnNoteToRestore.connectedDocuments.invoiceId
+        );
         if (invoice && !invoice.isDeleted) {
+          // Restore invoice returned quantities
           for (const returnItem of returnNoteToRestore.items) {
             const invoiceItemIndex = invoice.items.findIndex(
               (ii: any) =>
-                (ii.itemId && returnItem.itemId && ii.itemId.toString() === returnItem.itemId.toString()) ||
+                (ii.itemId &&
+                  returnItem.itemId &&
+                  ii.itemId.toString() === returnItem.itemId.toString()) ||
                 ii.description === returnItem.description
             );
 
             if (invoiceItemIndex !== -1) {
-              const currentReturned = invoice.items[invoiceItemIndex].returnedQuantity || 0;
-              invoice.items[invoiceItemIndex].returnedQuantity = currentReturned + returnItem.returnQuantity;
+              const currentReturned =
+                invoice.items[invoiceItemIndex].returnedQuantity || 0;
+              invoice.items[invoiceItemIndex].returnedQuantity =
+                currentReturned + returnItem.returnQuantity;
             }
           }
+
           // Re-add return note ID to invoice
-          const currentReturnNoteIds = invoice.connectedDocuments?.returnNoteIds || [];
-          if (!currentReturnNoteIds.some((rid: any) => rid.toString() === id)) {
+          const currentReturnNoteIds =
+            invoice.connectedDocuments?.returnNoteIds || [];
+          if (
+            !currentReturnNoteIds.some(
+              (rid: any) => rid.toString() === id
+            )
+          ) {
             currentReturnNoteIds.push(id);
             invoice.connectedDocuments = {
               ...invoice.connectedDocuments,
-              returnNoteIds: currentReturnNoteIds
+              returnNoteIds: currentReturnNoteIds,
             };
           }
 
@@ -122,38 +166,54 @@ export async function POST(request: Request) {
             user.id,
             user.username || user.name
           );
-
           await invoice.save();
 
-          // ✅ STOCK RESTORATION: Add materials back to stock (reverse the deduction)
+          // Add stock back (reverse the deduction)
           try {
             await reverseStockForSalesReturn(
               returnNoteToRestore._id,
               returnNoteToRestore.items
             );
-            console.log(`✅ Stock restored for sales return ${returnNoteToRestore.returnNumber}`);
+            console.log(
+              `✅ Stock restored for sales return ${returnNoteToRestore.returnNumber}`
+            );
           } catch (stockError: any) {
             console.error(`❌ Stock restoration failed:`, stockError);
-            // Fail the restore if stock restoration fails
-            return NextResponse.json({
-              error: `Cannot restore sales return: ${stockError.message}`
-            }, { status: 400 });
+            return NextResponse.json(
+              {
+                error: `Cannot restore sales return: ${stockError.message}`,
+              },
+              { status: 400 }
+            );
           }
         }
 
-        console.log(`✅ Sales return restored - invoice returned quantities updated and stock restored`);
+        // Recreate journal
+        await createJournalForSalesReturn(
+          returnNoteToRestore.toObject(),
+          user.id,
+          user.username || user.name
+        );
       }
+
     } else {
-      // Even if not approved, re-add to connected documents
-      if (returnType === 'purchaseReturn') {
-        const purchase = await Purchase.findById(returnNoteToRestore.connectedDocuments.purchaseId);
+      // ─── Not approved: just re-link to connected documents ──────────────
+      if (returnType === "purchaseReturn") {
+        const purchase = await Purchase.findById(
+          returnNoteToRestore.connectedDocuments.purchaseId
+        );
         if (purchase && !purchase.isDeleted) {
-          const currentReturnNoteIds = purchase.connectedDocuments?.returnNoteIds || [];
-          if (!currentReturnNoteIds.some((rid: any) => rid.toString() === id)) {
+          const currentReturnNoteIds =
+            purchase.connectedDocuments?.returnNoteIds || [];
+          if (
+            !currentReturnNoteIds.some(
+              (rid: any) => rid.toString() === id
+            )
+          ) {
             currentReturnNoteIds.push(id);
             purchase.connectedDocuments = {
               ...purchase.connectedDocuments,
-              returnNoteIds: currentReturnNoteIds
+              returnNoteIds: currentReturnNoteIds,
             };
           }
 
@@ -162,18 +222,24 @@ export async function POST(request: Request) {
             user.id,
             user.username || user.name
           );
-
           await purchase.save();
         }
-      } else if (returnType === 'salesReturn') {
-        const invoice = await Invoice.findById(returnNoteToRestore.connectedDocuments.invoiceId);
+      } else if (returnType === "salesReturn") {
+        const invoice = await Invoice.findById(
+          returnNoteToRestore.connectedDocuments.invoiceId
+        );
         if (invoice && !invoice.isDeleted) {
-          const currentReturnNoteIds = invoice.connectedDocuments?.returnNoteIds || [];
-          if (!currentReturnNoteIds.some((rid: any) => rid.toString() === id)) {
+          const currentReturnNoteIds =
+            invoice.connectedDocuments?.returnNoteIds || [];
+          if (
+            !currentReturnNoteIds.some(
+              (rid: any) => rid.toString() === id
+            )
+          ) {
             currentReturnNoteIds.push(id);
             invoice.connectedDocuments = {
               ...invoice.connectedDocuments,
-              returnNoteIds: currentReturnNoteIds
+              returnNoteIds: currentReturnNoteIds,
             };
           }
 
@@ -182,7 +248,6 @@ export async function POST(request: Request) {
             user.id,
             user.username || user.name
           );
-
           await invoice.save();
         }
       }
@@ -196,14 +261,19 @@ export async function POST(request: Request) {
     );
 
     if (!restoredReturnNote) {
-      return NextResponse.json({ error: "Return note not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Return note not found" },
+        { status: 404 }
+      );
     }
 
-    console.log(`✅ ${returnType} return note restored: ${restoredReturnNote.returnNumber}`);
+    console.log(
+      `✅ ${returnType} return note restored: ${restoredReturnNote.returnNumber}`
+    );
 
     return NextResponse.json({
       message: "Return note restored successfully",
-      returnNote: restoredReturnNote
+      returnNote: restoredReturnNote,
     });
   } catch (error) {
     console.error("Failed to restore return note:", error);

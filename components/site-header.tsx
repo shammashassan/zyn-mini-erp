@@ -30,7 +30,6 @@ const routeGroups: Record<string, { label: string; path: string }[]> = {
     { label: "Receipts", path: "/sales/receipts" },
     { label: "Delivery Notes", path: "/sales/delivery-notes" },
     { label: "Sales Returns", path: "/sales/sales-returns" },
-    { label: "Debit Notes", path: "/procurement/debit-notes" },
   ],
   hrm: [
     { label: "Employees", path: "/hrm/employees" },
@@ -56,7 +55,6 @@ const routeGroups: Record<string, { label: string; path: string }[]> = {
     { label: "Expenses", path: "/procurement/expenses" },
     { label: "Payments", path: "/procurement/payments" },
     { label: "Purchase Returns", path: "/procurement/purchase-returns" },
-    { label: "Credit Notes", path: "/sales/credit-notes" },
   ],
   reports: [
     { label: "Sales Report", path: "/reports/sales-report" },

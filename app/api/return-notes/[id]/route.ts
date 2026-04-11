@@ -1,4 +1,4 @@
-// app/api/return-notes/[id]/route.ts - COMPLETE: Multi-Type Support
+// app/api/return-notes/[id]/route.ts
 
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
@@ -9,17 +9,22 @@ import DebitNote from "@/models/DebitNote";
 import StockAdjustment from "@/models/StockAdjustment";
 import { softDelete } from "@/utils/softDelete";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
+import { voidJournalsForReference } from "@/utils/journalManager";
 import {
   reverseStockForSalesReturn,
   deductStockForInvoice,
   removeStockForPurchaseReturn,
-  addStockForPurchaseReturn
+  addStockForPurchaseReturn,
 } from "@/utils/inventoryManager";
+import {
+  createJournalForSalesReturn,
+  createJournalForPurchaseReturn,
+} from "@/utils/journalAutoCreate";
 
 interface RequestContext {
   params: Promise<{
     id: string;
-  }>
+  }>;
 }
 
 export async function GET(request: Request, context: RequestContext) {
@@ -36,34 +41,38 @@ export async function GET(request: Request, context: RequestContext) {
 
     const returnNote = await ReturnNote.findById(id)
       .populate({
-        path: 'connectedDocuments.purchaseId',
-        select: 'referenceNumber items inventoryStatus partySnapshot',
-        match: { isDeleted: false }
+        path: "connectedDocuments.purchaseId",
+        select: "referenceNumber items inventoryStatus partySnapshot",
+        match: { isDeleted: false },
       })
       .populate({
-        path: 'connectedDocuments.invoiceId',
-        select: 'invoiceNumber items status partySnapshot',
-        match: { isDeleted: false }
+        path: "connectedDocuments.invoiceId",
+        select: "invoiceNumber items status partySnapshot",
+        match: { isDeleted: false },
       })
       .populate({
-        path: 'connectedDocuments.debitNoteId',
-        select: 'debitNoteNumber status',
-        match: { isDeleted: false }
+        path: "connectedDocuments.debitNoteId",
+        select: "debitNoteNumber status",
+        match: { isDeleted: false },
       })
       .populate({
-        path: 'connectedDocuments.creditNoteId',
-        select: 'creditNoteNumber status',
-        match: { isDeleted: false }
+        path: "connectedDocuments.creditNoteId",
+        select: "creditNoteNumber status",
+        match: { isDeleted: false },
       });
 
     if (!returnNote) {
-      return NextResponse.json({ error: "Return note not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Return note not found" },
+        { status: 404 }
+      );
     }
 
     if (returnNote.isDeleted) {
-      return NextResponse.json({
-        error: "This return note has been deleted"
-      }, { status: 410 });
+      return NextResponse.json(
+        { error: "This return note has been deleted" },
+        { status: 410 }
+      );
     }
 
     return NextResponse.json(returnNote);
@@ -76,10 +85,13 @@ export async function GET(request: Request, context: RequestContext) {
 
 function detectChanges(oldReturnNote: any, newData: any) {
   const changes: Array<{ field: string; oldValue: any; newValue: any }> = [];
-  const fieldsToTrack = ['status', 'reason', 'notes'];
+  const fieldsToTrack = ["status", "reason", "notes"];
 
   for (const field of fieldsToTrack) {
-    if (newData[field] !== undefined && oldReturnNote[field] !== newData[field]) {
+    if (
+      newData[field] !== undefined &&
+      oldReturnNote[field] !== newData[field]
+    ) {
       changes.push({
         field,
         oldValue: oldReturnNote[field],
@@ -106,13 +118,19 @@ export async function PUT(request: Request, context: RequestContext) {
 
     const currentReturnNote = await ReturnNote.findById(id);
     if (!currentReturnNote) {
-      return NextResponse.json({ error: "Return note not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Return note not found" },
+        { status: 404 }
+      );
     }
 
     if (currentReturnNote.isDeleted) {
-      return NextResponse.json({
-        error: "Cannot update a deleted return note. Please restore it first."
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: "Cannot update a deleted return note. Please restore it first.",
+        },
+        { status: 400 }
+      );
     }
 
     const oldStatus = currentReturnNote.status;
@@ -121,29 +139,35 @@ export async function PUT(request: Request, context: RequestContext) {
 
     const changes = detectChanges(currentReturnNote.toObject(), body);
 
-    // Handle status change to 'approved'
-    if (oldStatus !== 'approved' && newStatus === 'approved') {
+    // ─── Transition: pending/cancelled → approved ──────────────────────────
+    if (oldStatus !== "approved" && newStatus === "approved") {
 
-      if (returnType === 'purchaseReturn') {
-        // Handle purchase return approval
-        const purchase = await Purchase.findById(currentReturnNote.connectedDocuments.purchaseId);
+      if (returnType === "purchaseReturn") {
+        // 1. Update purchase returned quantities
+        const purchase = await Purchase.findById(
+          currentReturnNote.connectedDocuments.purchaseId
+        );
         if (!purchase || purchase.isDeleted) {
-          return NextResponse.json({
-            error: "Associated purchase not found"
-          }, { status: 404 });
+          return NextResponse.json(
+            { error: "Associated purchase not found" },
+            { status: 404 }
+          );
         }
 
-        // Update purchase item returned quantities
         for (const returnItem of currentReturnNote.items) {
           const purchaseItemIndex = purchase.items.findIndex(
             (pi: any) =>
-              (pi.itemId && returnItem.itemId && pi.itemId.toString() === returnItem.itemId.toString()) ||
+              (pi.itemId &&
+                returnItem.itemId &&
+                pi.itemId.toString() === returnItem.itemId.toString()) ||
               pi.description === returnItem.description
           );
 
           if (purchaseItemIndex !== -1) {
-            const currentReturned = purchase.items[purchaseItemIndex].returnedQuantity || 0;
-            purchase.items[purchaseItemIndex].returnedQuantity = currentReturned + returnItem.returnQuantity;
+            const currentReturned =
+              purchase.items[purchaseItemIndex].returnedQuantity || 0;
+            purchase.items[purchaseItemIndex].returnedQuantity =
+              currentReturned + returnItem.returnQuantity;
           }
         }
 
@@ -152,10 +176,9 @@ export async function PUT(request: Request, context: RequestContext) {
           user.id,
           user.username || user.name
         );
-
         await purchase.save();
 
-        // Reduce material stock using helper function
+        // 2. Deduct stock
         await removeStockForPurchaseReturn(
           currentReturnNote._id,
           currentReturnNote.items.map((item: any) => ({
@@ -166,19 +189,29 @@ export async function PUT(request: Request, context: RequestContext) {
           currentReturnNote.returnNumber
         );
 
-      } else if (returnType === 'salesReturn') {
-        // Handle sales return approval - REVERSE STOCK VIA BOM
-        const invoice = await Invoice.findById(currentReturnNote.connectedDocuments.invoiceId);
+        // 3. Create journal
+        await createJournalForPurchaseReturn(
+          { ...currentReturnNote.toObject(), status: "approved" },
+          user.id,
+          user.username || user.name
+        );
+
+      } else if (returnType === "salesReturn") {
+        // 1. Update invoice returned quantities
+        const invoice = await Invoice.findById(
+          currentReturnNote.connectedDocuments.invoiceId
+        );
         if (invoice && !invoice.isDeleted) {
-          // Update invoice returned quantities
           for (const returnItem of currentReturnNote.items) {
             const invoiceItemIndex = invoice.items.findIndex(
               (ii: any) => ii.description === returnItem.description
             );
 
             if (invoiceItemIndex !== -1) {
-              const currentReturned = invoice.items[invoiceItemIndex].returnedQuantity || 0;
-              invoice.items[invoiceItemIndex].returnedQuantity = currentReturned + returnItem.returnQuantity;
+              const currentReturned =
+                invoice.items[invoiceItemIndex].returnedQuantity || 0;
+              invoice.items[invoiceItemIndex].returnedQuantity =
+                currentReturned + returnItem.returnQuantity;
             }
           }
           invoice.addAuditEntry(
@@ -187,40 +220,64 @@ export async function PUT(request: Request, context: RequestContext) {
             user.username || user.name
           );
           await invoice.save();
-
-          // ✅ REVERSE STOCK: Increment material stock based on BOM
-          try {
-            await reverseStockForSalesReturn(
-              currentReturnNote._id,
-              currentReturnNote.items
-            );
-          } catch (stockError: any) {
-            console.error(`❌ Stock reversal failed:`, stockError);
-            return NextResponse.json({
-              error: `Cannot approve sales return: ${stockError.message}`
-            }, { status: 400 });
-          }
         }
+
+        // 2. Restore stock (reverse the deduction that happened on invoice approval)
+        try {
+          await reverseStockForSalesReturn(
+            currentReturnNote._id,
+            currentReturnNote.items
+          );
+        } catch (stockError: any) {
+          console.error(`❌ Stock reversal failed:`, stockError);
+          return NextResponse.json(
+            { error: `Cannot approve sales return: ${stockError.message}` },
+            { status: 400 }
+          );
+        }
+
+        // 3. Create journal
+        await createJournalForSalesReturn(
+          { ...currentReturnNote.toObject(), status: "approved" },
+          user.id,
+          user.username || user.name
+        );
       }
-      // Manual returns: no document updates needed
     }
 
-    // Handle status change from 'approved' to other status
-    if (oldStatus === 'approved' && newStatus !== 'approved') {
-      if (returnType === 'purchaseReturn') {
-        const purchase = await Purchase.findById(currentReturnNote.connectedDocuments.purchaseId);
+    // ─── Transition: approved → pending/cancelled ──────────────────────────
+    if (oldStatus === "approved" && newStatus !== "approved") {
+
+      // 1. Void journal
+      await voidJournalsForReference(
+        currentReturnNote._id,
+        user.id,
+        user.username || user.name,
+        `Return note status changed from approved to ${newStatus}`
+      );
+
+      if (returnType === "purchaseReturn") {
+        // 2. Reverse purchase returned quantities
+        const purchase = await Purchase.findById(
+          currentReturnNote.connectedDocuments.purchaseId
+        );
         if (purchase && !purchase.isDeleted) {
-          // Reverse purchase item returned quantities
           for (const returnItem of currentReturnNote.items) {
             const purchaseItemIndex = purchase.items.findIndex(
               (pi: any) =>
-                (pi.itemId && returnItem.itemId && pi.itemId.toString() === returnItem.itemId.toString()) ||
+                (pi.itemId &&
+                  returnItem.itemId &&
+                  pi.itemId.toString() === returnItem.itemId.toString()) ||
                 pi.description === returnItem.description
             );
 
             if (purchaseItemIndex !== -1) {
-              const currentReturned = purchase.items[purchaseItemIndex].returnedQuantity || 0;
-              purchase.items[purchaseItemIndex].returnedQuantity = Math.max(0, currentReturned - returnItem.returnQuantity);
+              const currentReturned =
+                purchase.items[purchaseItemIndex].returnedQuantity || 0;
+              purchase.items[purchaseItemIndex].returnedQuantity = Math.max(
+                0,
+                currentReturned - returnItem.returnQuantity
+              );
             }
           }
 
@@ -229,11 +286,10 @@ export async function PUT(request: Request, context: RequestContext) {
             user.id,
             user.username || user.name
           );
-
           await purchase.save();
         }
 
-        // Add material stock back using helper function
+        // 3. Add stock back
         await addStockForPurchaseReturn(
           currentReturnNote._id,
           currentReturnNote.items.map((item: any) => ({
@@ -243,8 +299,12 @@ export async function PUT(request: Request, context: RequestContext) {
           })),
           currentReturnNote.returnNumber
         );
-      } else if (returnType === 'salesReturn') {
-        const invoice = await Invoice.findById(currentReturnNote.connectedDocuments.invoiceId);
+
+      } else if (returnType === "salesReturn") {
+        // 2. Reverse invoice returned quantities
+        const invoice = await Invoice.findById(
+          currentReturnNote.connectedDocuments.invoiceId
+        );
         if (invoice && !invoice.isDeleted) {
           for (const returnItem of currentReturnNote.items) {
             const invoiceItemIndex = invoice.items.findIndex(
@@ -252,8 +312,12 @@ export async function PUT(request: Request, context: RequestContext) {
             );
 
             if (invoiceItemIndex !== -1) {
-              const currentReturned = invoice.items[invoiceItemIndex].returnedQuantity || 0;
-              invoice.items[invoiceItemIndex].returnedQuantity = Math.max(0, currentReturned - returnItem.returnQuantity);
+              const currentReturned =
+                invoice.items[invoiceItemIndex].returnedQuantity || 0;
+              invoice.items[invoiceItemIndex].returnedQuantity = Math.max(
+                0,
+                currentReturned - returnItem.returnQuantity
+              );
             }
           }
           invoice.addAuditEntry(
@@ -262,12 +326,9 @@ export async function PUT(request: Request, context: RequestContext) {
             user.username || user.name
           );
           await invoice.save();
-          console.log(`  ✅ Invoice updated`);
-        } else {
-          console.log(`  ⚠️ Invoice not found or deleted`);
         }
 
-        // ✅ STOCK DEDUCTION: Deduct materials (reverse the addition from approval)
+        // 3. Deduct stock again (undo the reversal)
         try {
           await deductStockForInvoice(
             currentReturnNote.connectedDocuments.invoiceId,
@@ -275,14 +336,13 @@ export async function PUT(request: Request, context: RequestContext) {
           );
         } catch (stockError: any) {
           console.error(`❌ Stock deduction failed:`, stockError);
-          console.error(`  Error details:`, stockError.message, stockError.stack);
-          // Don't fail the status change if stock deduction fails, but log it
+          // Don't fail the status change if stock deduction fails
         }
       }
     }
 
     currentReturnNote.addAuditEntry(
-      'Updated',
+      "Updated",
       user.id,
       user.username || user.name,
       changes.length > 0 ? changes : undefined
@@ -301,7 +361,10 @@ export async function PUT(request: Request, context: RequestContext) {
   } catch (error) {
     const params = await context.params;
     console.error(`Failed to update return note ${params.id}:`, error);
-    return NextResponse.json({ error: "Failed to update return note" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Failed to update return note" },
+      { status: 400 }
+    );
   }
 }
 
@@ -320,44 +383,63 @@ export async function DELETE(request: Request, context: RequestContext) {
     const returnNote = await ReturnNote.findById(id);
 
     if (!returnNote) {
-      return NextResponse.json({ error: "Return note not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Return note not found" },
+        { status: 404 }
+      );
     }
 
     if (returnNote.isDeleted) {
-      return NextResponse.json({
-        error: "Return note is already deleted"
-      }, { status: 400 });
+      return NextResponse.json(
+        { error: "Return note is already deleted" },
+        { status: 400 }
+      );
     }
 
     const returnType = returnNote.returnType;
 
-    // If the return note was approved, reverse the changes
-    if (returnNote.status === 'approved') {
+    // ─── If approved: reverse everything ──────────────────────────────────
+    if (returnNote.status === "approved") {
 
-      if (returnType === 'purchaseReturn') {
-        const purchase = await Purchase.findById(returnNote.connectedDocuments.purchaseId);
+      // 1. Void journal
+      await voidJournalsForReference(
+        returnNote._id,
+        user.id,
+        user.username || user.name,
+        "Return note soft deleted"
+      );
+
+      if (returnType === "purchaseReturn") {
+        // 2. Reverse purchase returned quantities
+        const purchase = await Purchase.findById(
+          returnNote.connectedDocuments.purchaseId
+        );
         if (purchase && !purchase.isDeleted) {
-          // Reverse purchase item returned quantities
           for (const returnItem of returnNote.items) {
             const purchaseItemIndex = purchase.items.findIndex(
               (pi: any) =>
-                (pi.itemId && returnItem.itemId && pi.itemId.toString() === returnItem.itemId.toString()) ||
+                (pi.itemId &&
+                  returnItem.itemId &&
+                  pi.itemId.toString() === returnItem.itemId.toString()) ||
                 pi.description === returnItem.description
             );
 
             if (purchaseItemIndex !== -1) {
-              const currentReturned = purchase.items[purchaseItemIndex].returnedQuantity || 0;
-              purchase.items[purchaseItemIndex].returnedQuantity = Math.max(0, currentReturned - returnItem.returnQuantity);
+              const currentReturned =
+                purchase.items[purchaseItemIndex].returnedQuantity || 0;
+              purchase.items[purchaseItemIndex].returnedQuantity = Math.max(
+                0,
+                currentReturned - returnItem.returnQuantity
+              );
             }
           }
 
-          // Remove return note ID from purchase
-          const updatedReturnNoteIds = (purchase.connectedDocuments?.returnNoteIds || [])
-            .filter((rid: any) => rid.toString() !== id);
-
+          const updatedReturnNoteIds = (
+            purchase.connectedDocuments?.returnNoteIds || []
+          ).filter((rid: any) => rid.toString() !== id);
           purchase.connectedDocuments = {
             ...purchase.connectedDocuments,
-            returnNoteIds: updatedReturnNoteIds
+            returnNoteIds: updatedReturnNoteIds,
           };
 
           purchase.addAuditEntry(
@@ -365,11 +447,10 @@ export async function DELETE(request: Request, context: RequestContext) {
             user.id,
             user.username || user.name
           );
-
           await purchase.save();
         }
 
-        // Add material stock back using helper function
+        // 3. Add stock back
         await addStockForPurchaseReturn(
           returnNote._id,
           returnNote.items.map((item: any) => ({
@@ -379,8 +460,12 @@ export async function DELETE(request: Request, context: RequestContext) {
           })),
           returnNote.returnNumber
         );
-      } else if (returnType === 'salesReturn') {
-        const invoice = await Invoice.findById(returnNote.connectedDocuments.invoiceId);
+
+      } else if (returnType === "salesReturn") {
+        // 2. Reverse invoice returned quantities
+        const invoice = await Invoice.findById(
+          returnNote.connectedDocuments.invoiceId
+        );
         if (invoice && !invoice.isDeleted) {
           for (const returnItem of returnNote.items) {
             const invoiceItemIndex = invoice.items.findIndex(
@@ -388,17 +473,21 @@ export async function DELETE(request: Request, context: RequestContext) {
             );
 
             if (invoiceItemIndex !== -1) {
-              const currentReturned = invoice.items[invoiceItemIndex].returnedQuantity || 0;
-              invoice.items[invoiceItemIndex].returnedQuantity = Math.max(0, currentReturned - returnItem.returnQuantity);
+              const currentReturned =
+                invoice.items[invoiceItemIndex].returnedQuantity || 0;
+              invoice.items[invoiceItemIndex].returnedQuantity = Math.max(
+                0,
+                currentReturned - returnItem.returnQuantity
+              );
             }
           }
-          // Remove return note ID from invoice
-          const updatedReturnNoteIds = (invoice.connectedDocuments?.returnNoteIds || [])
-            .filter((rid: any) => rid.toString() !== id);
 
+          const updatedReturnNoteIds = (
+            invoice.connectedDocuments?.returnNoteIds || []
+          ).filter((rid: any) => rid.toString() !== id);
           invoice.connectedDocuments = {
             ...invoice.connectedDocuments,
-            returnNoteIds: updatedReturnNoteIds
+            returnNoteIds: updatedReturnNoteIds,
           };
 
           invoice.addAuditEntry(
@@ -406,37 +495,40 @@ export async function DELETE(request: Request, context: RequestContext) {
             user.id,
             user.username || user.name
           );
-
           await invoice.save();
 
-          // ✅ REVERSE THE STOCK REVERSAL: Deduct materials again (since return is being deleted)
-          // When return was approved, stock was added back. Now we need to remove it again.
+          // 3. Deduct stock again (undo the reversal)
           try {
             await deductStockForInvoice(
-              returnNote._id, // Using returnNote ID for the adjustment reference
+              returnNote._id,
               returnNote.items.map((item: any) => ({
-                itemId: item.itemId, // Strictly use the unified itemId
-                quantity: item.returnQuantity
+                itemId: item.itemId,
+                quantity: item.returnQuantity,
               }))
             );
-            console.log(`✅ Stock deducted for deleted sales return ${returnNote.returnNumber}`);
+            console.log(
+              `✅ Stock deducted for deleted sales return ${returnNote.returnNumber}`
+            );
           } catch (stockError: any) {
             console.error(`❌ Stock deduction failed:`, stockError);
-            // Don't fail the delete if stock deduction fails, but log it
           }
         }
       }
+
     } else {
-      // Even if not approved, remove from connected documents
-      if (returnType === 'purchaseReturn') {
-        const purchase = await Purchase.findById(returnNote.connectedDocuments.purchaseId);
+      // ─── Not approved: just unlink from connected documents ─────────────
+      if (returnType === "purchaseReturn") {
+        const purchase = await Purchase.findById(
+          returnNote.connectedDocuments.purchaseId
+        );
         if (purchase && !purchase.isDeleted) {
-          const updatedReturnNoteIds = (purchase.connectedDocuments?.returnNoteIds || [])
-            .filter((rid: any) => rid.toString() !== id);
+          const updatedReturnNoteIds = (
+            purchase.connectedDocuments?.returnNoteIds || []
+          ).filter((rid: any) => rid.toString() !== id);
 
           purchase.connectedDocuments = {
             ...purchase.connectedDocuments,
-            returnNoteIds: updatedReturnNoteIds
+            returnNoteIds: updatedReturnNoteIds,
           };
 
           purchase.addAuditEntry(
@@ -444,18 +536,20 @@ export async function DELETE(request: Request, context: RequestContext) {
             user.id,
             user.username || user.name
           );
-
           await purchase.save();
         }
-      } else if (returnType === 'salesReturn') {
-        const invoice = await Invoice.findById(returnNote.connectedDocuments.invoiceId);
+      } else if (returnType === "salesReturn") {
+        const invoice = await Invoice.findById(
+          returnNote.connectedDocuments.invoiceId
+        );
         if (invoice && !invoice.isDeleted) {
-          const updatedReturnNoteIds = (invoice.connectedDocuments?.returnNoteIds || [])
-            .filter((rid: any) => rid.toString() !== id);
+          const updatedReturnNoteIds = (
+            invoice.connectedDocuments?.returnNoteIds || []
+          ).filter((rid: any) => rid.toString() !== id);
 
           invoice.connectedDocuments = {
             ...invoice.connectedDocuments,
-            returnNoteIds: updatedReturnNoteIds
+            returnNoteIds: updatedReturnNoteIds,
           };
 
           invoice.addAuditEntry(
@@ -463,34 +557,42 @@ export async function DELETE(request: Request, context: RequestContext) {
             user.id,
             user.username || user.name
           );
-
           await invoice.save();
         }
       }
     }
 
     returnNote.addAuditEntry(
-      'Soft Deleted',
+      "Soft Deleted",
+      user.id,
+      user.username || user.name
+    );
+    await returnNote.save();
+
+    const deletedReturnNote = await softDelete(
+      ReturnNote,
+      id,
       user.id,
       user.username || user.name
     );
 
-    await returnNote.save();
-
-    const deletedReturnNote = await softDelete(ReturnNote, id, user.id, user.username || user.name);
-
-    console.log(`✅ Successfully soft deleted ${returnType} return note ${returnNote.returnNumber}`);
+    console.log(
+      `✅ Successfully soft deleted ${returnType} return note ${returnNote.returnNumber}`
+    );
 
     return NextResponse.json({
       message: "Return note soft deleted successfully",
-      returnNote: deletedReturnNote
+      returnNote: deletedReturnNote,
     });
   } catch (error) {
     const params = await context.params;
     console.error(`Failed to delete return note ${params.id}:`, error);
-    return NextResponse.json({
-      error: "Server error",
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "Server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
   }
 }

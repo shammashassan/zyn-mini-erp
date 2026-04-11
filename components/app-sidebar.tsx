@@ -51,14 +51,12 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Receipts": { voucher: ["read"] },
   "Delivery Notes": { deliveryNote: ["read"] },
   "Sales Returns": { returnNote: ["read"] },
-  "Debit Notes": { debitNote: ["read"] },
 
   // Procurement
   "Purchases": { purchase: ["read"] },
   "Expenses": { expense: ["read"] },
   "Payments": { voucher: ["read"] },
   "Purchase Returns": { returnNote: ["read"] },
-  "Credit Notes": { creditNote: ["read"] },
 
   // Reports
   "Sales Report": { report: ["read"] },
@@ -115,7 +113,6 @@ const staticData = {
         { title: "Receipts", url: "/sales/receipts" },
         { title: "Delivery Notes", url: "/sales/delivery-notes" },
         { title: "Sales Returns", url: "/sales/sales-returns" },
-        { title: "Credit Notes", url: "/sales/credit-notes" },
       ],
     },
     {
@@ -127,7 +124,6 @@ const staticData = {
         { title: "Expenses", url: "/procurement/expenses" },
         { title: "Payments", url: "/procurement/payments" },
         { title: "Purchase Returns", url: "/procurement/purchase-returns" },
-        { title: "Debit Notes", url: "/procurement/debit-notes" },
       ],
     },
     {

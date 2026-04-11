@@ -73,14 +73,12 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Receipts": { voucher: ["read"] },
   "Delivery notes": { deliveryNote: ["read"] },
   "Sales Returns": { returnNote: ["read"] },
-  "Debit Notes": { debitNote: ["read"] },
 
   // Procurement
   "Purchases": { purchase: ["read"] },
   "Expenses": { expense: ["read"] },
   "Payments": { voucher: ["read"] },
   "Purchase Returns": { returnNote: ["read"] },
-  "Credit Notes": { creditNote: ["read"] },
 
   // Reports
   "Sales Report": { report: ["read"] },
@@ -132,14 +130,12 @@ const navigationData = [
   { title: "Receipts", url: "/sales/receipts", icon: Ticket, group: "Sales" },
   { title: "Delivery notes", url: "/sales/delivery-notes", icon: Truck, group: "Sales" },
   { title: "Sales Returns", url: "/sales/sales-returns", icon: Undo2, group: "Sales" },
-  { title: "Credit Notes", url: "/sales/credit-notes", icon: ClipboardCheck, group: "Sales" },
 
   // Procurement
   { title: "Purchases", url: "/procurement/purchases", icon: ShoppingCart, group: "Procurement" },
   { title: "Expenses", url: "/procurement/expenses", icon: Banknote, group: "Procurement" },
   { title: "Payments", url: "/procurement/payments", icon: Banknote, group: "Procurement" },
   { title: "Purchase Returns", url: "/procurement/purchase-returns", icon: Redo2, group: "Procurement" },
-  { title: "Debit Notes", url: "/procurement/debit-notes", icon: ClipboardCheck, group: "Procurement" },
 
   // Reports
   { title: "Sales Report", url: "/reports/sales-report", icon: TrendingUp, group: "Reports" },

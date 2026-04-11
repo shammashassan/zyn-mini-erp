@@ -108,9 +108,8 @@ function JournalPageContent() {
     { value: "Payment", label: "Payment" },
     { value: "Purchase", label: "Purchase" },
     { value: "Expense", label: "Expense" },
-    { value: "CreditNote", label: "Credit Note" },
-    { value: "DebitNote", label: "Debit Note" },
-    { value: "ReturnNote", label: "Return Note" },
+    { value: "SalesReturn", label: "Sales Return" },
+    { value: "PurchaseReturn", label: "Purchase Return" },
   ];
 
 

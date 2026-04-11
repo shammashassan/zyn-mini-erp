@@ -58,7 +58,7 @@ type JournalEntry = {
 
 type JournalFormData = {
   entryDate: Date;
-  referenceType: 'POSSale' | 'Invoice' | 'Receipt' | 'Payment' | 'Purchase' | 'Expense' | 'DebitNote' | 'CreditNote' | 'ReturnNote' | 'General' | 'Contra' | 'Adjustment';
+  referenceType: 'POSSale' | 'Invoice' | 'Receipt' | 'Payment' | 'Purchase' | 'Expense' | 'PurchaseReturn' | 'SalesReturn' | 'General' | 'Contra' | 'Adjustment';
 
   referenceNumber?: string;
   partyType?: 'Customer' | 'Supplier' | 'Payee' | 'Vendor';
@@ -158,9 +158,8 @@ export function JournalForm({ isOpen, onClose, onSubmit, defaultValues }: Journa
     { value: "Payment", label: "Payment" },
     { value: "Purchase", label: "Purchase" },
     { value: "Expense", label: "Expense" },
-    { value: "CreditNote", label: "Credit Note" },
-    { value: "DebitNote", label: "Debit Note" },
-    { value: "ReturnNote", label: "Return Note" },
+    { value: "SalesReturn", label: "Sales Return" },
+    { value: "PurchaseReturn", label: "Purchase Return" },
   ];
 
   useEffect(() => {
