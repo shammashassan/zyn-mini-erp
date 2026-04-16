@@ -74,7 +74,7 @@ export interface IInvoice extends Document<string> {
   grandTotal: number;
   notes?: string;
   invoiceDate: Date;
-  status: 'paid' | 'pending' | 'partial' | 'overdue' | 'approved' | 'cancelled';
+  status: 'pending' | 'approved' | 'cancelled';
 
   receiptAllocations: IReceiptAllocation[];
 
@@ -114,15 +114,12 @@ export interface IInvoice extends Document<string> {
 }
 
 const ItemSchema: Schema = new Schema({
-  /** References unified Item model */
   itemId: { type: Schema.Types.ObjectId, ref: 'Item', required: false },
   description: { type: String, required: true },
   quantity: { type: Number, required: true },
   rate: { type: Number, required: true },
   total: { type: Number, required: true },
-  /** Tax rate snapshot — avoids re-lookup on edit; preserves rate at time of sale */
   taxRate: { type: Number, default: 0 },
-  /** Pre-computed tax amount per line — VATtotal = sum(taxAmount) */
   taxAmount: { type: Number, default: 0 },
   returnedQuantity: { type: Number, default: 0 },
 });
@@ -131,7 +128,7 @@ const ReceiptAllocationSchema: Schema = new Schema({
   voucherId: {
     type: Schema.Types.ObjectId,
     ref: 'Voucher',
-    required: true
+    required: true,
   },
   allocatedAmount: { type: Number, required: true, min: 0 },
   allocationDate: { type: Date, default: Date.now },
@@ -142,103 +139,114 @@ const AuditEntrySchema: Schema = new Schema({
   userId: { type: String, default: null },
   username: { type: String, default: null },
   timestamp: { type: Date, default: Date.now },
-  changes: [{
-    field: { type: String },
-    oldValue: { type: Schema.Types.Mixed },
-    newValue: { type: Schema.Types.Mixed },
-  }],
+  changes: [
+    {
+      field: { type: String },
+      oldValue: { type: Schema.Types.Mixed },
+      newValue: { type: Schema.Types.Mixed },
+    },
+  ],
 });
 
-const PartySnapshotSchema: Schema = new Schema({
-  displayName: { type: String, required: true },
-  address: {
-    street: { type: String },
-    city: { type: String },
-    district: { type: String },
-    state: { type: String },
-    country: { type: String },
-    postalCode: { type: String },
-  },
-  taxIdentifiers: {
-    vatNumber: { type: String },
-  },
-}, { _id: false });
-
-const ContactSnapshotSchema: Schema = new Schema({
-  name: { type: String, required: true },
-  phone: { type: String },
-  email: { type: String },
-  designation: { type: String },
-}, { _id: false });
-
-const InvoiceSchema: Schema<IInvoice> = new Schema({
-  invoiceNumber: { type: String, required: true, unique: true },
-
-  // Party & Contact References
-  partyId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Party',
-    required: true,
-    index: true
-  },
-  contactId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Contact',
-    required: false,
-    index: true
-  },
-
-  // Immutable Snapshots
-  partySnapshot: {
-    type: PartySnapshotSchema,
-    required: true
-  },
-  contactSnapshot: {
-    type: ContactSnapshotSchema,
-    required: false
-  },
-
-  items: [ItemSchema],
-  totalAmount: { type: Number, required: true },
-  discount: { type: Number, default: 0 },
-  vatAmount: { type: Number, default: 0 },
-  grandTotal: { type: Number, required: true },
-  notes: { type: String },
-  invoiceDate: { type: Date, required: true },
-  status: {
-    type: String,
-    enum: ['paid', 'pending', 'partial', 'overdue', 'approved', 'cancelled'],
-    default: 'pending'
-  },
-
-  receiptAllocations: [ReceiptAllocationSchema],
-
-  paidAmount: { type: Number, default: 0, min: 0 },
-  receivedAmount: { type: Number, default: 0, min: 0 },
-  remainingAmount: { type: Number, default: 0, min: 0 },
-  paymentStatus: {
-    type: String,
-    enum: ['Paid', 'Pending', 'Partially Paid'],
-    default: 'Pending'
-  },
-
-  connectedDocuments: {
-    type: {
-      receiptIds: [{ type: Schema.Types.ObjectId, ref: 'Voucher' }],
-      deliveryId: { type: Schema.Types.ObjectId, ref: 'DeliveryNote' },
-      returnNoteIds: [{ type: Schema.Types.ObjectId, ref: 'ReturnNote' }],
+const PartySnapshotSchema: Schema = new Schema(
+  {
+    displayName: { type: String, required: true },
+    address: {
+      street: { type: String },
+      city: { type: String },
+      district: { type: String },
+      state: { type: String },
+      country: { type: String },
+      postalCode: { type: String },
     },
-    default: {}
+    taxIdentifiers: {
+      vatNumber: { type: String },
+    },
   },
+  { _id: false }
+);
 
-  isDeleted: { type: Boolean, default: false, index: true },
-  deletedAt: { type: Date, default: null },
-  deletedBy: { type: String, default: null },
+const ContactSnapshotSchema: Schema = new Schema(
+  {
+    name: { type: String, required: true },
+    phone: { type: String },
+    email: { type: String },
+    designation: { type: String },
+  },
+  { _id: false }
+);
 
-  createdBy: { type: String, default: null },
-  updatedBy: { type: String, default: null },
-  actionHistory: [AuditEntrySchema],
-}, { timestamps: true });
+const InvoiceSchema: Schema<IInvoice> = new Schema(
+  {
+    invoiceNumber: { type: String, required: true, unique: true },
+
+    // Party & Contact References
+    partyId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Party',
+      required: true,
+      index: true,
+    },
+    contactId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Contact',
+      required: false,
+      index: true,
+    },
+
+    // Immutable Snapshots
+    partySnapshot: {
+      type: PartySnapshotSchema,
+      required: true,
+    },
+    contactSnapshot: {
+      type: ContactSnapshotSchema,
+      required: false,
+    },
+
+    items: [ItemSchema],
+    totalAmount: { type: Number, required: true },
+    discount: { type: Number, default: 0 },
+    vatAmount: { type: Number, default: 0 },
+    grandTotal: { type: Number, required: true },
+    notes: { type: String },
+    invoiceDate: { type: Date, required: true },
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'cancelled'],
+      default: 'pending',
+    },
+
+    receiptAllocations: [ReceiptAllocationSchema],
+
+    paidAmount: { type: Number, default: 0, min: 0 },
+    receivedAmount: { type: Number, default: 0, min: 0 },
+    remainingAmount: { type: Number, default: 0, min: 0 },
+    paymentStatus: {
+      type: String,
+      enum: ['Paid', 'Pending', 'Partially Paid'],
+      default: 'Pending',
+    },
+
+    connectedDocuments: {
+      type: {
+        receiptIds: [{ type: Schema.Types.ObjectId, ref: 'Voucher' }],
+        deliveryId: { type: Schema.Types.ObjectId, ref: 'DeliveryNote' },
+        returnNoteIds: [{ type: Schema.Types.ObjectId, ref: 'ReturnNote' }],
+      },
+      default: {},
+    },
+
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: String, default: null },
+
+    createdBy: { type: String, default: null },
+    updatedBy: { type: String, default: null },
+    actionHistory: [AuditEntrySchema],
+  },
+  { timestamps: true }
+);
 
 // Indexes
 InvoiceSchema.index({ isDeleted: 1, invoiceDate: -1 });
@@ -269,7 +277,7 @@ InvoiceSchema.pre('save', function (next) {
   // Recalculate remainingAmount
   this.remainingAmount = Math.max(0, this.grandTotal - effectiveAmount);
 
-  // Auto-calculate payment status
+  // Auto-calculate paymentStatus from allocation totals
   const EPSILON = 0.01;
 
   if (effectiveAmount >= this.grandTotal - EPSILON) {
@@ -353,12 +361,15 @@ InvoiceSchema.methods.getTotalAllocated = function (): number {
     return 0;
   }
 
-  return this.receiptAllocations.reduce((sum: number, alloc: IReceiptAllocation) => sum + alloc.allocatedAmount, 0);
+  return this.receiptAllocations.reduce(
+    (sum: number, alloc: IReceiptAllocation) => sum + alloc.allocatedAmount,
+    0
+  );
 };
 
 InvoiceSchema.methods.canAllocate = function (amount: number): boolean {
   const currentAllocated = this.getTotalAllocated();
-  return (currentAllocated + amount) <= this.grandTotal;
+  return currentAllocated + amount <= this.grandTotal;
 };
 
 InvoiceSchema.methods.addAuditEntry = function (

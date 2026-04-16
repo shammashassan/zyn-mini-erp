@@ -161,22 +161,32 @@ export async function POST(request: Request) {
         const sale = new POSSale(saleData);
 
         // ── Deduct stock ──────────────────────────────────────────────────────────
+        // [FIX Bug 4] deductStockForPOSSale now returns { adjustmentIds, cogsAmount }
+        // so we pass cogsAmount straight to the journal — no second DB round-trip.
         let stockAdjustmentIds: any[] = [];
+        let cogsAmount = 0;
+
         try {
-            stockAdjustmentIds = await deductStockForPOSSale(sale._id, items);
+            const stockResult = await deductStockForPOSSale(sale._id, items);
+            stockAdjustmentIds = stockResult.adjustmentIds;
+            cogsAmount = stockResult.cogsAmount;
         } catch (stockError: any) {
-            return NextResponse.json({ error: `Stock error: ${stockError.message}` }, { status: 400 });
+            return NextResponse.json(
+                { error: `Stock error: ${stockError.message}` },
+                { status: 400 }
+            );
         }
 
         // ── Save sale ─────────────────────────────────────────────────────────────
         sale.stockAdjustmentIds = stockAdjustmentIds;
         await sale.save();
 
-        // ── Create journal ────────────────────────────────────────────────────────
+        // ── Create journal (revenue + COGS in one balanced entry) ─────────────────
         const journal = await createJournalForPOSSale(
             sale.toObject(),
             session.user.id,
-            session.user.username || session.user.name
+            session.user.username || session.user.name,
+            cogsAmount  // [FIX Bug 4] pass COGS so Dr. COGS / Cr. Inventory is booked
         );
 
         if (journal) {

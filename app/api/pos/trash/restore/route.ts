@@ -27,10 +27,15 @@ export async function POST(request: Request) {
         if (!sale.isDeleted) return NextResponse.json({ error: 'Sale is not deleted' }, { status: 400 });
 
         // 1. Re-apply stock deductions (using previous adjustment records as templates)
+        // [FIX Bug 4] reapplyStockForPOSSale now returns { newIds, cogsAmount }
         let newAdjIds: any[] = [];
+        let cogsAmount = 0;
+
         if (sale.stockAdjustmentIds?.length > 0) {
             try {
-                newAdjIds = await reapplyStockForPOSSale(sale._id, sale.stockAdjustmentIds);
+                const stockResult = await reapplyStockForPOSSale(sale._id, sale.stockAdjustmentIds);
+                newAdjIds = stockResult.newIds;
+                cogsAmount = stockResult.cogsAmount;
             } catch (stockErr: any) {
                 return NextResponse.json(
                     { error: `Cannot restore: ${stockErr.message}` },
@@ -52,11 +57,13 @@ export async function POST(request: Request) {
         // 3. Update stockAdjustmentIds with the new ones
         restored.stockAdjustmentIds = newAdjIds;
 
-        // 4. Recreate journal
+        // 4. Recreate journal (revenue + COGS in one balanced entry)
+        // [FIX Bug 4] pass cogsAmount so Dr. COGS / Cr. Inventory is re-booked correctly
         const journal = await recreateJournalForPOSSale(
             restored.toObject(),
             user?.id || null,
-            user?.username || user?.name || null
+            user?.username || user?.name || null,
+            cogsAmount
         );
 
         if (journal) {

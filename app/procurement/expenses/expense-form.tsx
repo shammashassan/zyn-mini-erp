@@ -397,7 +397,7 @@ export function ExpenseForm({ isOpen, onClose, onSubmit, defaultValues }: Expens
                 {selectedParty && (
                   <div className="flex justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Payee:</span>
-                    <span className="font-medium break-words text-right">{selectedParty}</span>
+                    <span className="font-medium wrap-break-word text-right">{selectedParty}</span>
                   </div>
                 )}
                 {watchedCategory && (
