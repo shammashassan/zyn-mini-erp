@@ -101,7 +101,8 @@ function ItemsDisplay({ referenceType, referenceId }: { referenceType: string; r
           const data = await res.json();
           if (referenceType === 'Expense') {
             setItems([{
-              description: data.description || data.category || 'Expense',
+              description: data.description,
+              category: data.category,
               quantity: 1,
               total: data.amount || 0
             }]);
@@ -143,6 +144,20 @@ function ItemsDisplay({ referenceType, referenceId }: { referenceType: string; r
     );
   }
 
+  if (referenceType === 'Expense') {
+    const expense = items[0];
+    if (!expense) return null;
+    return (
+      <div className="space-y-1">
+        <div className="text-sm text-muted-foreground">Expense Details</div>
+        <p className="text-xs sm:text-sm wrap-break-word">
+          <span className="font-semibold">{expense.category}: </span>
+          {expense.description}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
       {items.map((item: any, index: number) => (
@@ -152,13 +167,11 @@ function ItemsDisplay({ referenceType, referenceId }: { referenceType: string; r
         >
           <div className="flex-1 min-w-0">
             <div className="font-medium wrap-break-word">
-              {item.description || '—'}
+              {item.description || item.category || '—'}
             </div>
-            {referenceType !== 'Expense' && (
-              <div className="text-xs text-muted-foreground mt-1">
-                Quantity: {item.quantity} {referenceType === 'Purchase' && `× ${formatCurrency(item.unitCost)}`}
-              </div>
-            )}
+            <div className="text-xs text-muted-foreground mt-1">
+              Quantity: {item.quantity} {referenceType === 'Purchase' && `× ${formatCurrency(item.unitCost)}`}
+            </div>
           </div>
           <div className="font-semibold text-right shrink-0">
             {formatCurrency(item.total)}
@@ -257,17 +270,6 @@ export function JournalViewModal({ isOpen, onClose, journal }: JournalViewModalP
                   </div>
                 )}
 
-                {journal.itemType && journal.itemName && (
-                  <div className="flex items-start gap-3">
-                    <Package className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground mt-0.5 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs sm:text-sm text-muted-foreground mb-1">
-                        {journal.itemType}
-                      </div>
-                      <div className="text-xs sm:text-sm font-medium wrap-break-word">{journal.itemName}</div>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {journal.narration && (
@@ -279,10 +281,12 @@ export function JournalViewModal({ isOpen, onClose, journal }: JournalViewModalP
 
               {['Invoice', 'Purchase', 'POSSale', 'SalesReturn', 'PurchaseReturn', 'Expense'].includes(journal.referenceType) && journal.referenceId && (
                 <div className="pt-3 sm:pt-4 border-t">
-                  <div className="text-xs sm:text-sm font-medium mb-3 flex items-center gap-2">
-                    <Package className="h-3 w-3 sm:h-4 sm:w-4" />
-                    Items from {journal.referenceType}
-                  </div>
+                  {journal.referenceType !== 'Expense' && (
+                    <div className="text-xs sm:text-sm font-medium mb-3 flex items-center gap-2">
+                      <Package className="h-3 w-3 sm:h-4 sm:w-4" />
+                      Items from {journal.referenceType}
+                    </div>
+                  )}
                   <ItemsDisplay
                     referenceType={journal.referenceType}
                     referenceId={journal.referenceId}
