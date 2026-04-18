@@ -38,8 +38,9 @@ export async function GET(request: Request, context: RequestContext) {
     if (error) return error;
 
     const _ensureModels = [DebitNote, Purchase, Invoice];
+    const includeDeleted = request.headers.get('X-Include-Deleted') === 'true';
 
-    const returnNote = await ReturnNote.findById(id)
+    const returnNoteQuery = ReturnNote.findById(id)
       .populate({
         path: "connectedDocuments.purchaseId",
         select: "referenceNumber items inventoryStatus partySnapshot",
@@ -61,6 +62,12 @@ export async function GET(request: Request, context: RequestContext) {
         match: { isDeleted: false },
       });
 
+    if (includeDeleted) {
+      returnNoteQuery.setOptions({ includeDeleted: true });
+    }
+
+    const returnNote = await returnNoteQuery;
+
     if (!returnNote) {
       return NextResponse.json(
         { error: "Return note not found" },
@@ -68,7 +75,7 @@ export async function GET(request: Request, context: RequestContext) {
       );
     }
 
-    if (returnNote.isDeleted) {
+    if (returnNote.isDeleted && !includeDeleted) {
       return NextResponse.json(
         { error: "This return note has been deleted" },
         { status: 410 }

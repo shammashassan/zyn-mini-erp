@@ -6,7 +6,8 @@ import POSSale from '@/models/POSSale';
 import { softDelete } from '@/utils/softDelete';
 import { requireAuthAndPermission } from '@/lib/auth-utils';
 import { getUserInfo } from '@/lib/auth-helpers';
-import { reverseStockForPOSSale, voidJournalForPOSSale } from '@/utils/posManager';
+import { reverseStockForPOSSale } from '@/utils/inventoryManager';
+import { voidJournalsForReference } from '@/utils/journalManager';
 
 interface RequestContext {
     params: Promise<{ id: string }>;
@@ -67,14 +68,13 @@ export async function DELETE(request: Request, context: RequestContext) {
             }
         }
 
-        // 2. Void the journal
-        if (sale.journalId) {
-            await voidJournalForPOSSale(
-                sale.journalId,
-                user.id,
-                user.username || user.name
-            );
-        }
+        // 2. Void the journal via referenceId (sale._id stored as referenceId on journal)
+        await voidJournalsForReference(
+            sale._id,
+            user.id,
+            user.username || user.name,
+            'POS sale soft deleted'
+        );
 
         // 3. Soft-delete the sale
         const deleted = await softDelete(POSSale, id, user.id);

@@ -1,4 +1,6 @@
 // utils/inventoryManager.ts - UPDATED: Uses unified Item model (replaces Product/Material)
+// POS stock functions (deductStockForPOSSale, reverseStockForPOSSale,
+// reapplyStockForPOSSale) moved here from posManager.ts.
 
 import mongoose from 'mongoose';
 import Item from '@/models/Item';
@@ -395,4 +397,190 @@ export async function canChangeItemUnit(itemId: string): Promise<boolean> {
 
 export async function lockItemUnit(itemId: string) {
     await Item.findByIdAndUpdate(itemId, { baseUnitLocked: true });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POS SALE stock helpers (moved from posManager.ts)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Deduct stock for a POS sale via BOM — mirrors deductStockForInvoice.
+ * Returns the MongoDB _ids of all StockAdjustment records created, plus the
+ * total COGS amount computed from BOM component costPrices (passed to the journal).
+ */
+export async function deductStockForPOSSale(
+    saleId: mongoose.Types.ObjectId,
+    lineItems: Array<{ itemId?: string; quantity?: number; description?: string }>
+): Promise<{ adjustmentIds: mongoose.Types.ObjectId[]; cogsAmount: number }> {
+    const operations: Array<{
+        itemId: string;
+        itemName: string;
+        requiredQty: number;
+        currentStock: number;
+        costPrice: number;
+    }> = [];
+
+    // Phase 1 — calculate all material requirements via BOM
+    for (const lineItem of lineItems) {
+        const lineItemId = lineItem.itemId;
+        const lineQty = lineItem.quantity ?? 0;
+        if (!lineItemId) continue;
+
+        const item = await Item.findById(lineItemId);
+        if (!item) throw new Error(`Item "${lineItem.description || lineItemId}" not found`);
+
+        if (!item.types.includes('product')) continue;
+        if (!item.bom || item.bom.length === 0) continue;
+
+        for (const bomComponent of item.bom) {
+            const requiredQty = bomComponent.quantity * lineQty;
+            const materialItem = await Item.findById(bomComponent.itemId);
+            if (!materialItem) throw new Error(`BOM component item ${bomComponent.itemId} not found`);
+
+            const existing = operations.find(op => op.itemId === materialItem._id.toString());
+            if (existing) {
+                existing.requiredQty += requiredQty;
+            } else {
+                operations.push({
+                    itemId: materialItem._id.toString(),
+                    itemName: materialItem.name,
+                    requiredQty,
+                    currentStock: materialItem.stock,
+                    costPrice: materialItem.costPrice || 0,
+                });
+            }
+        }
+    }
+
+    // Phase 2 — validate stock availability
+    for (const op of operations) {
+        if (op.currentStock < op.requiredQty) {
+            throw new Error(
+                `Insufficient stock for "${op.itemName}". Required: ${op.requiredQty}, Available: ${op.currentStock}`
+            );
+        }
+    }
+
+    // Phase 3 — execute deductions, collect adjustment IDs, compute total COGS
+    const adjustmentIds: mongoose.Types.ObjectId[] = [];
+    let cogsAmount = 0;
+
+    for (const op of operations) {
+        const item = await Item.findById(op.itemId);
+        if (!item) continue;
+
+        const oldStock = item.stock;
+        const newStock = oldStock - op.requiredQty;
+
+        await Item.findByIdAndUpdate(op.itemId, { stock: newStock });
+
+        cogsAmount += op.costPrice * op.requiredQty;
+
+        const adj = await StockAdjustment.create({
+            itemId: op.itemId,
+            itemName: op.itemName,
+            adjustmentType: 'decrement',
+            value: op.requiredQty,
+            oldStock,
+            newStock,
+            oldCostPrice: item.costPrice,
+            newCostPrice: item.costPrice,
+            adjustmentReason: 'POS sale — stock deducted',
+            referenceId: saleId,
+            referenceModel: 'Invoice',
+            createdAt: new Date(),
+        });
+
+        adjustmentIds.push(adj._id);
+    }
+
+    cogsAmount = Math.round(cogsAmount * 100) / 100;
+
+    return { adjustmentIds, cogsAmount };
+}
+
+/**
+ * Reverse stock deductions for a POS sale (used on soft-delete).
+ * Pass the stockAdjustmentIds stored on the POSSale document.
+ */
+export async function reverseStockForPOSSale(
+    adjustmentIds: mongoose.Types.ObjectId[]
+): Promise<void> {
+    for (const adjId of adjustmentIds) {
+        const adj = await StockAdjustment.findById(adjId).setOptions({ includeDeleted: true });
+        if (!adj) continue;
+
+        const item = await Item.findById(adj.itemId);
+        if (!item) continue;
+
+        const oldStock = item.stock;
+        const restored = adj.adjustmentType === 'decrement' ? adj.value : -adj.value;
+        const newStock = oldStock + restored;
+
+        await Item.findByIdAndUpdate(adj.itemId, { stock: newStock });
+
+        // Soft-delete the original adjustment record
+        await StockAdjustment.findByIdAndUpdate(adjId, {
+            isDeleted: true,
+            deletedAt: new Date(),
+        });
+    }
+}
+
+/**
+ * Re-apply stock deductions when restoring a soft-deleted POS sale.
+ * Reads the original adjustments (soft-deleted) and reapplies them.
+ * Returns new adjustment IDs and recomputed COGS.
+ */
+export async function reapplyStockForPOSSale(
+    saleId: mongoose.Types.ObjectId,
+    adjustmentIds: mongoose.Types.ObjectId[]
+): Promise<{ newIds: mongoose.Types.ObjectId[]; cogsAmount: number }> {
+    const newIds: mongoose.Types.ObjectId[] = [];
+    let cogsAmount = 0;
+
+    for (const adjId of adjustmentIds) {
+        const adj = await StockAdjustment.findById(adjId).setOptions({ includeDeleted: true });
+        if (!adj) continue;
+
+        const item = await Item.findById(adj.itemId);
+        if (!item) continue;
+
+        const oldStock = item.stock;
+        const newStock = adj.adjustmentType === 'decrement'
+            ? oldStock - adj.value
+            : oldStock + adj.value;
+
+        if (newStock < 0) {
+            throw new Error(`Insufficient stock for "${item.name}" to restore sale`);
+        }
+
+        await Item.findByIdAndUpdate(adj.itemId, { stock: newStock });
+
+        // Recompute COGS from current costPrice
+        if (adj.adjustmentType === 'decrement') {
+            cogsAmount += (item.costPrice || 0) * adj.value;
+        }
+
+        const newAdj = await StockAdjustment.create({
+            itemId: adj.itemId,
+            itemName: adj.itemName,
+            adjustmentType: adj.adjustmentType,
+            value: adj.value,
+            oldStock,
+            newStock,
+            oldCostPrice: item.costPrice,
+            newCostPrice: item.costPrice,
+            adjustmentReason: 'POS sale restored — stock re-deducted',
+            referenceId: saleId,
+            referenceModel: 'Invoice',
+            createdAt: new Date(),
+        });
+
+        newIds.push(newAdj._id);
+    }
+
+    cogsAmount = Math.round(cogsAmount * 100) / 100;
+
+    return { newIds, cogsAmount };
 }

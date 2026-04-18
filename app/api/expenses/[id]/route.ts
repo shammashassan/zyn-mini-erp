@@ -46,8 +46,9 @@ export async function GET(request: Request, context: RequestContext) {
 
     const _ensuremodel = [Payee, Voucher];
     const { id } = await context.params;
+    const includeDeleted = request.headers.get('X-Include-Deleted') === 'true';
 
-    const expense = await Expense.findById(id)
+    const expenseQuery = Expense.findById(id)
       .populate({
         path: 'connectedDocuments.paymentIds',
         model: 'Voucher',
@@ -58,10 +59,22 @@ export async function GET(request: Request, context: RequestContext) {
         path: 'payeeId',
         model: 'Payee',
         select: 'name type email phone'
-      })
+      });
+
+    if (includeDeleted) {
+      expenseQuery.setOptions({ includeDeleted: true });
+    }
+
+    const expense = await expenseQuery;
 
     if (!expense) {
       return NextResponse.json({ error: "Expense not found" }, { status: 404 });
+    }
+
+    if (expense.isDeleted && !includeDeleted) {
+      return NextResponse.json({
+        error: "This expense has been deleted"
+      }, { status: 410 });
     }
 
     return NextResponse.json(expense);

@@ -5,7 +5,8 @@ import dbConnect from '@/lib/dbConnect';
 import POSSale from '@/models/POSSale';
 import { restore } from '@/utils/softDelete';
 import { requireAuthAndPermission, validateRequiredFields } from '@/lib/auth-utils';
-import { reapplyStockForPOSSale, recreateJournalForPOSSale } from '@/utils/posManager';
+import { reapplyStockForPOSSale } from '@/utils/inventoryManager';
+import { recreateJournalForPOSSale } from '@/utils/journalAutoCreate';
 
 export async function POST(request: Request) {
     try {
@@ -27,7 +28,6 @@ export async function POST(request: Request) {
         if (!sale.isDeleted) return NextResponse.json({ error: 'Sale is not deleted' }, { status: 400 });
 
         // 1. Re-apply stock deductions (using previous adjustment records as templates)
-        // [FIX Bug 4] reapplyStockForPOSSale now returns { newIds, cogsAmount }
         let newAdjIds: any[] = [];
         let cogsAmount = 0;
 
@@ -58,7 +58,6 @@ export async function POST(request: Request) {
         restored.stockAdjustmentIds = newAdjIds;
 
         // 4. Recreate journal (revenue + COGS in one balanced entry)
-        // [FIX Bug 4] pass cogsAmount so Dr. COGS / Cr. Inventory is re-booked correctly
         const journal = await recreateJournalForPOSSale(
             restored.toObject(),
             user?.id || null,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ratelimit } from "@/utils/rateLimit";
+import { getSessionCookie } from "better-auth/cookies";
 
 // Define public routes that don't require authentication
 const PUBLIC_ROUTES = ['/login'];
@@ -51,10 +52,8 @@ export async function proxy(request: NextRequest) {
 
   // 1. OPTIMISTIC SESSION CHECK (No Database Call)
   // Instead of calling auth.api.getSession() which hits the DB,
-  // we simply check if the session cookie exists.
-  // based on your auth.ts config: advanced: { cookiePrefix: "better-auth" }
-  const sessionCookie = request.cookies.get("better-auth.session_token") ||
-    request.cookies.get("__Secure-better-auth.session_token");
+  // we simply check if the session cookie exists using Better Auth's helper.
+  const sessionCookie = getSessionCookie(request);
 
   const isLikelyAuthenticated = !!sessionCookie;
 
@@ -68,9 +67,11 @@ export async function proxy(request: NextRequest) {
   }
 
   // 3. Handle Public Routes (Login, Register, etc.)
-  // If user is already logged in, redirect them to dashboard
+  // If user is already logged in, redirect them to dashboard.
+  // HOWEVER, if the user was explicitly redirected here by a client-side auth guard
+  // (indicated by callbackURL), we bypass this to prevent infinite redirect loops on stale cookies.
   if (PUBLIC_ROUTES.some(route => path.startsWith(route))) {
-    if (isLikelyAuthenticated) {
+    if (isLikelyAuthenticated && !request.nextUrl.searchParams.has("callbackURL")) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     return NextResponse.next();

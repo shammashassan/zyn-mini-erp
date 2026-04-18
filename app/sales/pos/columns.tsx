@@ -60,7 +60,6 @@ const PaymentIcon = ({ method }: { method: string }) => {
         "Debit Card": CreditCard,
         UPI: Smartphone,
         "Bank Transfer": Building,
-        Cheque: Building,
     };
     const Icon = icons[method] || Banknote;
     return <Icon className="size-3.5" />;
@@ -226,11 +225,22 @@ export const getColumns = (
             accessorKey: "items",
             header: "Items",
             cell: ({ row }) => {
-                const items = row.original.items;
+                const items = row.original.items || [];
+                const displayItems = items.slice(0, 2);
+                const remainingCount = items.length - 2;
+
                 return (
-                    <div className="text-sm">
-                        <span className="font-medium">{items.length}</span>
-                        <span className="text-muted-foreground text-xs"> item(s)</span>
+                    <div className="flex flex-col gap-0.5 text-sm">
+                        {displayItems.map((item, idx) => (
+                            <div key={idx} className="text-muted-foreground">
+                                {item.description}: <span className="font-medium text-foreground">{item.quantity}</span>
+                            </div>
+                        ))}
+                        {remainingCount > 0 && (
+                            <div className="text-muted-foreground">
+                                +{remainingCount} more
+                            </div>
+                        )}
                     </div>
                 );
             },
@@ -238,18 +248,27 @@ export const getColumns = (
         {
             accessorKey: "paymentMethod",
             header: "Payment",
-            cell: ({ row }) => (
-                <Badge variant="secondary" appearance="outline" className="gap-1.5 text-xs font-medium">
-                    <PaymentIcon method={row.original.paymentMethod} />
-                    {row.original.paymentMethod}
-                </Badge>
-            ),
+            cell: ({ row }) => {
+                const method = row.original.paymentMethod;
+                const isCash = method?.toLowerCase() === "cash";
+                return (
+                    <Badge
+                        variant={isCash ? "success" : "primary"}
+                        appearance="outline"
+                        className="gap-1.5 text-xs font-medium"
+                    >
+                        <PaymentIcon method={method} />
+                        {method}
+                    </Badge>
+                );
+            },
             meta: {
                 label: "Payment",
                 variant: "select",
                 options: [
                     { label: "Cash", value: "Cash" },
                     { label: "Credit Card", value: "Credit Card" },
+                    { label: "Debit Card", value: "Debit Card" },
                     { label: "UPI", value: "UPI" },
                     { label: "Bank Transfer", value: "Bank Transfer" },
                 ],

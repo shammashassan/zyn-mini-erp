@@ -318,8 +318,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // AUTO-CREATE JOURNAL ENTRY - ONLY if inventoryStatus is "received" on creation
-    if (savedPurchase.inventoryStatus === 'received') {
+    // AUTO-CREATE JOURNAL ENTRY - ONLY if purchaseStatus is "approved" on creation
+    if (savedPurchase.purchaseStatus === 'approved') {
       try {
         await createJournalForPurchase(
           savedPurchase.toObject(),

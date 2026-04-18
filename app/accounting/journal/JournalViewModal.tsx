@@ -51,14 +51,18 @@ const getReferenceTypeVariant = (type: string) => {
 const getCreatorUsername = (journal: IJournal): string | null => {
   const createAction = journal.actionHistory?.find(
     action => action.action === 'Created' ||
-      action.action.startsWith('Auto-created from')
+      action.action.startsWith('Auto-created from') ||
+      action.action.startsWith('Recreated from')
   );
   return createAction?.username || null;
 };
 
 const getPosterUsername = (journal: IJournal): string | null => {
   const postAction = journal.actionHistory?.find(
-    action => action.action === 'Created' || action.action === 'Updated'
+    action => action.action === 'Created' ||
+      action.action === 'Updated' ||
+      action.action.startsWith('Auto-created from') ||
+      action.action.startsWith('Recreated from')
   );
   return postAction?.username || null;
 };
@@ -77,6 +81,12 @@ function ItemsDisplay({ referenceType, referenceId }: { referenceType: string; r
           endpoint = `/api/invoices/${referenceId}`;
         } else if (referenceType === 'Purchase') {
           endpoint = `/api/purchases/${referenceId}`;
+        } else if (referenceType === 'POSSale') {
+          endpoint = `/api/pos/${referenceId}`;
+        } else if (referenceType === 'SalesReturn' || referenceType === 'PurchaseReturn') {
+          endpoint = `/api/return-notes/${referenceId}`;
+        } else if (referenceType === 'Expense') {
+          endpoint = `/api/expenses/${referenceId}`;
         }
 
         if (!endpoint) {
@@ -84,10 +94,24 @@ function ItemsDisplay({ referenceType, referenceId }: { referenceType: string; r
           return;
         }
 
-        const res = await fetch(endpoint);
+        const res = await fetch(endpoint, {
+          headers: { 'X-Include-Deleted': 'true' }
+        });
         if (res.ok) {
           const data = await res.json();
-          setItems(data.items || []);
+          if (referenceType === 'Expense') {
+            setItems([{
+              description: data.description || data.category || 'Expense',
+              quantity: 1,
+              total: data.amount || 0
+            }]);
+          } else {
+            const mappedItems = (data.items || []).map((item: any) => ({
+              ...item,
+              quantity: item.quantity !== undefined ? item.quantity : item.returnQuantity
+            }));
+            setItems(mappedItems);
+          }
         } else {
           console.error("Failed to fetch items:", await res.text());
         }
@@ -130,9 +154,11 @@ function ItemsDisplay({ referenceType, referenceId }: { referenceType: string; r
             <div className="font-medium wrap-break-word">
               {item.description || '—'}
             </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              Quantity: {item.quantity} {referenceType === 'Purchase' && `× ${formatCurrency(item.unitCost)}`}
-            </div>
+            {referenceType !== 'Expense' && (
+              <div className="text-xs text-muted-foreground mt-1">
+                Quantity: {item.quantity} {referenceType === 'Purchase' && `× ${formatCurrency(item.unitCost)}`}
+              </div>
+            )}
           </div>
           <div className="font-semibold text-right shrink-0">
             {formatCurrency(item.total)}
@@ -251,7 +277,7 @@ export function JournalViewModal({ isOpen, onClose, journal }: JournalViewModalP
                 </div>
               )}
 
-              {(journal.referenceType === 'Invoice' || journal.referenceType === 'Purchase') && journal.referenceId && (
+              {['Invoice', 'Purchase', 'POSSale', 'SalesReturn', 'PurchaseReturn', 'Expense'].includes(journal.referenceType) && journal.referenceId && (
                 <div className="pt-3 sm:pt-4 border-t">
                   <div className="text-xs sm:text-sm font-medium mb-3 flex items-center gap-2">
                     <Package className="h-3 w-3 sm:h-4 sm:w-4" />

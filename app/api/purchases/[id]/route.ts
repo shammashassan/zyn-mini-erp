@@ -10,7 +10,7 @@ import ReturnNote from "@/models/ReturnNote";
 import Party from "@/models/Party";
 import { softDelete } from "@/utils/softDelete";
 import { getUserInfo } from "@/lib/auth-helpers";
-import { createJournalForPurchase } from '@/utils/journalAutoCreate';
+import { handlePurchaseStatusChange } from '@/utils/journalAutoCreate';
 import { voidJournalsForReference } from '@/utils/journalManager';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { createPartySnapshot } from "@/utils/partySnapshot";
@@ -39,8 +39,10 @@ export async function GET(request: Request, context: RequestContext) {
     const _ensureModels = [Purchase, Item, StockAdjustment, Voucher, ReturnNote, Party];
     const { id } = await context.params;
 
+    const includeDeleted = request.headers.get('X-Include-Deleted') === 'true';
+
     // ✅ FIXED: Added partyId and contactId population
-    const purchase = await Purchase.findById(id)
+    const purchaseQuery = Purchase.findById(id)
       .populate({
         path: 'partyId',
         select: 'name company type roles email phone address city district state country postalCode vatNumber'
@@ -62,8 +64,20 @@ export async function GET(request: Request, context: RequestContext) {
         match: { isDeleted: false }
       });
 
+    if (includeDeleted) {
+      purchaseQuery.setOptions({ includeDeleted: true });
+    }
+
+    const purchase = await purchaseQuery;
+
     if (!purchase) {
       return NextResponse.json({ error: "Purchase not found" }, { status: 404 });
+    }
+
+    if (purchase.isDeleted && !includeDeleted) {
+      return NextResponse.json({
+        error: "This purchase has been deleted"
+      }, { status: 410 });
     }
 
     return NextResponse.json(purchase);
@@ -595,24 +609,15 @@ export async function PUT(request: Request, context: RequestContext) {
 
     await currentPurchase.save();
 
-    const finalInventoryStatus = currentPurchase.inventoryStatus;
-
-    // Handle journal for inventory status changes
-    if (oldInventoryStatus !== newInventoryStatus) {
-      if (newInventoryStatus === 'received') {
-        await createJournalForPurchase(
-          currentPurchase.toObject(),
-          user.id,
-          user.username || user.name
-        );
-      } else if (oldInventoryStatus === 'received') {
-        await voidJournalsForReference(
-          currentPurchase._id,
-          user.id,
-          user.username,
-          `Inventory status changed from ${oldInventoryStatus} to ${newInventoryStatus}`
-        );
-      }
+    // Handle journal for purchase status changes
+    if (oldPurchaseStatus !== newPurchaseStatus) {
+      await handlePurchaseStatusChange(
+        currentPurchase.toObject(),
+        oldPurchaseStatus,
+        newPurchaseStatus,
+        user.id,
+        user.username || user.name
+      );
     }
 
     return NextResponse.json(currentPurchase);

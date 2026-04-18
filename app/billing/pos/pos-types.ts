@@ -47,7 +47,8 @@ export interface POSTotals {
 
 export const POS_PAYMENT_METHODS = [
     { value: "Cash", label: "Cash", icon: Banknote },
-    { value: "Credit Card", label: "Card", icon: CreditCard },
+    { value: "Credit Card", label: "Credit Card", icon: CreditCard },
+    { value: "Debit Card", label: "Debit Card", icon: CreditCard },
     { value: "UPI", label: "UPI", icon: Smartphone },
     { value: "Bank Transfer", label: "Bank", icon: Building },
 ] as const;

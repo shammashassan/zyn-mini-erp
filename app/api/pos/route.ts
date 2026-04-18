@@ -8,7 +8,8 @@ import Party from '@/models/Party';
 import generateInvoiceNumber from '@/utils/invoiceNumber';
 import { requireAuthAndPermission } from '@/lib/auth-utils';
 import { extractTableParams, executePaginatedQuery } from '@/lib/query-builders';
-import { deductStockForPOSSale, createJournalForPOSSale } from '@/utils/posManager';
+import { deductStockForPOSSale } from '@/utils/inventoryManager';
+import { createJournalForPOSSale } from '@/utils/journalAutoCreate';
 import { createPartySnapshot } from '@/utils/partySnapshot';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -161,8 +162,6 @@ export async function POST(request: Request) {
         const sale = new POSSale(saleData);
 
         // ── Deduct stock ──────────────────────────────────────────────────────────
-        // [FIX Bug 4] deductStockForPOSSale now returns { adjustmentIds, cogsAmount }
-        // so we pass cogsAmount straight to the journal — no second DB round-trip.
         let stockAdjustmentIds: any[] = [];
         let cogsAmount = 0;
 
@@ -186,7 +185,7 @@ export async function POST(request: Request) {
             sale.toObject(),
             session.user.id,
             session.user.username || session.user.name,
-            cogsAmount  // [FIX Bug 4] pass COGS so Dr. COGS / Cr. Inventory is booked
+            cogsAmount
         );
 
         if (journal) {
