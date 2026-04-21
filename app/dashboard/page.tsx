@@ -11,6 +11,7 @@ import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { useDataTable } from "@/hooks/use-data-table";
 import { ChartAreaInteractive } from "./dashboard-chart";
+import { ProductSalesTable } from "./top-products-table";
 import { SectionCards, type CardData } from "@/components/section-cards";
 import { getColumns, type RecentSale } from "./columns";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
@@ -21,10 +22,12 @@ import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
 import Preloader from "@/components/preloader";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
-import { Banknote, ChevronRight, FileClock, FileText, ShoppingBag, ShoppingCart, Ticket, Truck } from "lucide-react";
+import { Banknote, ChevronRight, FileClock, FileText, ShoppingBag, ShoppingCart, Ticket, Truck, LayoutGrid, List } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { MiniStatsCards } from "@/components/mini-stats-card";
 
 interface DailySummary {
   date: string;
@@ -39,41 +42,61 @@ interface TrendData {
 
 interface DashboardData {
   summary: {
-    currentRevenue: number;
-    lastRevenue: number;
-    currentCosts: number;
-    lastCosts: number;
-    currentProfit: number;
-    lastProfit: number;
-    currentOrders: number;
-    lastOrders: number;
+    revenue: number;
+    purchases: number;
+    expenses: number;
+    netTax: number;
+    orders: number;
+    totalCosts: number;
+    netProfit: number;
+  };
+  previousSummary: {
+    revenue: number;
+    purchases: number;
+    expenses: number;
+    netTax: number;
+    orders: number;
+    totalCosts: number;
+    netProfit: number;
   };
   trends: {
     revenue: TrendData;
-    costs: TrendData;
-    profit: TrendData;
+    purchases: TrendData;
+    expenses: TrendData;
+    netProfit: TrendData;
     orders: TrendData;
   };
   chartData: DailySummary[];
   recentSales: RecentSale[];
+  topProducts: any[];
 }
 
+const HARDCODED_RENT_DAILY = 500;
+const HARDCODED_SALARY_DAILY = 1200;
+const HARDCODED_RENT_MONTHLY = 15000;
+const HARDCODED_SALARY_MONTHLY = 36000;
+
 // ✅ ADDED: Dashboard Skeleton Component
-function DashboardSkeleton({ isBasicUser }: { isBasicUser: boolean }) {
+function DashboardSkeleton({ isBasicUser, viewMode }: { isBasicUser: boolean; viewMode: "mini" | "section" }) {
+  const cardCount = viewMode === "mini" ? 6 : 4;
+  const gridCols = viewMode === "mini" 
+    ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" 
+    : "grid-cols-1 md:grid-cols-2 lg:grid-cols-4";
+
   return (
     <div className="space-y-6 animate-in fade-in-50 px-4 lg:px-6">
       {/* Metrics Cards Skeleton */}
       {!isBasicUser && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className={cn("grid gap-4", gridCols)}>
+          {Array.from({ length: cardCount }).map((_, i) => (
             <Card key={i}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-[100px]" />
+                <Skeleton className="h-4 w-[80px]" />
                 <Skeleton className="h-4 w-4 rounded-full" />
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-8 w-[120px] mb-2" />
-                <Skeleton className="h-3 w-[160px]" />
+                <Skeleton className="h-8 w-[100px] mb-2" />
+                <Skeleton className="h-3 w-[140px]" />
               </CardContent>
             </Card>
           ))}
@@ -138,6 +161,8 @@ function DashboardContent() {
   const searchParams = useSearchParams();
 
   const [showWelcome, setShowWelcome] = useState(() => searchParams.get("welcome") === "true");
+  const [timeRange, setTimeRange] = useState<"daily" | "monthly">("daily");
+  const [viewMode, setViewMode] = useState<"mini" | "section">("mini");
 
   useEffect(() => {
     if (searchParams.get("welcome") === "true") {
@@ -159,16 +184,15 @@ function DashboardContent() {
   }, []);
 
   // ✅ UPDATED: Added 'background' param for silent refreshes
-  const fetchDashboardData = useCallback(async (background = false) => {
+  const fetchDashboardData = useCallback(async (background = false, range = timeRange) => {
     if (!canRead) return;
 
     try {
-      // Only show spinner if not a background fetch
       if (!background) {
         setIsLoading(true);
       }
 
-      const response = await fetch("/api/dashboard");
+      const response = await fetch(`/api/dashboard?range=${range}`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch dashboard data");
@@ -186,14 +210,14 @@ function DashboardContent() {
         setIsLoading(false);
       }
     }
-  }, [canRead]);
+  }, [canRead, timeRange]);
 
-  // ✅ UPDATED: Standard fetch on mount
+  // ✅ UPDATED: Standard fetch on mount & range change
   useEffect(() => {
     if (isMounted && session && canRead) {
-      fetchDashboardData();
+      fetchDashboardData(false, timeRange);
     }
-  }, [session, canRead, isMounted, fetchDashboardData]);
+  }, [session, canRead, isMounted, fetchDashboardData, timeRange]);
 
   // ✅ NEW: Window Focus Listener - SILENT MODE
   useEffect(() => {
@@ -252,47 +276,107 @@ function DashboardContent() {
     if (!dashboardData) return [];
 
     const { summary, trends } = dashboardData;
-    const profitMargin = summary.currentRevenue > 0
-      ? ((summary.currentProfit / summary.currentRevenue) * 100).toFixed(1)
+    const profitMargin = summary.revenue > 0
+      ? ((summary.netProfit / summary.revenue) * 100).toFixed(1)
       : '0';
 
     return [
       {
         label: "Total Revenue",
-        value: formatCompactCurrency(summary.currentRevenue),
+        value: formatCompactCurrency(summary.revenue),
         trend: trends.revenue.trend,
         change: `${trends.revenue.change >= 0 ? '+' : ''}${trends.revenue.change.toFixed(1)}%`,
         note: trends.revenue.trend === "up" ? "Revenue trending up" : "Revenue declining",
-        subtext: `Revenue excluding VAT`,
+        subtext: `Sales excluding VAT`,
       },
       {
-        label: "Total Costs",
-        value: formatCompactCurrency(summary.currentCosts),
-        trend: trends.costs.trend,
-        change: `${trends.costs.change >= 0 ? '+' : ''}${trends.costs.change.toFixed(1)}%`,
-        note: trends.costs.trend === "up" ? "Costs increased" : "Costs reduced",
-        subtext: "Including purchases & net taxes",
+        label: "Direct Costs",
+        value: formatCompactCurrency(summary.totalCosts),
+        trend: summary.totalCosts > dashboardData.previousSummary.totalCosts ? "up" : "down",
+        change: `${summary.totalCosts >= dashboardData.previousSummary.totalCosts ? '+' : ''}${(Math.abs(summary.totalCosts - dashboardData.previousSummary.totalCosts) / (dashboardData.previousSummary.totalCosts || 1) * 100).toFixed(1)}%`,
+        note: summary.totalCosts > dashboardData.previousSummary.totalCosts ? "Costs increased" : "Costs reduced",
+        subtext: "Purchases & expenses",
       },
       {
         label: "Net Profit",
-        value: formatCompactCurrency(summary.currentProfit),
-        trend: trends.profit.trend,
-        change: `${trends.profit.change >= 0 ? '+' : ''}${trends.profit.change.toFixed(1)}%`,
-        note: summary.currentProfit >= 0 ? "Profitable month" : "Loss this month",
+        value: formatCompactCurrency(summary.netProfit),
+        trend: trends.netProfit.trend,
+        change: `${trends.netProfit.change >= 0 ? '+' : ''}${trends.netProfit.change.toFixed(1)}%`,
+        note: summary.netProfit >= 0 ? "Profitable performance" : "Operating loss",
         subtext: `Margin: ${profitMargin}%`,
       },
       {
         label: "Orders",
-        value: summary.currentOrders.toString(),
+        value: summary.orders.toString(),
         trend: trends.orders.trend,
         change: `${trends.orders.change >= 0 ? '+' : ''}${trends.orders.change.toFixed(1)}%`,
         note: "Approved sales",
-        subtext: summary.currentOrders > 0
-          ? `Avg: ${formatCurrency(summary.currentRevenue / summary.currentOrders)} per order`
+        subtext: summary.orders > 0
+          ? `Avg: ${formatCurrency(summary.revenue / summary.orders)} per order`
           : 'No orders yet',
       },
     ];
   }, [dashboardData]);
+
+  const miniCards = useMemo(() => {
+    if (!dashboardData) return [];
+    const { summary, trends } = dashboardData;
+    
+    const rent = timeRange === 'daily' ? HARDCODED_RENT_DAILY : HARDCODED_RENT_MONTHLY;
+    const salary = timeRange === 'daily' ? HARDCODED_SALARY_DAILY : HARDCODED_SALARY_MONTHLY;
+    const netBalance = summary.netProfit - rent - salary;
+
+    return [
+      { 
+        label: "Sales", 
+        value: formatCompactCurrency(summary.revenue), 
+        change: `${trends.revenue.change.toFixed(1)}%`, 
+        trend: trends.revenue.trend,
+        note: trends.revenue.change >= 0 ? "Sales increasing" : "Sales decreasing",
+        subtext: "Excluding VAT"
+      },
+      { 
+        label: "Purchases", 
+        value: formatCompactCurrency(summary.purchases), 
+        change: `${trends.purchases.change.toFixed(1)}%`, 
+        trend: trends.purchases.trend,
+        note: trends.purchases.change >= 0 ? "Purchases up" : "Purchases down",
+        subtext: "Stock acquisition"
+      },
+      { 
+        label: "Expenses", 
+        value: formatCompactCurrency(summary.expenses), 
+        change: `${trends.expenses.change.toFixed(1)}%`, 
+        trend: trends.expenses.trend,
+        note: trends.expenses.change >= 0 ? "Expenses rising" : "Expenses falling",
+        subtext: "Operational spend"
+      },
+      { 
+        label: "Rent", 
+        value: formatCompactCurrency(rent), 
+        change: "Fixed", 
+        trend: "neutral" as const,
+        note: "Fixed overhead",
+        subtext: "Monthly rent"
+      },
+      { 
+        label: "Salary", 
+        value: formatCompactCurrency(salary), 
+        change: "Fixed", 
+        trend: "neutral" as const,
+        note: "Payroll obligation",
+        subtext: "Staff salaries"
+      },
+      { 
+        label: "Balance", 
+        value: formatCompactCurrency(netBalance), 
+        change: `${trends.netProfit.change.toFixed(1)}%`, 
+        trend: trends.netProfit.trend,
+        note: netBalance >= 0 ? "Positive balance" : "Reflects deficit",
+        subtext: "Net after costs"
+      },
+    ];
+  }, [dashboardData, timeRange]);
 
   if (!isMounted || isPending) {
     return (
@@ -327,27 +411,74 @@ function DashboardContent() {
 
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-            <div className="px-4 lg:px-6">
-              <h1 className="text-2xl font-bold tracking-tight">
-                Welcome back, {session.user.name || session.user.email}!
-              </h1>
-              <p className="text-muted-foreground">
-                {isBasicUser
-                  ? "Access your recent sales and quick actions."
-                  : "Here's what's happening with your business today."}
-              </p>
+            <div className="flex flex-col gap-4 px-4 lg:px-6 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">
+                  Welcome back, {session.user.name || session.user.email}!
+                </h1>
+                <p className="text-muted-foreground">
+                  {isBasicUser
+                    ? "Access your recent sales and quick actions."
+                    : "Here's what's happening with your business today."}
+                </p>
+              </div>
+
+              {!isBasicUser && (
+                <div className="flex items-center gap-2">
+                  <ToggleGroup 
+                    type="single" 
+                    value={timeRange} 
+                    onValueChange={(v) => v && setTimeRange(v as any)}
+                  >
+                    <ToggleGroupItem value="daily" className="px-3">Daily</ToggleGroupItem>
+                    <ToggleGroupItem value="monthly" className="px-3">Monthly</ToggleGroupItem>
+                  </ToggleGroup>
+                  
+                  <Separator orientation="vertical" className="h-8 mx-1" />
+
+                  <ToggleGroup 
+                    type="single" 
+                    value={viewMode} 
+                    onValueChange={(v) => v && setViewMode(v as any)}
+                  >
+                    <ToggleGroupItem value="mini" aria-label="Mini view">
+                      <LayoutGrid className="h-4 w-4" />
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="section" aria-label="Section view">
+                      <List className="h-4 w-4" />
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+              )}
             </div>
 
             {/* ✅ UPDATED: Applied transition-opacity & Skeleton */}
             <div className={cn("transition-opacity duration-200", isLoading && !dashboardData ? "opacity-50" : "opacity-100")}>
               {isLoading && !dashboardData ? (
-                <DashboardSkeleton isBasicUser={isBasicUser} />
+                <DashboardSkeleton isBasicUser={isBasicUser} viewMode={viewMode} />
               ) : (
                 <>
-                  {!isBasicUser && <SectionCards cards={cards} />}
+                  {!isBasicUser && (
+                    <div className="space-y-6">
+                      {viewMode === "mini" ? (
+                        <MiniStatsCards cards={miniCards} />
+                      ) : (
+                        <SectionCards cards={cards} />
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex flex-col gap-4 xl:gap-6 mt-4 md:mt-6 px-4 lg:px-6">
-                    {!isBasicUser && <ChartAreaInteractive chartData={dashboardData?.chartData || []} />}
+                    {!isBasicUser && (
+                      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] 2xl:grid-cols-[2fr_1fr] gap-4 xl:gap-6">
+                        <div className="min-w-0 h-full">
+                          <ChartAreaInteractive chartData={dashboardData?.chartData || []} />
+                        </div>
+                        <div className="min-w-0 h-full">
+                          <ProductSalesTable products={dashboardData?.topProducts || []} />
+                        </div>
+                      </div>
+                    )}
 
                     {isBasicUser && (
                       <>

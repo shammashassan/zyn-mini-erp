@@ -32,7 +32,10 @@ export function SectionCards({ cards }: { cards: CardData[] }) {
               {card.value}
             </CardTitle>
             <CardAction>
-              <Badge variant="outline" className="text-foreground">
+              <Badge
+                variant={card.trend === "up" ? "success" : "destructive"}
+                appearance="outline"
+              >
                 {card.trend === "up" ? <TrendingUp /> : <TrendingDown />}
                 {card.change}
               </Badge>

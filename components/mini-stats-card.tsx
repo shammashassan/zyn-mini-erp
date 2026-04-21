@@ -1,46 +1,59 @@
-import { ArrowDownRightIcon, ArrowUpRightIcon, MinusIcon } from "lucide-react";
+import { TrendingDown, TrendingUp, MinusIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+    Card,
+    CardAction,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
 
-import { cn } from "@/lib/utils";
-
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-
-export interface MiniStatsCardProps {
-    title: string;
+export type MiniCardData = {
+    label: string;
     value: string | number;
-    changeValue: string | number;
-    direction?: "up" | "down" | "neutral";
-}
-
-export const MiniStatsCard = ({ title, value, changeValue, direction = "up" }: MiniStatsCardProps) => {
-    const variants = {
-        up: {
-            Icon: ArrowUpRightIcon,
-            color: "text-success",
-        },
-        down: {
-            Icon: ArrowDownRightIcon,
-            color: "text-destructive",
-        },
-        neutral: {
-            Icon: MinusIcon,
-            color: "text-muted-foreground",
-        },
-    };
-
-    const { Icon, color } = variants[direction];
-
-    return (
-        <Card className="@container/card gap-4 py-4">
-            <CardHeader className="px-4">
-                <CardDescription className="font-medium">{title}</CardDescription>
-                <CardTitle className="text-2xl font-semibold @[600px]/card:text-4xl @[800px]/card:text-5xl">
-                    {value}
-                </CardTitle>
-            </CardHeader>
-            <CardFooter className={cn("flex-row items-center gap-1 px-4 text-sm font-medium", color)}>
-                <Icon className="size-4" />
-                <span>{changeValue}</span>
-            </CardFooter>
-        </Card>
-    );
+    change?: string | number;
+    trend?: "up" | "down" | "neutral";
+    note?: string;
+    subtext?: string;
 };
+
+export function MiniStatsCards({ cards }: { cards: MiniCardData[] }) {
+    return (
+        <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @4xl/main:grid-cols-3 @7xl/main:grid-cols-6">
+            {cards.map((card, idx) => {
+                const Icon = card.trend === "up" ? TrendingUp : card.trend === "down" ? TrendingDown : MinusIcon;
+                const badgeVariant = card.trend === "up" ? "success" : card.trend === "down" ? "destructive" : "secondary";
+
+                return (
+                    <Card key={idx} className="@container/card py-4">
+                        <CardHeader className="px-4">
+                            <CardDescription className="font-medium">{card.label}</CardDescription>
+                            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+                                {card.value}
+                            </CardTitle>
+                            {card.change && (
+                                <CardAction>
+                                    <Badge variant={badgeVariant} appearance="outline">
+                                        <Icon className="size-3" />
+                                        {card.change}
+                                    </Badge>
+                                </CardAction>
+                            )}
+                        </CardHeader>
+                        {(card.note || card.subtext) && (
+                            <CardFooter className="flex-col items-start gap-1.5 px-4 text-sm">
+                                {card.note && (
+                                    <div className="line-clamp-1 flex gap-2 font-medium">
+                                        {card.note} <Icon className="size-4" />
+                                    </div>
+                                )}
+                                {card.subtext && <div className="text-muted-foreground">{card.subtext}</div>}
+                            </CardFooter>
+                        )}
+                    </Card>
+                );
+            })}
+        </div>
+    );
+}

@@ -9,6 +9,8 @@ import ChartOfAccount from "@/models/ChartOfAccount";
 import POSSale from "@/models/POSSale";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { startOfMonth, endOfMonth, subMonths, eachDayOfInterval, format } from 'date-fns';
+import Item from "@/models/Item";
+import mongoose from "mongoose";
 
 // Types for aggregated data
 interface DailySummary {
@@ -58,7 +60,7 @@ interface AggregatedPeriodResult {
   orderCount: number;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { error } = await requireAuthAndPermission({
       dashboard: ["read"],
@@ -67,18 +69,35 @@ export async function GET() {
 
     await dbConnect();
 
-    const _ensuremodel = [Invoice, Journal, Party, ChartOfAccount, POSSale];
+    const _ensuremodel = [Invoice, Journal, Party, ChartOfAccount, POSSale, Item];
+    const { searchParams } = new URL(request.url);
+    const range = searchParams.get("range") || "monthly";
 
     const now = new Date();
-    // Set 'now' to end of day to include today's transactions
     const todayEnd = new Date(now);
     todayEnd.setHours(23, 59, 59, 999);
 
-    const currentMonthStart = startOfMonth(now);
-    const lastMonthStart = startOfMonth(subMonths(now, 1));
-    const lastMonthEnd = endOfMonth(subMonths(now, 1));
+    let currentStart: Date;
+    let previousStart: Date;
+    let previousEnd: Date;
+
+    if (range === "daily") {
+      currentStart = new Date(now);
+      currentStart.setHours(0, 0, 0, 0);
+
+      previousStart = new Date(currentStart);
+      previousStart.setDate(previousStart.getDate() - 1);
+
+      previousEnd = new Date(previousStart);
+      previousEnd.setHours(23, 59, 59, 999);
+    } else {
+      // Default to Monthly
+      currentStart = startOfMonth(now);
+      previousStart = startOfMonth(subMonths(now, 1));
+      previousEnd = endOfMonth(subMonths(now, 1));
+    }
+
     const chartStartDate = subMonths(now, 3);
-    // Ensure chart starts at beginning of that day
     chartStartDate.setHours(0, 0, 0, 0);
 
     // 1. Pre-fetch Accounts to Identify Groups
@@ -111,8 +130,6 @@ export async function GET() {
         $project: {
           entryDate: 1,
           referenceType: 1,
-          // Calculate Metrics Per Journal using $reduce
-          // Use $ifNull to handle potentially missing 'entries' array or missing fields
           revenue: {
             $reduce: {
               input: { $ifNull: ["$entries", []] },
@@ -169,11 +186,10 @@ export async function GET() {
       },
       {
         $facet: {
-          // A. Current Month Summary
           "currentSummary": [
             {
               $match: {
-                entryDate: { $gte: currentMonthStart, $lte: todayEnd }
+                entryDate: { $gte: currentStart, $lte: todayEnd }
               }
             },
             {
@@ -187,11 +203,10 @@ export async function GET() {
               }
             }
           ],
-          // B. Last Month Summary
-          "lastSummary": [
+          "previousSummary": [
             {
               $match: {
-                entryDate: { $gte: lastMonthStart, $lte: lastMonthEnd }
+                entryDate: { $gte: previousStart, $lte: previousEnd }
               }
             },
             {
@@ -205,7 +220,6 @@ export async function GET() {
               }
             }
           ],
-          // C. Daily Chart Data
           "dailyData": [
             {
               $group: {
@@ -222,19 +236,22 @@ export async function GET() {
     ]);
 
     const currentRes: AggregatedPeriodResult = aggResult[0].currentSummary[0] || { revenue: 0, expenses: 0, purchases: 0, netTax: 0, orderCount: 0 };
-    const lastRes: AggregatedPeriodResult = aggResult[0].lastSummary[0] || { revenue: 0, expenses: 0, purchases: 0, netTax: 0, orderCount: 0 };
+    const previousRes: AggregatedPeriodResult = aggResult[0].previousSummary[0] || { revenue: 0, expenses: 0, purchases: 0, netTax: 0, orderCount: 0 };
     const dailyRes: any[] = aggResult[0].dailyData;
 
     // 3. Process Summary Data
-    const calculateStats = (res: AggregatedPeriodResult) => ({
+    const prepareStats = (res: AggregatedPeriodResult) => ({
       revenue: res.revenue,
-      costs: res.expenses + res.purchases + res.netTax,
-      profit: res.revenue - (res.expenses + res.purchases + res.netTax),
-      orders: res.orderCount
+      purchases: res.purchases,
+      expenses: res.expenses,
+      netTax: res.netTax,
+      orders: res.orderCount,
+      totalCosts: res.expenses + res.purchases + res.netTax,
+      netProfit: res.revenue - (res.expenses + res.purchases + res.netTax),
     });
 
-    const currentStats = calculateStats(currentRes);
-    const lastStats = calculateStats(lastRes);
+    const currentStats = prepareStats(currentRes);
+    const previousStats = prepareStats(previousRes);
 
     // 4. Process Daily Data
     const dailyMap = new Map(dailyRes.map(d => [d._id, d]));
@@ -254,32 +271,17 @@ export async function GET() {
       };
     });
 
-    // 5. Fetch Recent Sales (Invoices + POS)
+    // 5. Fetch Recent Sales
     const [recentInvoicesList, recentPOSSales] = await Promise.all([
-      Invoice.find({
-        isDeleted: false,
-        status: "approved"
-      })
+      Invoice.find({ isDeleted: false, status: "approved" })
         .select("invoiceNumber partySnapshot partyId grandTotal createdAt status")
-        .populate({
-          path: 'partyId',
-          select: 'name company type'
-        })
-        .sort({ createdAt: -1 })
-        .limit(10)
-        .lean<any[]>(),
+        .populate({ path: 'partyId', select: 'name company type' })
+        .sort({ createdAt: -1 }).limit(10).lean<any[]>(),
 
-      POSSale.find({
-        isDeleted: false,
-      })
+      POSSale.find({ isDeleted: false })
         .select("saleNumber customerName partySnapshot partyId grandTotal createdAt")
-        .populate({
-          path: 'partyId',
-          select: 'name company type'
-        })
-        .sort({ createdAt: -1 })
-        .limit(10)
-        .lean<any[]>()
+        .populate({ path: 'partyId', select: 'name company type' })
+        .sort({ createdAt: -1 }).limit(10).lean<any[]>()
     ]);
 
     const combinedSales = [
@@ -305,31 +307,95 @@ export async function GET() {
       }))
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 10);
 
-    // 6. Calculate Trends
-    const revenueTrend = calculateTrend(currentStats.revenue, lastStats.revenue);
-    const costsTrend = calculateTrend(currentStats.costs, lastStats.costs);
-    const profitTrend = calculateTrend(currentStats.profit, lastStats.profit);
-    const ordersTrend = calculateTrend(currentStats.orders, lastStats.orders);
+    // 6. Calculate Top Selling Products
+    const [invoiceItemStats, posItemStats] = await Promise.all([
+      Invoice.aggregate([
+        {
+          $match: {
+            isDeleted: false,
+            status: "approved",
+            invoiceDate: { $gte: currentStart, $lte: todayEnd }
+          }
+        },
+        { $unwind: "$items" },
+        {
+          $group: {
+            _id: "$items.itemId",
+            sales: { $sum: "$items.quantity" },
+            revenue: { $sum: "$items.total" }
+          }
+        }
+      ]),
+      POSSale.aggregate([
+        {
+          $match: {
+            isDeleted: false,
+            createdAt: { $gte: currentStart, $lte: todayEnd }
+          }
+        },
+        { $unwind: "$items" },
+        {
+          $group: {
+            _id: "$items.itemId",
+            sales: { $sum: "$items.quantity" },
+            revenue: { $sum: "$items.total" }
+          }
+        }
+      ])
+    ]);
 
+    const productStatsMap = new Map();
+    const processStats = (stats: any[]) => {
+      for (const stat of stats) {
+        if (!stat._id) continue;
+        const id = String(stat._id);
+        const existing = productStatsMap.get(id) || { sales: 0, revenue: 0 };
+        productStatsMap.set(id, {
+          sales: existing.sales + stat.sales,
+          revenue: existing.revenue + stat.revenue,
+        });
+      }
+    };
+    processStats(invoiceItemStats);
+    processStats(posItemStats);
+
+    const topItemIds = Array.from(productStatsMap.keys())
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
+
+    const topItemsData = await Item.find({ _id: { $in: topItemIds }, isDeleted: false })
+      .select("name sku category stock minStockLevel")
+      .lean<any[]>();
+
+    const topProducts = topItemsData.map(item => {
+      const stats = productStatsMap.get(String(item._id));
+
+      return {
+        id: String(item._id),
+        name: item.name || "Unknown Item",
+        category: item.category || "Uncategorized",
+        price: 0,
+        sales: stats?.sales || 0,
+        revenue: stats?.revenue || 0
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 6);
+
+    // 7. Calculate Trends
     return NextResponse.json({
-      summary: {
-        currentRevenue: currentStats.revenue,
-        lastRevenue: lastStats.revenue,
-        currentCosts: currentStats.costs,
-        lastCosts: lastStats.costs,
-        currentProfit: currentStats.profit,
-        lastProfit: lastStats.profit,
-        currentOrders: currentStats.orders,
-        lastOrders: lastStats.orders,
-      },
+      summary: currentStats,
+      previousSummary: previousStats,
       trends: {
-        revenue: revenueTrend,
-        costs: costsTrend,
-        profit: profitTrend,
-        orders: ordersTrend,
+        revenue: calculateTrend(currentStats.revenue, previousStats.revenue),
+        purchases: calculateTrend(currentStats.purchases, previousStats.purchases),
+        expenses: calculateTrend(currentStats.expenses, previousStats.expenses),
+        netProfit: calculateTrend(currentStats.netProfit, previousStats.netProfit),
+        orders: calculateTrend(currentStats.orders, previousStats.orders),
       },
       chartData,
-      recentSales: combinedSales
+      recentSales: combinedSales,
+      topProducts
     });
 
   } catch (error) {
@@ -340,6 +406,7 @@ export async function GET() {
     );
   }
 }
+
 
 function calculateTrend(current: number, previous: number) {
   if (previous === 0) {

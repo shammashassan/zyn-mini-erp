@@ -22,7 +22,7 @@ export function StatsCards({ data, columns = 3 }: StatsCardsProps) {
   return (
     <div className="w-full">
       <dl className={cn(
-        "grid grid-cols-1 gap-6 sm:grid-cols-2 w-full",
+        "*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:shadow-xs grid grid-cols-1 gap-6 sm:grid-cols-2 w-full",
         columns === 3 ? "lg:grid-cols-3" : "xl:grid-cols-4"
       )}>
         {data.map((item) => (
@@ -36,8 +36,8 @@ export function StatsCards({ data, columns = 3 }: StatsCardsProps) {
                   <Badge
                     variant={
                       item.changeType === "positive" ? "success" :
-                      item.changeType === "negative" ? "destructive" :
-                      "neutral"
+                        item.changeType === "negative" ? "destructive" :
+                          "neutral"
                     }
                     appearance="outline"
                   >

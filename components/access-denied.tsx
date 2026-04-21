@@ -13,25 +13,25 @@ interface AccessDeniedProps {
    * @default "Access Denied"
    */
   title?: string;
-  
+
   /**
    * The description to display
    * @default "You don't have permission to access this page."
    */
   description?: string;
-  
+
   /**
    * The icon to display
    * @default ShieldAlert
    */
   icon?: React.ComponentType<{ className?: string }>;
-  
+
   /**
    * Whether to show the go back button
    * @default true
    */
   showBackButton?: boolean;
-  
+
   /**
    * Custom action button
    */
@@ -60,14 +60,14 @@ export function AccessDenied({
               {/* Animated icon container */}
               <div className="relative mb-8">
                 <div className="absolute inset-0 bg-destructive/20 rounded-full blur-2xl animate-pulse" />
-                <div className="relative p-8 bg-gradient-to-br from-destructive/10 to-destructive/5 rounded-full border-2 border-destructive/20">
+                <div className="relative p-8 bg-linear-to-br from-destructive/10 to-destructive/5 rounded-full border-2 border-destructive/20">
                   <Icon className="h-12 w-12 text-destructive" />
                 </div>
               </div>
 
               {/* Text content */}
               <div className="space-y-4 mb-10">
-                <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
+                <h2 className="text-4xl font-bold tracking-tight bg-linear-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
                   {title}
                 </h2>
                 <p className="text-muted-foreground text-lg max-w-md leading-relaxed">
@@ -89,7 +89,7 @@ export function AccessDenied({
                   </Button>
                 )}
                 {action && (
-                  <Button 
+                  <Button
                     size="lg"
                     onClick={action.onClick}
                     className="min-w-[140px]"

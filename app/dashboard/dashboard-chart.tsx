@@ -44,7 +44,7 @@ const chartConfig = {
     color: "var(--chart-1)",
   },
   expenses: {
-    label: "Expenses", 
+    label: "Expenses",
     color: "var(--chart-2)",
   },
 } satisfies ChartConfig
@@ -69,20 +69,20 @@ export function ChartAreaInteractive({ chartData = [] }: ChartAreaInteractivePro
   // Memoize filtered data for performance
   const filteredData = React.useMemo(() => {
     if (chartData.length === 0) return []
-    
+
     const sortedData = [...chartData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     const referenceDate = new Date(sortedData[sortedData.length - 1]?.date || new Date())
-    
+
     let daysToSubtract = 30 // Default to 30 instead of 90
     if (timeRange === "90d") {
       daysToSubtract = 90
     } else if (timeRange === "7d") {
       daysToSubtract = 7
     }
-    
+
     const startDate = new Date(referenceDate)
     startDate.setDate(startDate.getDate() - daysToSubtract)
-    
+
     return sortedData.filter(item => {
       const date = new Date(item.date)
       return date >= startDate
@@ -92,16 +92,16 @@ export function ChartAreaInteractive({ chartData = [] }: ChartAreaInteractivePro
   // Calculate Y-axis domain to prevent negative values - memoized for performance
   const yAxisDomain = React.useMemo(() => {
     if (filteredData.length === 0) return [0, 100]
-    
+
     const maxSales = Math.max(...filteredData.map(d => d.sales || 0))
     const maxExpenses = Math.max(...filteredData.map(d => d.expenses || 0))
     const maxValue = Math.max(maxSales, maxExpenses)
-    
+
     return [0, Math.ceil(maxValue * 1.1)]
   }, [filteredData])
 
   return (
-    <Card className="@container/card">
+    <Card className="@container/card h-full flex flex-col">
       <CardHeader>
         <CardTitle>Sales & Expenses Trend</CardTitle>
         <CardDescription>
@@ -116,7 +116,7 @@ export function ChartAreaInteractive({ chartData = [] }: ChartAreaInteractivePro
             value={timeRange}
             onValueChange={setTimeRange}
             variant="outline"
-            className="hidden *:data-[slot=toggle-group-item]:!px-4 @[767px]/card:flex"
+            className="hidden *:data-[slot=toggle-group-item]:px-4! @[767px]/card:flex"
           >
             <ToggleGroupItem value="90d">Last 3 months</ToggleGroupItem>
             <ToggleGroupItem value="30d">Last 30 days</ToggleGroupItem>
@@ -144,7 +144,7 @@ export function ChartAreaInteractive({ chartData = [] }: ChartAreaInteractivePro
           </Select>
         </CardAction>
       </CardHeader>
-      <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
+      <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6 flex-1">
         <ChartContainer
           config={chartConfig}
           className="aspect-auto h-[250px] w-full"
@@ -188,7 +188,7 @@ export function ChartAreaInteractive({ chartData = [] }: ChartAreaInteractivePro
                 return formatMonthDay(date)
               }}
             />
-            
+
             <ChartTooltip
               cursor={false}
               defaultIndex={isMobile ? -1 : 10}
