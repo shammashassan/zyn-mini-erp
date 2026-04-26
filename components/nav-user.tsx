@@ -77,6 +77,9 @@ export function NavUser({ user }: NavUserProps) {
       // CHANGE 2: Use the wrapper and await it.
       // We perform the redirect manually after the cookie is cleared.
       await signOut();
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("ZynMiniErp_welcome_shown");
+      }
       toast.success("Logged out successfully.")
       router.push("/login")
 
@@ -142,7 +145,7 @@ export function NavUser({ user }: NavUserProps) {
             </DropdownMenuTrigger>
 
             <DropdownMenuContent
-              className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-56 rounded-lg"
+              className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
               side={isMobile ? "bottom" : "right"}
               align="end"
               sideOffset={4}

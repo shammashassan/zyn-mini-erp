@@ -27,12 +27,12 @@ export function LoginForm({
 }: React.ComponentProps<"div">) {
   const router = useRouter();
   const { data: session } = useSession();
-  
+
   // Form States
   const [emailOrUsername, setEmailOrUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(false);
-  
+
   // UI States
   const [showPassword, setShowPassword] = React.useState(false);
   const [rememberMe, setRememberMe] = React.useState(false);
@@ -41,7 +41,7 @@ export function LoginForm({
 
   // 1. Check for saved user on mount
   React.useEffect(() => {
-    const saved = localStorage.getItem("ZynErp_recent_user");
+    const saved = localStorage.getItem("ZynMiniErp_recent_user");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -50,7 +50,7 @@ export function LoginForm({
         // or just use it for display.
         setEmailOrUsername(parsed.username || parsed.email);
       } catch (e) {
-        localStorage.removeItem("ZynErp_recent_user");
+        localStorage.removeItem("ZynMiniErp_recent_user");
       }
     }
   }, []);
@@ -100,11 +100,11 @@ export function LoginForm({
           image: result.data.user.image,
           username: (result.data.user as any).username, // Type assertion if username isn't in default types
         };
-        localStorage.setItem("ZynErp_recent_user", JSON.stringify(userData));
+        localStorage.setItem("ZynMiniErp_recent_user", JSON.stringify(userData));
       }
 
       toast.success("Login successful!");
-      
+
       // Start the preloader animation (which handles the redirect when finished)
       setShowPreloader(true);
 
@@ -119,25 +119,25 @@ export function LoginForm({
     setSavedUser(null);
     setEmailOrUsername("");
     setPassword("");
-    localStorage.removeItem("ZynErp_recent_user");
+    localStorage.removeItem("ZynMiniErp_recent_user");
   };
 
   return (
     <div className={cn("flex flex-col gap-6 dark text-foreground", className)} {...props}>
-      
+
       {showPreloader && (
-        <Preloader 
+        <Preloader
           mode="wait"
           onComplete={() => {
             router.push('/dashboard?welcome=true');
-          }} 
+          }}
         />
       )}
 
       {/* Modern Glass Card */}
       <Card className="overflow-hidden p-0 border-white/10 bg-black/40 backdrop-blur-xl shadow-2xl">
         <CardContent className="grid p-0 md:grid-cols-2">
-          
+
           <form onSubmit={handleLogin} className="p-6 md:p-12 flex flex-col justify-center relative">
             <div className="flex flex-col gap-6">
 
@@ -162,7 +162,7 @@ export function LoginForm({
                   </div>
                 </div>
               )}
-              
+
               {/* HEADER SECTION */}
               <div className="flex flex-col items-center text-center">
                 <h1 className="text-2xl font-bold tracking-tight text-white">
@@ -171,14 +171,14 @@ export function LoginForm({
                 <div className="text-zinc-400 text-sm mt-2">
                   {savedUser ? (
                     <div className="flex flex-col gap-1 items-center">
-                       <span className="font-medium text-zinc-300">{savedUser.email}</span>
-                       <button 
-                          type="button" 
-                          onClick={handleSwitchAccount}
-                          className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline"
-                        >
-                          Not you? Switch account
-                        </button>
+                      <span className="font-medium text-zinc-300">{savedUser.email}</span>
+                      <button
+                        type="button"
+                        onClick={handleSwitchAccount}
+                        className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline"
+                      >
+                        Not you? Switch account
+                      </button>
                     </div>
                   ) : (
                     "Login to your Company Dashboard"
@@ -188,7 +188,7 @@ export function LoginForm({
 
               {/* INPUTS SECTION */}
               <div className="grid gap-4">
-                
+
                 {!savedUser && (
                   <div className="grid gap-2">
                     <Label htmlFor="email-username" className="text-zinc-300">Email or Username</Label>
@@ -204,7 +204,7 @@ export function LoginForm({
                     />
                   </div>
                 )}
-                
+
                 <div className="grid gap-2">
                   <div className="flex items-center">
                     <Label htmlFor="password" className="text-zinc-300">Password</Label>
@@ -251,18 +251,18 @@ export function LoginForm({
                       onChange={(e) => setRememberMe(e.target.checked)}
                       className="h-4 w-4 rounded border-white/10 bg-zinc-900/50 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-zinc-900 accent-indigo-600"
                     />
-                    <Label 
-                      htmlFor="remember" 
+                    <Label
+                      htmlFor="remember"
                       className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-zinc-400"
                     >
                       Remember login info
                     </Label>
                   </div>
                 )}
-                
-                <Button 
-                  type="submit" 
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-11 mt-2 font-medium transition-all duration-200 shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(79,70,229,0.5)] border-0" 
+
+                <Button
+                  type="submit"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-11 mt-2 font-medium transition-all duration-200 shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(79,70,229,0.5)] border-0"
                   disabled={isLoading}
                 >
                   {isLoading ? "Logging in..." : "Login"}
@@ -270,9 +270,9 @@ export function LoginForm({
               </div>
             </div>
           </form>
-          
+
           <div className="relative hidden md:flex items-center justify-center p-12 bg-zinc-900/50">
-            <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/20 to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-t from-indigo-900/20 to-transparent" />
             <img
               src="/Company_logo.png"
               alt="Company Logo"

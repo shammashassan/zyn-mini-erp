@@ -170,15 +170,28 @@ function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [showWelcome, setShowWelcome] = useState(() => searchParams.get("welcome") === "true");
+  const [showWelcome, setShowWelcome] = useState(() => {
+    if (typeof window !== "undefined" && searchParams.get("welcome") === "true") {
+      const hasShown = sessionStorage.getItem("ZynMiniErp_welcome_shown");
+      if (!hasShown) {
+        return true;
+      }
+    }
+    return false;
+  });
+
   const [timeRange, setTimeRange] = useState<"daily" | "monthly">("daily");
   const [viewMode, setViewMode] = useState<"mini" | "section">("mini");
 
   useEffect(() => {
     if (searchParams.get("welcome") === "true") {
+      // Mark as shown immediately
+      sessionStorage.setItem("ZynMiniErp_welcome_shown", "true");
+      
+      // Clear the URL parameter
       const timeout = setTimeout(() => {
         router.replace("/dashboard", { scroll: false });
-      }, 50);
+      }, 100);
       return () => clearTimeout(timeout);
     }
   }, [searchParams, router]);
