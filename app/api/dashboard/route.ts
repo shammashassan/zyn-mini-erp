@@ -57,6 +57,8 @@ interface AggregatedPeriodResult {
   expenses: number;
   purchases: number;
   netTax: number;
+  salary: number;
+  rent: number;
   orderCount: number;
 }
 
@@ -106,16 +108,19 @@ export async function GET(request: Request) {
       isDeleted: false
     }).select('accountCode groupName').lean();
 
+    const inventoryCode = 'A1200';
+    const vatPayableCode = 'L1002';
+    const vatReceivableCode = 'A1300';
+    const salaryCode = 'X2001';
+    const rentCode = 'X2002';
+
     const incomeCodes = accounts
       .filter(a => a.groupName === 'Income' && a.accountCode)
       .map(a => a.accountCode);
 
     const expenseCodes = accounts
-      .filter(a => a.groupName === 'Expenses' && a.accountCode)
+      .filter(a => a.groupName === 'Expenses' && a.accountCode && a.accountCode !== salaryCode && a.accountCode !== rentCode)
       .map(a => a.accountCode);
-
-    const inventoryCode = 'A1200';
-    const vatPayableCode = 'L1002';
 
     // 2. AGGREGATION PIPELINE
     const aggResult = await Journal.aggregate([
@@ -137,7 +142,7 @@ export async function GET(request: Request) {
               in: {
                 $cond: [
                   { $in: ["$$this.accountCode", incomeCodes] },
-                  { $add: ["$$value", { $ifNull: ["$$this.credit", 0] }] },
+                  { $add: ["$$value", { $subtract: [{ $ifNull: ["$$this.credit", 0] }, { $ifNull: ["$$this.debit", 0] }] }] },
                   "$$value"
                 ]
               }
@@ -150,7 +155,7 @@ export async function GET(request: Request) {
               in: {
                 $cond: [
                   { $in: ["$$this.accountCode", expenseCodes] },
-                  { $add: ["$$value", { $ifNull: ["$$this.debit", 0] }] },
+                  { $add: ["$$value", { $subtract: [{ $ifNull: ["$$this.debit", 0] }, { $ifNull: ["$$this.credit", 0] }] }] },
                   "$$value"
                 ]
               }
@@ -163,7 +168,7 @@ export async function GET(request: Request) {
               in: {
                 $cond: [
                   { $eq: ["$$this.accountCode", inventoryCode] },
-                  { $add: ["$$value", { $ifNull: ["$$this.debit", 0] }] },
+                  { $add: ["$$value", { $subtract: [{ $ifNull: ["$$this.debit", 0] }, { $ifNull: ["$$this.credit", 0] }] }] },
                   "$$value"
                 ]
               }
@@ -175,8 +180,34 @@ export async function GET(request: Request) {
               initialValue: 0,
               in: {
                 $cond: [
-                  { $eq: ["$$this.accountCode", vatPayableCode] },
+                  { $in: ["$$this.accountCode", [vatPayableCode, vatReceivableCode]] },
                   { $add: ["$$value", { $subtract: [{ $ifNull: ["$$this.credit", 0] }, { $ifNull: ["$$this.debit", 0] }] }] },
+                  "$$value"
+                ]
+              }
+            }
+          },
+          salary: {
+            $reduce: {
+              input: { $ifNull: ["$entries", []] },
+              initialValue: 0,
+              in: {
+                $cond: [
+                  { $eq: ["$$this.accountCode", salaryCode] },
+                  { $add: ["$$value", { $subtract: [{ $ifNull: ["$$this.debit", 0] }, { $ifNull: ["$$this.credit", 0] }] }] },
+                  "$$value"
+                ]
+              }
+            }
+          },
+          rent: {
+            $reduce: {
+              input: { $ifNull: ["$entries", []] },
+              initialValue: 0,
+              in: {
+                $cond: [
+                  { $eq: ["$$this.accountCode", rentCode] },
+                  { $add: ["$$value", { $subtract: [{ $ifNull: ["$$this.debit", 0] }, { $ifNull: ["$$this.credit", 0] }] }] },
                   "$$value"
                 ]
               }
@@ -199,6 +230,8 @@ export async function GET(request: Request) {
                 expenses: { $sum: "$expenses" },
                 purchases: { $sum: "$purchases" },
                 netTax: { $sum: "$netTax" },
+                salary: { $sum: "$salary" },
+                rent: { $sum: "$rent" },
                 orderCount: { $sum: { $cond: [{ $gt: ["$revenue", 0] }, 1, 0] } }
               }
             }
@@ -216,6 +249,8 @@ export async function GET(request: Request) {
                 expenses: { $sum: "$expenses" },
                 purchases: { $sum: "$purchases" },
                 netTax: { $sum: "$netTax" },
+                salary: { $sum: "$salary" },
+                rent: { $sum: "$rent" },
                 orderCount: { $sum: { $cond: [{ $gt: ["$revenue", 0] }, 1, 0] } }
               }
             }
@@ -225,9 +260,10 @@ export async function GET(request: Request) {
               $group: {
                 _id: { $dateToString: { format: "%Y-%m-%d", date: "$entryDate" } },
                 revenue: { $sum: "$revenue" },
-                expenses: { $sum: "$expenses" },
                 purchases: { $sum: "$purchases" },
-                netTax: { $sum: "$netTax" }
+                netTax: { $sum: "$netTax" },
+                salary: { $sum: "$salary" },
+                rent: { $sum: "$rent" }
               }
             }
           ]
@@ -235,20 +271,33 @@ export async function GET(request: Request) {
       }
     ]);
 
-    const currentRes: AggregatedPeriodResult = aggResult[0].currentSummary[0] || { revenue: 0, expenses: 0, purchases: 0, netTax: 0, orderCount: 0 };
-    const previousRes: AggregatedPeriodResult = aggResult[0].previousSummary[0] || { revenue: 0, expenses: 0, purchases: 0, netTax: 0, orderCount: 0 };
+    const currentRes: AggregatedPeriodResult = aggResult[0].currentSummary[0] || { revenue: 0, expenses: 0, purchases: 0, netTax: 0, salary: 0, rent: 0, orderCount: 0 };
+    const previousRes: AggregatedPeriodResult = aggResult[0].previousSummary[0] || { revenue: 0, expenses: 0, purchases: 0, netTax: 0, salary: 0, rent: 0, orderCount: 0 };
     const dailyRes: any[] = aggResult[0].dailyData;
 
     // 3. Process Summary Data
-    const prepareStats = (res: AggregatedPeriodResult) => ({
-      revenue: res.revenue,
-      purchases: res.purchases,
-      expenses: res.expenses,
-      netTax: res.netTax,
-      orders: res.orderCount,
-      totalCosts: res.expenses + res.purchases + res.netTax,
-      netProfit: res.revenue - (res.expenses + res.purchases + res.netTax),
-    });
+    const prepareStats = (res: AggregatedPeriodResult) => {
+      const revenue = res.revenue;
+      const cogs = res.purchases;
+      const grossProfit = revenue - cogs;
+      const opex = res.expenses + res.salary + res.rent;
+      const netProfit = grossProfit - opex;
+
+      return {
+        revenue,
+        cogs,
+        grossProfit,
+        opex,
+        netProfit,
+        expenses: res.expenses, // Other expenses
+        purchases: res.purchases,
+        netTax: res.netTax,
+        salary: res.salary,
+        rent: res.rent,
+        orders: res.orderCount,
+        totalCosts: cogs + opex,
+      };
+    };
 
     const currentStats = prepareStats(currentRes);
     const previousStats = prepareStats(previousRes);
@@ -261,8 +310,8 @@ export async function GET(request: Request) {
       const dateKey = format(day, 'yyyy-MM-dd');
       const data = dailyMap.get(dateKey) || { revenue: 0, expenses: 0, purchases: 0, netTax: 0 };
 
-      const sales = data.revenue + data.netTax;
-      const expenses = data.expenses + data.purchases + data.netTax;
+      const sales = data.revenue;
+      const expenses = data.expenses + data.purchases + (data.salary || 0) + (data.rent || 0);
 
       return {
         date: dateKey,
@@ -379,8 +428,8 @@ export async function GET(request: Request) {
         revenue: stats?.revenue || 0
       };
     })
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 6);
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 6);
 
     // 7. Calculate Trends
     return NextResponse.json({
@@ -388,10 +437,16 @@ export async function GET(request: Request) {
       previousSummary: previousStats,
       trends: {
         revenue: calculateTrend(currentStats.revenue, previousStats.revenue),
-        purchases: calculateTrend(currentStats.purchases, previousStats.purchases),
-        expenses: calculateTrend(currentStats.expenses, previousStats.expenses),
+        cogs: calculateTrend(currentStats.cogs, previousStats.cogs),
+        grossProfit: calculateTrend(currentStats.grossProfit, previousStats.grossProfit),
+        opex: calculateTrend(currentStats.opex, previousStats.opex),
         netProfit: calculateTrend(currentStats.netProfit, previousStats.netProfit),
+        expenses: calculateTrend(currentStats.expenses, previousStats.expenses),
+        purchases: calculateTrend(currentStats.purchases, previousStats.purchases),
         orders: calculateTrend(currentStats.orders, previousStats.orders),
+        totalCosts: calculateTrend(currentStats.totalCosts, previousStats.totalCosts),
+        salary: calculateTrend(currentStats.salary, previousStats.salary),
+        rent: calculateTrend(currentStats.rent, previousStats.rent),
       },
       chartData,
       recentSales: combinedSales,
@@ -410,12 +465,15 @@ export async function GET(request: Request) {
 
 function calculateTrend(current: number, previous: number) {
   if (previous === 0) {
-    return { trend: current >= 0 ? "up" : "down", change: 0 };
+    if (current > 0) return { trend: "up", change: 100 };
+    if (current < 0) return { trend: "down", change: -100 };
+    return { trend: "neutral", change: 0 };
   }
 
   const percentChange = ((current - previous) / previous) * 100;
+
   return {
-    trend: percentChange >= 0 ? "up" : "down",
+    trend: percentChange > 0 ? "up" : percentChange < 0 ? "down" : "neutral",
     change: percentChange
   };
 }

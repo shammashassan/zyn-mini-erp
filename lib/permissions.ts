@@ -1,4 +1,4 @@
-// lib/permissions.ts - UPDATED: item replaces product and material
+// lib/permissions.ts — UPDATED: added attendance + salaryDisbursement resources
 import { createAccessControl } from "better-auth/plugins/access";
 import { defaultStatements, adminAc } from "better-auth/plugins/admin/access";
 
@@ -14,7 +14,7 @@ export const statement = {
   help: ["read"],
   notification: ["read"],
 
-  // Inventory — unified "item" resource (replaces product + material)
+  // Inventory
   item: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
   stockAdjustment: ["read", "create", "soft_delete", "view_trash", "restore", "permanent_delete"],
 
@@ -44,6 +44,12 @@ export const statement = {
 
   // HRM
   employee: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
+
+  // ✅ NEW: Attendance
+  attendance: ["read", "create", "update", "delete", "bulk_create"],
+
+  // ✅ NEW: Salary Disbursements
+  salaryDisbursement: ["read", "create", "update", "delete", "approve"],
 
   // Settings
   companyDetails: ["read", "update"],
@@ -76,6 +82,8 @@ export const user = ac.newRole({
   returnNote: ["read", "create", "update"],
 
   chartOfAccounts: ["read"],
+
+  attendance: ["read"],
 });
 
 export const manager = ac.newRole({
@@ -111,6 +119,10 @@ export const manager = ac.newRole({
 
   employee: ["read", "create", "update", "soft_delete"],
   user: ["list"],
+
+  // ✅ Managers can manage attendance and disbursements
+  attendance: ["read", "create", "update", "delete", "bulk_create"],
+  salaryDisbursement: ["read", "create", "update", "delete", "approve"],
 });
 
 export const admin = ac.newRole({
@@ -147,6 +159,10 @@ export const admin = ac.newRole({
   employee: ["read", "create", "update", "soft_delete", "view_trash", "restore", "permanent_delete"],
   user: ["list", "create", "update", "delete", "set-role", "ban", "impersonate", "set-password"],
   companyDetails: ["read", "update"],
+
+  // ✅ Full attendance + disbursement access
+  attendance: ["read", "create", "update", "delete", "bulk_create"],
+  salaryDisbursement: ["read", "create", "update", "delete", "approve"],
 });
 
 export const owner = ac.newRole({
@@ -186,6 +202,10 @@ export const owner = ac.newRole({
   user: ["list", "create", "update", "delete", "set-role", "ban", "impersonate", "set-password"],
   session: ["list", "revoke", "delete"],
   companyDetails: ["read", "update"],
+
+  // ✅ Full attendance + disbursement access
+  attendance: ["read", "create", "update", "delete", "bulk_create"],
+  salaryDisbursement: ["read", "create", "update", "delete", "approve"],
 });
 
 export const roles = { user, manager, admin, owner } as const;

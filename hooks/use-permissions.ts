@@ -1,4 +1,4 @@
-// hooks/use-permissions.ts
+// hooks/use-permissions.ts — UPDATED: added attendance + salaryDisbursement hooks
 import { useSession } from "@/lib/auth-client";
 import { authClient } from "@/lib/auth-client";
 import { useMemo } from "react";
@@ -11,56 +11,32 @@ interface PermissionCheck {
 
 export function usePermissions(permissionChecks: Record<string, PermissionCheck>) {
   const { data: session, isPending } = useSession();
-
   const userRole = session?.user?.role as RoleType | undefined;
 
   const permissions = useMemo(() => {
     const result: Record<string, boolean> = {};
-
     for (const [key, permissionCheck] of Object.entries(permissionChecks)) {
-
-      if (!session || !userRole) {
-        result[key] = false;
-        continue;
-      }
-
+      if (!session || !userRole) { result[key] = false; continue; }
       try {
-        result[key] = authClient.admin.checkRolePermission({
-          role: userRole,
-          permissions: permissionCheck,
-        });
+        result[key] = authClient.admin.checkRolePermission({ role: userRole, permissions: permissionCheck });
       } catch (error) {
-        console.error("Permission check failed:", error);
         result[key] = false;
       }
     }
-
     return result;
   }, [userRole, permissionChecks, session]);
 
-  return {
-    permissions,
-    userRole,
-    session,
-    isPending,
-    isAuthenticated: !!session?.user,
-  };
+  return { permissions, userRole, session, isPending, isAuthenticated: !!session?.user };
 }
 
-// Specific hook for dashboard permissions
+// ── Existing hooks (kept intact) ────────────────────────────────────────────
+
 export function useDashboardPermissions() {
-  return usePermissions({
-    canRead: { dashboard: ["read"] },
-  });
+  return usePermissions({ canRead: { dashboard: ["read"] } });
 }
-
-// Specific hook for general billing page access
 export function useBillPermissions() {
-  return usePermissions({
-    canCreate: { bill: ["create"] },
-  });
+  return usePermissions({ canCreate: { bill: ["create"] } });
 }
-
 export function usePOSPermissions() {
   return usePermissions({
     canRead: { posSale: ["read"] },
@@ -71,36 +47,18 @@ export function usePOSPermissions() {
     canPermanentDelete: { posSale: ["permanent_delete"] },
   });
 }
-
-// Specific hook for settings permissions
 export function useSettingsPermissions() {
-  return usePermissions({
-    canRead: { settings: ["read"] },
-  });
+  return usePermissions({ canRead: { settings: ["read"] } });
 }
-
-// Specific hook for account permissions
 export function useAccountPermissions() {
-  return usePermissions({
-    canRead: { account: ["read"] },
-  });
+  return usePermissions({ canRead: { account: ["read"] } });
 }
-
-// Specific hook for help permissions
 export function useHelpPermissions() {
-  return usePermissions({
-    canRead: { help: ["read"] },
-  });
+  return usePermissions({ canRead: { help: ["read"] } });
 }
-
-// Specific hook for notification permissions
 export function useNotificationPermissions() {
-  return usePermissions({
-    canRead: { notification: ["read"] },
-  });
+  return usePermissions({ canRead: { notification: ["read"] } });
 }
-
-// Specific hook for item permissions (unified products/materials)
 export function useItemPermissions() {
   return usePermissions({
     canRead: { item: ["read"] },
@@ -112,8 +70,6 @@ export function useItemPermissions() {
     canPermanentDelete: { item: ["permanent_delete"] },
   });
 }
-
-// Specific hook for stock adjustment permissions
 export function useStockAdjustmentPermissions() {
   return usePermissions({
     canRead: { stockAdjustment: ["read"] },
@@ -124,8 +80,6 @@ export function useStockAdjustmentPermissions() {
     canPermanentDelete: { stockAdjustment: ["permanent_delete"] },
   });
 }
-
-// Specific hook for party permissions
 export function usePartyPermissions() {
   return usePermissions({
     canRead: { party: ["read"] },
@@ -137,8 +91,6 @@ export function usePartyPermissions() {
     canPermanentDelete: { party: ["permanent_delete"] },
   });
 }
-
-// Specific hook for contact permissions
 export function useContactPermissions() {
   return usePermissions({
     canRead: { contact: ["read"] },
@@ -150,8 +102,6 @@ export function useContactPermissions() {
     canPermanentDelete: { contact: ["permanent_delete"] },
   });
 }
-
-// Specific hook for payee permissions
 export function usePayeePermissions() {
   return usePermissions({
     canRead: { payee: ["read"] },
@@ -163,8 +113,6 @@ export function usePayeePermissions() {
     canPermanentDelete: { payee: ["permanent_delete"] },
   });
 }
-
-// Specific hook for invoice permissions
 export function useInvoicePermissions() {
   return usePermissions({
     canRead: { invoice: ["read"] },
@@ -179,8 +127,6 @@ export function useInvoicePermissions() {
     canCreateDelivery: { invoice: ["create_delivery"] },
   });
 }
-
-// Specific hook for voucher permissions
 export function useVoucherPermissions() {
   return usePermissions({
     canRead: { voucher: ["read"] },
@@ -191,8 +137,6 @@ export function useVoucherPermissions() {
     canPermanentDelete: { voucher: ["permanent_delete"] },
   });
 }
-
-// Specific hook for delivery notes
 export function useDeliveryNotePermissions() {
   return usePermissions({
     canRead: { deliveryNote: ["read"] },
@@ -204,8 +148,6 @@ export function useDeliveryNotePermissions() {
     canPermanentDelete: { deliveryNote: ["permanent_delete"] },
   });
 }
-
-// Specific hook for expense permissions
 export function useExpensePermissions() {
   return usePermissions({
     canRead: { expense: ["read"] },
@@ -217,8 +159,6 @@ export function useExpensePermissions() {
     canPermanentDelete: { expense: ["permanent_delete"] },
   });
 }
-
-// Specific hook for purchase permissions
 export function usePurchasePermissions() {
   return usePermissions({
     canRead: { purchase: ["read"] },
@@ -233,8 +173,6 @@ export function usePurchasePermissions() {
     canCreatePayment: { purchase: ["create_payment"] },
   });
 }
-
-// Specific hook for return note permissions
 export function useReturnNotePermissions() {
   return usePermissions({
     canRead: { returnNote: ["read"] },
@@ -247,16 +185,9 @@ export function useReturnNotePermissions() {
     canPermanentDelete: { returnNote: ["permanent_delete"] },
   });
 }
-
-// Report permissions hook (for all reports)
 export function useReportPermissions() {
-  return usePermissions({
-    canRead: { report: ["read"] },
-    canExport: { report: ["export"] },
-  });
+  return usePermissions({ canRead: { report: ["read"] }, canExport: { report: ["export"] } });
 }
-
-// Chart of Accounts permissions
 export function useChartOfAccountsPermissions() {
   return usePermissions({
     canRead: { chartOfAccounts: ["read"] },
@@ -270,8 +201,6 @@ export function useChartOfAccountsPermissions() {
     canPermanentDelete: { chartOfAccounts: ["permanent_delete"] },
   });
 }
-
-// Journal permissions
 export function useJournalPermissions() {
   return usePermissions({
     canRead: { journal: ["read"] },
@@ -285,40 +214,18 @@ export function useJournalPermissions() {
     canPermanentDelete: { journal: ["permanent_delete"] },
   });
 }
-
-// Ledger permissions (uses COA read + Journal read)
 export function useLedgerPermissions() {
-  return usePermissions({
-    canRead: { ledger: ["read"] },
-    canExport: { ledger: ["export"] },
-  });
+  return usePermissions({ canRead: { ledger: ["read"] }, canExport: { ledger: ["export"] } });
 }
-
-// Trial Balance permissions
 export function useTrialBalancePermissions() {
-  return usePermissions({
-    canRead: { trialBalance: ["read"] },
-    canExport: { trialBalance: ["export"] },
-  });
+  return usePermissions({ canRead: { trialBalance: ["read"] }, canExport: { trialBalance: ["export"] } });
 }
-
-// Profit & Loss permissions
 export function useProfitLossPermissions() {
-  return usePermissions({
-    canRead: { profitLoss: ["read"] },
-    canExport: { profitLoss: ["export"] },
-  });
+  return usePermissions({ canRead: { profitLoss: ["read"] }, canExport: { profitLoss: ["export"] } });
 }
-
-// Financial Statements permissions
 export function useFinancialStatementsPermissions() {
-  return usePermissions({
-    canRead: { financialStatements: ["read"] },
-    canExport: { financialStatements: ["export"] },
-  });
+  return usePermissions({ canRead: { financialStatements: ["read"] }, canExport: { financialStatements: ["export"] } });
 }
-
-// Specific hook for employee permissions
 export function useEmployeePermissions() {
   return usePermissions({
     canRead: { employee: ["read"] },
@@ -330,8 +237,6 @@ export function useEmployeePermissions() {
     canPermanentDelete: { employee: ["permanent_delete"] },
   });
 }
-
-// Specific hook for user management permissions
 export function useUserManagementPermissions() {
   return usePermissions({
     canList: { user: ["list"] },
@@ -345,11 +250,30 @@ export function useUserManagementPermissions() {
     canRevokeSession: { session: ["revoke"] },
   });
 }
-
-// Specific hook for company settings permissions
 export function useCompanyDetailsPermissions() {
+  return usePermissions({ canRead: { companyDetails: ["read"] }, canUpdate: { companyDetails: ["update"] } });
+}
+
+// ── NEW hooks ────────────────────────────────────────────────────────────────
+
+/** Attendance management */
+export function useAttendancePermissions() {
   return usePermissions({
-    canRead: { companyDetails: ["read"] },
-    canUpdate: { companyDetails: ["update"] },
+    canRead: { attendance: ["read"] },
+    canCreate: { attendance: ["create"] },
+    canUpdate: { attendance: ["update"] },
+    canDelete: { attendance: ["delete"] },
+    canBulkCreate: { attendance: ["bulk_create"] },
+  });
+}
+
+/** Salary disbursement management */
+export function useSalaryDisbursementPermissions() {
+  return usePermissions({
+    canRead: { salaryDisbursement: ["read"] },
+    canCreate: { salaryDisbursement: ["create"] },
+    canUpdate: { salaryDisbursement: ["update"] },
+    canDelete: { salaryDisbursement: ["delete"] },
+    canApprove: { salaryDisbursement: ["approve"] },
   });
 }

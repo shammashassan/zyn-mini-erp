@@ -36,19 +36,24 @@ interface DailySummary {
 }
 
 interface TrendData {
-  trend: "up" | "down";
+  trend: "up" | "down" | "neutral";
   change: number;
 }
 
 interface DashboardData {
   summary: {
     revenue: number;
+    cogs: number;
+    grossProfit: number;
+    opex: number;
+    netProfit: number;
     purchases: number;
     expenses: number;
     netTax: number;
     orders: number;
     totalCosts: number;
-    netProfit: number;
+    salary: number;
+    rent: number;
   };
   previousSummary: {
     revenue: number;
@@ -58,29 +63,34 @@ interface DashboardData {
     orders: number;
     totalCosts: number;
     netProfit: number;
+    salary: number;
+    rent: number;
   };
   trends: {
     revenue: TrendData;
+    cogs: TrendData;
+    grossProfit: TrendData;
+    opex: TrendData;
+    netProfit: TrendData;
     purchases: TrendData;
     expenses: TrendData;
-    netProfit: TrendData;
     orders: TrendData;
+    totalCosts: TrendData;
+    salary: TrendData;
+    rent: TrendData;
   };
   chartData: DailySummary[];
   recentSales: RecentSale[];
   topProducts: any[];
 }
 
-const HARDCODED_RENT_DAILY = 500;
-const HARDCODED_SALARY_DAILY = 1200;
-const HARDCODED_RENT_MONTHLY = 15000;
-const HARDCODED_SALARY_MONTHLY = 36000;
+// Removed hardcoded constants - now pulling from API
 
 // ✅ ADDED: Dashboard Skeleton Component
 function DashboardSkeleton({ isBasicUser, viewMode }: { isBasicUser: boolean; viewMode: "mini" | "section" }) {
   const cardCount = viewMode === "mini" ? 6 : 4;
-  const gridCols = viewMode === "mini" 
-    ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" 
+  const gridCols = viewMode === "mini"
+    ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
     : "grid-cols-1 md:grid-cols-2 lg:grid-cols-4";
 
   return (
@@ -280,40 +290,48 @@ function DashboardContent() {
       ? ((summary.netProfit / summary.revenue) * 100).toFixed(1)
       : '0';
 
+    const formatTrend = (val: number) => {
+      if (Math.abs(val) < 0.05) return "0.0%";
+      const sign = val > 0 ? "+" : val < 0 ? "-" : "";
+      return `${sign}${Math.abs(val).toFixed(1)}%`;
+    };
+
     return [
       {
-        label: "Total Revenue",
-        value: formatCompactCurrency(summary.revenue),
-        trend: trends.revenue.trend,
-        change: `${trends.revenue.change >= 0 ? '+' : ''}${trends.revenue.change.toFixed(1)}%`,
-        note: trends.revenue.trend === "up" ? "Revenue trending up" : "Revenue declining",
-        subtext: `Sales excluding VAT`,
+        label: "Revenue",
+        value: formatCompactCurrency(summary?.revenue || 0),
+        trend: trends?.revenue?.trend || "neutral",
+        change: formatTrend(trends?.revenue?.change || 0),
+        note: (trends?.revenue?.trend === "up") ? "Revenue trending up" : "Revenue declining",
+        subtext: `Revenue excluding VAT`,
+        href: "/sales/invoices",
       },
       {
-        label: "Direct Costs",
-        value: formatCompactCurrency(summary.totalCosts),
-        trend: summary.totalCosts > dashboardData.previousSummary.totalCosts ? "up" : "down",
-        change: `${summary.totalCosts >= dashboardData.previousSummary.totalCosts ? '+' : ''}${(Math.abs(summary.totalCosts - dashboardData.previousSummary.totalCosts) / (dashboardData.previousSummary.totalCosts || 1) * 100).toFixed(1)}%`,
-        note: summary.totalCosts > dashboardData.previousSummary.totalCosts ? "Costs increased" : "Costs reduced",
-        subtext: "Purchases & expenses",
+        label: "Gross Profit",
+        value: formatCompactCurrency(summary?.grossProfit || 0),
+        trend: trends?.grossProfit?.trend || "neutral",
+        change: formatTrend(trends?.grossProfit?.change || 0),
+        note: `Margin: ${summary?.revenue > 0 ? ((summary.grossProfit / summary.revenue) * 100).toFixed(1) : '0'}%`,
+        subtext: `After COGS (${formatCompactCurrency(summary?.cogs || 0)})`,
+        href: "/procurement/purchases",
+      },
+      {
+        label: "Operating Expenses",
+        value: formatCompactCurrency(summary?.opex || 0),
+        trend: trends?.opex?.trend || "neutral",
+        change: formatTrend(trends?.opex?.change || 0),
+        note: `Other + Salary + Rent`,
+        subtext: "Operational overhead",
+        href: "/procurement/expenses",
       },
       {
         label: "Net Profit",
-        value: formatCompactCurrency(summary.netProfit),
-        trend: trends.netProfit.trend,
-        change: `${trends.netProfit.change >= 0 ? '+' : ''}${trends.netProfit.change.toFixed(1)}%`,
-        note: summary.netProfit >= 0 ? "Profitable performance" : "Operating loss",
-        subtext: `Margin: ${profitMargin}%`,
-      },
-      {
-        label: "Orders",
-        value: summary.orders.toString(),
-        trend: trends.orders.trend,
-        change: `${trends.orders.change >= 0 ? '+' : ''}${trends.orders.change.toFixed(1)}%`,
-        note: "Approved sales",
-        subtext: summary.orders > 0
-          ? `Avg: ${formatCurrency(summary.revenue / summary.orders)} per order`
-          : 'No orders yet',
+        value: formatCompactCurrency(summary?.netProfit || 0),
+        trend: trends?.netProfit?.trend || "neutral",
+        change: formatTrend(trends?.netProfit?.change || 0),
+        note: (summary?.netProfit || 0) >= 0 ? "Profitable performance" : "Operating loss",
+        subtext: `Net Margin: ${profitMargin}%`,
+        href: "/accounting/profit-loss",
       },
     ];
   }, [dashboardData]);
@@ -321,59 +339,69 @@ function DashboardContent() {
   const miniCards = useMemo(() => {
     if (!dashboardData) return [];
     const { summary, trends } = dashboardData;
-    
-    const rent = timeRange === 'daily' ? HARDCODED_RENT_DAILY : HARDCODED_RENT_MONTHLY;
-    const salary = timeRange === 'daily' ? HARDCODED_SALARY_DAILY : HARDCODED_SALARY_MONTHLY;
-    const netBalance = summary.netProfit - rent - salary;
+
+    const netBalance = summary.netProfit;
+
+    const formatTrend = (val: number) => {
+      if (Math.abs(val) < 0.05) return "0.0%";
+      const sign = val > 0 ? "+" : val < 0 ? "-" : "";
+      return `${sign}${Math.abs(val).toFixed(1)}%`;
+    };
 
     return [
-      { 
-        label: "Sales", 
-        value: formatCompactCurrency(summary.revenue), 
-        change: `${trends.revenue.change.toFixed(1)}%`, 
-        trend: trends.revenue.trend,
-        note: trends.revenue.change >= 0 ? "Sales increasing" : "Sales decreasing",
-        subtext: "Excluding VAT"
+      {
+        label: "Revenue",
+        value: formatCompactCurrency(summary?.revenue || 0),
+        change: formatTrend(trends?.revenue?.change || 0),
+        trend: trends?.revenue?.trend || "neutral",
+        note: (trends?.revenue?.change || 0) >= 0 ? "Revenue increasing" : "Revenue decreasing",
+        subtext: "Excluding VAT",
+        href: "/sales/pos",
       },
-      { 
-        label: "Purchases", 
-        value: formatCompactCurrency(summary.purchases), 
-        change: `${trends.purchases.change.toFixed(1)}%`, 
-        trend: trends.purchases.trend,
-        note: trends.purchases.change >= 0 ? "Purchases up" : "Purchases down",
-        subtext: "Stock acquisition"
+      {
+        label: "COGS",
+        value: formatCompactCurrency(summary?.cogs || 0),
+        change: formatTrend(trends?.cogs?.change || 0),
+        trend: trends?.cogs?.trend || "neutral",
+        note: "Direct Costs",
+        subtext: "Stock acquisition",
+        href: "/procurement/purchases",
       },
-      { 
-        label: "Expenses", 
-        value: formatCompactCurrency(summary.expenses), 
-        change: `${trends.expenses.change.toFixed(1)}%`, 
-        trend: trends.expenses.trend,
-        note: trends.expenses.change >= 0 ? "Expenses rising" : "Expenses falling",
-        subtext: "Operational spend"
+      {
+        label: "Expenses",
+        value: formatCompactCurrency(summary?.expenses || 0),
+        change: formatTrend(trends?.expenses?.change || 0),
+        trend: trends?.expenses?.trend || "neutral",
+        note: "Operating spend",
+        subtext: "Excl. Salary/Rent",
+        href: "/procurement/expenses",
       },
-      { 
-        label: "Rent", 
-        value: formatCompactCurrency(rent), 
-        change: "Fixed", 
-        trend: "neutral" as const,
-        note: "Fixed overhead",
-        subtext: "Monthly rent"
+      {
+        label: "Rent",
+        value: formatCompactCurrency(summary?.rent || 0),
+        change: formatTrend(trends?.rent?.change || 0),
+        trend: trends?.rent?.trend || "neutral",
+        note: "Facility Cost",
+        subtext: "Dynamic from Journal",
+        href: "/procurement/expenses",
       },
-      { 
-        label: "Salary", 
-        value: formatCompactCurrency(salary), 
-        change: "Fixed", 
-        trend: "neutral" as const,
-        note: "Payroll obligation",
-        subtext: "Staff salaries"
+      {
+        label: "Salary",
+        value: formatCompactCurrency(summary?.salary || 0),
+        change: formatTrend(trends?.salary?.change || 0),
+        trend: trends?.salary?.trend || "neutral",
+        note: "Personnel Cost",
+        subtext: "Dynamic from Journal",
+        href: "/hrm/employees",
       },
-      { 
-        label: "Balance", 
-        value: formatCompactCurrency(netBalance), 
-        change: `${trends.netProfit.change.toFixed(1)}%`, 
-        trend: trends.netProfit.trend,
+      {
+        label: "Net Profit",
+        value: formatCompactCurrency(netBalance),
+        change: formatTrend(trends?.netProfit?.change || 0),
+        trend: trends?.netProfit?.trend || "neutral",
         note: netBalance >= 0 ? "Positive balance" : "Reflects deficit",
-        subtext: "Net after costs"
+        subtext: "Final Balance",
+        href: "/accounting/profit-loss",
       },
     ];
   }, [dashboardData, timeRange]);
@@ -425,20 +453,20 @@ function DashboardContent() {
 
               {!isBasicUser && (
                 <div className="flex items-center gap-2">
-                  <ToggleGroup 
-                    type="single" 
-                    value={timeRange} 
+                  <ToggleGroup
+                    type="single"
+                    value={timeRange}
                     onValueChange={(v) => v && setTimeRange(v as any)}
                   >
                     <ToggleGroupItem value="daily" className="px-3">Daily</ToggleGroupItem>
                     <ToggleGroupItem value="monthly" className="px-3">Monthly</ToggleGroupItem>
                   </ToggleGroup>
-                  
+
                   <Separator orientation="vertical" className="h-8 mx-1" />
 
-                  <ToggleGroup 
-                    type="single" 
-                    value={viewMode} 
+                  <ToggleGroup
+                    type="single"
+                    value={viewMode}
                     onValueChange={(v) => v && setViewMode(v as any)}
                   >
                     <ToggleGroupItem value="mini" aria-label="Mini view">

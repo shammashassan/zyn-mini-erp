@@ -8,6 +8,9 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import Link from "next/link";
+
 
 export type MiniCardData = {
     label: string;
@@ -16,17 +19,23 @@ export type MiniCardData = {
     trend?: "up" | "down" | "neutral";
     note?: string;
     subtext?: string;
+    href?: string;
 };
 
 export function MiniStatsCards({ cards }: { cards: MiniCardData[] }) {
     return (
-        <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @4xl/main:grid-cols-3 @7xl/main:grid-cols-6">
+        <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @4xl/main:grid-cols-3 @7xl/main:grid-cols-6">
             {cards.map((card, idx) => {
                 const Icon = card.trend === "up" ? TrendingUp : card.trend === "down" ? TrendingDown : MinusIcon;
                 const badgeVariant = card.trend === "up" ? "success" : card.trend === "down" ? "destructive" : "secondary";
 
-                return (
-                    <Card key={idx} className="@container/card py-4">
+                const cardContent = (
+                    <Card
+                        className={cn(
+                            "@container/card py-4 h-full transition-all duration-200 from-primary/5 to-card dark:bg-card bg-linear-to-t shadow-xs",
+                            card.href && "hover:border-primary/30 hover:bg-primary/5 hover:shadow-md cursor-pointer"
+                        )}
+                    >
                         <CardHeader className="px-4">
                             <CardDescription className="font-medium">{card.label}</CardDescription>
                             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
@@ -52,6 +61,26 @@ export function MiniStatsCards({ cards }: { cards: MiniCardData[] }) {
                             </CardFooter>
                         )}
                     </Card>
+                );
+
+                if (card.href) {
+                    return (
+                        <Link
+                            key={idx}
+                            href={card.href}
+                            className={cn(
+                                "group block transition-transform duration-200 active:scale-[0.98]"
+                            )}
+                        >
+                            {cardContent}
+                        </Link>
+                    )
+                }
+
+                return (
+                    <div key={idx} className="group block">
+                        {cardContent}
+                    </div>
                 );
             })}
         </div>
