@@ -35,6 +35,7 @@ const getReferenceTypeVariant = (type: string) => {
   switch (type) {
     case 'Invoice': return 'primary';
     case 'POSSale': return 'blue';
+    case 'POSReturn': return 'indigo';
     case 'Receipt': return 'success';
     case 'Payment': return 'destructive';
     case 'Purchase': return 'warning';
@@ -279,7 +280,7 @@ export function JournalViewModal({ isOpen, onClose, journal }: JournalViewModalP
                 </div>
               )}
 
-              {['Invoice', 'Purchase', 'POSSale', 'SalesReturn', 'PurchaseReturn', 'Expense'].includes(journal.referenceType) && journal.referenceId && (
+              {['Invoice', 'Purchase', 'POSSale', 'POSReturn', 'SalesReturn', 'PurchaseReturn', 'Expense'].includes(journal.referenceType) && journal.referenceId && (
                 <div className="pt-3 sm:pt-4 border-t">
                   {journal.referenceType !== 'Expense' && (
                     <div className="text-xs sm:text-sm font-medium mb-3 flex items-center gap-2">

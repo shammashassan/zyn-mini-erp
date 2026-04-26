@@ -31,10 +31,10 @@ export interface IAuditEntry {
 
 export interface IReturnNote extends Document<string> {
   returnNumber: string;
-  returnType: 'salesReturn' | 'purchaseReturn';
+  returnType: 'salesReturn' | 'purchaseReturn' | 'posReturn';
 
   // Party & Contact References
-  partyId: mongoose.Types.ObjectId;
+  partyId?: mongoose.Types.ObjectId;
   contactId?: mongoose.Types.ObjectId;
 
   // Immutable snapshots for historical accuracy (PDFs, reports)
@@ -74,6 +74,7 @@ export interface IReturnNote extends Document<string> {
   connectedDocuments: {
     purchaseId?: mongoose.Types.ObjectId;
     invoiceId?: mongoose.Types.ObjectId;
+    posSaleId?: mongoose.Types.ObjectId;
     debitNoteId?: mongoose.Types.ObjectId;
     creditNoteId?: mongoose.Types.ObjectId;
   };
@@ -129,12 +130,12 @@ const ReturnNoteSchema: Schema<IReturnNote> = new Schema({
   returnType: {
     type: String,
     required: true,
-    enum: ['salesReturn', 'purchaseReturn'],
+    enum: ['salesReturn', 'purchaseReturn', 'posReturn'],
     default: 'purchaseReturn'
   },
 
   // Party & Contact References
-  partyId: { type: Schema.Types.ObjectId, ref: 'Party', required: true, index: true },
+  partyId: { type: Schema.Types.ObjectId, ref: 'Party', required: false, index: true },
   contactId: { type: Schema.Types.ObjectId, ref: 'Contact', required: false },
 
   // Immutable snapshots
@@ -153,7 +154,7 @@ const ReturnNoteSchema: Schema<IReturnNote> = new Schema({
         vatNumber: { type: String }
       },
     },
-    required: true,
+    required: false,
     _id: false
   },
   contactSnapshot: {
@@ -187,6 +188,7 @@ const ReturnNoteSchema: Schema<IReturnNote> = new Schema({
     type: {
       purchaseId: { type: Schema.Types.ObjectId, ref: 'Purchase' },
       invoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice' },
+      posSaleId: { type: Schema.Types.ObjectId, ref: 'POSSale' },
       debitNoteId: { type: Schema.Types.ObjectId, ref: 'DebitNote' },
       creditNoteId: { type: Schema.Types.ObjectId, ref: 'CreditNote' },
     },

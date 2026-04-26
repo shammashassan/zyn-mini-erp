@@ -584,3 +584,73 @@ export async function reapplyStockForPOSSale(
 
     return { newIds, cogsAmount };
 }
+
+/**
+ * Add stock back when a POS Return is created (immediate approval).
+ * Mirrors reverseStockForSalesReturn but without specific return notes ID.
+ */
+export async function addStockForPOSReturn(
+    returnNoteId: mongoose.Types.ObjectId,
+    lineItems: Array<{ itemId?: string; returnQuantity: number }>
+) {
+    const operations: Array<{
+        itemId: string;
+        itemName: string;
+        returnedQty: number;
+    }> = [];
+
+    for (const lineItem of lineItems) {
+        if (!lineItem.itemId) continue;
+
+        const item = await Item.findById(lineItem.itemId);
+        if (!item) throw new Error(`Item ${lineItem.itemId} not found`);
+
+        if (!item.types.includes('product') || !item.bom || item.bom.length === 0) continue;
+
+        for (const bomComponent of item.bom) {
+            const returnedQty = bomComponent.quantity * lineItem.returnQuantity;
+            const materialItem = await Item.findById(bomComponent.itemId);
+            if (!materialItem) throw new Error(`BOM item ${bomComponent.itemId} not found`);
+
+            const existing = operations.find(
+                (op) => op.itemId === materialItem._id.toString()
+            );
+            if (existing) {
+                existing.returnedQty += returnedQty;
+            } else {
+                operations.push({
+                    itemId: materialItem._id.toString(),
+                    itemName: materialItem.name,
+                    returnedQty,
+                });
+            }
+        }
+    }
+
+    for (const op of operations) {
+        const item = await Item.findById(op.itemId);
+        if (!item) continue;
+
+        const oldStock = item.stock;
+        const newStock = oldStock + op.returnedQty;
+
+        await Item.findByIdAndUpdate(op.itemId, { stock: newStock });
+
+        await StockAdjustment.create({
+            itemId: op.itemId,
+            itemName: op.itemName,
+            adjustmentType: 'increment',
+            value: op.returnedQty,
+            oldStock,
+            newStock,
+            oldCostPrice: item.costPrice,
+            newCostPrice: item.costPrice,
+            adjustmentReason: 'POS return created — stock restored',
+            referenceId: returnNoteId,
+            referenceModel: 'ReturnNote',
+            createdAt: new Date(),
+        });
+    }
+
+    return operations;
+}

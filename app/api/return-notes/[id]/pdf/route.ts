@@ -62,10 +62,15 @@ export async function GET(
       };
     }
 
-    const documentElement = React.createElement(ReturnNoteDocument, {
-      returnNote: returnNoteWithDetails,
-      companyDetails,
-    });
+    const documentElement = returnNote.returnType === 'posReturn' 
+      ? React.createElement((await import("@/components/pdf/POSReturnReceiptDocument")).POSReturnReceiptDocument, {
+        returnNote: returnNoteWithDetails,
+        companyDetails,
+      })
+      : React.createElement(ReturnNoteDocument, {
+        returnNote: returnNoteWithDetails,
+        companyDetails,
+      });
 
     const pdfStream = await renderToStream(documentElement as any);
 

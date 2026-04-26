@@ -649,3 +649,65 @@ export async function recreateJournalForPOSSale(
 ): Promise<any> {
   return createJournalForPOSSale(sale, userId, username, cogsAmount);
 }
+
+/**
+ * Auto-create journal entry for a POS Return (immediate).
+ *
+ * Revenue reversal entries:
+ *   Dr. Sales Returns      (subtotal)
+ *   Dr. VAT Payable        (vatAmount — if any)
+ *   Cr. Cash/Bank          (grandTotal)
+ *
+ * COGS reversal entries (only when cogsAmount > 0):
+ *   Dr. Inventory          (cogsAmount)
+ *   Cr. Cost of Goods Sold (cogsAmount)
+ */
+export async function createJournalForPOSReturn(
+  returnNote: any,
+  paymentMethod: string,
+  userId: string | null = null,
+  username: string | null = null,
+  cogsAmount: number = 0
+): Promise<any> {
+  try {
+    const entries: JournalEntryData[] = [];
+    const paymentAccount = paymentMethod === 'Cash' ? 'A1001' : 'A1002';
+    const paymentAccountName = paymentMethod === 'Cash' ? 'Cash in Hand' : 'Cash at Bank';
+
+    const totalAmount = Number(returnNote.totalAmount) || 0;
+    const discount = Number(returnNote.discount) || 0;
+    const vatAmount = Number(returnNote.vatAmount) || 0;
+    const subtotal = totalAmount - discount;
+    const grandTotal = subtotal + vatAmount;
+
+    // Dr. Sales Returns
+    entries.push({ accountCode: 'I1003', accountName: 'Sales Returns', debit: subtotal, credit: 0 });
+
+    // Dr. VAT Payable (if any)
+    if (vatAmount > 0)
+      entries.push({ accountCode: 'L1002', accountName: 'VAT Payable', debit: vatAmount, credit: 0 });
+
+    // Cr. Cash/Bank
+    entries.push({ accountCode: paymentAccount, accountName: paymentAccountName, debit: 0, credit: grandTotal });
+
+    // COGS reversal entries — Dr. Inventory / Cr. COGS
+    if (cogsAmount > 0) {
+      entries.push({ accountCode: 'A1200', accountName: 'Inventory', debit: cogsAmount, credit: 0 });
+      entries.push({ accountCode: 'X1001', accountName: 'Cost of Goods Sold', debit: 0, credit: cogsAmount });
+    }
+
+    const meta: PartyMeta = {
+      partyType: 'Customer',
+      partyId: str(returnNote.partyId),
+      partyName: returnNote.partySnapshot?.displayName || 'Walk-in',
+    };
+
+    return await saveJournal({
+      referenceType: 'POSReturn', referenceId: str(returnNote._id), referenceNumber: returnNote.returnNumber,
+      meta,
+      narration: `POS Return ${returnNote.returnNumber} via ${paymentMethod}`,
+      entries, entryDate: new Date(returnNote.returnDate || Date.now()),
+      userId, username, actionLabel: 'Auto-created from POS Return',
+    });
+  } catch (err) { console.error('Error creating POS return journal:', err); return null; }
+}

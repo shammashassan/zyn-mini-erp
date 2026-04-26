@@ -6,6 +6,7 @@ import ReturnNote from "@/models/ReturnNote";
 import Purchase from "@/models/Purchase";
 import Invoice from "@/models/Invoice";
 import DebitNote from "@/models/DebitNote";
+import POSSale from "@/models/POSSale";
 import StockAdjustment from "@/models/StockAdjustment";
 import { softDelete } from "@/utils/softDelete";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
@@ -345,6 +346,45 @@ export async function PUT(request: Request, context: RequestContext) {
           console.error(`❌ Stock deduction failed:`, stockError);
           // Don't fail the status change if stock deduction fails
         }
+      } else if (returnType === "posReturn") {
+        // 2. Reverse POSSale returned quantities
+        const posSale = await POSSale.findById(
+          currentReturnNote.connectedDocuments.posSaleId
+        );
+        if (posSale && !posSale.isDeleted) {
+          for (const returnItem of currentReturnNote.items) {
+            const posItemIndex = posSale.items.findIndex(
+              (pi: any) => pi.itemId?.toString() === returnItem.itemId?.toString()
+            );
+
+            if (posItemIndex !== -1) {
+              const currentReturned = posSale.items[posItemIndex].returnedQuantity || 0;
+              posSale.items[posItemIndex].returnedQuantity = Math.max(
+                0,
+                currentReturned - returnItem.returnQuantity
+              );
+            }
+          }
+          posSale.addAuditEntry(
+            `POS Return Note ${currentReturnNote.returnNumber} status changed from approved to ${newStatus}`,
+            user.id,
+            user.username || user.name
+          );
+          await posSale.save();
+        }
+
+        // 3. Deduct stock again (undo the reversal)
+        try {
+          await deductStockForInvoice(
+            currentReturnNote._id,
+            currentReturnNote.items.map((item: any) => ({
+              itemId: item.itemId,
+              quantity: item.returnQuantity,
+            }))
+          );
+        } catch (stockError: any) {
+          console.error(`❌ Stock deduction failed:`, stockError);
+        }
       }
     }
 
@@ -520,6 +560,54 @@ export async function DELETE(request: Request, context: RequestContext) {
             console.error(`❌ Stock deduction failed:`, stockError);
           }
         }
+      } else if (returnType === "posReturn") {
+        // 2. Reverse POSSale returned quantities
+        const posSale = await POSSale.findById(
+          returnNote.connectedDocuments.posSaleId
+        );
+        if (posSale && !posSale.isDeleted) {
+          for (const returnItem of returnNote.items) {
+            const posItemIndex = posSale.items.findIndex(
+              (pi: any) => pi.itemId?.toString() === returnItem.itemId?.toString()
+            );
+
+            if (posItemIndex !== -1) {
+              const currentReturned = posSale.items[posItemIndex].returnedQuantity || 0;
+              posSale.items[posItemIndex].returnedQuantity = Math.max(
+                0,
+                currentReturned - returnItem.returnQuantity
+              );
+            }
+          }
+
+          const updatedReturnNoteIds = (
+            posSale.connectedDocuments?.returnNoteIds || []
+          ).filter((rid: any) => rid.toString() !== id);
+          posSale.connectedDocuments = {
+            ...posSale.connectedDocuments,
+            returnNoteIds: updatedReturnNoteIds,
+          };
+
+          posSale.addAuditEntry(
+            `POS Return Note ${returnNote.returnNumber} deleted`,
+            user.id,
+            user.username || user.name
+          );
+          await posSale.save();
+
+          // 3. Deduct stock again (undo the reversal)
+          try {
+            await deductStockForInvoice(
+              returnNote._id,
+              returnNote.items.map((item: any) => ({
+                itemId: item.itemId,
+                quantity: item.returnQuantity,
+              }))
+            );
+          } catch (stockError: any) {
+            console.error(`❌ Stock deduction failed:`, stockError);
+          }
+        }
       }
 
     } else {
@@ -565,6 +653,27 @@ export async function DELETE(request: Request, context: RequestContext) {
             user.username || user.name
           );
           await invoice.save();
+        }
+      } else if (returnType === "posReturn") {
+        const posSale = await POSSale.findById(
+          returnNote.connectedDocuments.posSaleId
+        );
+        if (posSale && !posSale.isDeleted) {
+          const updatedReturnNoteIds = (
+            posSale.connectedDocuments?.returnNoteIds || []
+          ).filter((rid: any) => rid.toString() !== id);
+
+          posSale.connectedDocuments = {
+            ...posSale.connectedDocuments,
+            returnNoteIds: updatedReturnNoteIds,
+          };
+
+          posSale.addAuditEntry(
+            `POS Return Note ${returnNote.returnNumber} deleted`,
+            user.id,
+            user.username || user.name
+          );
+          await posSale.save();
         }
       }
     }

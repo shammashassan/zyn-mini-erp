@@ -73,6 +73,7 @@ const PERMISSION_MAP: Record<string, Record<string, string[]>> = {
   "Receipts": { voucher: ["read"] },
   "Delivery notes": { deliveryNote: ["read"] },
   "Sales Returns": { returnNote: ["read"] },
+  "POS Returns": { returnNote: ["read"] },
 
   // Procurement
   "Purchases": { purchase: ["read"] },
@@ -130,6 +131,7 @@ const navigationData = [
   { title: "Receipts", url: "/sales/receipts", icon: Ticket, group: "Sales" },
   { title: "Delivery notes", url: "/sales/delivery-notes", icon: Truck, group: "Sales" },
   { title: "Sales Returns", url: "/sales/sales-returns", icon: Undo2, group: "Sales" },
+  { title: "POS Returns", url: "/sales/pos-returns", icon: Undo2, group: "Sales" },
 
   // Procurement
   { title: "Purchases", url: "/procurement/purchases", icon: ShoppingCart, group: "Procurement" },

@@ -56,6 +56,7 @@ const getReferenceTypeVariant = (type: string) => {
   switch (type) {
     case 'Invoice': return 'primary';
     case 'POSSale': return 'blue';
+    case 'POSReturn': return 'indigo';
     case 'Receipt': return 'success';
     case 'Payment': return 'destructive';
     case 'Purchase': return 'warning';

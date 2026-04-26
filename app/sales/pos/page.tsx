@@ -6,10 +6,11 @@ import React, {
 } from "react";
 import { useQueryStates, parseAsInteger } from "nuqs";
 import { toast } from "sonner";
-import { ShoppingBag, Plus, CalendarIcon, Trash2 } from "lucide-react";
+import { ShoppingBag, Plus, CalendarIcon, Trash2, Undo2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { POSReturnModal } from "./pos-return-modal";
 import { useDataTable } from "@/hooks/use-data-table";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
@@ -44,11 +45,13 @@ function POSSaleDetailModal({
     onClose,
     sale,
     onViewPdf,
+    onReturnItems,
 }: {
     isOpen: boolean;
     onClose: () => void;
     sale: POSSale | null;
     onViewPdf: (sale: POSSale) => void;
+    onReturnItems?: (sale: POSSale) => void;
 }) {
     if (!sale) return null;
     return (
@@ -131,9 +134,16 @@ function POSSaleDetailModal({
                         </div>
                     </div>
 
-                    <Button className="w-full" onClick={() => onViewPdf(sale)}>
-                        Print Receipt
-                    </Button>
+                    <div className="flex gap-2 w-full pt-2">
+                        <Button className="flex-1" variant="outline" onClick={() => onViewPdf(sale)}>
+                            Print Receipt
+                        </Button>
+                        {onReturnItems && (
+                            <Button className="flex-1" variant="destructive" onClick={() => onReturnItems(sale)}>
+                                Return Items
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </DialogContent>
         </Dialog>
@@ -172,6 +182,7 @@ function POSSalesPageContent() {
     const [pdfTitle, setPdfTitle] = useState("");
 
     const [detailOpen, setDetailOpen] = useState(false);
+    const [returnModalOpen, setReturnModalOpen] = useState(false);
     const [selectedSale, setSelectedSale] = useState<POSSale | null>(null);
 
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -469,6 +480,20 @@ function POSSalesPageContent() {
                 onClose={() => { setDetailOpen(false); setSelectedSale(null); }}
                 sale={selectedSale}
                 onViewPdf={handleViewPdf}
+                onReturnItems={(sale) => {
+                    setSelectedSale(sale);
+                    setDetailOpen(false);
+                    setReturnModalOpen(true);
+                }}
+            />
+
+            <POSReturnModal
+                isOpen={returnModalOpen}
+                onClose={() => { setReturnModalOpen(false); setSelectedSale(null); }}
+                sale={selectedSale}
+                onSuccess={() => {
+                    fetchSales(true);
+                }}
             />
         </>
     );

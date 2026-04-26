@@ -226,6 +226,10 @@ function LedgerPageContent() {
         { label: "General", value: "General", count: ledgerData.entries.filter(e => e.referenceType === "General").length },
         { label: "Contra", value: "Contra", count: ledgerData.entries.filter(e => e.referenceType === "Contra").length },
         { label: "Adjustment", value: "Adjustment", count: ledgerData.entries.filter(e => e.referenceType === "Adjustment").length },
+        { label: "POS Sale", value: "POSSale", count: ledgerData.entries.filter(e => e.referenceType === "POSSale").length },
+        { label: "POS Return", value: "POSReturn", count: ledgerData.entries.filter(e => e.referenceType === "POSReturn").length },
+        { label: "Sales Return", value: "SalesReturn", count: ledgerData.entries.filter(e => e.referenceType === "SalesReturn").length },
+        { label: "Purchase Return", value: "PurchaseReturn", count: ledgerData.entries.filter(e => e.referenceType === "PurchaseReturn").length },
       ].filter(opt => opt.count > 0)
       : [];
     return columns.map((col: any) => {

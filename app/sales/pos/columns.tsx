@@ -32,10 +32,12 @@ export interface POSSale {
     partyId?: any;
     partySnapshot?: { displayName: string };
     items: Array<{
+        itemId?: string;
         description: string;
         quantity: number;
         rate: number;
         total: number;
+        returnedQuantity?: number;
     }>;
     discount: number;
     totalAmount: number;

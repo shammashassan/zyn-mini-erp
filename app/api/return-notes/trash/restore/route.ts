@@ -5,6 +5,7 @@ import dbConnect from "@/lib/dbConnect";
 import ReturnNote from "@/models/ReturnNote";
 import Purchase from "@/models/Purchase";
 import Invoice from "@/models/Invoice";
+import POSSale from "@/models/POSSale";
 import { restore } from "@/utils/softDelete";
 import { requireAuthAndPermission, validateRequiredFields } from "@/lib/auth-utils";
 import {
@@ -14,6 +15,7 @@ import {
 import {
   createJournalForSalesReturn,
   createJournalForPurchaseReturn,
+  createJournalForPOSReturn,
 } from "@/utils/journalAutoCreate";
 
 export async function POST(request: Request) {
@@ -66,7 +68,7 @@ export async function POST(request: Request) {
         if (purchase && !purchase.isDeleted) {
           // Restore purchase item returned quantities
           for (const returnItem of returnNoteToRestore.items) {
-            const purchaseItemIndex = purchase.items.findIndex(
+            const purchaseItem = purchase.items.find(
               (pi: any) =>
                 (pi.itemId &&
                   returnItem.itemId &&
@@ -74,11 +76,19 @@ export async function POST(request: Request) {
                 pi.description === returnItem.description
             );
 
-            if (purchaseItemIndex !== -1) {
-              const currentReturned =
-                purchase.items[purchaseItemIndex].returnedQuantity || 0;
-              purchase.items[purchaseItemIndex].returnedQuantity =
-                currentReturned + returnItem.returnQuantity;
+            if (purchaseItem) {
+              const currentReturned = purchaseItem.returnedQuantity || 0;
+              const originalQty = purchaseItem.quantity;
+
+              if (currentReturned + returnItem.returnQuantity > originalQty) {
+                return NextResponse.json(
+                  {
+                    error: `Cannot restore: Item ${purchaseItem.description} already has ${currentReturned} returned out of ${originalQty} purchased. Restoring this would exceed the original quantity.`,
+                  },
+                  { status: 400 }
+                );
+              }
+              purchaseItem.returnedQuantity = currentReturned + returnItem.returnQuantity;
             }
           }
 
@@ -130,7 +140,7 @@ export async function POST(request: Request) {
         if (invoice && !invoice.isDeleted) {
           // Restore invoice returned quantities
           for (const returnItem of returnNoteToRestore.items) {
-            const invoiceItemIndex = invoice.items.findIndex(
+            const invoiceItem = invoice.items.find(
               (ii: any) =>
                 (ii.itemId &&
                   returnItem.itemId &&
@@ -138,11 +148,19 @@ export async function POST(request: Request) {
                 ii.description === returnItem.description
             );
 
-            if (invoiceItemIndex !== -1) {
-              const currentReturned =
-                invoice.items[invoiceItemIndex].returnedQuantity || 0;
-              invoice.items[invoiceItemIndex].returnedQuantity =
-                currentReturned + returnItem.returnQuantity;
+            if (invoiceItem) {
+              const currentReturned = invoiceItem.returnedQuantity || 0;
+              const originalQty = invoiceItem.quantity;
+
+              if (currentReturned + returnItem.returnQuantity > originalQty) {
+                return NextResponse.json(
+                  {
+                    error: `Cannot restore: Item ${invoiceItem.description} already has ${currentReturned} returned out of ${originalQty} sold. Restoring this would exceed the original quantity.`,
+                  },
+                  { status: 400 }
+                );
+              }
+              invoiceItem.returnedQuantity = currentReturned + returnItem.returnQuantity;
             }
           }
 
@@ -191,6 +209,79 @@ export async function POST(request: Request) {
         // Recreate journal
         await createJournalForSalesReturn(
           returnNoteToRestore.toObject(),
+          user.id,
+          user.username || user.name
+        );
+      } else if (returnType === "posReturn") {
+        const posSale = await POSSale.findById(
+          returnNoteToRestore.connectedDocuments.posSaleId
+        );
+        if (posSale && !posSale.isDeleted) {
+          // Restore POSSale returned quantities
+          for (const returnItem of returnNoteToRestore.items) {
+            const posItem = posSale.items.find(
+              (pi: any) => pi.itemId?.toString() === returnItem.itemId?.toString()
+            );
+
+            if (posItem) {
+              const currentReturned = posItem.returnedQuantity || 0;
+              const originalSold = posItem.quantity;
+
+              if (currentReturned + returnItem.returnQuantity > originalSold) {
+                return NextResponse.json(
+                  {
+                    error: `Cannot restore: Item ${posItem.description} already has ${currentReturned} returned out of ${originalSold} sold. Restoring this would exceed the sold quantity.`,
+                  },
+                  { status: 400 }
+                );
+              }
+              posItem.returnedQuantity = currentReturned + returnItem.returnQuantity;
+            }
+          }
+
+          // Re-add return note ID to posSale
+          const currentReturnNoteIds =
+            posSale.connectedDocuments?.returnNoteIds || [];
+          if (
+            !currentReturnNoteIds.some(
+              (rid: any) => rid.toString() === id
+            )
+          ) {
+            currentReturnNoteIds.push(id);
+            posSale.connectedDocuments = {
+              ...posSale.connectedDocuments,
+              returnNoteIds: currentReturnNoteIds,
+            };
+          }
+
+          posSale.addAuditEntry(
+            `POS Return Note ${returnNoteToRestore.returnNumber} restored`,
+            user.id,
+            user.username || user.name
+          );
+          await posSale.save();
+        }
+
+        // Add stock back (restore the reversal)
+        try {
+          await reverseStockForSalesReturn(
+            returnNoteToRestore._id,
+            returnNoteToRestore.items
+          );
+        } catch (stockError: any) {
+          console.error(`❌ Stock restoration failed:`, stockError);
+          return NextResponse.json(
+            {
+              error: `Cannot restore POS return: ${stockError.message}`,
+            },
+            { status: 400 }
+          );
+        }
+
+        // Recreate journal
+        await createJournalForPOSReturn(
+          returnNoteToRestore.toObject(),
+          posSale?.paymentMethod || 'Cash',
           user.id,
           user.username || user.name
         );
@@ -249,6 +340,32 @@ export async function POST(request: Request) {
             user.username || user.name
           );
           await invoice.save();
+        }
+      } else if (returnType === "posReturn") {
+        const posSale = await POSSale.findById(
+          returnNoteToRestore.connectedDocuments.posSaleId
+        );
+        if (posSale && !posSale.isDeleted) {
+          const currentReturnNoteIds =
+            posSale.connectedDocuments?.returnNoteIds || [];
+          if (
+            !currentReturnNoteIds.some(
+              (rid: any) => rid.toString() === id
+            )
+          ) {
+            currentReturnNoteIds.push(id);
+            posSale.connectedDocuments = {
+              ...posSale.connectedDocuments,
+              returnNoteIds: currentReturnNoteIds,
+            };
+          }
+
+          posSale.addAuditEntry(
+            `POS Return Note ${returnNoteToRestore.returnNumber} restored`,
+            user.id,
+            user.username || user.name
+          );
+          await posSale.save();
         }
       }
     }

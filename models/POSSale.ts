@@ -10,6 +10,7 @@ export interface IPOSSaleItem {
     total: number;
     taxRate?: number;
     taxAmount?: number;
+    returnedQuantity?: number;
 }
 
 export interface IPOSSale extends Document<string> {
@@ -47,6 +48,11 @@ export interface IPOSSale extends Document<string> {
     // Auto-created references — needed to reverse on soft-delete
     journalId?: mongoose.Types.ObjectId;
     stockAdjustmentIds: mongoose.Types.ObjectId[];
+    
+    // Connections
+    connectedDocuments?: {
+        returnNoteIds?: mongoose.Types.ObjectId[];
+    };
 
     // Soft delete
     isDeleted: boolean;
@@ -66,6 +72,7 @@ const POSSaleItemSchema = new Schema({
     total: { type: Number, required: true },
     taxRate: { type: Number, default: 0 },
     taxAmount: { type: Number, default: 0 },
+    returnedQuantity: { type: Number, default: 0 },
 });
 
 const PartySnapshotSchema = new Schema({
@@ -95,6 +102,10 @@ const POSSaleSchema = new Schema<IPOSSale>({
 
     journalId: { type: Schema.Types.ObjectId, ref: 'Journal', required: false },
     stockAdjustmentIds: [{ type: Schema.Types.ObjectId, ref: 'StockAdjustment' }],
+
+    connectedDocuments: {
+        returnNoteIds: [{ type: Schema.Types.ObjectId, ref: 'ReturnNote' }]
+    },
 
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },

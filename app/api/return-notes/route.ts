@@ -4,6 +4,7 @@ import dbConnect from "@/lib/dbConnect";
 import ReturnNote from "@/models/ReturnNote";
 import Purchase from "@/models/Purchase";
 import Invoice from "@/models/Invoice";
+import POSSale from "@/models/POSSale";
 import Item from "@/models/Item";
 import DebitNote from "@/models/DebitNote";
 import CreditNote from "@/models/CreditNote";
@@ -14,6 +15,7 @@ import generateInvoiceNumber from "@/utils/invoiceNumber";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { extractTableParams, executePaginatedQuery } from "@/lib/query-builders";
 import { createPartySnapshot } from "@/utils/partySnapshot";
+
 export async function GET(request: Request) {
     try {
         const { error } = await requireAuthAndPermission({
@@ -21,7 +23,7 @@ export async function GET(request: Request) {
         });
         if (error) return error;
         await dbConnect();
-        const _ensureModels = [DebitNote, CreditNote, Purchase, Invoice, Item, Party, Contact];
+        const _ensureModels = [DebitNote, CreditNote, Purchase, Invoice, POSSale, Item, Party, Contact];
         const { searchParams } = new URL(request.url);
         const isServerSide = searchParams.has('page') || searchParams.has('pageSize');
         const startDateParam = searchParams.get('startDate');
@@ -184,6 +186,7 @@ export async function POST(request: Request) {
             returnType = 'purchaseReturn',
             purchaseId,
             invoiceId,
+            posSaleId,
             partyId,
             contactId,
             items,
@@ -193,10 +196,12 @@ export async function POST(request: Request) {
             status = 'pending',
             totalAmount,
             vatAmount,
-            grandTotal
+            grandTotal,
+            paymentMethod = 'Cash',
+            cogsAmount = 0
         } = body;
         // Validate partyId
-        if (!partyId) {
+        if (returnType !== 'posReturn' && !partyId) {
             return NextResponse.json({ error: "Party ID is required" }, { status: 400 });
         }
         // Validate return type
@@ -208,9 +213,13 @@ export async function POST(request: Request) {
             if (!invoiceId) {
                 return NextResponse.json({ error: "Invoice ID is required for sales returns" }, { status: 400 });
             }
+        } else if (returnType === 'posReturn') {
+            if (!posSaleId) {
+                return NextResponse.json({ error: "POS Sale ID is required for POS returns" }, { status: 400 });
+            }
         } else {
             return NextResponse.json({
-                error: "Invalid return type. Must be 'purchaseReturn' or 'salesReturn'"
+                error: "Invalid return type. Must be 'purchaseReturn', 'salesReturn', or 'posReturn'"
             }, { status: 400 });
         }
         if (!items || !Array.isArray(items) || items.length === 0) {
@@ -280,6 +289,31 @@ export async function POST(request: Request) {
                     }, { status: 400 });
                 }
             }
+        } else if (returnType === 'posReturn') {
+            const posSale = await POSSale.findById(posSaleId);
+            if (!posSale || posSale.isDeleted) {
+                return NextResponse.json({ error: "POS Sale not found" }, { status: 404 });
+            }
+            // Validate return quantities against source POS Sale
+            for (const returnItem of items) {
+                const saleItem = posSale.items.find(
+                    (si: any) => si.itemId?.toString() === returnItem.itemId?.toString()
+                );
+                if (!saleItem) {
+                    return NextResponse.json({
+                        error: `Item "${returnItem.description}" not found in POS sale`
+                    }, { status: 400 });
+                }
+                const soldQty = saleItem.quantity || 0;
+                const alreadyReturned = saleItem.returnedQuantity || 0;
+                const availableToReturn = soldQty - alreadyReturned;
+                if (returnItem.returnQuantity > availableToReturn) {
+                    return NextResponse.json({
+                        error: `Cannot return ${returnItem.returnQuantity} units of "${returnItem.description}". ` +
+                            `Available to return: ${availableToReturn}`
+                    }, { status: 400 });
+                }
+            }
         }
         // Generate return number
         const returnNumber = await generateInvoiceNumber('return');
@@ -294,15 +328,18 @@ export async function POST(request: Request) {
             }, { status: 500 });
         }
         // ✅ Create party and contact snapshots
-        const { partySnapshot, contactSnapshot } = await createPartySnapshot(partyId, contactId);
+        let partySnapshot = undefined, contactSnapshot = undefined;
+        if (partyId) {
+            const snapshots = await createPartySnapshot(partyId, contactId);
+            partySnapshot = snapshots.partySnapshot;
+            contactSnapshot = snapshots.contactSnapshot;
+        }
         // Create return note data
         const returnNoteData: any = {
             returnNumber,
             returnType,
             partyId,
             contactId,
-            partySnapshot,
-            contactSnapshot,
             items,
             returnDate: returnDate || new Date(),
             reason,
@@ -333,7 +370,14 @@ export async function POST(request: Request) {
         } else if (returnType === 'salesReturn') {
             const invoice = await Invoice.findById(invoiceId);
             returnNoteData.connectedDocuments.invoiceId = invoice._id;
+        } else if (returnType === 'posReturn') {
+            const posSale = await POSSale.findById(posSaleId);
+            returnNoteData.connectedDocuments.posSaleId = posSale._id;
+            returnNoteData.status = 'approved'; // POS returns are immediate
         }
+        if (partySnapshot) returnNoteData.partySnapshot = partySnapshot;
+        if (contactSnapshot) returnNoteData.contactSnapshot = contactSnapshot;
+
         const newReturnNote = new ReturnNote(returnNoteData);
         const savedReturnNote = await newReturnNote.save();
         // Update source document
@@ -410,6 +454,50 @@ export async function POST(request: Request) {
             );
             await invoice.save();
             console.log(`✅ Sales Return Note ${returnNumber} linked to invoice${status === 'approved' ? ' - returned quantities updated' : ''}`);
+        } else if (returnType === 'posReturn') {
+            const posSale = await POSSale.findById(posSaleId);
+            // Link return note
+            const currentReturnNoteIds = posSale.connectedDocuments?.returnNoteIds || [];
+            if (!currentReturnNoteIds.some((rid: any) => rid.toString() === savedReturnNote._id.toString())) {
+                currentReturnNoteIds.push(savedReturnNote._id);
+                posSale.connectedDocuments = {
+                    ...posSale.connectedDocuments,
+                    returnNoteIds: currentReturnNoteIds
+                };
+            }
+            // Update returned quantities
+            for (const returnItem of items) {
+                const saleItemIndex = posSale.items.findIndex(
+                    (ii: any) => ii.itemId?.toString() === returnItem.itemId?.toString()
+                );
+                if (saleItemIndex !== -1) {
+                    const currentReturned = posSale.items[saleItemIndex].returnedQuantity || 0;
+                    posSale.items[saleItemIndex].returnedQuantity = currentReturned + returnItem.returnQuantity;
+                }
+            }
+            await posSale.save();
+            
+            // Add stock back via BOM
+            const { addStockForPOSReturn } = await import("@/utils/inventoryManager");
+            await addStockForPOSReturn(
+                savedReturnNote._id,
+                items.map((item: any) => ({
+                    itemId: item.itemId?.toString(),
+                    returnQuantity: item.returnQuantity,
+                }))
+            );
+            
+            // Create journal
+            const { createJournalForPOSReturn } = await import("@/utils/journalAutoCreate");
+            await createJournalForPOSReturn(
+                savedReturnNote,
+                paymentMethod,
+                user.id,
+                user.username || user.name,
+                cogsAmount
+            );
+            
+            console.log(`✅ POS Return Note ${returnNumber} created and approved`);
         }
         return NextResponse.json({
             message: 'Return note created successfully',
