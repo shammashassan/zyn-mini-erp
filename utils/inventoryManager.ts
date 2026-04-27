@@ -36,30 +36,43 @@ export async function deductStockForInvoice(
         const item = await Item.findById(lineItemId);
         if (!item) throw new Error(`Item ${lineItemId} not found`);
 
-        // Only "product" items affect stock via BOM
-        if (!item.types.includes('product')) continue;
+        // 1. If item has a BOM, deduct components
+        if (item.bom && item.bom.length > 0) {
+            for (const bomComponent of item.bom) {
+                const requiredQty = bomComponent.quantity * lineQty;
+                const materialItem = await Item.findById(bomComponent.itemId);
+                if (!materialItem) {
+                    throw new Error(`BOM item ${bomComponent.itemId} not found`);
+                }
 
-        // Products without BOM skip stock deduction
-        if (!item.bom || item.bom.length === 0) continue;
-
-        for (const bomComponent of item.bom) {
-            const requiredQty = bomComponent.quantity * lineQty;
-            const materialItem = await Item.findById(bomComponent.itemId);
-            if (!materialItem) {
-                throw new Error(`BOM item ${bomComponent.itemId} not found`);
+                const existing = operations.find(
+                    (op) => op.itemId === materialItem._id.toString()
+                );
+                if (existing) {
+                    existing.requiredQty += requiredQty;
+                } else {
+                    operations.push({
+                        itemId: materialItem._id.toString(),
+                        itemName: materialItem.name,
+                        requiredQty,
+                        currentStock: materialItem.stock,
+                    });
+                }
             }
-
+        } 
+        // 2. If item is a "material" (including both product/material) but has no BOM, deduct the item itself
+        else if (item.types.includes('material')) {
             const existing = operations.find(
-                (op) => op.itemId === materialItem._id.toString()
+                (op) => op.itemId === item._id.toString()
             );
             if (existing) {
-                existing.requiredQty += requiredQty;
+                existing.requiredQty += lineQty;
             } else {
                 operations.push({
-                    itemId: materialItem._id.toString(),
-                    itemName: materialItem.name,
-                    requiredQty,
-                    currentStock: materialItem.stock,
+                    itemId: item._id.toString(),
+                    itemName: item.name,
+                    requiredQty: lineQty,
+                    currentStock: item.stock,
                 });
             }
         }
@@ -122,23 +135,36 @@ export async function reverseStockForSalesReturn(
         const item = await Item.findById(lineItem.itemId);
         if (!item) throw new Error(`Item ${lineItem.itemId} not found`);
 
-        if (!item.types.includes('product') || !item.bom || item.bom.length === 0) continue;
+        if (item.bom && item.bom.length > 0) {
+            for (const bomComponent of item.bom) {
+                const returnedQty = bomComponent.quantity * lineItem.returnQuantity;
+                const materialItem = await Item.findById(bomComponent.itemId);
+                if (!materialItem) throw new Error(`BOM item ${bomComponent.itemId} not found`);
 
-        for (const bomComponent of item.bom) {
-            const returnedQty = bomComponent.quantity * lineItem.returnQuantity;
-            const materialItem = await Item.findById(bomComponent.itemId);
-            if (!materialItem) throw new Error(`BOM item ${bomComponent.itemId} not found`);
-
+                const existing = operations.find(
+                    (op) => op.itemId === materialItem._id.toString()
+                );
+                if (existing) {
+                    existing.returnedQty += returnedQty;
+                } else {
+                    operations.push({
+                        itemId: materialItem._id.toString(),
+                        itemName: materialItem.name,
+                        returnedQty,
+                    });
+                }
+            }
+        } else if (item.types.includes('material')) {
             const existing = operations.find(
-                (op) => op.itemId === materialItem._id.toString()
+                (op) => op.itemId === item._id.toString()
             );
             if (existing) {
-                existing.returnedQty += returnedQty;
+                existing.returnedQty += lineItem.returnQuantity;
             } else {
                 operations.push({
-                    itemId: materialItem._id.toString(),
-                    itemName: materialItem.name,
-                    returnedQty,
+                    itemId: item._id.toString(),
+                    itemName: item.name,
+                    returnedQty: lineItem.returnQuantity,
                 });
             }
         }
@@ -191,23 +217,36 @@ export async function reverseStockForInvoice(
         const item = await Item.findById(lineItem.itemId);
         if (!item) throw new Error(`Item ${lineItem.itemId} not found`);
 
-        if (!item.types.includes('product') || !item.bom || item.bom.length === 0) continue;
+        if (item.bom && item.bom.length > 0) {
+            for (const bomComponent of item.bom) {
+                const restoredQty = bomComponent.quantity * lineItem.quantity;
+                const materialItem = await Item.findById(bomComponent.itemId);
+                if (!materialItem) throw new Error(`BOM item ${bomComponent.itemId} not found`);
 
-        for (const bomComponent of item.bom) {
-            const restoredQty = bomComponent.quantity * lineItem.quantity;
-            const materialItem = await Item.findById(bomComponent.itemId);
-            if (!materialItem) throw new Error(`BOM item ${bomComponent.itemId} not found`);
-
+                const existing = operations.find(
+                    (op) => op.itemId === materialItem._id.toString()
+                );
+                if (existing) {
+                    existing.restoredQty += restoredQty;
+                } else {
+                    operations.push({
+                        itemId: materialItem._id.toString(),
+                        itemName: materialItem.name,
+                        restoredQty,
+                    });
+                }
+            }
+        } else if (item.types.includes('material')) {
             const existing = operations.find(
-                (op) => op.itemId === materialItem._id.toString()
+                (op) => op.itemId === item._id.toString()
             );
             if (existing) {
-                existing.restoredQty += restoredQty;
+                existing.restoredQty += lineItem.quantity;
             } else {
                 operations.push({
-                    itemId: materialItem._id.toString(),
-                    itemName: materialItem.name,
-                    restoredQty,
+                    itemId: item._id.toString(),
+                    itemName: item.name,
+                    restoredQty: lineItem.quantity,
                 });
             }
         }
@@ -430,23 +469,36 @@ export async function deductStockForPOSSale(
         if (!item) throw new Error(`Item "${lineItem.description || lineItemId}" not found`);
 
         if (!item.types.includes('product')) continue;
-        if (!item.bom || item.bom.length === 0) continue;
+        if (item.bom && item.bom.length > 0) {
+            for (const bomComponent of item.bom) {
+                const requiredQty = bomComponent.quantity * lineQty;
+                const materialItem = await Item.findById(bomComponent.itemId);
+                if (!materialItem) throw new Error(`BOM component item ${bomComponent.itemId} not found`);
 
-        for (const bomComponent of item.bom) {
-            const requiredQty = bomComponent.quantity * lineQty;
-            const materialItem = await Item.findById(bomComponent.itemId);
-            if (!materialItem) throw new Error(`BOM component item ${bomComponent.itemId} not found`);
-
-            const existing = operations.find(op => op.itemId === materialItem._id.toString());
+                const existing = operations.find(op => op.itemId === materialItem._id.toString());
+                if (existing) {
+                    existing.requiredQty += requiredQty;
+                } else {
+                    operations.push({
+                        itemId: materialItem._id.toString(),
+                        itemName: materialItem.name,
+                        requiredQty,
+                        currentStock: materialItem.stock,
+                        costPrice: materialItem.costPrice || 0,
+                    });
+                }
+            }
+        } else if (item.types.includes('material')) {
+            const existing = operations.find(op => op.itemId === item._id.toString());
             if (existing) {
-                existing.requiredQty += requiredQty;
+                existing.requiredQty += lineQty;
             } else {
                 operations.push({
-                    itemId: materialItem._id.toString(),
-                    itemName: materialItem.name,
-                    requiredQty,
-                    currentStock: materialItem.stock,
-                    costPrice: materialItem.costPrice || 0,
+                    itemId: item._id.toString(),
+                    itemName: item.name,
+                    requiredQty: lineQty,
+                    currentStock: item.stock,
+                    costPrice: item.costPrice || 0,
                 });
             }
         }
@@ -605,23 +657,36 @@ export async function addStockForPOSReturn(
         const item = await Item.findById(lineItem.itemId);
         if (!item) throw new Error(`Item ${lineItem.itemId} not found`);
 
-        if (!item.types.includes('product') || !item.bom || item.bom.length === 0) continue;
+        if (item.bom && item.bom.length > 0) {
+            for (const bomComponent of item.bom) {
+                const returnedQty = bomComponent.quantity * lineItem.returnQuantity;
+                const materialItem = await Item.findById(bomComponent.itemId);
+                if (!materialItem) throw new Error(`BOM item ${bomComponent.itemId} not found`);
 
-        for (const bomComponent of item.bom) {
-            const returnedQty = bomComponent.quantity * lineItem.returnQuantity;
-            const materialItem = await Item.findById(bomComponent.itemId);
-            if (!materialItem) throw new Error(`BOM item ${bomComponent.itemId} not found`);
-
+                const existing = operations.find(
+                    (op) => op.itemId === materialItem._id.toString()
+                );
+                if (existing) {
+                    existing.returnedQty += returnedQty;
+                } else {
+                    operations.push({
+                        itemId: materialItem._id.toString(),
+                        itemName: materialItem.name,
+                        returnedQty,
+                    });
+                }
+            }
+        } else if (item.types.includes('material')) {
             const existing = operations.find(
-                (op) => op.itemId === materialItem._id.toString()
+                (op) => op.itemId === item._id.toString()
             );
             if (existing) {
-                existing.returnedQty += returnedQty;
+                existing.returnedQty += lineItem.returnQuantity;
             } else {
                 operations.push({
-                    itemId: materialItem._id.toString(),
-                    itemName: materialItem.name,
-                    returnedQty,
+                    itemId: item._id.toString(),
+                    itemName: item.name,
+                    returnedQty: lineItem.returnQuantity,
                 });
             }
         }

@@ -224,8 +224,8 @@ export function ItemViewModal({ isOpen, onClose, item: initialItem }: ItemViewMo
                             </Card>
                         )}
 
-                        {/* BOM (product) */}
-                        {isProduct && data.bom && data.bom.length > 0 && (
+                        {/* BOM (product only, hidden if it's also a material as it uses self-deduction) */}
+                        {isProduct && !isMaterial && data.bom && data.bom.length > 0 && (
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="text-sm">Bill of Materials (BOM)</CardTitle>

@@ -178,6 +178,11 @@ export function ItemForm({
             data.taxRate = 0;
         }
 
+        // If it's a material (including both), clear the BOM as it's not used (self-deduction is used instead)
+        if (data.types.includes('material')) {
+            data.bom = [];
+        }
+
         const id = defaultValues?._id ? String(defaultValues._id) : undefined;
         onSubmit(data, id);
     };
@@ -561,8 +566,8 @@ export function ItemForm({
                         </div>
                     )}
 
-                    {/* BOM (product only) */}
-                    {isProduct && (
+                    {/* BOM (product only, and ONLY if it's not also a material) */}
+                    {isProduct && !isMaterial && (
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <div>

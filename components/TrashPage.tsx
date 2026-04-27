@@ -102,12 +102,15 @@ export function TrashPage<T extends { _id: string; deletedAt?: Date | string; de
         body: JSON.stringify({ id: item._id }),
       });
 
-      if (!res.ok) throw new Error("Failed to restore item");
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to restore item");
+      }
 
       toast.success("Item restored successfully.");
       fetchTrashItems();
-    } catch (error) {
-      toast.error("Failed to restore item.");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to restore item.");
     }
   };
 
