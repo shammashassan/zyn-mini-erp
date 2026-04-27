@@ -39,7 +39,14 @@ export interface POSReturn {
   _id: string;
   returnNumber: string;
   returnType: 'posReturn';
-  posSaleId?: any;
+  connectedDocuments: {
+    posSaleId?: {
+      _id: string;
+      saleNumber: string;
+      paymentMethod?: string;
+      status?: string;
+    };
+  };
   items: Array<{
     description?: string;
     itemName?: string;
@@ -59,6 +66,7 @@ export interface POSReturn {
 interface RowActionsProps {
   posReturn: POSReturn;
   onDelete: (id: string) => void;
+  onView: (posReturn: POSReturn) => void;
   onViewPdf?: (posReturn: POSReturn) => void;
   canDelete: boolean;
 }
@@ -66,6 +74,7 @@ interface RowActionsProps {
 const RowActions = ({
   posReturn,
   onDelete,
+  onView,
   onViewPdf,
   canDelete,
 }: RowActionsProps) => {
@@ -82,6 +91,10 @@ const RowActions = ({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => onView(posReturn)}>
+            <Eye className="mr-2 h-4 w-4" />
+            View Details
+          </DropdownMenuItem>
           {onViewPdf && (
             <DropdownMenuItem onClick={() => onViewPdf(posReturn)}>
               <FileText className="mr-2 h-4 w-4" />
@@ -145,6 +158,7 @@ const RowActions = ({
 
 export const getColumns = (
   onDelete: (id: string) => void,
+  onView: (posReturn: POSReturn) => void,
   onViewPdf: (posReturn: POSReturn) => void,
   canDelete: boolean
 ): ColumnDef<POSReturn>[] => [
@@ -191,9 +205,9 @@ export const getColumns = (
       id: "posSaleId",
       header: "Original Sale",
       cell: ({ row }) => {
-        const posSale = row.original.posSaleId as any;
+        const posSale = row.original.connectedDocuments?.posSaleId;
         return (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm font-medium">
             {posSale?.saleNumber || "—"}
           </span>
         );
@@ -266,6 +280,7 @@ export const getColumns = (
         <RowActions
           posReturn={row.original}
           onDelete={onDelete}
+          onView={onView}
           onViewPdf={onViewPdf}
           canDelete={canDelete}
         />

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { POSReturnModal } from "./pos-return-modal";
+import { POSViewModal } from "./pos-view-modal";
 import { useDataTable } from "@/hooks/use-data-table";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
@@ -39,116 +40,7 @@ import { Separator } from "@/components/ui/separator";
 import { usePOSPermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 
-// ─── Sale detail modal ────────────────────────────────────────────────────────
-function POSSaleDetailModal({
-    isOpen,
-    onClose,
-    sale,
-    onViewPdf,
-    onReturnItems,
-}: {
-    isOpen: boolean;
-    onClose: () => void;
-    sale: POSSale | null;
-    onViewPdf: (sale: POSSale) => void;
-    onReturnItems?: (sale: POSSale) => void;
-}) {
-    if (!sale) return null;
-    return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto sidebar-scroll">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <ShoppingBag className="size-5" />
-                        {sale.saleNumber}
-                    </DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                            <p className="text-muted-foreground text-xs mb-0.5">Customer</p>
-                            <p className="font-medium">{sale.customerName}</p>
-                        </div>
-                        <div>
-                            <p className="text-muted-foreground text-xs mb-0.5">Payment</p>
-                            <p className="font-medium">{sale.paymentMethod}</p>
-                        </div>
-                        <div>
-                            <p className="text-muted-foreground text-xs mb-0.5">Date</p>
-                            <p className="font-medium">{formatDateTime(sale.createdAt)}</p>
-                        </div>
-                        <div>
-                            <p className="text-muted-foreground text-xs mb-0.5">Items</p>
-                            <p className="font-medium">{sale.items.length} item(s)</p>
-                        </div>
-                    </div>
 
-                    <div className="rounded-lg border overflow-hidden">
-                        <table className="w-full text-sm">
-                            <thead className="bg-muted/50 text-xs">
-                                <tr>
-                                    <th className="p-2 text-left font-medium">Item</th>
-                                    <th className="p-2 text-center font-medium">Qty</th>
-                                    <th className="p-2 text-right font-medium">Rate</th>
-                                    <th className="p-2 text-right font-medium">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {sale.items.map((item, i) => (
-                                    <tr key={i} className="border-t">
-                                        <td className="p-2">{item.description}</td>
-                                        <td className="p-2 text-center">{item.quantity}</td>
-                                        <td className="p-2 text-right text-muted-foreground">
-                                            {formatCurrency(item.rate)}
-                                        </td>
-                                        <td className="p-2 text-right font-medium">
-                                            {formatCurrency(item.total)}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div className="rounded-lg bg-muted/30 p-3 space-y-1.5 text-sm">
-                        <div className="flex justify-between">
-                            <span className="text-muted-foreground">Subtotal</span>
-                            <span>{formatCurrency(sale.totalAmount)}</span>
-                        </div>
-                        {sale.discount > 0 && (
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Discount</span>
-                                <span className="text-destructive">- {formatCurrency(sale.discount)}</span>
-                            </div>
-                        )}
-                        {sale.vatAmount > 0 && (
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">VAT</span>
-                                <span>{formatCurrency(sale.vatAmount)}</span>
-                            </div>
-                        )}
-                        <Separator />
-                        <div className="flex justify-between font-bold">
-                            <span>Grand Total</span>
-                            <span className="text-green-600">{formatCurrency(sale.grandTotal)}</span>
-                        </div>
-                    </div>
-
-                    <div className="flex gap-2 w-full pt-2">
-                        <Button className="flex-1" variant="outline" onClick={() => onViewPdf(sale)}>
-                            Print Receipt
-                        </Button>
-                        {onReturnItems && (
-                            <Button className="flex-1" variant="destructive" onClick={() => onReturnItems(sale)}>
-                                Return Items
-                            </Button>
-                        )}
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 // ─── Main page content ────────────────────────────────────────────────────────
 function POSSalesPageContent() {
@@ -475,7 +367,7 @@ function POSSalesPageContent() {
                 title={pdfTitle}
             />
 
-            <POSSaleDetailModal
+            <POSViewModal
                 isOpen={detailOpen}
                 onClose={() => { setDetailOpen(false); setSelectedSale(null); }}
                 sale={selectedSale}

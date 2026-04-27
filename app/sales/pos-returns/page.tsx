@@ -11,6 +11,7 @@ import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { DataTable } from "@/components/data-table/data-table";
 import { getColumns, type POSReturn } from "./columns";
 import { PDFViewerModal } from "@/components/PDFViewerModal";
+import { POSReturnViewModal } from "./pos-return-view-modal";
 import { useReturnNotePermissions } from "@/hooks/use-permissions";
 import { AccessDenied } from "@/components/access-denied";
 import { Spinner } from "@/components/ui/spinner";
@@ -36,6 +37,8 @@ function POSReturnsPageContent() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [selectedReturn, setSelectedReturn] = useState<POSReturn | null>(null);
   const [selectedPdfUrl, setSelectedPdfUrl] = useState("");
   const [selectedPdfTitle, setSelectedPdfTitle] = useState("");
 
@@ -173,6 +176,11 @@ function POSReturnsPageContent() {
     }
   };
 
+  const handleViewDetails = useCallback((posReturn: POSReturn) => {
+    setSelectedReturn(posReturn);
+    setIsViewModalOpen(true);
+  }, []);
+
   const handleViewPdf = useCallback((posReturn: POSReturn) => {
     if (!posReturn || !posReturn._id) {
       toast.error("Cannot view PDF. Return data is missing.");
@@ -220,8 +228,8 @@ function POSReturnsPageContent() {
   };
 
   const columns = useMemo(
-    () => getColumns(handleDelete, handleViewPdf, canDelete),
-    [canDelete, handleViewPdf]
+    () => getColumns(handleDelete, handleViewDetails, handleViewPdf, canDelete),
+    [canDelete, handleViewDetails, handleViewPdf]
   );
 
   const { table } = useDataTable<POSReturn>({
@@ -411,6 +419,13 @@ function POSReturnsPageContent() {
         onClose={() => setIsModalOpen(false)}
         pdfUrl={selectedPdfUrl}
         title={selectedPdfTitle}
+      />
+
+      <POSReturnViewModal
+        isOpen={isViewModalOpen}
+        onClose={() => setIsViewModalOpen(false)}
+        posReturn={selectedReturn}
+        onViewPdf={handleViewPdf}
       />
     </>
   );

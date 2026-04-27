@@ -75,6 +75,11 @@ export async function GET(request: Request) {
                     path: 'connectedDocuments.creditNoteId',
                     select: 'creditNoteNumber status',
                     match: { isDeleted: false }
+                },
+                {
+                    path: 'connectedDocuments.posSaleId',
+                    select: 'saleNumber items status paymentMethod',
+                    match: { isDeleted: false }
                 }
             ] : undefined;
             const result = await executePaginatedQuery(ReturnNote, {
@@ -162,6 +167,11 @@ export async function GET(request: Request) {
                     .populate({
                         path: 'connectedDocuments.creditNoteId',
                         select: 'creditNoteNumber status',
+                        match: { isDeleted: false }
+                    })
+                    .populate({
+                        path: 'connectedDocuments.posSaleId',
+                        select: 'saleNumber items status paymentMethod',
                         match: { isDeleted: false }
                     });
             }

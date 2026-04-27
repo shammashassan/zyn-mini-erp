@@ -47,6 +47,7 @@ export interface POSSale {
     createdAt: string;
     updatedAt: string;
     isDeleted?: boolean;
+    status?: string;
 }
 
 export interface POSPermissions {
