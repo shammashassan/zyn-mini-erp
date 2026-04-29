@@ -3,7 +3,7 @@
 "use client";
 
 import * as React from "react";
-import { useForm, SubmitHandler, useFieldArray, Controller } from "react-hook-form";
+import { useForm, SubmitHandler, useFieldArray, Controller, FieldErrors } from "react-hook-form";
 import { format } from "date-fns";
 import { CalendarIcon, PlusCircleIcon, Trash2Icon, ChevronsUpDown, Check, Plus, Loader2 } from "lucide-react";
 
@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -73,7 +74,7 @@ interface EmployeeFormProps {
 }
 
 export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existingRoles = [] }: EmployeeFormProps) {
-  const { register, handleSubmit, reset, control, formState: { isSubmitting, isDirty } } = useForm<EmployeeFormData>({
+  const { register, handleSubmit, reset, control, formState: { isSubmitting, isDirty, errors } } = useForm<EmployeeFormData>({
     defaultValues: {
       firstName: "",
       lastName: "",
@@ -146,6 +147,18 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
     await onSubmit(data, avatarBlob, wasAvatarRemoved, submissionId);
   };
 
+  const onInvalid = (errors: FieldErrors<EmployeeFormData>) => {
+    if (errors.firstName) {
+      toast.error(errors.firstName.message || "First name is required");
+    } else if (errors.lastName) {
+      toast.error(errors.lastName.message || "Last name is required");
+    } else if (errors.role) {
+      toast.error(errors.role.message || "Role is required");
+    } else {
+      toast.error("Please fill in all required fields");
+    }
+  };
+
   const isEditing = !!defaultValues?._id;
   const hasChanges = isDirty || avatarBlob !== null || wasAvatarRemoved;
 
@@ -173,19 +186,27 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto pr-2 sidebar-scroll">
-          <form id="employee-form" onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 px-4 pb-4" autoComplete="off">
+          <form id="employee-form" onSubmit={handleSubmit(handleFormSubmit, onInvalid)} className="space-y-4 px-4 pb-4" autoComplete="off">
             <ImageUploader
               initialImageUrl={defaultValues?.avatar}
               onImageCropped={handleImageCropped}
             />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
-                <Input id="firstName" {...register("firstName", { required: true })} />
+                <Label htmlFor="firstName">First Name <span className="text-destructive">*</span></Label>
+                <Input 
+                  id="firstName" 
+                  {...register("firstName", { required: "First name is required" })} 
+                  className={cn(errors.firstName && "border-destructive")}
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input id="lastName" {...register("lastName", { required: true })} />
+                <Label htmlFor="lastName">Last Name <span className="text-destructive">*</span></Label>
+                <Input 
+                  id="lastName" 
+                  {...register("lastName", { required: "Last name is required" })} 
+                  className={cn(errors.lastName && "border-destructive")}
+                />
               </div>
             </div>
             <div className="space-y-2">
@@ -206,7 +227,10 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
                       <Button
                         variant="outline"
                         role="combobox"
-                        className="w-full justify-between"
+                        className={cn(
+                          "w-full justify-between",
+                          errors.role && "border-destructive text-destructive"
+                        )}
                       >
                         {field.value || "Select or create role..."}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
