@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeProvider } from "@/components/layout/theme-provider";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
-import { AppLayout } from "@/components/app-layout";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -32,7 +31,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <NuqsAdapter>
-              <AppLayout>{children}</AppLayout>
+              {children}
             </NuqsAdapter>
             <Toaster
               expand={false}
