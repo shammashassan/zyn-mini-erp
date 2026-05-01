@@ -11,6 +11,7 @@ import { extractTableParams, executePaginatedQuery } from '@/lib/query-builders'
 import { deductStockForPOSSale } from '@/utils/inventoryManager';
 import { createJournalForPOSSale } from '@/utils/journalAutoCreate';
 import { createPartySnapshot } from '@/utils/partySnapshot';
+import { unstable_rethrow } from 'next/navigation';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET  /api/pos  — paginated list of POS sales
@@ -80,6 +81,7 @@ export async function GET(request: Request) {
         const sales = await POSSale.find(filter).sort({ createdAt: -1 });
         return NextResponse.json(sales);
     } catch (error) {
+        unstable_rethrow(error);
         console.error('GET /api/pos error:', error);
         return NextResponse.json({ error: 'Server error' }, { status: 500 });
     }
@@ -197,6 +199,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ message: 'POS sale created', sale }, { status: 201 });
     } catch (error: any) {
+        unstable_rethrow(error);
         console.error('POST /api/pos error:', error);
         return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
     }

@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/accordion";
 import { Separator } from "@/components/ui/separator";
 import { useHelpPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { redirect, usePathname } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -175,7 +175,7 @@ export default function GetHelpPage() {
 
   // Access control
   if (!canRead) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   return (

@@ -15,7 +15,7 @@ import type { IPayee } from "@/models/Payee";
 import { Users, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { usePayeePermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { redirect, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -186,7 +186,7 @@ export default function PayeesPage() {
   }
 
   if (!canRead) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   return (

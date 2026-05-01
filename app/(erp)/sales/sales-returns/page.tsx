@@ -17,7 +17,7 @@ import { SalesReturnViewModal } from "./SalesReturnViewModal";
 import { PDFViewerModal } from "@/components/shared/PDFViewerModal";
 import Link from "next/link";
 import { useReturnNotePermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { useQueryStates, parseAsInteger } from "nuqs";
 import { getSortingStateParser, getFiltersStateParser } from "@/lib/data-table/parsers";
@@ -414,7 +414,7 @@ function SalesReturnsPageContent() {
   }
 
   if (!canRead) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   return (

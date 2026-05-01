@@ -18,7 +18,7 @@ import { PDFViewerModal } from "@/components/shared/PDFViewerModal";
 import { PurchaseViewModal } from "@/app/(erp)/procurement/purchases/PurchaseViewModal";
 import Link from "next/link";
 import { useReturnNotePermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { useQueryStates, parseAsInteger } from "nuqs";
 import { getSortingStateParser, getFiltersStateParser } from "@/lib/data-table/parsers";
@@ -453,7 +453,7 @@ function PurchaseReturnsPageContent() {
   }
 
   if (!canRead) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   return (

@@ -13,7 +13,7 @@ import { getColumns, type POSReturn } from "./columns";
 import { PDFViewerModal } from "@/components/shared/PDFViewerModal";
 import { POSReturnViewModal } from "./pos-return-view-modal";
 import { useReturnNotePermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { useQueryStates, parseAsInteger } from "nuqs";
 import { getSortingStateParser, getFiltersStateParser } from "@/lib/data-table/parsers";
@@ -275,7 +275,7 @@ function POSReturnsPageContent() {
   }
 
   if (!canRead) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   return (

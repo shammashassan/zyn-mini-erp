@@ -17,7 +17,7 @@ import { PDFViewerModal } from "@/components/shared/PDFViewerModal";
 import { PurchaseViewModal } from "./PurchaseViewModal";
 import Link from "next/link";
 import { usePurchasePermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { useQueryStates, parseAsInteger } from "nuqs";
 import { getSortingStateParser, getFiltersStateParser } from "@/lib/data-table/parsers";
@@ -446,7 +446,7 @@ function PurchasesPageContent() {
   }
 
   if (!canRead) {
-    return <AccessDenied />
+    forbidden();
   }
 
   return (

@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/command";
 import { PartyContactSelector } from "@/components/shared/PartyContactSelector";
 import { useJournalPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { useQueryStates, parseAsInteger } from "nuqs";
 import { getSortingStateParser, getFiltersStateParser } from "@/lib/data-table/parsers";
@@ -408,7 +408,7 @@ function JournalPageContent() {
   }
 
   if (!canRead) {
-    return <AccessDenied />
+    forbidden();
   }
 
   return (

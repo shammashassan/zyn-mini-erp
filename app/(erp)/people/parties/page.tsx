@@ -18,7 +18,7 @@ import type { IParty } from "@/models/Party";
 import Link from "next/link";
 import { StatsCards, type StatItem } from "@/components/shared/stats-cards";
 import { usePartyPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -289,7 +289,7 @@ function PartiesPageContent() {
     }
 
     if (!canRead) {
-        return <AccessDenied />
+        forbidden();
     }
 
     return (

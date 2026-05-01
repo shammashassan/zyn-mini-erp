@@ -6,7 +6,7 @@ import DeliveryNote from "@/models/DeliveryNote";
 import { softDelete } from "@/utils/softDelete";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 import { createPartySnapshot } from "@/utils/partySnapshot";
-import { getUserInfo } from "@/lib/auth-helpers";
+import { getUserInfo } from "@/lib/auth-utils";
 
 interface RequestContext {
   params: Promise<{

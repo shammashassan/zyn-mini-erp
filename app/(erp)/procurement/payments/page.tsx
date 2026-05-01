@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import { Wallet, Trash2, BarChart3, Plus, CalendarIcon } from "lucide-react";
 import Link from "next/link";
 import { useVoucherPermissions, useReportPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { getSortingStateParser, getFiltersStateParser } from "@/lib/data-table/parsers";
 import type { ExtendedColumnSort, ExtendedColumnFilter } from "@/types/data-table";
@@ -384,7 +384,7 @@ function PaymentsPageContent() {
     }
 
     if (!canRead) {
-        return <AccessDenied />
+        forbidden();
     }
 
     return (

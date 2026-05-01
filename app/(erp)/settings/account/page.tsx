@@ -4,7 +4,7 @@
 import { redirect, usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { getUserInfo } from "@/lib/auth-helpers";
+import { getUserInfo } from "@/lib/auth-utils";
 import { ProfileSection } from "./profile-section";
 import { PasswordModal } from "./password-modal";
 import { SessionsModal } from "./sessions-modal";
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAccountPermissions } from "@/hooks/use-permissions";
 import { Spinner } from "@/components/ui/spinner";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 
 export default function AccountPage() {
   const pathname = usePathname();
@@ -47,7 +47,7 @@ export default function AccountPage() {
   }
 
   if (!canRead) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   return (

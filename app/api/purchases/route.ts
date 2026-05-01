@@ -8,7 +8,7 @@ import ReturnNote from "@/models/ReturnNote";
 import Item from "@/models/Item";
 import StockAdjustment from "@/models/StockAdjustment";
 import Party from "@/models/Party";
-import { getUserInfo } from "@/lib/auth-helpers";
+import { getUserInfo } from "@/lib/auth-utils";
 import { createJournalForPurchase } from '@/utils/journalAutoCreate';
 import generateInvoiceNumber from '@/utils/invoiceNumber';
 import { requireAuthAndPermission } from "@/lib/auth-utils";

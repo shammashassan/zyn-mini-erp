@@ -9,7 +9,7 @@ import Employee from '@/models/Employee';
 import Expense from '@/models/Expense';
 import Payee from '@/models/Payee';
 import { requireAuthAndPermission } from '@/lib/auth-utils';
-import { getUserInfo } from '@/lib/auth-helpers';
+import { getUserInfo } from '@/lib/auth-utils';
 import generateInvoiceNumber from '@/utils/invoiceNumber';
 import { calculateSalary } from '@/utils/salaryCalculation';
 import { createPayeeSnapshot } from '@/utils/partySnapshot';

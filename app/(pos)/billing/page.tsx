@@ -13,7 +13,7 @@ import type {
 } from "./pos-types";
 import { ShoppingBag } from "lucide-react";
 import { useBillPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -181,7 +181,7 @@ export default function POSPage() {
   }
 
   if (!session) redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
-  if (!canCreate) return <AccessDenied />;
+  if (!canCreate) forbidden();
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render

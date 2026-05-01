@@ -26,7 +26,7 @@ import { useDataTable } from '@/hooks/use-data-table';
 import { StatsCards, type StatItem } from '@/components/shared/stats-cards';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
-import { AccessDenied } from '@/components/shared/access-denied';
+import { forbidden } from "next/navigation";
 import { cn } from '@/lib/utils';
 import { redirect, usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -217,7 +217,7 @@ export default function StockPage() {
         );
     }
     if (!session) redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
-    if (!canRead) return <AccessDenied />;
+    if (!canRead) forbidden();
 
     return (
         <>

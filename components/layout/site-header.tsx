@@ -67,7 +67,7 @@ const routeGroups: Record<string, { label: string; path: string }[]> = {
   ],
 };
 
-const standaloneRoutes = ["/dashboard", "/docs", "/settings", "/notifications"];
+const standaloneRoutes = ["/dashboard", "/settings", "/notifications"];
 
 export function SiteHeader() {
   const pathname = usePathname();

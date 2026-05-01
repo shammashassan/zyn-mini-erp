@@ -18,7 +18,7 @@ import { PDFViewerModal } from "@/components/shared/PDFViewerModal";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { formatCurrency, formatCompactCurrency } from "@/utils/formatters/currency";
 import { useDashboardPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import Preloader from "@/components/layout/preloader";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -432,7 +432,7 @@ function DashboardContent() {
   }
 
   if (!canRead) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   // Check if user role is "user" for simplified dashboard

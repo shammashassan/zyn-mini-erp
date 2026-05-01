@@ -22,7 +22,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
 import { formatCompactCurrency } from "@/utils/formatters/currency";
 import { useReportPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { redirect, usePathname } from "next/navigation";
@@ -318,7 +318,7 @@ function PaymentsReportPageContent() {
   }
 
   if (!canRead) {
-    return <AccessDenied />
+    forbidden();
   }
 
   return (

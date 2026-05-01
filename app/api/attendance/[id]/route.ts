@@ -5,7 +5,7 @@ import { z } from 'zod';
 import dbConnect from '@/lib/dbConnect';
 import Attendance, { ATTENDANCE_STATUSES } from '@/models/Attendance';
 import { requireAuthAndPermission } from '@/lib/auth-utils';
-import { getUserInfo } from '@/lib/auth-helpers';
+import { getUserInfo } from '@/lib/auth-utils';
 
 interface RequestContext {
     params: Promise<{ id: string }>;

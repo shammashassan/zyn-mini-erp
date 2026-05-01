@@ -15,7 +15,7 @@ import {
   Phone, MapPin, FileText, Camera, Wallet
 } from "lucide-react";
 import { useCompanyDetailsPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -171,7 +171,7 @@ export default function CompanyDetailsPage() {
   }
 
   if (!canRead) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   if (isLoading) {

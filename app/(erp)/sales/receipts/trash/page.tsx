@@ -6,7 +6,7 @@ import { TrashPage } from "@/components/shared/TrashPage";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { Receipt, Ticket } from "lucide-react";
 import { useVoucherPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { redirect, usePathname } from "next/navigation";
@@ -49,7 +49,7 @@ export default function ReceiptsTrashPage() {
     }
 
     if (!canViewTrash) {
-        return <AccessDenied />;
+        forbidden();
     }
 
     return (

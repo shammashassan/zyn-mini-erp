@@ -9,12 +9,12 @@ import Voucher from "@/models/Voucher";
 import ReturnNote from "@/models/ReturnNote";
 import Party from "@/models/Party";
 import { softDelete } from "@/utils/softDelete";
-import { getUserInfo } from "@/lib/auth-helpers";
-import { handlePurchaseStatusChange } from '@/utils/journalAutoCreate';
-import { voidJournalsForReference } from '@/utils/journalManager';
-import { requireAuthAndPermission } from "@/lib/auth-utils";
+import { requireAuthAndPermission, getUserInfo } from "@/lib/auth-utils";
 import { createPartySnapshot } from "@/utils/partySnapshot";
 import { addStockForPurchase, removeStockForPurchase } from "@/utils/inventoryManager";
+import { forbidden, unstable_rethrow } from "next/navigation";
+import { handlePurchaseStatusChange } from '@/utils/journalAutoCreate';
+import { voidJournalsForReference } from '@/utils/journalManager';
 
 interface RequestContext {
   params: Promise<{
@@ -82,6 +82,7 @@ export async function GET(request: Request, context: RequestContext) {
 
     return NextResponse.json(purchase);
   } catch (error) {
+    unstable_rethrow(error);
     const params = await context.params;
     console.error(`Failed to fetch purchase ${params.id}:`, error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
@@ -622,6 +623,7 @@ export async function PUT(request: Request, context: RequestContext) {
 
     return NextResponse.json(currentPurchase);
   } catch (error) {
+    unstable_rethrow(error);
     const params = await context.params;
     console.error(`Failed to update purchase ${params.id}:`, error);
     return NextResponse.json({ error: "Failed to update purchase" }, { status: 400 });
@@ -700,6 +702,7 @@ export async function DELETE(request: Request, context: RequestContext) {
       purchase: deletedPurchase
     });
   } catch (error) {
+    unstable_rethrow(error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

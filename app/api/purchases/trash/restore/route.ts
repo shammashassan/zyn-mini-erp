@@ -5,7 +5,7 @@ import dbConnect from "@/lib/dbConnect";
 import Purchase from "@/models/Purchase";
 import { restore } from "@/utils/softDelete";
 import { getVoidedJournalsForReference, createJournalWithDate } from "@/utils/journalManager";
-import { getUserInfo } from "@/lib/auth-helpers";
+import { getUserInfo } from "@/lib/auth-utils";
 import { requireAuthAndPermission, validateRequiredFields } from "@/lib/auth-utils";
 import { addStockForPurchase } from "@/utils/inventoryManager";
 

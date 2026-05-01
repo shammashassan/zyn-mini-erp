@@ -18,7 +18,7 @@ import { InvoiceForm } from "./invoice-form";
 import { InvoiceViewModal } from "./InvoiceViewModal";
 import Link from "next/link";
 import { useInvoicePermissions, useReportPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { getSortingStateParser, getFiltersStateParser } from "@/lib/data-table/parsers";
 import type { ExtendedColumnSort, ExtendedColumnFilter } from "@/types/data-table";
@@ -381,7 +381,7 @@ function InvoicesPageContent() {
   }
 
   if (!canRead) {
-    return <AccessDenied />
+    forbidden();
   }
 
   return (

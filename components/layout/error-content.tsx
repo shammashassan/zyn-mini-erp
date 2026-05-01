@@ -64,8 +64,8 @@ export function ErrorContent({
         >
           {code}
         </EmptyTitle>
-        <EmptyDescription className="-mt-8 text-nowrap text-foreground/80">
-          {description.split('\n').map((line, i) => (
+        <EmptyDescription className="-mt-8 text-foreground/80 text-balance">
+          {description.split(/\\n|\n/).map((line, i) => (
             <span key={i}>
               {line}
               <br />

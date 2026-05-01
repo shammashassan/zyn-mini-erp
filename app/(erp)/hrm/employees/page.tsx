@@ -18,7 +18,7 @@ import { UsersRound, Plus, Trash2, Briefcase } from "lucide-react";
 import Link from "next/link";
 import React from "react";
 import { useEmployeePermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { redirect } from "next/navigation";
@@ -365,7 +365,7 @@ function EmployeesPageContent() {
 
   // If user doesn't have read permission, show access denied
   if (!canRead) {
-    return <AccessDenied />
+    forbidden();
   }
 
   return (

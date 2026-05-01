@@ -19,7 +19,7 @@ import { useDataTable } from "@/hooks/use-data-table";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { useUserManagementPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
@@ -615,7 +615,7 @@ function UsersPageContent() {
 
   // If user doesn't have list permission, show access denied
   if (!canList) {
-    return <AccessDenied />
+    forbidden();
   }
 
   return (

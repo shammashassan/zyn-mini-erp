@@ -2,13 +2,64 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { forbidden } from "next/navigation";
+
+export interface UserInfo {
+  id: string | null;
+  username: string | null;
+  email: string | null;
+  name: string | null;
+}
+
+/**
+ * Get authenticated user info from session
+ * Returns null values if not authenticated
+ */
+export async function getUserInfo(): Promise<UserInfo> {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return { 
+        id: null, 
+        username: null,
+        email: null,
+        name: null 
+      };
+    }
+
+    return {
+      id: session.user.id,
+      username: session.user.username || session.user.name || null,
+      email: session.user.email,
+      name: session.user.name,
+    };
+  } catch (error) {
+    console.error('Auth error:', error);
+    return { 
+      id: null, 
+      username: null,
+      email: null,
+      name: null 
+    };
+  }
+}
 
 /**
  * Check if user is authenticated
- * Returns session or error response
+ */
+export async function isAuthenticated(): Promise<boolean> {
+  const user = await getUserInfo();
+  return user.id !== null;
+}
+
+/**
+ * Check if user is authenticated
+ * Returns session or error response for API routes
  */
 export async function requireAuth() {
-  // Use auth.api.getSession to leverage server-side caching mechanisms
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -25,7 +76,7 @@ export async function requireAuth() {
 
 /**
  * Check if user has specific permissions
- * Returns boolean or error response
+ * Throws forbidden() if not allowed (Next.js 16 approach)
  */
 export async function requirePermission(
   userId: string,
@@ -41,13 +92,7 @@ export async function requirePermission(
   const isAllowed = typeof result === 'boolean' ? result : result?.success;
 
   if (!isAllowed) {
-    return {
-      error: NextResponse.json(
-        { error: "Forbidden: You don't have permission to perform this action" },
-        { status: 403 }
-      ),
-      hasPermission: false,
-    };
+    forbidden();
   }
 
   return { error: null, hasPermission: true };
@@ -55,7 +100,7 @@ export async function requirePermission(
 
 /**
  * Combined auth check: authentication + permission
- * Returns session or error response
+ * Throws forbidden() if permission is missing
  */
 export async function requireAuthAndPermission(
   permissions: Record<string, string[]>
@@ -66,14 +111,11 @@ export async function requireAuthAndPermission(
     return { error: authError, session: null };
   }
 
-  // Then check permission
-  const { error: permError } = await requirePermission(
+  // Then check permission (this will throw forbidden() if unauthorized)
+  await requirePermission(
     session!.user.id,
     permissions
   );
-  if (permError) {
-    return { error: permError, session: null };
-  }
 
   return { error: null, session };
 }

@@ -7,7 +7,7 @@ import { TrashPage } from "@/components/shared/TrashPage";
 import { PackageX, Undo2 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { useReturnNotePermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { redirect, usePathname } from "next/navigation";
 
@@ -56,7 +56,7 @@ export default function POSReturnsTrashPage() {
   }
 
   if (!canViewTrash) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   return (

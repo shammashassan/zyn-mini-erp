@@ -26,10 +26,10 @@ export default function GlobalError({
   return (
     <html lang="en" className={theme} style={{ colorScheme: theme }}>
       <body className="antialiased font-sans">
-        <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-background p-6">
-          <ErrorContent 
+        <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden p-6">
+          <ErrorContent
             code="500"
-            description="A critical error occurred in the\napplication core."
+            description={`A critical error occurred in the\napplication core.`}
             showRetry
             onRetry={() => reset()}
           />

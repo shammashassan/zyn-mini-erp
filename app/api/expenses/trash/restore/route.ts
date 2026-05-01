@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Expense from "@/models/Expense";
 import { restore } from "@/utils/softDelete";
-import { getUserInfo } from "@/lib/auth-helpers";
+import { getUserInfo } from "@/lib/auth-utils";
 import { getVoidedJournalsForReference, createJournalWithDate } from "@/utils/journalManager";
 import { requireAuthAndPermission, validateRequiredFields } from "@/lib/auth-utils";
 import { formatCurrency } from "@/utils/formatters/currency";

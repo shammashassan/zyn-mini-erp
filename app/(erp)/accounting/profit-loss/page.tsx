@@ -22,7 +22,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
 import { formatCompactCurrency } from "@/utils/formatters/currency";
 import { useProfitLossPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { ExportMenu } from "@/components/shared/export-menu";
 import { exportProfitLossToExcel } from "@/utils/reportExports";
 import { PDFViewerModal } from "@/components/shared/PDFViewerModal";
@@ -308,7 +308,7 @@ function ProfitLossPageContent() {
   }
 
   if (!session) redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
-  if (!canRead) return <AccessDenied />;
+  if (!canRead) forbidden();
 
   return (
     <>

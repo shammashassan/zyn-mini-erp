@@ -25,7 +25,7 @@ import Link from 'next/link';
 import { redirect, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
-import { AccessDenied } from '@/components/shared/access-denied';
+import { forbidden } from "next/navigation";
 import { useItemPermissions } from '@/hooks/use-permissions';
 import { getColumns } from './columns';
 import { ItemForm, type ItemFormData } from './item-form';
@@ -217,7 +217,7 @@ export default function ItemsPage() {
         );
     }
     if (!session) redirect(`/login?callbackURL=${encodeURIComponent(pathname)}`);
-    if (!canRead) return <AccessDenied />;
+    if (!canRead) forbidden();
 
     return (
         <>

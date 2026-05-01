@@ -7,7 +7,7 @@ import { TrashPage } from "@/components/shared/TrashPage";
 import { Banknote } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { useExpensePermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { redirect, usePathname } from "next/navigation";
 
@@ -59,7 +59,7 @@ export default function ExpensesTrashPage() {
   }
 
   if (!canViewTrash) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   return (

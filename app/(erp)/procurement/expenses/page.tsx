@@ -18,7 +18,7 @@ import type { IExpense } from "@/models/Expense";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import { useExpensePermissions, useReportPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { useQueryStates, parseAsInteger } from "nuqs";
 import { getSortingStateParser, getFiltersStateParser } from "@/lib/data-table/parsers";
@@ -400,7 +400,7 @@ function ExpensesPageContent() {
   }
 
   if (!canRead) {
-    return <AccessDenied />
+    forbidden();
   }
 
   return (

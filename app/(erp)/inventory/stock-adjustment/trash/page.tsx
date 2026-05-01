@@ -7,7 +7,7 @@ import { ArrowRightLeft } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { formatDisplayDate, formatTime } from "@/utils/formatters/date";
 import { useStockAdjustmentPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { redirect, usePathname } from "next/navigation";
@@ -53,7 +53,7 @@ export default function StockAdjustmentTrashPage() {
   }
 
   if (!canViewTrash) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   return (

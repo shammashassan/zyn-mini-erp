@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import { TrashPage } from "@/components/shared/TrashPage";
 import { Briefcase, UsersRound } from "lucide-react";
 import { useEmployeePermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { redirect } from "next/navigation";
 
@@ -45,7 +45,7 @@ export default function EmployeesTrashPage() {
   }
 
   if (!canViewTrash) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   return (

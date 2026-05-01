@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { usePOSPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 
 
 
@@ -216,7 +216,7 @@ function POSSalesPageContent() {
     }
 
     if (!canRead) {
-        return <AccessDenied />;
+        forbidden();
     }
 
     const hasActiveFilters = urlState.filters && urlState.filters.length > 0;

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Bell } from "lucide-react";
 import { EmptyNotificationState } from "@/components/shared/empty-notification-state";
 import { useNotificationPermissions } from "@/hooks/use-permissions";
@@ -39,7 +39,7 @@ export default function NotificationsPage() {
 
   // 2. Access Control (Access Denied)
   if (!canRead) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   const handleRefresh = () => {

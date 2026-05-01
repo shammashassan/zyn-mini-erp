@@ -6,7 +6,7 @@ import React, { useEffect, useState } from "react";
 import { TrashPage } from "@/components/shared/TrashPage";
 import { PackageX, Redo2 } from "lucide-react";
 import { useReturnNotePermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { redirect, usePathname } from "next/navigation";
 
@@ -55,7 +55,7 @@ export default function PurchaseReturnsTrashPage() {
   }
 
   if (!canViewTrash) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   return (

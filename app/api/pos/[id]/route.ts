@@ -5,7 +5,7 @@ import dbConnect from '@/lib/dbConnect';
 import POSSale from '@/models/POSSale';
 import { softDelete } from '@/utils/softDelete';
 import { requireAuthAndPermission } from '@/lib/auth-utils';
-import { getUserInfo } from '@/lib/auth-helpers';
+import { getUserInfo } from '@/lib/auth-utils';
 import { reverseStockForPOSSale } from '@/utils/inventoryManager';
 import { voidJournalsForReference } from '@/utils/journalManager';
 

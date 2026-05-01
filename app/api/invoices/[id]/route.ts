@@ -8,7 +8,7 @@ import { softDelete } from "@/utils/softDelete";
 import { handleInvoiceStatusChange } from '@/utils/journalAutoCreate';
 import { voidJournalsForReference } from '@/utils/journalManager';
 import { requireAuthAndPermission } from "@/lib/auth-utils";
-import { getUserInfo } from "@/lib/auth-helpers";
+import { getUserInfo } from "@/lib/auth-utils";
 import { createPartySnapshot } from "@/utils/partySnapshot";
 import { deductStockForInvoice, reverseStockForInvoice } from "@/utils/inventoryManager";
 

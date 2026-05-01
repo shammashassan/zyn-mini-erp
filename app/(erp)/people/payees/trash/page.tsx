@@ -3,7 +3,7 @@
 import { TrashPage } from "@/components/shared/TrashPage";
 import { Users } from "lucide-react";
 import { usePayeePermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { redirect, usePathname } from "next/navigation";
@@ -44,7 +44,7 @@ export default function PayeesTrashPage() {
   }
 
   if (!canViewTrash) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   return (

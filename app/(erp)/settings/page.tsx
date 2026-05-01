@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSettingsPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { redirect } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -125,7 +125,7 @@ export default function SettingsPage() {
   }
 
   if (!canRead) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   return (

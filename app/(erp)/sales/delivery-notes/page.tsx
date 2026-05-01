@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { Truck, Trash2, Plus, CalendarIcon } from "lucide-react";
 import Link from "next/link";
 import { useDeliveryNotePermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { getSortingStateParser, getFiltersStateParser } from "@/lib/data-table/parsers";
 import type { ExtendedColumnSort, ExtendedColumnFilter } from "@/types/data-table";
@@ -398,7 +398,7 @@ function DeliveryNotesPageContent() {
   }
 
   if (!canRead) {
-    return <AccessDenied />;
+    forbidden();
   }
 
   return (

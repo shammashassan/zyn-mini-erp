@@ -6,7 +6,7 @@ import Expense from "@/models/Expense";
 import Payee from "@/models/Payee";
 import Voucher from "@/models/Voucher";
 import { getActive } from "@/utils/softDelete";
-import { getUserInfo } from "@/lib/auth-helpers";
+import { getUserInfo } from "@/lib/auth-utils";
 import { createJournalForExpense } from '@/utils/journalAutoCreate';
 import generateInvoiceNumber from '@/utils/invoiceNumber';
 import { requireAuthAndPermission } from "@/lib/auth-utils";

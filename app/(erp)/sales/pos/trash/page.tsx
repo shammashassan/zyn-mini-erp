@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { redirect, usePathname } from "next/navigation";
 import { usePOSPermissions } from "@/hooks/use-permissions";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { forbidden } from "next/navigation";
 
 interface DeletedPOSSale {
     _id: string;
@@ -46,7 +46,7 @@ export default function POSSalesTrashPage() {
     }
 
     if (!canViewTrash) {
-        return <AccessDenied />;
+        forbidden();
     }
 
     return (
