@@ -254,7 +254,7 @@ ExpenseSchema.pre('save', function (next) {
   this.remainingAmount = Math.max(0, this.amount - this.paidAmount);
 
   // Auto-calculate payment status
-  if (this.paidAmount >= this.amount) {
+  if (this.amount > 0 && this.paidAmount >= this.amount) {
     this.paymentStatus = 'Paid';
   } else if (this.paidAmount > 0) {
     this.paymentStatus = 'Partially Paid';

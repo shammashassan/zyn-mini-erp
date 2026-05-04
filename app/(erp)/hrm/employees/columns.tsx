@@ -122,7 +122,7 @@ export const getColumns = (
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10">
               <AvatarImage src={employee.avatar} />
-              <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium">
+              <AvatarFallback className="bg-linear-to-br from-blue-500 to-purple-600 text-white font-medium">
                 {fallback}
               </AvatarFallback>
             </Avatar>

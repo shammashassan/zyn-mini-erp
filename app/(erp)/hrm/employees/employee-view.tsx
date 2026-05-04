@@ -8,13 +8,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Briefcase, User, CalendarDays, WalletCards } from "lucide-react";
+import { Briefcase, CalendarDays, Wallet, User } from "lucide-react";
 import type { IEmployee } from "@/models/Employee";
 
-// Import modular components
-import { ProfileTab } from "./profile-tab";
+import { EmployeeProfileTab } from "./employee-profile";
 import { AttendanceTab } from "./attendance-tab";
-import { SalaryTab } from "./salary-tab";
+import { SalaryHistoryTab } from "./salary-history-tab";
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface EmployeeViewProps {
   isOpen: boolean;
@@ -22,64 +23,69 @@ interface EmployeeViewProps {
   employee: IEmployee | null;
 }
 
+// ─── Modal ────────────────────────────────────────────────────────────────────
+
 export function EmployeeViewModal({ isOpen, onClose, employee }: EmployeeViewProps) {
+  // Track how many times each tab has been (re-)activated so child tabs can
+  // silently refetch whenever the user switches back to them.
+  const [attendanceKey, setAttendanceKey] = React.useState(0);
+  const [salaryKey, setSalaryKey] = React.useState(0);
+  const prevTab = React.useRef<string>("profile");
+
+  const handleTabChange = (tab: string) => {
+    // Increment the key for the tab being switched INTO (silent background fetch)
+    if (tab === "attendance" && prevTab.current !== "attendance") {
+      setAttendanceKey((k) => k + 1);
+    }
+    if (tab === "salary" && prevTab.current !== "salary") {
+      setSalaryKey((k) => k + 1);
+    }
+    prevTab.current = tab;
+  };
+
   if (!employee) return null;
+
+  const displayName = employee.firstName
+    ? `${employee.firstName} ${employee.lastName}`
+    : (employee as any).name || "Employee";
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] lg:max-w-5xl max-h-[95vh] overflow-hidden flex flex-col p-0 gap-0 border-none shadow-2xl">
-        {/* Modern Header */}
-        <DialogHeader className="p-6 bg-muted/30 border-b">
-          <DialogTitle className="flex items-center gap-3 text-xl font-bold tracking-tight">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
-              <Briefcase className="h-5 w-5" />
-            </div>
-            Employee Management
+      <DialogContent className="max-w-[95vw] lg:max-w-4xl max-h-[90vh] overflow-y-auto sidebar-scroll">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Briefcase className="size-4 text-muted-foreground" />
+            <span>{displayName}</span>
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="profile" className="flex-1 flex flex-col overflow-hidden">
-          {/* Navigation Bar */}
-          <div className="px-6 py-2 bg-background border-b flex justify-center">
-            <TabsList className="bg-transparent h-auto p-0 gap-4 w-full justify-center">
-              <TabsTrigger
-                value="profile"
-                className="gap-2"
-              >
-                <User data-icon="inline-start" />
-                Profile
-              </TabsTrigger>
-              <TabsTrigger
-                value="attendance"
-                className="gap-2"
-              >
-                <CalendarDays data-icon="inline-start" />
-                Attendance
-              </TabsTrigger>
-              <TabsTrigger
-                value="salary"
-                className="gap-2"
-              >
-                <WalletCards data-icon="inline-start" />
-                Salary & Payroll
-              </TabsTrigger>
-            </TabsList>
-          </div>
+        <Tabs defaultValue="profile" onValueChange={handleTabChange} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="profile" className="gap-1.5 text-xs sm:text-sm">
+              <User data-icon="inline-start" />
+              Profile
+            </TabsTrigger>
+            <TabsTrigger value="attendance" className="gap-1.5 text-xs sm:text-sm">
+              <CalendarDays data-icon="inline-start" />
+              Attendance
+            </TabsTrigger>
+            <TabsTrigger value="salary" className="gap-1.5 text-xs sm:text-sm">
+              <Wallet data-icon="inline-start" />
+              Salary
+            </TabsTrigger>
+          </TabsList>
 
-          {/* Scrollable Content Area */}
-          <div className="flex-1 overflow-y-auto p-6 sidebar-scroll bg-muted/5">
-            <TabsContent value="profile" className="mt-0 focus-visible:ring-0">
-              <ProfileTab employee={employee} />
-            </TabsContent>
+          <TabsContent value="profile" className="mt-4">
+            <EmployeeProfileTab employee={employee} />
+          </TabsContent>
 
-            <TabsContent value="attendance" className="mt-0 focus-visible:ring-0">
-              <AttendanceTab employee={employee} />
-            </TabsContent>
+          <TabsContent value="attendance" className="mt-4">
+            <AttendanceTab employee={employee} refreshKey={attendanceKey} />
+          </TabsContent>
 
-            <TabsContent value="salary" className="mt-0 focus-visible:ring-0">
-              <SalaryTab employee={employee} />
-            </TabsContent>
-          </div>
+          <TabsContent value="salary" className="mt-4">
+            <SalaryHistoryTab employee={employee} refreshKey={salaryKey} />
+          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>

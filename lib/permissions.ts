@@ -49,7 +49,7 @@ export const statement = {
   attendance: ["read", "create", "update", "delete", "bulk_create"],
 
   // ✅ NEW: Salary Disbursements
-  salaryDisbursement: ["read", "create", "update", "delete", "approve"],
+  salaryDisbursement: ["read", "create", "update", "delete"],
 
   // Settings
   companyDetails: ["read", "update"],
@@ -122,7 +122,7 @@ export const manager = ac.newRole({
 
   // ✅ Managers can manage attendance and disbursements
   attendance: ["read", "create", "update", "delete", "bulk_create"],
-  salaryDisbursement: ["read", "create", "update", "delete", "approve"],
+  salaryDisbursement: ["read", "create", "update", "delete"],
 });
 
 export const admin = ac.newRole({
@@ -162,7 +162,7 @@ export const admin = ac.newRole({
 
   // ✅ Full attendance + disbursement access
   attendance: ["read", "create", "update", "delete", "bulk_create"],
-  salaryDisbursement: ["read", "create", "update", "delete", "approve"],
+  salaryDisbursement: ["read", "create", "update", "delete"],
 });
 
 export const owner = ac.newRole({
@@ -205,7 +205,7 @@ export const owner = ac.newRole({
 
   // ✅ Full attendance + disbursement access
   attendance: ["read", "create", "update", "delete", "bulk_create"],
-  salaryDisbursement: ["read", "create", "update", "delete", "approve"],
+  salaryDisbursement: ["read", "create", "update", "delete"],
 });
 
 export const roles = { user, manager, admin, owner } as const;

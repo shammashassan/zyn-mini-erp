@@ -2,6 +2,17 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import {
+  Item,
+  ItemContent,
+  ItemTitle,
+  ItemDescription,
+  ItemMedia,
+  ItemGroup,
+  ItemSeparator,
+} from "@/components/ui/item";
 import {
   Tooltip,
   TooltipContent,
@@ -14,25 +25,18 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Calendar,
   AlertCircle,
+  Calendar,
   Loader2,
 } from "lucide-react";
-import { formatDisplayDate } from "@/utils/formatters/date";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAttendancePermissions } from "@/hooks/use-permissions";
-import { Skeleton } from "@/components/ui/skeleton";
+import type { AttendanceStatus } from "@/models/Attendance";
+import { formatDisplayDate } from "@/utils/formatters/date";
 import type { IEmployee } from "@/models/Employee";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-
-export type AttendanceStatus =
-  | "Present"
-  | "Absent"
-  | "Half-Day"
-  | "Paid Leave"
-  | "Unpaid Leave";
 
 export const ATTENDANCE_STATUSES: AttendanceStatus[] = [
   "Present",
@@ -42,326 +46,337 @@ export const ATTENDANCE_STATUSES: AttendanceStatus[] = [
   "Unpaid Leave",
 ];
 
-const STATUS_CONFIG: Record<
+export const STATUS_CONFIG: Record<
   AttendanceStatus,
-  { label: string; color: string; badgeVariant: any; icon: React.ElementType }
+  { short: string; bg: string; text: string; icon: React.ElementType }
 > = {
-  Present: { label: "Present", color: "bg-green-500", badgeVariant: "success", icon: CheckCircle },
-  Absent: { label: "Absent", color: "bg-red-500", badgeVariant: "destructive", icon: XCircle },
-  "Half-Day": { label: "Half", color: "bg-yellow-400", badgeVariant: "warning", icon: Clock },
-  "Paid Leave": { label: "P.Leave", color: "bg-blue-400", badgeVariant: "info", icon: Calendar },
-  "Unpaid Leave": { label: "U.Leave", color: "bg-gray-400", badgeVariant: "secondary", icon: AlertCircle },
+  Present: { short: "P", bg: "bg-green-500", text: "text-white", icon: CheckCircle },
+  Absent: { short: "A", bg: "bg-red-500", text: "text-white", icon: XCircle },
+  "Half-Day": { short: "½", bg: "bg-yellow-400", text: "text-black", icon: Clock },
+  "Paid Leave": { short: "PL", bg: "bg-blue-400", text: "text-white", icon: Calendar },
+  "Unpaid Leave": { short: "UL", bg: "bg-muted-foreground", text: "text-white", icon: AlertCircle },
 };
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const CYCLE: (AttendanceStatus | null)[] = [
+  "Present", "Half-Day", "Absent", "Paid Leave", "Unpaid Leave", null,
+];
 
-interface AttendanceRecord {
+const DAY_LABELS: { full: string; short: string }[] = [
+  { full: "Mon", short: "M" },
+  { full: "Tue", short: "T" },
+  { full: "Wed", short: "W" },
+  { full: "Thu", short: "T" },
+  { full: "Fri", short: "F" },
+  { full: "Sat", short: "S" },
+];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function getWorkingDaysInMonth(year: number, month: number): Date[] {
+  const days: Date[] = [];
+  const d = new Date(year, month, 1);
+  while (d.getMonth() === month) {
+    if (d.getDay() !== 0) days.push(new Date(d));
+    d.setDate(d.getDate() + 1);
+  }
+  return days;
+}
+
+function dateKey(d: Date) {
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function isSameDay(a: Date, b: Date) {
+  return dateKey(a) === dateKey(b);
+}
+
+export interface AttendanceRecord {
   _id: string;
   date: string;
   status: AttendanceStatus;
   notes?: string;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function getMonthDays(year: number, month: number) {
-  const first = new Date(year, month, 1);
-  const last = new Date(year, month + 1, 0);
-  const days: Date[] = [];
-  for (let d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) {
-    if (d.getDay() !== 0) {
-      days.push(new Date(d));
-    }
-  }
-  return days;
-}
-
-function isSameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function AttendanceTab({ employee }: { employee: IEmployee }) {
+interface AttendanceTabProps {
+  employee: IEmployee;
+  refreshKey?: number;
+}
+
+export function AttendanceTab({ employee, refreshKey }: AttendanceTabProps) {
   const { permissions } = useAttendancePermissions();
   const today = new Date();
+
   const [year, setYear] = React.useState(today.getFullYear());
   const [month, setMonth] = React.useState(today.getMonth());
-  const [records, setRecords] = React.useState<AttendanceRecord[]>([]);
-  const [loading, setLoading] = React.useState(true); // Initial loading
-  const [syncing, setSyncing] = React.useState(false); // Background sync
+  const [recordMap, setRecordMap] = React.useState<Record<string, AttendanceRecord>>({});
+  const [pendingKeys, setPendingKeys] = React.useState<Set<string>>(new Set());
+  const [initialLoading, setInitialLoading] = React.useState(false);
+  const [bulkSaving, setBulkSaving] = React.useState(false);
 
   const employeeId = (employee._id as any).toString();
 
-  const fetchRecords = React.useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
+  const fetchMonth = React.useCallback(async (y: number, m: number, silent = false) => {
+    if (!silent) setInitialLoading(true);
     try {
       const res = await fetch(
-        `/api/attendance?employeeId=${employeeId}&month=${year}-${String(month + 1).padStart(2, "0")}`
+        `/api/attendance?employeeId=${employeeId}&month=${y}-${String(m + 1).padStart(2, "0")}`
       );
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      setRecords(data);
+      if (!res.ok) throw new Error();
+      const records: AttendanceRecord[] = await res.json();
+      const map: Record<string, AttendanceRecord> = {};
+      records.forEach((r) => { map[dateKey(new Date(r.date))] = r; });
+      setRecordMap(map);
     } catch {
-      toast.error("Could not load attendance");
+      if (!silent) toast.error("Could not load attendance");
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent) setInitialLoading(false);
     }
-  }, [employeeId, year, month]);
+  }, [employeeId]);
 
+  // Fetch on month change or refreshKey change
+  React.useEffect(() => { fetchMonth(year, month); }, [fetchMonth, year, month, refreshKey]);
+
+  // Silent refetch when browser tab regains focus
   React.useEffect(() => {
-    fetchRecords();
-  }, [fetchRecords]);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchMonth(year, month, true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [fetchMonth, year, month]);
 
-  const workingDays = getMonthDays(year, month);
-
-  const recordByDate = React.useMemo(() => {
-    const map: Record<string, AttendanceRecord> = {};
-    records.forEach((r) => {
-      const d = new Date(r.date);
-      map[`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`] = r;
-    });
-    return map;
-  }, [records]);
-
-  const getRecord = (date: Date) =>
-    recordByDate[`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`];
+  const workingDays = React.useMemo(() => getWorkingDaysInMonth(year, month), [year, month]);
 
   const handleDayClick = async (date: Date) => {
     if (!permissions.canCreate) return;
-    const existing = getRecord(date);
+    const key = dateKey(date);
+    if (pendingKeys.has(key)) return;
 
-    // Cycle logic
-    const CYCLE: (AttendanceStatus | null)[] = [
-      "Present",
-      "Half-Day",
-      "Absent",
-      "Paid Leave",
-      "Unpaid Leave",
-      null,
-    ];
-    const currentIdx = existing
-      ? CYCLE.indexOf(existing.status as AttendanceStatus)
-      : -1;
-    const status = CYCLE[(currentIdx + 1) % CYCLE.length];
+    const existing = recordMap[key];
+    const currentIdx = existing ? CYCLE.indexOf(existing.status) : -1;
+    const nextStatus = CYCLE[(currentIdx + 1) % CYCLE.length];
 
-    // --- OPTIMISTIC UPDATE ---
-    const previousRecords = [...records];
-    if (status === null && existing) {
-      setRecords(records.filter((r) => r._id !== existing._id));
-    } else if (status !== null) {
-      const tempId = Math.random().toString();
-      const newRecord: AttendanceRecord = {
-        _id: tempId,
-        date: date.toISOString(),
-        status,
-      };
-      if (existing) {
-        setRecords(records.map((r) => (r._id === existing._id ? newRecord : r)));
-      } else {
-        setRecords([...records, newRecord]);
-      }
-    }
+    setRecordMap((prev) => {
+      const next = { ...prev };
+      if (nextStatus === null) delete next[key];
+      else next[key] = { _id: existing?._id || "__optimistic__", date: date.toISOString(), status: nextStatus };
+      return next;
+    });
+    setPendingKeys((prev) => new Set(prev).add(key));
 
-    setSyncing(true);
     try {
-      if (status === null && existing) {
+      if (nextStatus === null && existing) {
         const res = await fetch(`/api/attendance/${existing._id}`, { method: "DELETE" });
         if (!res.ok) throw new Error();
-      } else if (status !== null) {
+      } else if (nextStatus !== null) {
         const res = await fetch("/api/attendance", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            employeeId,
-            date: date.toISOString(),
-            status,
-          }),
+          body: JSON.stringify({ employeeId, date: date.toISOString(), status: nextStatus }),
         });
         if (!res.ok) throw new Error();
+        const saved: AttendanceRecord = await res.json();
+        setRecordMap((prev) => ({ ...prev, [key]: saved }));
       }
-      // Re-fetch to get real IDs and sync
-      await fetchRecords(true);
     } catch {
       toast.error("Failed to update attendance");
-      setRecords(previousRecords); // ROLLBACK
+      setRecordMap((prev) => {
+        const next = { ...prev };
+        if (existing) next[key] = existing;
+        else delete next[key];
+        return next;
+      });
     } finally {
-      setSyncing(false);
+      setPendingKeys((prev) => { const s = new Set(prev); s.delete(key); return s; });
     }
   };
 
   const handleFillPresent = async () => {
     if (!permissions.canBulkCreate) return;
-    const unmarked = workingDays.filter((d) => !getRecord(d));
-    if (unmarked.length === 0) {
-      toast.info("All working days are already marked");
-      return;
-    }
+    const unmarked = workingDays.filter((d) => !recordMap[dateKey(d)]);
+    if (unmarked.length === 0) { toast.info("All working days already marked"); return; }
 
-    // Optimistic bulk mark
-    const previousRecords = [...records];
-    const tempRecords: AttendanceRecord[] = unmarked.map((d) => ({
-      _id: Math.random().toString(),
-      date: d.toISOString(),
-      status: "Present",
-    }));
-    setRecords([...records, ...tempRecords]);
-
-    setSyncing(true);
+    setRecordMap((prev) => {
+      const next = { ...prev };
+      unmarked.forEach((d) => {
+        next[dateKey(d)] = { _id: "__optimistic__", date: d.toISOString(), status: "Present" };
+      });
+      return next;
+    });
+    setBulkSaving(true);
     try {
       const res = await fetch("/api/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           employeeId,
-          entries: unmarked.map((d) => ({
-            date: d.toISOString(),
-            status: "Present",
-          })),
+          entries: unmarked.map((d) => ({ date: d.toISOString(), status: "Present" })),
         }),
       });
       if (!res.ok) throw new Error();
       toast.success(`Marked ${unmarked.length} day(s) as Present`);
-      await fetchRecords(true);
+      await fetchMonth(year, month);
     } catch {
       toast.error("Failed to bulk-mark attendance");
-      setRecords(previousRecords);
+      await fetchMonth(year, month);
     } finally {
-      setSyncing(false);
+      setBulkSaving(false);
     }
   };
 
   const prevMonth = () => {
-    if (month === 0) { setYear(y => y - 1); setMonth(11); }
-    else setMonth(m => m - 1);
+    if (month === 0) { setYear((y) => y - 1); setMonth(11); }
+    else setMonth((m) => m - 1);
   };
   const nextMonth = () => {
-    if (month === 11) { setYear(y => y + 1); setMonth(0); }
-    else setMonth(m => m + 1);
+    if (month === 11) { setYear((y) => y + 1); setMonth(0); }
+    else setMonth((m) => m + 1);
   };
+
+  const monthLabel = new Date(year, month).toLocaleString("default", { month: "long", year: "numeric" });
 
   const summary = React.useMemo(() => {
     const counts: Record<AttendanceStatus, number> = {
       Present: 0, Absent: 0, "Half-Day": 0, "Paid Leave": 0, "Unpaid Leave": 0,
     };
-    records.forEach((r) => {
-      if (r.status in counts) counts[r.status as AttendanceStatus]++;
-    });
-    return counts;
-  }, [records]);
+    Object.values(recordMap).forEach((r) => { if (r.status in counts) counts[r.status]++; });
+    return { counts, total: workingDays.length };
+  }, [recordMap, workingDays]);
 
-  const monthLabel = new Date(year, month).toLocaleString("default", {
-    month: "long",
-    year: "numeric",
-  });
+  const firstColOffset = workingDays[0] ? (workingDays[0].getDay() + 6) % 7 : 0;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={prevMonth} disabled={syncing}>
-            <ChevronLeft data-icon="inline-start" />
+    <div className="flex flex-col gap-4">
+
+      {/* ── Header: nav + working days + fill button ── */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          <Button variant="outline" size="icon" className="size-8" onClick={prevMonth} disabled={initialLoading}>
+            <ChevronLeft />
           </Button>
-          <span className="font-semibold text-sm sm:text-base w-40 text-center">{monthLabel}</span>
-          <Button variant="outline" size="icon" onClick={nextMonth} disabled={syncing}>
-            <ChevronRight data-icon="inline-start" />
+          <span className="text-sm font-semibold w-44 text-center tabular-nums select-none">
+            {monthLabel}
+          </span>
+          <Button variant="outline" size="icon" className="size-8" onClick={nextMonth} disabled={initialLoading}>
+            <ChevronRight />
           </Button>
-          {syncing && <Loader2 className="size-4 animate-spin ml-2" />}
+          {/* Working days pill next to nav */}
+          {!initialLoading && (
+            <span className="text-xs text-muted-foreground ml-1 tabular-nums">
+              {summary.total} working days
+            </span>
+          )}
         </div>
+
         {permissions.canBulkCreate && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleFillPresent}
-            disabled={syncing}
-          >
-            <CheckCircle data-icon="inline-start" />
+          <Button variant="outline" size="sm" onClick={handleFillPresent} disabled={bulkSaving || initialLoading}>
+            {bulkSaving
+              ? <Loader2 data-icon="inline-start" className="animate-spin" />
+              : <CheckCircle data-icon="inline-start" />}
             Fill Present
           </Button>
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2 text-xs">
-        {ATTENDANCE_STATUSES.map((s) => {
-          const cfg = STATUS_CONFIG[s as AttendanceStatus];
-          return (
-            <div key={s} className="flex items-center gap-1">
-              <span className={cn("size-3 rounded-sm inline-block", cfg.color)} />
-              <span className="text-muted-foreground">{cfg.label}</span>
+      {/* ── Calendar grid ── */}
+      {initialLoading ? (
+        <div className="grid grid-cols-6 gap-0.5 sm:gap-1">
+          {DAY_LABELS.map((d) => (
+            <div key={d.full} className="text-center text-xs font-medium text-muted-foreground py-1">
+              <span className="sm:hidden">{d.short}</span>
+              <span className="hidden sm:inline">{d.full}</span>
             </div>
-          );
-        })}
-      </div>
+          ))}
+          {Array.from({ length: 26 }).map((_, i) => <Skeleton key={i} className="h-8 sm:h-11 rounded-md" />)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-6 gap-0.5 sm:gap-1">
+          {DAY_LABELS.map((d) => (
+            <div key={d.full} className="text-center text-xs font-medium text-muted-foreground py-1">
+              <span className="sm:hidden">{d.short}</span>
+              <span className="hidden sm:inline">{d.full}</span>
+            </div>
+          ))}
+          {Array.from({ length: firstColOffset }).map((_, i) => <div key={`off-${i}`} />)}
+          {workingDays.map((date) => {
+            const key = dateKey(date);
+            const record = recordMap[key];
+            const cfg = record ? STATUS_CONFIG[record.status] : null;
+            const isPending = pendingKeys.has(key);
+            const isToday = isSameDay(date, today);
 
-      <div className="grid grid-cols-6 gap-1">
-        {DAYS.map((d) => (
-          <div key={d} className="text-center text-xs font-medium text-muted-foreground py-1">
-            {d}
-          </div>
-        ))}
-        {workingDays.map((date) => {
-          const record = getRecord(date);
-          const cfg = record ? STATUS_CONFIG[record.status] : null;
-          const isToday = isSameDay(date, today);
-
-          if (loading) {
-            return <Skeleton key={date.toISOString()} className="h-10 w-full rounded-md" />;
-          }
-
-          return (
-            <TooltipProvider key={date.toISOString()}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => handleDayClick(date)}
-                    disabled={!permissions.canCreate}
-                    className={cn(
-                      "relative flex flex-col items-center justify-center rounded-md border transition-all",
-                      "h-10 text-xs font-medium",
-                      permissions.canCreate
-                        ? "hover:ring-2 hover:ring-primary cursor-pointer"
-                        : "cursor-default",
-                      isToday && "ring-2 ring-primary",
-                      cfg ? cfg.color + " text-white border-transparent shadow-sm" : "border-dashed"
-                    )}
-                  >
-                    <span>{date.getDate()}</span>
-                    {cfg && <span className="text-[9px] opacity-80 leading-none">{cfg.label}</span>}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">
-                  <p className="font-medium">{formatDisplayDate(date)}</p>
-                  {record ? (
-                    <>
-                      <p>Status: {record.status}</p>
-                      {permissions.canCreate && <p className="text-muted-foreground mt-1">Click to cycle</p>}
-                    </>
-                  ) : (
+            return (
+              <TooltipProvider key={key} delayDuration={400}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => handleDayClick(date)}
+                      disabled={!permissions.canCreate || bulkSaving}
+                      className={cn(
+                        "relative flex flex-col items-center justify-center rounded-md border",
+                        "h-8 sm:h-11 text-[10px] sm:text-xs font-medium transition-all select-none",
+                        permissions.canCreate && !bulkSaving ? "cursor-pointer" : "cursor-default",
+                        isToday && "ring-2 ring-primary ring-offset-1",
+                        cfg
+                          ? `${cfg.bg} ${cfg.text} border-transparent`
+                          : "hover:bg-muted border-dashed border-muted-foreground/30"
+                      )}
+                    >
+                      <span>{date.getDate()}</span>
+                      {cfg && <span className="hidden sm:block text-[9px] opacity-80 leading-none mt-0.5">{cfg.short}</span>}
+                      {isPending && (
+                        <span className="absolute top-0.5 right-0.5">
+                          <Loader2 className="size-2.5 animate-spin opacity-60" />
+                        </span>
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    <p className="font-medium">{formatDisplayDate(date)}</p>
                     <p className="text-muted-foreground">
-                      {permissions.canCreate ? "Click to mark Present" : "No record"}
+                      {record ? record.status : permissions.canCreate ? "Click to mark" : "No record"}
                     </p>
-                  )}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          );
-        })}
-      </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            );
+          })}
+        </div>
+      )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t">
-        {(Object.keys(summary) as AttendanceStatus[]).map((s) => {
-          return (
-            <div key={s} className="text-center p-2 rounded-lg bg-muted/50">
-              <div className="text-lg font-bold">{summary[s]}</div>
-              <div className="text-xs text-muted-foreground">{s}</div>
-            </div>
-          );
-        })}
-      </div>
+      {/* ── Summary row — all 5 statuses in one horizontal ItemGroup ── */}
+      {!initialLoading && (
+        <>
+          <Separator />
+          {/* overflow-x-auto so it scrolls on very small screens instead of wrapping */}
+          <div className="overflow-x-auto">
+            <ItemGroup className="flex flex-row min-w-max">
+              {(ATTENDANCE_STATUSES as AttendanceStatus[]).map((s, i) => {
+                const cfg = STATUS_CONFIG[s];
+                const Icon = cfg.icon;
+                return (
+                  <React.Fragment key={s}>
+                    <Item className="flex-1">
+                      <ItemMedia variant="icon">
+                        <span className={cn("flex items-center justify-center size-full rounded", cfg.bg)}>
+                          <Icon className={cfg.text} />
+                        </span>
+                      </ItemMedia>
+                      <ItemContent>
+                        <ItemTitle>{summary.counts[s]}</ItemTitle>
+                        <ItemDescription>{s}</ItemDescription>
+                      </ItemContent>
+                    </Item>
+                    {i < ATTENDANCE_STATUSES.length - 1 && <ItemSeparator orientation="vertical" />}
+                  </React.Fragment>
+                );
+              })}
+            </ItemGroup>
+          </div>
+        </>
+      )}
     </div>
   );
 }

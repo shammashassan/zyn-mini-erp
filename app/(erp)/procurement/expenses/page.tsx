@@ -17,8 +17,7 @@ import { getColumns } from "./columns";
 import type { IExpense } from "@/models/Expense";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
-import { useExpensePermissions, useReportPermissions } from "@/hooks/use-permissions";
-import { forbidden } from "next/navigation";
+import { forbidden, redirect, usePathname } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { useQueryStates, parseAsInteger } from "nuqs";
 import { getSortingStateParser, getFiltersStateParser } from "@/lib/data-table/parsers";
@@ -34,10 +33,10 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, subMonths, addMonths, startOfMonth, endOfMonth } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
-import { redirect, usePathname } from "next/navigation";
+import { useExpensePermissions, useReportPermissions } from "@/hooks/use-permissions";
 
 function ExpensesPageContent() {
   const pathname = usePathname();
@@ -61,7 +60,7 @@ function ExpensesPageContent() {
   // Date Range State (Default 6 months)
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(subMonths(new Date(), 5)),
-    to: endOfMonth(new Date()),
+    to: endOfMonth(addMonths(new Date(), 1)),
   });
 
   const [activeTab, setActiveTab] = useState("all");

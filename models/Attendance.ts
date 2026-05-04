@@ -71,6 +71,6 @@ AttendanceSchema.index({ date: -1 });
 AttendanceSchema.index({ status: 1 });
 
 const Attendance =
-    (models && models.Attendance) || model<IAttendance>('Attendance', AttendanceSchema);
+    models.Attendance || model<IAttendance>('Attendance', AttendanceSchema);
 
 export default Attendance;

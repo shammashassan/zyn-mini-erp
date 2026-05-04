@@ -5,9 +5,10 @@
 import * as React from "react";
 import { useForm, SubmitHandler, useFieldArray, Controller, FieldErrors } from "react-hook-form";
 import { format } from "date-fns";
-import { CalendarIcon, PlusCircleIcon, Trash2Icon, ChevronsUpDown, Check, Plus, Loader2 } from "lucide-react";
+import { CalendarIcon, PlusCircleIcon, Trash2Icon, ChevronsUpDown, Check, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -25,8 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +45,7 @@ import {
 } from "@/components/ui/command";
 import { ImageUploader } from "@/components/shared/image-uploader";
 import type { IEmployee } from "@/models/Employee";
+import { Spinner } from "@/components/ui/spinner";
 
 type EmployeeFormData = {
   firstName: string;
@@ -59,7 +59,7 @@ type EmployeeFormData = {
   dob?: string;
   civilStatus: string;
   salary?: number;
-  salaryFrequency?: string;
+  salaryFrequency: "daily" | "weekly" | "monthly";
   joinedDate?: string;
   description?: string;
   avatar?: string;
@@ -87,7 +87,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
       dob: "",
       civilStatus: "Single",
       salary: 0,
-      salaryFrequency: "monthly",
+      salaryFrequency: "monthly" as const,
       joinedDate: "",
       description: "",
       avatar: "",
@@ -124,7 +124,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
         dob: defaultValues?.dob ? new Date(defaultValues.dob).toISOString().split('T')[0] : "",
         civilStatus: defaultValues?.civilStatus || "Single",
         salary: defaultValues?.salary || 0,
-        salaryFrequency: (defaultValues as any)?.salaryFrequency || "monthly",
+        salaryFrequency: ((defaultValues as any)?.salaryFrequency || "monthly") as "daily" | "weekly" | "monthly",
         joinedDate: defaultValues?.joinedDate ? new Date(defaultValues.joinedDate).toISOString().split('T')[0] : "",
         description: defaultValues?.description || "",
         avatar: defaultValues?.avatar || "",
@@ -431,17 +431,19 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
                 <Input id="salary" type="number" step="0.01" {...register("salary", { valueAsNumber: true })} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="salaryFrequency">Salary Frequency</Label>
+                <Label>Salary Frequency</Label>
                 <Controller
                   control={control}
                   name="salaryFrequency"
                   render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select frequency" />
+                      </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
                         <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
                       </SelectContent>
                     </Select>
                   )}
@@ -460,10 +462,10 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, defaultValues, existin
           </DialogClose>
           <Button type="submit" form="employee-form" disabled={isSubmitting || (isEditing && !hasChanges)}>
             {isSubmitting ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="size-4 animate-spin" />
+              <>
+                <Spinner />
                 Saving...
-              </div>
+              </>
             ) : "Save Employee"}
           </Button>
         </DialogFooter>

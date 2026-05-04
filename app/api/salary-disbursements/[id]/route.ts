@@ -4,8 +4,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import SalaryDisbursement from '@/models/SalaryDisbursement';
 import Expense from '@/models/Expense';
-import { requireAuthAndPermission } from '@/lib/auth-utils';
-import { getUserInfo } from '@/lib/auth-utils';
+import { requireAuthAndPermission, getUserInfo } from '@/lib/auth-utils';
 import { voidJournalsForReference } from '@/utils/journalManager';
 import { softDelete } from '@/utils/softDelete';
 

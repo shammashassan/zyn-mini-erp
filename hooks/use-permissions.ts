@@ -274,6 +274,5 @@ export function useSalaryDisbursementPermissions() {
     canCreate: { salaryDisbursement: ["create"] },
     canUpdate: { salaryDisbursement: ["update"] },
     canDelete: { salaryDisbursement: ["delete"] },
-    canApprove: { salaryDisbursement: ["approve"] },
   });
 }

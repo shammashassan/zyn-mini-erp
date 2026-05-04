@@ -6,10 +6,9 @@ import Expense from "@/models/Expense";
 import Payee from "@/models/Payee";
 import Voucher from "@/models/Voucher";
 import { softDelete } from "@/utils/softDelete";
-import { getUserInfo } from "@/lib/auth-utils";
 import { voidJournalsForReference } from '@/utils/journalManager';
 import { handleExpenseStatusChange } from '@/utils/journalAutoCreate';
-import { requireAuthAndPermission } from "@/lib/auth-utils";
+import { requireAuthAndPermission, getUserInfo } from "@/lib/auth-utils";
 import { createPayeeSnapshot } from "@/utils/partySnapshot";
 
 interface RequestContext {
@@ -46,9 +45,14 @@ export async function GET(request: Request, context: RequestContext) {
 
     const _ensuremodel = [Payee, Voucher];
     const { id } = await context.params;
-    const includeDeleted = request.headers.get('X-Include-Deleted') === 'true';
 
-    const expenseQuery = Expense.findById(id)
+    const expenseQuery = Expense.findById(id);
+    const includeDeleted = request.headers.get('X-Include-Deleted') === 'true';
+    if (includeDeleted) {
+      expenseQuery.setOptions({ includeDeleted: true });
+    }
+
+    const expense = await expenseQuery
       .populate({
         path: 'connectedDocuments.paymentIds',
         model: 'Voucher',
@@ -59,13 +63,7 @@ export async function GET(request: Request, context: RequestContext) {
         path: 'payeeId',
         model: 'Payee',
         select: 'name type email phone'
-      });
-
-    if (includeDeleted) {
-      expenseQuery.setOptions({ includeDeleted: true });
-    }
-
-    const expense = await expenseQuery;
+      })
 
     if (!expense) {
       return NextResponse.json({ error: "Expense not found" }, { status: 404 });
@@ -196,6 +194,69 @@ export async function PUT(request: Request, context: RequestContext) {
   } catch (error) {
     console.error(`Failed to update expense:`, error);
     return NextResponse.json({ error: "Failed to update expense" }, { status: 400 });
+  }
+}
+
+export async function PATCH(request: Request, context: RequestContext) {
+  try {
+    const { error } = await requireAuthAndPermission({
+      expense: ["update"],
+    });
+
+    if (error) return error;
+
+    await dbConnect();
+    const { id } = await context.params;
+    const body = await request.json();
+    const user = await getUserInfo();
+
+    const expense = await Expense.findById(id);
+
+    if (!expense) {
+      return NextResponse.json({ error: "Expense not found" }, { status: 404 });
+    }
+
+    if (expense.isDeleted) {
+      return NextResponse.json({ error: "Expense has been deleted" }, { status: 410 });
+    }
+
+    const ALLOWED_STATUS = ["pending", "approved", "cancelled"] as const;
+    type AllowedStatus = typeof ALLOWED_STATUS[number];
+
+    if (body.status !== undefined && !ALLOWED_STATUS.includes(body.status)) {
+      return NextResponse.json(
+        { error: `Invalid status. Must be one of: ${ALLOWED_STATUS.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    const oldStatus = expense.status;
+    const newStatus: AllowedStatus = body.status ?? oldStatus;
+
+    expense.addAuditEntry(
+      `Status changed: ${oldStatus} → ${newStatus}`,
+      user.id,
+      user.username
+    );
+
+    expense.set({ status: newStatus, updatedBy: user.id });
+    await expense.save();
+
+    // Delegate journal logic to the shared handler (same as PUT)
+    if (oldStatus !== newStatus) {
+      await handleExpenseStatusChange(
+        expense.toObject(),
+        oldStatus,
+        newStatus,
+        user.id,
+        user.username || user.name
+      );
+    }
+
+    return NextResponse.json(expense);
+  } catch (error) {
+    console.error(`Failed to patch expense:`, error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
