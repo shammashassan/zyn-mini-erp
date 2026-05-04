@@ -113,13 +113,14 @@ export async function GET(request: Request) {
     const vatReceivableCode = 'A1300';
     const salaryCode = 'X2001';
     const rentCode = 'X2002';
+    const cogsCode = 'X1001'; // Cost of Goods Sold — isolated from general expenses
 
     const incomeCodes = accounts
       .filter(a => a.groupName === 'Income' && a.accountCode)
       .map(a => a.accountCode);
 
     const expenseCodes = accounts
-      .filter(a => a.groupName === 'Expenses' && a.accountCode && a.accountCode !== salaryCode && a.accountCode !== rentCode)
+      .filter(a => a.groupName === 'Expenses' && a.accountCode && a.accountCode !== salaryCode && a.accountCode !== rentCode && a.accountCode !== cogsCode)
       .map(a => a.accountCode);
 
     // 2. AGGREGATION PIPELINE
@@ -167,7 +168,7 @@ export async function GET(request: Request) {
               initialValue: 0,
               in: {
                 $cond: [
-                  { $eq: ["$$this.accountCode", inventoryCode] },
+                  { $eq: ["$$this.accountCode", cogsCode] }, // X1001 — true P&L cost, not inventory balance
                   { $add: ["$$value", { $subtract: [{ $ifNull: ["$$this.debit", 0] }, { $ifNull: ["$$this.credit", 0] }] }] },
                   "$$value"
                 ]

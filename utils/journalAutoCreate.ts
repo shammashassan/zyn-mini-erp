@@ -1,28 +1,45 @@
-// utils/journalAutoCreate.ts
+// utils/journalAutoCreate.ts — Project 1 (POS + Return Notes, no Credit/Debit Notes)
 //
-// Architecture matches reference design:
-//   str()       — normalises any id to String (fixes ObjectId vs String mismatch)
-//   saveJournal — single balanced-check + save helper used by every function
-//   Party meta extractors — fixed BUG-4 (roles is object not array),
-//                           BUG-6 (snapshot has no roles/name),
-//                           BUG-7 (payment used partySnapshot?.name → undefined)
+// ══════════════════════════════════════════════════════════════════════════════
+// ARCHITECTURE
+// ══════════════════════════════════════════════════════════════════════════════
 //
-// Voucher journal — allocation-aware routing (BUG-2 / BUG-3):
-//   Receipt: debitNote allocations → Cr. AP, invoice allocations → Cr. AR
-//   Payment: creditNote allocations → Dr. AR, others → Dr. AP
+// RETURN NOTES  → financial journals here (Sales Return + Purchase Return).
+//                  Stock movements handled by inventoryManager.ts separately.
+// POS SALES     → full journal: revenue side + COGS side in one entry.
+// POS RETURNS   → immediate reversal: revenue + COGS reversal in one entry.
 //
-// Purchase journal — fires on purchaseStatus === 'approved' (not inventoryStatus).
-//   Call handlePurchaseStatusChange from purchases/[id]/route.ts PUT handler.
+// ══════════════════════════════════════════════════════════════════════════════
+// BUGS FIXED
+// ══════════════════════════════════════════════════════════════════════════════
 //
-// Return Note journals — kept (this app uses ReturnNotes, not Credit/Debit Notes).
-//
-// POS journal functions — moved here from posManager.ts.
-//   POS stock functions moved to inventoryManager.ts.
+// [BUG-1]  Expense journal used expense.paymentMethod (does not exist).
+//          Fixed: Cr. AP (L1001) — accrual basis.
+// [BUG-2]  Voucher Receipt always Cr. AR even for debitNote allocations.
+//          Fixed: route by allocation.documentType.
+// [BUG-3]  Voucher Payment always Dr. AP even for creditNote allocations.
+//          Fixed: route by allocation.documentType.
+// [BUG-4]  party.roles.includes() → TypeError. roles is an object, not array.
+//          Fixed: boolean property access.
+// [BUG-5]  handleInvoiceStatusChange missed 'partial'/'overdue' → 'approved'.
+//          Fixed: oldStatus !== 'approved' && newStatus === 'approved'.
+// [BUG-6]  partySnapshot.roles / partySnapshot.name do not exist on snapshot.
+//          Fixed: .name → .displayName.
+// [BUG-7]  Voucher payment partySnapshot?.name → always undefined.
+//          Fixed: partySnapshot?.displayName.
+// [JM-1]   referenceId ObjectId vs String mismatch on all journal queries.
+//          Fixed: str() helper normalises every id before use.
+// [BUG-V]  createJournalForVoucher used voucher.invoiceNumber (undefined).
+//          Fixed: voucher.voucherNumber.
+// [BUG-E]  Equipment category mapped to A2002 (Fixed Asset, not expense).
+//          Fixed: removed; falls through to X2014 Miscellaneous.
+// [BUG-X]  handleExpenseStatusChange missing return after void.
+//          Fixed: early return added.
+// ══════════════════════════════════════════════════════════════════════════════
 
 import Journal from '@/models/Journal';
 import generateInvoiceNumber from './invoiceNumber';
 import { voidJournalsForReference } from './journalManager';
-import mongoose from 'mongoose';
 
 interface JournalEntryData {
   accountCode: string;
@@ -32,10 +49,8 @@ interface JournalEntryData {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UTILITIES
+// UTILITY — normalise any id to a plain string (matches Journal.referenceId: String)
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** Normalise any id to a plain string — matches Journal.referenceId: String. */
 const str = (v: any): string | undefined =>
   v != null ? (typeof v.toString === 'function' ? v.toString() : String(v)) : undefined;
 
@@ -43,7 +58,7 @@ const sumEntries = (entries: JournalEntryData[], side: 'debit' | 'credit') =>
   entries.reduce((s, e) => s + e[side], 0);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PARTY / ITEM META
+// PARTY / ITEM EXTRACTORS
 // ─────────────────────────────────────────────────────────────────────────────
 
 type PartyMeta = {
@@ -78,9 +93,9 @@ function extractInvoiceMeta(invoice: any): PartyMeta {
 
 /**
  * Voucher — type depends on voucherType + allocation targets.
- * BUG-4: Party.roles is { customer: boolean, supplier: boolean } — NOT array.
- * BUG-6: partySnapshot has no `roles` or `name` field.
- * BUG-7: Payment branch used partySnapshot?.name (undefined). Fixed: displayName.
+ * [BUG-4] Party.roles is { customer: boolean, supplier: boolean } — NOT array.
+ * [BUG-6] partySnapshot has no `roles` or `name` field.
+ * [BUG-7] Payment branch used partySnapshot?.name (undefined). Fixed: displayName.
  */
 function extractVoucherMeta(voucher: any): PartyMeta {
   const base: PartyMeta = {
@@ -96,10 +111,10 @@ function extractVoucherMeta(voucher: any): PartyMeta {
     if (voucher.payeeName || voucher.payeeId) {
       return { ...base, partyType: 'Payee', partyName: voucher.payeeName, partyId: str(voucher.payeeId) || base.partyId };
     }
-    // BUG-6: snapshot has no roles — resolve from populated partyId object
+    // [BUG-6] snapshot has no roles — resolve from populated partyId object
     const displayName = voucher.partySnapshot?.displayName;
     if (displayName) {
-      // BUG-4: boolean object access, NOT .includes()
+      // [BUG-4] boolean object access, NOT .includes()
       const roles = typeof voucher.partyId === 'object' ? voucher.partyId?.roles : null;
       const type = roles?.supplier && !roles?.customer ? 'Supplier' : 'Customer';
       return { ...base, partyType: type, partyName: displayName };
@@ -107,7 +122,7 @@ function extractVoucherMeta(voucher: any): PartyMeta {
     if (typeof voucher.partyId === 'object') {
       const p = voucher.partyId;
       const name = p.company || p.name || 'Unknown Party';
-      // BUG-4
+      // [BUG-4]
       const type = p.roles?.supplier && !p.roles?.customer ? 'Supplier' : 'Customer';
       return { ...base, partyType: type, partyName: name };
     }
@@ -116,7 +131,7 @@ function extractVoucherMeta(voucher: any): PartyMeta {
 
   // payment
   if (voucher.payeeName || voucher.payeeId) {
-    // BUG-7: was partySnapshot?.name — undefined always; fixed to displayName
+    // [BUG-7] was partySnapshot?.name — undefined always
     return { ...base, partyType: 'Payee', partyName: voucher.partySnapshot?.displayName || voucher.payeeName, partyId: str(voucher.payeeId) || base.partyId };
   }
   if (voucher.vendorName) return { ...base, partyType: 'Vendor', partyName: voucher.vendorName };
@@ -165,11 +180,7 @@ async function extractExpenseMeta(expense: any): Promise<PartyMeta> {
   return { ...firstItemMeta([{ description: expense.description }], 'Product') };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SAVE HELPER
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Validate balance and persist a journal entry. Throws if unbalanced. */
+/** Save a balanced journal or throw if unbalanced. */
 async function saveJournal(opts: {
   referenceType: string;
   referenceId: string | undefined;
@@ -207,7 +218,7 @@ async function saveJournal(opts: {
 /**
  * Approved Invoice journal.
  *   Dr. Accounts Receivable  (grandTotal)
- *   Dr. Sales Discount        (discount — if any)
+ *   Dr. Sales Discount        (I1004 — if any)
  *   Cr. Sales Revenue         (totalAmount)
  *   Cr. VAT Payable           (vatAmount — if any)
  */
@@ -235,11 +246,7 @@ export async function createJournalForInvoice(
   } catch (err) { console.error('Error creating invoice journal:', err); return null; }
 }
 
-/**
- * Handle journal for invoice status change.
- * Catches ALL transitions into 'approved', not just from 'pending'/'cancelled'.
- * Transitions to 'paid'/'partial'/'overdue' are payment-progression — no action here.
- */
+/** [BUG-5] Catches ALL transitions into 'approved', not just from 'pending'/'cancelled'. */
 export async function handleInvoiceStatusChange(
   invoice: any, oldStatus: string, newStatus: string,
   userId: string | null = null, username: string | null = null
@@ -261,11 +268,11 @@ export async function handleInvoiceStatusChange(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Allocation-aware voucher journal.
+ * [BUG-2][BUG-3] Allocation-aware control account routing.
  *
  * RECEIPT:
  *   Dr. Cash / Bank
- *   Cr. Accounts Receivable  ← invoice allocations + unallocated
+ *   Cr. Accounts Receivable  ← invoice allocations + unallocated amount
  *   Cr. Accounts Payable     ← debitNote allocations (supplier refund cash-in)
  *
  * PAYMENT:
@@ -282,7 +289,7 @@ export async function createJournalForVoucher(
     const payAcc = voucher.paymentMethod === 'Cash' ? 'A1001' : 'A1002';
     const payName = voucher.paymentMethod === 'Cash' ? 'Cash in Hand' : 'Cash at Bank';
     const allocs: Array<{ documentType: string; amount: number }> = voucher.allocations || [];
-    const sumAlloc = (type: string) => allocs.filter(a => a.documentType === type).reduce((s, a) => s + Number(a.amount || 0), 0);
+    const sum = (type: string) => allocs.filter(a => a.documentType === type).reduce((s, a) => s + Number(a.amount || 0), 0);
     const entries: JournalEntryData[] = [];
     let refType = 'Manual';
     let narration = '';
@@ -290,8 +297,8 @@ export async function createJournalForVoucher(
     if (voucher.voucherType === 'receipt') {
       refType = 'Receipt';
       narration = `Payment received from ${meta.partyName || 'Customer'} via ${voucher.paymentMethod}`;
-      const invAmt = sumAlloc('invoice');
-      const dnAmt = sumAlloc('debitNote');
+      const invAmt = sum('invoice');
+      const dnAmt = sum('debitNote');
       const arCredit = invAmt + Math.max(0, grand - invAmt - dnAmt);
       entries.push({ accountCode: payAcc, accountName: payName, debit: grand, credit: 0 });
       if (arCredit > 0) entries.push({ accountCode: 'A1100', accountName: 'Accounts Receivable', debit: 0, credit: arCredit });
@@ -300,9 +307,9 @@ export async function createJournalForVoucher(
       refType = 'Payment';
       const paidTo = meta.partyName || voucher.payeeName || voucher.vendorName || 'Payee';
       narration = `Payment made to ${paidTo} via ${voucher.paymentMethod}`;
-      const purAmt = sumAlloc('purchase');
-      const expAmt = sumAlloc('expense');
-      const cnAmt = sumAlloc('creditNote');
+      const purAmt = sum('purchase');
+      const expAmt = sum('expense');
+      const cnAmt = sum('creditNote');
       const apDebit = purAmt + expAmt + Math.max(0, grand - purAmt - expAmt - cnAmt);
       if (apDebit > 0) entries.push({ accountCode: 'L1001', accountName: 'Accounts Payable', debit: apDebit, credit: 0 });
       if (cnAmt > 0) entries.push({ accountCode: 'A1100', accountName: 'Accounts Receivable', debit: cnAmt, credit: 0 });
@@ -312,7 +319,7 @@ export async function createJournalForVoucher(
     if (!entries.length) return null;
 
     return await saveJournal({
-      referenceType: refType, referenceId: str(voucher._id), referenceNumber: voucher.invoiceNumber,
+      referenceType: refType, referenceId: str(voucher._id), referenceNumber: voucher.voucherNumber, // [BUG-V] was voucher.invoiceNumber
       meta, narration, entries,
       entryDate: new Date(voucher.voucherDate || voucher.createdAt || Date.now()),
       userId, username, actionLabel: `Auto-created from ${refType}`,
@@ -321,14 +328,76 @@ export async function createJournalForVoucher(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PURCHASE
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Approved Purchase journal.
+ *   Dr. Inventory         (subtotal — gross minus trade discount)
+ *   Dr. VAT Receivable    (vatAmount — if any)
+ *   Cr. Accounts Payable  (grandTotal)
+ */
+export async function createJournalForPurchase(
+  purchase: any, userId: string | null = null, username: string | null = null
+) {
+  try {
+    if (purchase.purchaseStatus !== 'approved') {
+      console.log(`⏭️ Skipping purchase journal — purchaseStatus is '${purchase.purchaseStatus}'`);
+      return null;
+    }
+    const meta = extractPurchaseMeta(purchase);
+    const gross = Number(purchase.totalAmount) || 0;
+    const discount = Number(purchase.discount) || 0;
+    const subtotal = gross - discount;
+    const vat = Number(purchase.vatAmount) || 0;
+    const grand = Number(purchase.grandTotal) || (subtotal + vat);
+    const entries: JournalEntryData[] = [
+      { accountCode: 'A1200', accountName: 'Inventory', debit: subtotal, credit: 0 },
+    ];
+    if (vat > 0) entries.push({ accountCode: 'A1300', accountName: 'VAT Receivable', debit: vat, credit: 0 });
+    entries.push({ accountCode: 'L1001', accountName: 'Accounts Payable', debit: 0, credit: grand });
+
+    const narration = discount > 0
+      ? `Purchase from ${meta.partyName || 'Supplier'} — ${purchase.items.length} item(s) (Discount: ${discount.toFixed(2)})`
+      : `Purchase from ${meta.partyName || 'Supplier'} — ${purchase.items.length} item(s)`;
+
+    return await saveJournal({
+      referenceType: 'Purchase', referenceId: str(purchase._id), referenceNumber: purchase.referenceNumber,
+      meta, narration, entries,
+      entryDate: new Date(purchase.purchaseDate || purchase.date || Date.now()),
+      userId, username, actionLabel: 'Auto-created from Purchase (Approved)',
+    });
+  } catch (err) { console.error('❌ Error creating purchase journal:', err); return null; }
+}
+
+export async function handlePurchaseStatusChange(
+  purchase: any, oldStatus: string, newStatus: string,
+  userId: string | null = null, username: string | null = null
+) {
+  try {
+    console.log(`📝 Purchase status: ${oldStatus} → ${newStatus}`);
+    if (oldStatus === 'approved' && newStatus !== 'approved') {
+      await voidJournalsForReference(purchase._id, userId, username, `Purchase status changed from approved to ${newStatus}`);
+      return;
+    }
+    if (oldStatus !== 'approved' && newStatus === 'approved') {
+      await createJournalForPurchase(purchase, userId, username);
+    }
+  } catch (err) { console.error('handlePurchaseStatusChange error:', err); }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // RETURN NOTES (Sales & Purchase)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Approved Sales Return Note journal.
- *   Dr. Sales Returns    (subtotal)
+ *   Dr. Sales Returns    (I1003 — subtotal)
  *   Dr. VAT Payable      (vatAmount — reduces VAT liability)
  *   Cr. Accounts Receivable (grandTotal)
+ *
+ * Inventory restock (Dr. Inventory / Cr. COGS) included when returnNote.cogsAmount
+ * is provided. If inventoryManager handles stock separately, pass cogsAmount = 0.
  */
 export async function createJournalForSalesReturn(
   returnNote: any, userId: string | null = null, username: string | null = null
@@ -361,6 +430,14 @@ export async function createJournalForSalesReturn(
     if (vatAmount > 0)
       entries.push({ accountCode: 'L1002', accountName: 'VAT Payable', debit: vatAmount, credit: 0 });
     entries.push({ accountCode: 'A1100', accountName: 'Accounts Receivable', debit: 0, credit: grandTotal });
+
+    // Inventory restock — goods re-enter stock: Dr. Inventory / Cr. COGS.
+    // Attach cogsAmount to returnNote before calling if stock is managed here.
+    const cogsAmount = Number(returnNote.cogsAmount) || 0;
+    if (cogsAmount > 0) {
+      entries.push({ accountCode: 'A1200', accountName: 'Inventory', debit: cogsAmount, credit: 0 });
+      entries.push({ accountCode: 'X1001', accountName: 'Cost of Goods Sold', debit: 0, credit: cogsAmount });
+    }
 
     return await saveJournal({
       referenceType: 'SalesReturn', referenceId: str(returnNote._id), referenceNumber: returnNote.returnNumber,
@@ -418,9 +495,6 @@ export async function createJournalForPurchaseReturn(
   } catch (err) { console.error('❌ Error creating purchase return journal:', err); return null; }
 }
 
-/**
- * Handle journal for return note status change.
- */
 export async function handleReturnNoteStatusChange(
   returnNote: any, oldStatus: string, newStatus: string,
   userId: string | null = null, username: string | null = null
@@ -442,84 +516,13 @@ export async function handleReturnNoteStatusChange(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PURCHASE
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Approved Purchase journal — mirrors the Invoice pattern exactly.
- * Triggers when purchaseStatus === 'approved', regardless of inventoryStatus.
- *
- *   Dr. Inventory         (subtotal — gross minus trade discount)
- *   Dr. VAT Receivable    (vatAmount — if any)
- *   Cr. Accounts Payable  (grandTotal)
- */
-export async function createJournalForPurchase(
-  purchase: any, userId: string | null = null, username: string | null = null
-) {
-  try {
-    if (purchase.purchaseStatus !== 'approved') {
-      console.log(`⏭️ Skipping purchase journal — purchaseStatus is '${purchase.purchaseStatus}'`);
-      return null;
-    }
-    const meta = extractPurchaseMeta(purchase);
-    const gross = Number(purchase.totalAmount) || 0;
-    const discount = Number(purchase.discount) || 0;
-    const subtotal = gross - discount;
-    const vat = Number(purchase.vatAmount) || 0;
-    const grand = Number(purchase.grandTotal) || (subtotal + vat);
-
-    const entries: JournalEntryData[] = [
-      { accountCode: 'A1200', accountName: 'Inventory', debit: subtotal, credit: 0 },
-    ];
-    if (vat > 0) entries.push({ accountCode: 'A1300', accountName: 'VAT Receivable', debit: vat, credit: 0 });
-    entries.push({ accountCode: 'L1001', accountName: 'Accounts Payable', debit: 0, credit: grand });
-
-    const narration = discount > 0
-      ? `Purchase from ${meta.partyName || 'Supplier'} — ${purchase.items.length} item(s) (Discount: ${discount.toFixed(2)})`
-      : `Purchase from ${meta.partyName || 'Supplier'} — ${purchase.items.length} item(s)`;
-
-    return await saveJournal({
-      referenceType: 'Purchase', referenceId: str(purchase._id), referenceNumber: purchase.referenceNumber,
-      meta, narration, entries,
-      entryDate: new Date(purchase.purchaseDate || purchase.date || Date.now()),
-      userId, username, actionLabel: 'Auto-created from Purchase (Approved)',
-    });
-  } catch (err) { console.error('❌ Error creating purchase journal:', err); return null; }
-}
-
-/**
- * Handle journal for Purchase purchaseStatus change.
- * Same pattern as handleInvoiceStatusChange.
- * Wire from purchases/[id]/route.ts PUT wherever purchaseStatus changes.
- */
-export async function handlePurchaseStatusChange(
-  purchase: any, oldStatus: string, newStatus: string,
-  userId: string | null = null, username: string | null = null
-) {
-  try {
-    console.log(`📝 Purchase status: ${oldStatus} → ${newStatus}`);
-    if (oldStatus === 'approved' && newStatus !== 'approved') {
-      await voidJournalsForReference(purchase._id, userId, username, `Purchase status changed from approved to ${newStatus}`);
-      return;
-    }
-    if (oldStatus !== 'approved' && newStatus === 'approved') {
-      await createJournalForPurchase(purchase, userId, username);
-    }
-  } catch (err) { console.error('handlePurchaseStatusChange error:', err); }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // EXPENSE — accrual basis
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Approved Expense journal — accrual basis.
- *   Dr. Expense Account   (expense.amount)
- *   Cr. Accounts Payable  (expense.amount)
- *
- * The matching Payment Voucher closes the liability:
- *   Dr. Accounts Payable  = amount
- *   Cr. Cash/Bank         = amount
+ * [BUG-1] expense.paymentMethod does not exist in IExpense.
+ * Correct accrual entry: Dr. Expense / Cr. AP.
+ * Payment Voucher later does: Dr. AP / Cr. Cash — completing the two-step flow.
  */
 export async function createJournalForExpense(
   expense: any, userId: string | null = null, username: string | null = null
@@ -532,7 +535,8 @@ export async function createJournalForExpense(
       'Marketing': { code: 'X2005', name: 'Marketing Expense' },
       'Utilities': { code: 'X2003', name: 'Utilities Expense' },
       'Software': { code: 'X2011', name: 'Software & Technology Expense' },
-      'Equipment': { code: 'A2002', name: 'Equipment' },
+      // 'Equipment' omitted — A2002 is a Fixed Asset, not an expense account. [BUG-E]
+      // Equipment expenses fall through to Miscellaneous (X2014).
       'Meals': { code: 'X2012', name: 'Meal Expense' },
       'Professional Services': { code: 'X2008', name: 'Professional Fees' },
       'Rent': { code: 'X2002', name: 'Rent Expense' },
@@ -564,6 +568,7 @@ export async function handleExpenseStatusChange(
     console.log(`📄 Expense status: ${oldStatus} → ${newStatus}`);
     if (oldStatus === 'approved' && newStatus !== 'approved') {
       await voidJournalsForReference(expense._id, userId, username, `Expense status changed from ${oldStatus} to ${newStatus}`);
+      return; // [BUG-X] prevent fall-through to create branch
     }
     if (newStatus === 'approved' && oldStatus !== 'approved') {
       await createJournalForExpense(expense, userId, username);
@@ -572,7 +577,7 @@ export async function handleExpenseStatusChange(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POS SALE (moved from posManager.ts)
+// POS SALE
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -580,13 +585,13 @@ export async function handleExpenseStatusChange(
  *
  * Revenue entries:
  *   Dr. Cash/Bank          (grandTotal)
- *   Dr. Sales Discount     (discount — if any)
+ *   Dr. Sales Discount     (I1004 — if any)
  *   Cr. Sales Revenue      (totalAmount)
  *   Cr. VAT Payable        (vatAmount — if any)
  *
  * COGS entries (only when cogsAmount > 0 — computed by deductStockForPOSSale):
- *   Dr. Cost of Goods Sold (cogsAmount)
- *   Cr. Inventory          (cogsAmount)
+ *   Dr. Cost of Goods Sold (X1001 — cogsAmount)
+ *   Cr. Inventory          (A1200 — cogsAmount)
  *
  * Revenue block and COGS block each balance independently.
  */
@@ -615,7 +620,7 @@ export async function createJournalForPOSSale(
     if ((sale.vatAmount || 0) > 0)
       entries.push({ accountCode: 'L1002', accountName: 'VAT Payable', debit: 0, credit: sale.vatAmount });
 
-    // COGS entries — Dr. COGS / Cr. Inventory (balance independently)
+    // COGS entries — Dr. X1001 / Cr. A1200 (balance independently)
     if (cogsAmount > 0) {
       entries.push({ accountCode: 'X1001', accountName: 'Cost of Goods Sold', debit: cogsAmount, credit: 0 });
       entries.push({ accountCode: 'A1200', accountName: 'Inventory', debit: 0, credit: cogsAmount });
@@ -654,13 +659,13 @@ export async function recreateJournalForPOSSale(
  * Auto-create journal entry for a POS Return (immediate).
  *
  * Revenue reversal entries:
- *   Dr. Sales Returns      (subtotal)
+ *   Dr. Sales Returns      (I1003 — subtotal)
  *   Dr. VAT Payable        (vatAmount — if any)
  *   Cr. Cash/Bank          (grandTotal)
  *
  * COGS reversal entries (only when cogsAmount > 0):
- *   Dr. Inventory          (cogsAmount)
- *   Cr. Cost of Goods Sold (cogsAmount)
+ *   Dr. Inventory          (A1200 — cogsAmount)
+ *   Cr. Cost of Goods Sold (X1001 — cogsAmount)
  */
 export async function createJournalForPOSReturn(
   returnNote: any,
@@ -690,7 +695,7 @@ export async function createJournalForPOSReturn(
     // Cr. Cash/Bank
     entries.push({ accountCode: paymentAccount, accountName: paymentAccountName, debit: 0, credit: grandTotal });
 
-    // COGS reversal entries — Dr. Inventory / Cr. COGS
+    // COGS reversal — Dr. Inventory / Cr. COGS
     if (cogsAmount > 0) {
       entries.push({ accountCode: 'A1200', accountName: 'Inventory', debit: cogsAmount, credit: 0 });
       entries.push({ accountCode: 'X1001', accountName: 'Cost of Goods Sold', debit: 0, credit: cogsAmount });

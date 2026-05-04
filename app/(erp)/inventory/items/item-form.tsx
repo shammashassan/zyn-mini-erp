@@ -248,7 +248,13 @@ export function ItemForm({
                                                     <CommandList
                                                         className="max-h-[180px] overflow-y-auto"
                                                         onWheel={(e) => e.stopPropagation()}
+                                                        onTouchStart={(e) => e.stopPropagation()}
+                                                        onTouchMove={(e) => e.stopPropagation()}
                                                     >
+                                                        <CommandEmpty>
+                                                            {categorySearch.trim() ? 'No categories found' : 'Type to create a category'}
+                                                        </CommandEmpty>
+
                                                         {existingCategories
                                                             .filter(
                                                                 (c) =>
