@@ -535,8 +535,7 @@ export async function createJournalForExpense(
       'Marketing': { code: 'X2005', name: 'Marketing Expense' },
       'Utilities': { code: 'X2003', name: 'Utilities Expense' },
       'Software': { code: 'X2011', name: 'Software & Technology Expense' },
-      // 'Equipment' omitted — A2002 is a Fixed Asset, not an expense account. [BUG-E]
-      // Equipment expenses fall through to Miscellaneous (X2014).
+      'Equipment': { code: 'A2002', name: 'Equipment' },
       'Meals': { code: 'X2012', name: 'Meal Expense' },
       'Professional Services': { code: 'X2008', name: 'Professional Fees' },
       'Rent': { code: 'X2002', name: 'Rent Expense' },
