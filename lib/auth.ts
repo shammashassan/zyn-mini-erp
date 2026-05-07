@@ -1,11 +1,9 @@
-// lib/auth.ts
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { nextCookies } from "better-auth/next-js";
-import { admin as adminPlugin, username, jwt } from "better-auth/plugins"; 
+import { admin as adminPlugin, username, jwt } from "better-auth/plugins";
 import { ac, user, manager, admin, owner } from "@/lib/permissions";
 import { getMongoDb, getMongoClient } from "./mongoClient";
-import { ObjectId } from "mongodb";
 
 const db = await getMongoDb();
 const client = await getMongoClient();
@@ -19,20 +17,19 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
-    autoSignIn: true, 
+    autoSignIn: true,
     requireEmailVerification: false,
     minPasswordLength: 8,
     maxPasswordLength: 128,
   },
 
   session: {
-    expiresIn: 60 * 60 * 24, // 24 hours
-    updateAge: 60 * 60 * 4,  // Update session in DB every 4 hours
+    expiresIn: 60 * 60 * 24,
+    updateAge: 60 * 60 * 4,
     cookieCache: {
       enabled: true,
-      maxAge: 60 * 60 * 2,   // Cache lasts 2 hours
+      maxAge: 60 * 60 * 2,
       strategy: "compact",
-      // NOTE: refreshCache is only for stateless (DB-less) setups — removed
     }
   },
 
@@ -45,14 +42,11 @@ export const auth = betterAuth({
       enabled: true,
     },
     additionalFields: {
-      role: {
-        type: "string",
-        defaultValue: "user",
-        required: false,
-      },
+      // Role is handled by admin plugin - removed from here
       lastLoginAt: {
         type: "date",
         required: false,
+        input: false, // Prevent users from setting this manually
       },
     },
   },
@@ -71,18 +65,13 @@ export const auth = betterAuth({
   databaseHooks: {
     session: {
       create: {
-        async after(session) {
+        after: async (session) => {
+          const { ObjectId } = await import("mongodb");
           try {
-            let result = await db.collection('user').updateOne(
-              { id: session.userId },
-              { $set: { lastLoginAt: new Date(), updatedAt: new Date() } }
-            );
-            
-            if (result.matchedCount === 0 && ObjectId.isValid(session.userId)) {
-              await db.collection('user').updateOne(
-                { _id: new ObjectId(session.userId) },
-                { $set: { lastLoginAt: new Date(), updatedAt: new Date() } }
-              );
+            let result = await db.collection('user').updateOne({ id: session.userId }, { $set: { lastLoginAt: new Date(), updatedAt: new Date() } });
+
+            if (result.matchedCount === 0) {
+              await db.collection('user').updateOne({ _id: new ObjectId(session.userId) }, { $set: { lastLoginAt: new Date(), updatedAt: new Date() } });
             }
           } catch (error) {
             console.error('❌ Failed to update lastLoginAt:', error);
@@ -96,23 +85,23 @@ export const auth = betterAuth({
     username(),
 
     jwt({
-        jwt: {
-            expirationTime: "24h", 
-            definePayload: ({ user }) => {
-                return {
-                    id: user.id,
-                    email: user.email,
-                    role: user.role, 
-                }
-            }
+      jwt: {
+        expirationTime: "24h",
+        definePayload: ({ user }) => {
+          return {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+          }
         }
+      }
     }),
 
     adminPlugin({
       ac,
       roles: { user, manager, admin, owner },
       defaultRole: "user",
-      adminUserIds: [], 
+      adminUserIds: [],
       impersonationSessionDuration: 60 * 60,
       defaultBanReason: "Banned by administrator",
       bannedUserMessage: "Your account has been banned. Please contact support.",

@@ -177,7 +177,7 @@ export async function DELETE(request: Request, context: RequestContext) {
       // ===== NEW SYSTEM: Use allocations =====
       console.log(`📉 Removing ${voucher.allocations.length} allocation(s)...`);
 
-      for (const allocation of voucher.allocations) {
+      await Promise.all(voucher.allocations.map(async (allocation: any) => {
         if (allocation.documentType === 'invoice') {
           const invoice = await Invoice.findById(allocation.documentId);
 
@@ -573,7 +573,7 @@ export async function DELETE(request: Request, context: RequestContext) {
             console.log(`✅ Credit Note ${creditNote.creditNoteNumber} updated`);
           }
         }
-      }
+      }));
     } else {
       // ===== OLD SYSTEM: Use connectedDocuments =====
       console.log('⚠️ Using old system (no allocations stored)');
@@ -589,15 +589,11 @@ export async function DELETE(request: Request, context: RequestContext) {
               .filter((rid: any) => rid.toString() !== id);
 
             let newPaidAmount = 0;
-            for (const receiptId of updatedReceiptIds) {
-              try {
-                const receipt = await Voucher.findById(receiptId);
-                if (receipt && !receipt.isDeleted) {
-                  newPaidAmount += receipt.grandTotal;
-                }
-              } catch (err) {
-                console.error(`Failed to fetch receipt ${receiptId}:`, err);
-              }
+            try {
+              const receipts = await Voucher.find({ _id: { $in: updatedReceiptIds }, isDeleted: { $ne: true } }).select("grandTotal").lean();
+              newPaidAmount = receipts.reduce((sum: number, r: any) => sum + r.grandTotal, 0);
+            } catch (err) {
+              console.error(`Failed to batch fetch receipts for updated ids:`, err);
             }
 
             const oldPaidAmount = invoice.paidAmount;
@@ -636,15 +632,11 @@ export async function DELETE(request: Request, context: RequestContext) {
               .filter((pid: any) => pid.toString() !== id);
 
             let newPaidAmount = 0;
-            for (const paymentId of updatedPaymentIds) {
-              try {
-                const payment = await Voucher.findById(paymentId);
-                if (payment && !payment.isDeleted) {
-                  newPaidAmount += payment.grandTotal;
-                }
-              } catch (err) {
-                console.error(`Failed to fetch payment ${paymentId}:`, err);
-              }
+            try {
+              const payments = await Voucher.find({ _id: { $in: updatedPaymentIds }, isDeleted: { $ne: true } }).select("grandTotal").lean();
+              newPaidAmount = payments.reduce((sum: number, p: any) => sum + p.grandTotal, 0);
+            } catch (err) {
+              console.error(`Failed to batch fetch payments for updated ids:`, err);
             }
 
             const oldPaidAmount = purchase.paidAmount;
@@ -683,15 +675,11 @@ export async function DELETE(request: Request, context: RequestContext) {
               .filter((pid: any) => pid.toString() !== id);
 
             let newPaidAmount = 0;
-            for (const paymentId of updatedPaymentIds) {
-              try {
-                const payment = await Voucher.findById(paymentId);
-                if (payment && !payment.isDeleted) {
-                  newPaidAmount += payment.grandTotal;
-                }
-              } catch (err) {
-                console.error(`Failed to fetch payment ${paymentId}:`, err);
-              }
+            try {
+              const payments = await Voucher.find({ _id: { $in: updatedPaymentIds }, isDeleted: { $ne: true } }).select("grandTotal").lean();
+              newPaidAmount = payments.reduce((sum: number, p: any) => sum + p.grandTotal, 0);
+            } catch (err) {
+              console.error(`Failed to batch fetch payments for updated ids:`, err);
             }
 
             expense.paidAmount = newPaidAmount;
@@ -728,15 +716,11 @@ export async function DELETE(request: Request, context: RequestContext) {
               .filter((rid: any) => rid.toString() !== id);
 
             let newReceivedAmount = 0;
-            for (const receiptId of updatedReceiptIds) {
-              try {
-                const receipt = await Voucher.findById(receiptId);
-                if (receipt && !receipt.isDeleted) {
-                  newReceivedAmount += receipt.grandTotal;
-                }
-              } catch (err) {
-                console.error(`Failed to fetch receipt ${receiptId}:`, err);
-              }
+            try {
+              const receipts = await Voucher.find({ _id: { $in: updatedReceiptIds }, isDeleted: { $ne: true } }).select("grandTotal").lean();
+              newReceivedAmount = receipts.reduce((sum: number, r: any) => sum + r.grandTotal, 0);
+            } catch (err) {
+              console.error(`Failed to batch fetch receipts for updated ids:`, err);
             }
 
             debitNote.receivedAmount = newReceivedAmount;
@@ -773,15 +757,11 @@ export async function DELETE(request: Request, context: RequestContext) {
               .filter((pid: any) => pid.toString() !== id);
 
             let newPaidAmount = 0;
-            for (const paymentId of updatedPaymentIds) {
-              try {
-                const payment = await Voucher.findById(paymentId);
-                if (payment && !payment.isDeleted) {
-                  newPaidAmount += payment.grandTotal;
-                }
-              } catch (err) {
-                console.error(`Failed to fetch payment ${paymentId}:`, err);
-              }
+            try {
+              const payments = await Voucher.find({ _id: { $in: updatedPaymentIds }, isDeleted: { $ne: true } }).select("grandTotal").lean();
+              newPaidAmount = payments.reduce((sum: number, p: any) => sum + p.grandTotal, 0);
+            } catch (err) {
+              console.error(`Failed to batch fetch payments for updated ids:`, err);
             }
 
             creditNote.paidAmount = newPaidAmount;

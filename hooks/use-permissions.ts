@@ -1,33 +1,36 @@
-// hooks/use-permissions.ts — UPDATED: added attendance + salaryDisbursement hooks
-import { useSession } from "@/lib/auth-client";
-import { authClient } from "@/lib/auth-client";
+// hooks/use-permissions.ts — CORRECTED
+import { useSession, authClient } from "@/lib/auth-client";
 import { useMemo } from "react";
-
 type RoleType = "user" | "admin" | "manager" | "owner";
-
-interface PermissionCheck {
-  [resource: string]: string[];
-}
-
-export function usePermissions(permissionChecks: Record<string, PermissionCheck>) {
+export function usePermissions(permissionChecks: Record<string, {
+  [resource: string]: string[]
+}>) {
   const { data: session, isPending } = useSession();
   const userRole = session?.user?.role as RoleType | undefined;
-
   const permissions = useMemo(() => {
+    if (isPending || !userRole) {
+      return Object.fromEntries(
+        Object.keys(permissionChecks).map((k) => [k, false])
+      ) as Record<string, boolean>;
+    }
     const result: Record<string, boolean> = {};
-    for (const [key, permissionCheck] of Object.entries(permissionChecks)) {
-      if (!session || !userRole) { result[key] = false; continue; }
-      try {
-        result[key] = authClient.admin.checkRolePermission({ role: userRole, permissions: permissionCheck });
-      } catch (error) {
-        result[key] = false;
-      }
+    for (const [key, permCheck] of Object.entries(permissionChecks)) {
+      result[key] = authClient.admin.checkRolePermission({
+        role: userRole,
+        permissions: permCheck,
+      });
     }
     return result;
-  }, [userRole, permissionChecks, session]);
-
-  return { permissions, userRole, session, isPending, isAuthenticated: !!session?.user };
+  }, [userRole, permissionChecks, isPending]);
+  return {
+    permissions,
+    userRole,
+    session,
+    isPending,
+    isAuthenticated: !!session?.user
+  };
 }
+
 
 // ── Existing hooks (kept intact) ────────────────────────────────────────────
 
@@ -141,7 +144,8 @@ export function useDeliveryNotePermissions() {
   return usePermissions({
     canRead: { deliveryNote: ["read"] },
     canCreate: { deliveryNote: ["create"] },
-    canUpdate: { deliveryNote: ["update_status"] },
+    canUpdate: { deliveryNote: ["update"] },
+    canUpdateStatus: { deliveryNote: ["update_status"] },
     canDelete: { deliveryNote: ["soft_delete"] },
     canViewTrash: { deliveryNote: ["view_trash"] },
     canRestore: { deliveryNote: ["restore"] },

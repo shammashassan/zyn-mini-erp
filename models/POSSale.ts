@@ -13,6 +13,18 @@ export interface IPOSSaleItem {
     returnedQuantity?: number;
 }
 
+export interface IAuditEntry {
+    action: string;
+    userId: string | null;
+    username: string | null;
+    timestamp: Date;
+    changes?: {
+        field: string;
+        oldValue: any;
+        newValue: any;
+    }[];
+}
+
 export interface IPOSSale extends Document<string> {
     saleNumber: string;
 
@@ -60,8 +72,17 @@ export interface IPOSSale extends Document<string> {
     deletedBy: string | null;
 
     createdBy: string | null;
+    updatedBy: string | null;
+    actionHistory: IAuditEntry[];
     createdAt: Date;
     updatedAt: Date;
+
+    addAuditEntry(
+        action: string,
+        userId?: string | null,
+        username?: string | null,
+        changes?: IAuditEntry['changes']
+    ): void;
 }
 
 const POSSaleItemSchema = new Schema({
@@ -83,6 +104,18 @@ const PartySnapshotSchema = new Schema({
     },
     taxIdentifiers: { vatNumber: String },
 }, { _id: false });
+
+const AuditEntrySchema = new Schema({
+    action: { type: String, required: true },
+    userId: { type: String, default: null },
+    username: { type: String, default: null },
+    timestamp: { type: Date, default: Date.now },
+    changes: [{
+        field: { type: String },
+        oldValue: { type: Schema.Types.Mixed },
+        newValue: { type: Schema.Types.Mixed },
+    }],
+});
 
 const POSSaleSchema = new Schema<IPOSSale>({
     saleNumber: { type: String, required: true, unique: true, index: true },
@@ -112,6 +145,8 @@ const POSSaleSchema = new Schema<IPOSSale>({
     deletedBy: { type: String, default: null },
 
     createdBy: { type: String, default: null },
+    updatedBy: { type: String, default: null },
+    actionHistory: [AuditEntrySchema],
 }, { timestamps: true });
 
 POSSaleSchema.index({ isDeleted: 1, createdAt: -1 });
@@ -124,6 +159,24 @@ POSSaleSchema.pre(/^find/, function (this: Query<any, any>, next) {
     }
     next();
 });
+
+POSSaleSchema.methods.addAuditEntry = function (
+    action: string,
+    userId: string | null = null,
+    username: string | null = null,
+    changes?: IAuditEntry['changes']
+) {
+    if (!this.actionHistory) {
+        this.actionHistory = [];
+    }
+    this.actionHistory.push({
+        action,
+        userId,
+        username,
+        timestamp: new Date(),
+        changes,
+    });
+};
 
 const POSSale = models.POSSale || model<IPOSSale>('POSSale', POSSaleSchema);
 export default POSSale;

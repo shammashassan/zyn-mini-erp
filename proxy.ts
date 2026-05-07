@@ -14,15 +14,15 @@ export async function proxy(request: NextRequest) {
   if (
     path.startsWith('/_next/') ||
     path.startsWith('/favicon') ||
-    /\.[a-zA-Z0-9]+$/.test(path) // has a file extension
+    (!path.startsWith('/api/') && /\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2|ttf|otf)$/i.test(path))
   ) {
     return NextResponse.next();
   }
 
   // 🛡️ RATE LIMITING LOGIC
-  // We only limit POST requests (usually login/mutations) or specific paths to save quota
-  // You can remove "request.method === 'POST'" if you want to limit EVERYTHING.
-  if (path.startsWith('/api/') && request.method === 'POST') {
+  // Narrow rate limiting strictly to sensitive authentication routes under /api/auth/ (POST only)
+  // to avoid hitting Upstash Redis on standard business transactions.
+  if (path.startsWith('/api/auth/') && request.method === 'POST') {
     try {
       // 1. Safe IP Detection
       const forwardedFor = request.headers.get("x-forwarded-for");
