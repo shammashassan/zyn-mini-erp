@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const voucherType = searchParams.get("voucherType");
 
-    const trashedVouchers = await getTrash(Voucher);
+    const trashedVouchers = await getTrash(Voucher, {}, "partyId payeeId");
 
     // Filter by voucherType if provided
     const filteredVouchers = voucherType

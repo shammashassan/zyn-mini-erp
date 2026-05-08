@@ -17,7 +17,7 @@ export async function GET() {
 
         await dbConnect();
 
-        const trashedContacts = await getTrash(Contact);
+        const trashedContacts = await getTrash(Contact, {}, "partyId");
 
         return NextResponse.json(trashedContacts);
     } catch (error) {

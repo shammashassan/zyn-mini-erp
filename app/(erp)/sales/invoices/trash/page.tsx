@@ -2,19 +2,19 @@
 
 "use client";
 
-import { TrashPage } from "@/components/shared/TrashPage";
+import { useEffect, useState } from "react";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { FileText } from "lucide-react";
-import { useInvoicePermissions } from "@/hooks/use-permissions";
-import { forbidden } from "next/navigation";
-import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect, usePathname } from "next/navigation";
+import { TrashPage } from "@/components/shared/TrashPage";
+import { useInvoicePermissions } from "@/hooks/use-permissions";
+import { forbidden, redirect, usePathname } from "next/navigation";
 
 interface DeletedInvoice {
   _id: string;
   invoiceNumber: string;
   partyId?: any; // Populated
+  partySnapshot?: any; // Immutable snapshot fallback
   grandTotal?: number;
   paymentStatus?: string;
   deletedAt?: Date | string;
@@ -63,7 +63,7 @@ export default function InvoicesTrashPage() {
       getItemName={(item) => item.invoiceNumber || "Unnamed Invoice"}
       getItemDescription={(item) => {
         const party = item.partyId;
-        const name = party?.name || party?.company || 'Unknown Party';
+        const name = party?.name || party?.company || item.partySnapshot?.displayName || 'Unknown Party';
         return `${name} • ${formatCurrency(item.grandTotal || 0.00)} • ${item.paymentStatus || 'N/A'}`;
       }}
     />

@@ -2,19 +2,20 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { TrashPage } from "@/components/shared/TrashPage";
-import { PackageX, Redo2 } from "lucide-react";
+import { Redo2 } from "lucide-react";
 import { useReturnNotePermissions } from "@/hooks/use-permissions";
-import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect, usePathname } from "next/navigation";
+import { forbidden, redirect, usePathname } from "next/navigation";
 
 interface DeletedPurchaseReturn {
   _id: string;
   returnNumber?: string;
   purchaseReference?: string;
   partyId?: any; // Populated
+  partySnapshot?: any; // Immutable snapshot fallback
+  connectedDocuments?: any; // Populated connected documents
   items?: Array<{
     returnQuantity: number;
   }>;
@@ -72,13 +73,13 @@ export default function PurchaseReturnsTrashPage() {
       getItemDescription={(item) => {
         const totalQuantity =
           item.items?.reduce((sum, i) => sum + (i.returnQuantity || 0), 0) || 0;
-        const deleteAction = item.actionHistory?.find((a) => a.action === "Soft Deleted");
-        const deletedByUsername = deleteAction?.username || item.deletedBy || "Unknown";
 
         const party = item.partyId;
-        const name = party?.name || party?.company || 'Unknown Party';
+        const name = party?.name || party?.company || item.partySnapshot?.displayName || 'Unknown Party';
 
-        return `${item.purchaseReference || "N/A"} • ${name} • ${totalQuantity.toFixed(2)} units • ${item.reason || "No reason"} • Deleted by @${deletedByUsername}`;
+        const purchaseRef = item.connectedDocuments?.purchaseId?.referenceNumber || item.purchaseReference || "N/A";
+
+        return `${purchaseRef} • ${name} • ${totalQuantity.toFixed(2)} units • ${item.reason || "No reason"}`;
       }}
     />
   );

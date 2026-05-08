@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import ReturnNote from "@/models/ReturnNote";
+import { getTrash } from "@/utils/softDelete";
 import { requireAuthAndPermission } from "@/lib/auth-utils";
 
 export async function GET(request: Request) {
@@ -17,16 +18,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const returnTypeParam = searchParams.get('returnType'); // ✅ GET returnType parameter
 
-    const filter: any = { isDeleted: true };
+    const filter: any = {};
 
     // ✅ ADD returnType filter
     if (returnTypeParam) {
       filter.returnType = returnTypeParam;
     }
 
-    const trashedReturnNotes = await ReturnNote.find(filter)
-      .setOptions({ includeDeleted: true })
-      .sort({ deletedAt: -1 });
+    const trashedReturnNotes = await getTrash(ReturnNote, filter, "partyId connectedDocuments.invoiceId connectedDocuments.posSaleId connectedDocuments.purchaseId");
 
     return NextResponse.json(trashedReturnNotes);
   } catch (error) {

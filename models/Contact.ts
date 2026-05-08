@@ -15,8 +15,12 @@ export interface IContact extends Document<string> {
     isPrimary: boolean;        // Default contact for documents
     isActive: boolean;
 
-    // Metadata
+    // Metadata & Audit
     isDeleted: boolean;
+    deletedAt: Date | null;
+    deletedBy: string | null;
+    createdBy: string | null;
+    updatedBy: string | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -38,7 +42,12 @@ const ContactSchema: Schema<IContact> = new Schema({
     isPrimary: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
 
-    isDeleted: { type: Boolean, default: false },
+    // Soft delete & Metadata
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: String, default: null },
+    createdBy: { type: String, default: null },
+    updatedBy: { type: String, default: null },
 }, {
     timestamps: true,
 });
@@ -49,11 +58,16 @@ ContactSchema.index({ partyId: 1, isActive: 1 });
 ContactSchema.index({ name: 1 });
 ContactSchema.index({ phone: 1 });
 ContactSchema.index({ email: 1 });
+ContactSchema.index({ isDeleted: 1, createdAt: -1 });
 
-// Ensure only one primary contact per party (optional but recommended uniqueness constraint)
-// Note: This needs careful handling during updates if we want strict db-level constraint, 
-// but often handled in logic to avoid race conditions. 
-// For now, we'll index for performance but manage uniqueness in logic/API.
+// Pre-find hook to exclude soft-deleted records by default
+ContactSchema.pre(/^find/, function (this: Query<any, any>, next) {
+    const options = this.getOptions();
+    if (!options.includeDeleted) {
+        this.find({ isDeleted: false });
+    }
+    next();
+});
 
 const Contact = models.Contact || model<IContact>('Contact', ContactSchema);
 

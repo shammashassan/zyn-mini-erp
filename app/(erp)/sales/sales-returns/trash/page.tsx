@@ -2,20 +2,21 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { TrashPage } from "@/components/shared/TrashPage";
-import { PackageX, Undo2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Undo2 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
-import { useReturnNotePermissions } from "@/hooks/use-permissions";
-import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect, usePathname } from "next/navigation";
+import { TrashPage } from "@/components/shared/TrashPage";
+import { useReturnNotePermissions } from "@/hooks/use-permissions";
+import { forbidden, redirect, usePathname } from "next/navigation";
 
 interface DeletedSalesReturn {
   _id: string;
   returnNumber?: string;
   invoiceReference?: string;
   partyId?: any; // Populated
+  partySnapshot?: any; // Immutable snapshot fallback
+  connectedDocuments?: any; // Populated connected documents
   items?: Array<{
     returnQuantity: number;
   }>;
@@ -74,14 +75,14 @@ export default function SalesReturnsTrashPage() {
       getItemDescription={(item) => {
         const totalQuantity =
           item.items?.reduce((sum, i) => sum + (i.returnQuantity || 0), 0) || 0;
-        const deleteAction = item.actionHistory?.find((a) => a.action === "Soft Deleted");
-        const deletedByUsername = deleteAction?.username || item.deletedBy || "Unknown";
         const displayTotal = item.grandTotal || 0;
 
-        const party = item.partyId;
-        const name = party?.name || party?.company || 'Unknown Party';
+        const party = item.connectedDocuments?.partyId;
+        const name = party?.name || party?.company || item.partySnapshot?.displayName || 'Unknown Party';
 
-        return `${item.invoiceReference || "N/A"} • ${name} • ${totalQuantity.toFixed(2)} units • ${formatCurrency(displayTotal)} • ${item.reason || "No reason"} • Deleted by @${deletedByUsername}`;
+        const invoiceRef = item.connectedDocuments?.invoiceId?.invoiceNumber || item.invoiceReference || "N/A";
+
+        return `${invoiceRef} • ${name} • ${totalQuantity.toFixed(2)} units • ${formatCurrency(displayTotal)} • ${item.reason || "No reason"}`;
       }}
     />
   );

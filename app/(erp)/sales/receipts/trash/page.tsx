@@ -2,21 +2,23 @@
 
 "use client";
 
-import { TrashPage } from "@/components/shared/TrashPage";
+import { useEffect, useState } from "react";
 import { formatCurrency } from "@/utils/formatters/currency";
-import { Receipt, Ticket } from "lucide-react";
-import { useVoucherPermissions } from "@/hooks/use-permissions";
-import { forbidden } from "next/navigation";
-import { useState, useEffect } from "react";
+import { Ticket } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect, usePathname } from "next/navigation";
+import { TrashPage } from "@/components/shared/TrashPage";
+import { useVoucherPermissions } from "@/hooks/use-permissions";
+import { forbidden, redirect, usePathname } from "next/navigation";
 
 interface DeletedReceipt {
     _id: string;
     invoiceNumber: string;
     payeeName?: string;
+    payeeId?: any; // Populated
+    payeeSnapshot?: any; // Immutable snapshot fallback
     vendorName?: string;
     partyId?: any; // Populated
+    partySnapshot?: any; // Immutable snapshot fallback
     voucherType?: 'receipt';
     grandTotal?: number;
     deletedAt?: Date | string;
@@ -67,7 +69,8 @@ export default function ReceiptsTrashPage() {
             }
             getItemDescription={(item) => {
                 const party = item.partyId;
-                const name = party?.name || party?.company || item.payeeName || item.vendorName || 'Unknown';
+                const payee = item.payeeId;
+                const name = party?.name || party?.company || item.partySnapshot?.displayName || payee?.name || item.payeeSnapshot?.name || item.payeeName || item.vendorName || 'Unknown';
 
                 return `${name} • ${formatCurrency(item.grandTotal || 0.00)}`;
             }}

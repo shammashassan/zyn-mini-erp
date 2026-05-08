@@ -2,15 +2,13 @@
 
 "use client";
 
-import { TrashPage } from "@/components/shared/TrashPage";
-import { ArrowRightLeft } from "lucide-react";
-import { formatCurrency } from "@/utils/formatters/currency";
-import { formatDisplayDate, formatTime } from "@/utils/formatters/date";
-import { useStockAdjustmentPermissions } from "@/hooks/use-permissions";
-import { forbidden } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect, usePathname } from "next/navigation";
+import { formatCurrency } from "@/utils/formatters/currency";
+import { ArrowRightLeft } from "lucide-react";
+import { TrashPage } from "@/components/shared/TrashPage";
+import { useStockAdjustmentPermissions } from "@/hooks/use-permissions";
+import { forbidden, redirect, usePathname } from "next/navigation";
 
 interface DeletedAdjustment {
   _id: string;
@@ -69,12 +67,6 @@ export default function StockAdjustmentTrashPage() {
       getItemName={(item) => item.itemName || "Unknown Item"}
       getItemDescription={(item) => {
         const parts: string[] = [];
-
-        // Add date information
-        if (item.createdAt) {
-          const date = new Date(item.createdAt);
-          parts.push(`${formatDisplayDate(date)} at ${formatTime(date)}`);
-        }
 
         // Add adjustment details
         const hasStockChange = (item.value ?? 0) > 0;

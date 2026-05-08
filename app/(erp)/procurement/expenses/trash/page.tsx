@@ -2,18 +2,20 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { TrashPage } from "@/components/shared/TrashPage";
 import { Banknote } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { useExpensePermissions } from "@/hooks/use-permissions";
-import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect, usePathname } from "next/navigation";
+import { forbidden, redirect, usePathname } from "next/navigation";
 
 interface DeletedExpense {
   _id: string;
   referenceNumber?: string;
+  payeeId?: any; // Populated
+  vendor?: string;
+  payeeSnapshot?: any; // Immutable snapshot fallback
   description?: string;
   category?: string;
   amount?: number;
@@ -78,8 +80,9 @@ export default function ExpensesTrashPage() {
         "Unnamed Expense"
       }
       getItemDescription={(item) => {
-        const deletedBy = getDeletedByUsername(item);
-        return `${item.category || 'Uncategorized'} • ${formatCurrency(item.amount || 0)} • Deleted by @${deletedBy}`;
+        const payee = item.payeeId;
+        const payeeName = payee?.name || item.payeeSnapshot?.name || item.vendor || 'Unknown Party';
+        return `${payeeName} • ${item.category || 'Uncategorized'} • ${formatCurrency(item.amount || 0)}`;
       }}
     />
   );

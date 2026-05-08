@@ -2,19 +2,19 @@
 
 "use client";
 
-import { TrashPage } from "@/components/shared/TrashPage";
+import { useEffect, useState } from "react";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { Truck } from "lucide-react";
-import { useDeliveryNotePermissions } from "@/hooks/use-permissions";
-import { forbidden } from "next/navigation";
-import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect, usePathname } from "next/navigation";
+import { TrashPage } from "@/components/shared/TrashPage";
+import { useDeliveryNotePermissions } from "@/hooks/use-permissions";
+import { forbidden, redirect, usePathname } from "next/navigation";
 
 interface DeletedDeliveryNote {
   _id: string;
   invoiceNumber: string;
   partyId?: any; // Populated
+  partySnapshot?: any; // Immutable snapshot fallback
   grandTotal?: number;
   status?: string;
   deletedAt?: Date | string;
@@ -63,7 +63,7 @@ export default function DeliveryNotesTrashPage() {
       getItemName={(item) => item.invoiceNumber || "Unnamed Delivery Note"}
       getItemDescription={(item) => {
         const party = item.partyId;
-        const name = party?.name || party?.company || 'Unknown Party';
+        const name = party?.name || party?.company || item.partySnapshot?.displayName || 'Unknown Party';
         return `${name} • ${formatCurrency(item.grandTotal || 0.00)} • ${item.status || 'N/A'}`;
       }}
     />

@@ -2,19 +2,19 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { TrashPage } from "@/components/shared/TrashPage";
 import { ShoppingCart } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { usePurchasePermissions } from "@/hooks/use-permissions";
-import { forbidden } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect, usePathname } from "next/navigation";
+import { forbidden, redirect, usePathname } from "next/navigation";
 
 interface DeletedPurchase {
   _id: string;
   referenceNumber?: string;
   partyId?: any; // Populated
+  partySnapshot?: any; // Immutable snapshot fallback
   items?: Array<{
     quantity: number;
   }>;
@@ -80,7 +80,7 @@ export default function PurchasesTrashPage() {
         const displayTotal = item.grandTotal || (item.totalAmount || 0) + (item.vatAmount || 0);
 
         const party = item.partyId;
-        const name = party?.name || party?.company || 'Unknown Party';
+        const name = party?.name || party?.company || item.partySnapshot?.displayName || 'Unknown Party';
 
         return `${name} • ${totalQuantity} units • ${formatCurrency(displayTotal)} • Deleted by @${deletedByUsername}`;
       }}

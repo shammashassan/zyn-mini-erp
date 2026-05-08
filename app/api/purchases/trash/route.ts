@@ -21,7 +21,7 @@ export async function GET() {
     await dbConnect();
     
     // Using the utility function to get only soft-deleted records
-    const trashedPurchases = await getTrash(Purchase);
+    const trashedPurchases = await getTrash(Purchase, {}, "partyId");
     
     return NextResponse.json(trashedPurchases);
   } catch (error) {

@@ -2,21 +2,23 @@
 
 "use client";
 
+import { useEffect, useState } from "react";
 import { TrashPage } from "@/components/shared/TrashPage";
 import { formatCurrency } from "@/utils/formatters/currency";
 import { Wallet } from "lucide-react";
 import { useVoucherPermissions } from "@/hooks/use-permissions";
-import { forbidden } from "next/navigation";
-import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
-import { redirect, usePathname } from "next/navigation";
+import { forbidden, redirect, usePathname } from "next/navigation";
 
 interface DeletedPayment {
     _id: string;
     invoiceNumber: string;
     payeeName?: string;
+    payeeId?: any; // Populated
+    payeeSnapshot?: any; // Immutable snapshot fallback
     vendorName?: string;
     partyId?: any; // Populated
+    partySnapshot?: any; // Immutable snapshot fallback
     voucherType?: 'payment';
     grandTotal?: number;
     deletedAt?: Date | string;
@@ -67,7 +69,8 @@ export default function PaymentsTrashPage() {
             }
             getItemDescription={(item) => {
                 const party = item.partyId;
-                const name = party?.name || party?.company || item.payeeName || item.vendorName || 'Unknown';
+                const payee = item.payeeId;
+                const name = party?.name || party?.company || item.partySnapshot?.displayName || payee?.name || item.payeeSnapshot?.name || item.payeeName || item.vendorName || 'Unknown';
 
                 return `${name} • ${formatCurrency(item.grandTotal || 0.00)}`;
             }}

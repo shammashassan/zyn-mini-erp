@@ -14,10 +14,14 @@ import { redirect, usePathname } from "next/navigation";
 interface DeletedPOSReturn {
   _id: string;
   returnNumber?: string;
-  posSaleId?: any; // Populated
   items?: Array<{
     returnQuantity: number;
   }>;
+  connectedDocuments?: {
+    posSaleId: {
+      saleNumber: string;
+    }
+  };
   grandTotal?: number;
   reason?: string;
   status?: string;
@@ -73,14 +77,11 @@ export default function POSReturnsTrashPage() {
       getItemDescription={(item) => {
         const totalQuantity =
           item.items?.reduce((sum, i) => sum + (i.returnQuantity || 0), 0) || 0;
-        const deleteAction = item.actionHistory?.find((a) => a.action === "Soft Deleted");
-        const deletedByUsername = deleteAction?.username || item.deletedBy || "Unknown";
         const displayTotal = item.grandTotal || 0;
 
-        const posSale = item.posSaleId;
-        const saleRef = posSale?.saleNumber || "Unknown Sale";
+        const saleRef = item.connectedDocuments?.posSaleId?.saleNumber || "Unknown Sale";
 
-        return `Sale: ${saleRef} • ${totalQuantity.toFixed(2)} units • ${formatCurrency(displayTotal)} • ${item.reason || "No reason"} • Deleted by @${deletedByUsername}`;
+        return `Sale: ${saleRef} • ${totalQuantity.toFixed(2)} units • ${formatCurrency(displayTotal)} • ${item.reason || "No reason"}`;
       }}
     />
   );

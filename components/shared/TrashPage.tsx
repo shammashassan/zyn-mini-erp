@@ -232,27 +232,28 @@ export function TrashPage<T extends { _id: string; deletedAt?: Date | string; de
                       <Item key={item._id} variant="outline">
                         <ItemContent>
                           <ItemTitle>{getItemName(item)}</ItemTitle>
-                          <ItemDescription>
-                            {getItemDescription ? (
-                              <span className="block mb-1">{getItemDescription(item)}</span>
-                            ) : (
-                              <span className="flex items-center gap-2 text-xs">
-                                <span>
-                                  Deleted{" "}
-                                  {item.deletedAt
-                                    ? formatDistanceToNow(new Date(item.deletedAt), {
-                                      addSuffix: true,
-                                    })
-                                    : "at unknown time"}
-                                </span>
-                                {item.deletedBy && (
-                                  <>
-                                    <span>•</span>
-                                    <span>by @{item.deletedBy}</span>
-                                  </>
-                                )}
+                          <ItemDescription className="line-clamp-none flex flex-col gap-1.5">
+                            {getItemDescription && (
+                              <span className="block text-sm leading-normal">
+                                {getItemDescription(item)}
                               </span>
                             )}
+                            <span className="flex items-center gap-2 text-xs text-muted-foreground/80 font-normal">
+                              <span>
+                                Deleted{" "}
+                                {item.deletedAt
+                                  ? formatDistanceToNow(new Date(item.deletedAt), {
+                                    addSuffix: true,
+                                  })
+                                  : "at unknown time"}
+                              </span>
+                              {item.deletedBy && (
+                                <>
+                                  <span className="text-muted-foreground/40">•</span>
+                                  <span>by @{item.deletedBy}</span>
+                                </>
+                              )}
+                            </span>
                           </ItemDescription>
                         </ItemContent>
                         <ItemActions>

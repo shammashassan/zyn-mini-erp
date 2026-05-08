@@ -194,13 +194,67 @@ export async function getActive<T extends SoftDeleteDocument>(
  */
 export async function getTrash<T extends SoftDeleteDocument>(
   model: Model<T>,
-  filter: any = {}
-): Promise<T[]> {
+  filter: any = {},
+  populateFields: any = null
+): Promise<any[]> {
   try {
-    return await model
+    let query = model
       .find({ ...filter, isDeleted: true })
       .setOptions({ includeDeleted: true })
       .sort({ deletedAt: -1 });
+
+    if (populateFields) {
+      if (typeof populateFields === 'string') {
+        query = query.populate({
+          path: populateFields,
+          options: { includeDeleted: true }
+        });
+      } else {
+        query = query.populate(populateFields);
+      }
+    }
+
+    const trashed = await query;
+
+    const userIds = Array.from(new Set(trashed.map(item => item.deletedBy).filter(Boolean)));
+    const userMap = new Map<string, string>();
+
+    if (userIds.length > 0 && mongoose.connection.db) {
+      // Filter out any null values and enforce string type
+      const stringIds = userIds.filter((id): id is string => typeof id === "string");
+
+      // Handle both string and ObjectId formats for the _id field
+      const objectIds = stringIds
+        .filter(id => id.length === 24 && /^[0-9a-fA-F]{24}$/.test(id))
+        .map(id => new mongoose.Types.ObjectId(id));
+
+      const users = await mongoose.connection.db.collection('user').find({
+        $or: [
+          { id: { $in: stringIds } },
+          { _id: { $in: [...stringIds, ...objectIds] as any } }
+        ]
+      }, {
+        projection: { id: 1, _id: 1, username: 1, name: 1 }
+      }).toArray();
+
+      for (const user of users) {
+        const usernameVal = user.username || user.name || '';
+        if (usernameVal) {
+          if (user.id) userMap.set(user.id, usernameVal);
+          if (user._id) {
+            userMap.set(user._id.toString(), usernameVal);
+          }
+        }
+      }
+    }
+
+    return trashed.map(item => {
+      const itemObj = item.toObject();
+      if (itemObj.deletedBy) {
+        itemObj.deletedBy = userMap.get(itemObj.deletedBy) || itemObj.deletedBy;
+      }
+      return itemObj;
+    });
   } catch (error) {
     console.error('Get trash error:', error);
     throw error;

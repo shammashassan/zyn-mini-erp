@@ -20,8 +20,8 @@ export async function GET() {
 
     await dbConnect();
     
-    // Using the utility function to get only soft-deleted records
-    const trashedExpenses = await getTrash(Expense);
+    // Using the utility function to get only soft-deleted records and populating payeeId
+    const trashedExpenses = await getTrash(Expense, {}, "payeeId");
     
     return NextResponse.json(trashedExpenses);
   } catch (error) {

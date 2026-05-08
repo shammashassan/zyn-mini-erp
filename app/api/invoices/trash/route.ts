@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     });
     if (error) return error;
     
-    const trashedInvoices = await getTrash(Invoice);
+    const trashedInvoices = await getTrash(Invoice, {}, "partyId");
     
     return NextResponse.json(trashedInvoices);
   } catch (error) {
